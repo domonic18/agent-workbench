@@ -1,0 +1,27 @@
+# 环境变量与密钥(只提交 .env.example)
+.env
+.env.local
+.env.*.local
+
+# 宿主机持久化数据(workspace 内容不入库,保留目录)
+workspace/*
+!workspace/.gitkeep
+
+# 依赖
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 构建产物
+dist/
+build/
+.next/
+*.log
+
+# IDE / 系统
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/settings.json
