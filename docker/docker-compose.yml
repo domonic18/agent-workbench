@@ -1,0 +1,53 @@
+name: agent-workbench
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  console:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.console
+      args:
+        AW_UID: ${AW_UID:-10001}
+        AW_GID: ${AW_GID:-10001}
+    env_file:
+      - ../.env
+    environment:
+      HOST: 0.0.0.0
+      DATABASE_PATH: /app/workspace/console.db
+    ports:
+      - "127.0.0.1:8787:8787"
+    volumes:
+      - ../workspace:/app/workspace
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8787/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging: *default-logging
+
+  frpc:
+    image: snowdreamtech/frpc:0.61.1
+    profiles: ["tunnel"]
+    depends_on:
+      console:
+        condition: service_healthy
+    command: ["-c", "/etc/frp/frpc.toml"]
+    env_file:
+      - ../.env
+    volumes:
+      - ./frpc.toml:/etc/frp/frpc.toml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    logging: *default-logging

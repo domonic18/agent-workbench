@@ -1,0 +1,22 @@
+# 复制为 docker/frpc.toml 后使用(该文件已 gitignore)
+# 服务器地址与 token 走 env:FRP_SERVER_ADDR / FRP_SERVER_PORT / FRP_AUTH_TOKEN
+serverAddr = "{{ .Envs.FRP_SERVER_ADDR }}"
+serverPort = {{ .Envs.FRP_SERVER_PORT }}
+auth.method = "token"
+auth.token = "{{ .Envs.FRP_AUTH_TOKEN }}"
+
+# 规则一:控制台。同 compose 网络用服务名;控制台跑宿主机时改 host.docker.internal
+[[proxies]]
+name = "aw-http"
+type = "http"
+localIP = "console"
+localPort = 8787
+customDomains = ["aw.17aitech.com"]
+
+# 规则二:Teleport proxy,与规则一互不复用
+[[proxies]]
+name = "aw-teleport"
+type = "tcp"
+localIP = "host.docker.internal"
+localPort = 443
+remotePort = 443
