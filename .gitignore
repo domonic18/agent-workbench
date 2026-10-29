@@ -3,25 +3,32 @@
 .env.local
 .env.*.local
 
-# 宿主机持久化数据(workspace 内容不入库,保留目录)
+# 宿主机持久化数据:内容不入库,保留目录骨架
 workspace/*
 !workspace/.gitkeep
+!workspace/backups/
+workspace/backups/*
+!workspace/backups/.gitkeep
+!workspace/collector/
+workspace/collector/*
+!workspace/collector/.gitkeep
 
 # 依赖
 node_modules/
-__pycache__/
-*.pyc
-.venv/
-venv/
 
 # 构建产物
 dist/
 build/
 .next/
+coverage/
 *.log
+*.tsbuildinfo
+.eslintcache
+
+# 本地容器配置(从 frpc.toml.example 复制)
+docker/frpc.toml
 
 # IDE / 系统
 .DS_Store
 .idea/
-.vscode/*
-!.vscode/settings.json
+.vscode/
