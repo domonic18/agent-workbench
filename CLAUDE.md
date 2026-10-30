@@ -11,6 +11,7 @@
   - frpc 两条独立规则：`aw.example.com → 8787`（http）、`tp.example.com:8443 → 443`（tcp，给 Teleport proxy；443 已被 frps 的 HTTPS vhost 占用），互不复用
   - 跨机：每台运行 Agent 的机器各跑一个采集器（MacBook、macmini），launchd 常驻，只经 `/api/ingest` 单向推送；Teleport node agent 装目标机
   - 授权：SSH / 数据库访问走 Teleport CE + tbot 的 15 分钟短时证书，不自研证书签发；Teleport CE 为 AGPL-3.0，独立容器运行，只经 API 调用
+  - **三平面**：展示面（浏览器 B/S，不做任何约束判定）/ 控制面（策略、判定、审计）/ 执行面（每台机本地 C/S：采集器、MCP proxy、Claude Code 配置托管）。约束只在后两者执行；原生工具靠托管权限规则 + `PreToolUse` hook 拦截，hook 不可用即拒绝启动；**一期不做 OS 级沙箱**，终端直跑会话不受拦截（缺口见 06 O6）；托盘与进程急停不入一期（2026-10-31 裁决）
   - 不重写 Agent 运行时（Claude Code / cc-connect 是资产）
 
 ## 2. 项目结构
