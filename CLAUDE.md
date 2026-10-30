@@ -8,7 +8,7 @@
   - 产品形态是「控制台 + 飞书」双面并存：控制台管状态与权力，飞书管说话与拍板；控制台不承担 IM 功能
   - 事实源在控制台库（task / a2a_message / capability / agent_run）；**不使用飞书黑板，不做投影**（2026-10-29 裁决）
   - 控制台只绑定 127.0.0.1:8787，不自己处理 TLS；提供 `/healthz`；经 frp 以 `aw.17aitech.com` 暴露
-  - frpc 两条独立规则：`aw.17aitech.com → 8787`（http）、`tp.17aitech.com → 443`（https/tcp，给 Teleport proxy），互不复用
+  - frpc 两条独立规则：`aw.17aitech.com → 8787`（http）、`tp.17aitech.com:8443 → 443`（tcp，给 Teleport proxy；443 已被 frps 的 HTTPS vhost 占用），互不复用
   - 跨机：每台运行 Agent 的机器各跑一个采集器（MacBook、macmini），launchd 常驻，只经 `/api/ingest` 单向推送；Teleport node agent 装目标机
   - 授权：SSH / 数据库访问走 Teleport CE + tbot 的 15 分钟短时证书，不自研证书签发；Teleport CE 为 AGPL-3.0，独立容器运行，只经 API 调用
   - 不重写 Agent 运行时（Claude Code / cc-connect 是资产）
@@ -26,7 +26,7 @@
 - `workspace/` 宿主机持久化数据(SQLite 库、备份、采集缓冲),gitignore 不入库
 
 工程入口:pnpm workspace(根包 + `web/` + `collector/`)、TypeScript、ESLint、Vitest;命令统一走 `Makefile`,`make check` 是唯一质量闸门。
-- 文档:requirement/(需求基准) arch/(终态方案) plan/development-plan.md(状态真相源) reference/(外部文档快照,不参与需求裁决)
+- 文档:requirement/(需求基准) arch/(终态方案) plan/development-plan.md(状态真相源) + plan/tasks/(M0~M4 任务清单,只描述任务与依赖,不记进度) reference/(外部文档快照,不参与需求裁决)
 
 **共享边界**:`src/shared` 只放服务端与采集器共用的协议类型、错误码、常量(web 以路径别名引用,不复制);`web/src/shared` 只放纯前端的展示映射与格式化。禁止两侧各维护一份业务枚举。
 
@@ -41,6 +41,7 @@
 | 授权与闸门（能力模型 / Teleport / 审批 / 调用策略） | docs/arch/05 |
 | 架构评审（缺口清单 / 复审结论 / 开放项） | docs/arch/06 |
 | 工程目录与维护约定 | docs/arch/07 |
+| 里程碑任务清单（开工前看对应 Mx） | docs/plan/tasks/ |
 
 ## 3. 通用编码规范与 AI 指令
 
