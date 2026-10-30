@@ -7,10 +7,26 @@ describe("buildApp", () => {
     const response = await app.inject({ method: "GET", url: "/healthz" });
 
     expect(response.statusCode).toBe(200);
-    const body = response.json() as { status: string; version: string; uptime: number };
+    const body = response.json() as {
+      status: string;
+      version: string;
+      db: string;
+      uptime: number;
+    };
     expect(body.status).toBe("ok");
     expect(body.version).toMatch(/^\d+\.\d+\.\d+/);
+    expect(body.db).toBe("ok");
     expect(body.uptime).toBeGreaterThanOrEqual(0);
+
+    await app.close();
+  });
+
+  it("库不可写时 /healthz 返回 503", async () => {
+    const app = buildApp({ logLevel: "silent", databaseStatus: () => "unavailable" });
+    const response = await app.inject({ method: "GET", url: "/healthz" });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toMatchObject({ status: "degraded", db: "unavailable" });
 
     await app.close();
   });
