@@ -32,3 +32,6 @@ docker/frpc.toml
 .DS_Store
 .idea/
 .vscode/
+
+# 本机 Claude Code 配置:skills 是绝对路径软链,只对当前机器有效
+.claude/
