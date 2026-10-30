@@ -17,7 +17,7 @@
 
 **⚠️ 执行任何任务前,先读本文件;涉及哪一层,再读 docs/ 对应 arch 文档(按需,勿全量加载)。**
 
-- `src/` 服务端源码(server / domain / reliability / store / adapters / shared);技术选型定稿后各一级目录建专属 CLAUDE.md,在该目录工作前先读
+- `src/` 服务端源码(server / domain / reliability / store / adapters / config / shared);技术选型定稿后各一级目录建专属 CLAUDE.md,在该目录工作前先读
 - `web/` React SPA 源码(pages / components / api / stores / shared),产物 `dist/` 由后端同源托管
 - `collector/` 跨机采集器,独立构建产物;与 `src/shared` 共享协议类型
 - `scripts/` 运维与工具脚本(备份等)
