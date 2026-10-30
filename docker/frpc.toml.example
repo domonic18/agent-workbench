@@ -14,9 +14,11 @@ localPort = 8787
 customDomains = ["aw.17aitech.com"]
 
 # 规则二:Teleport proxy,与规则一互不复用
+# 公网侧用 8443 而非 443:frps 的 443 已被 *.17aitech.com 的 HTTPS vhost 占用,
+# 而 Teleport 需要 TCP 透传,不能挂在 TLS 终止的 vhost 后面。
 [[proxies]]
 name = "aw-teleport"
 type = "tcp"
 localIP = "host.docker.internal"
 localPort = 443
-remotePort = 443
+remotePort = 8443
