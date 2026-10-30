@@ -1,36 +1,51 @@
-import { readFileSync } from "node:fs";
-import { createServer } from "node:http";
-import { healthPayload } from "../shared/health.js";
+import { dirname, join } from "node:path";
+import { loadConfig } from "../config/env.js";
+import { isDatabaseWritable, openDatabase } from "../store/database.js";
+import { acquireInstanceLock } from "../store/lock.js";
+import { runMigrations } from "../store/migrator.js";
+import { buildApp } from "./app.js";
 
-const host = process.env.HOST ?? "127.0.0.1";
-const port = Number.parseInt(process.env.PORT ?? "8787", 10);
-const startedAt = Date.now();
-// dist/server 与 src/server 到仓库根同为两级,容器内亦然
-const { version } = JSON.parse(
-  readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
-) as { version: string };
+// 启动顺序(01 §2):env → 单实例锁 → 打开库 → 迁移 → 注册路由 → 监听。
+// 锁先于开库:第二个进程不能在第一个进程的库上跑迁移。
+const config = loadConfig();
+const lock = acquireInstanceLock(join(dirname(config.databasePath), "console.lock"));
+const db = openDatabase(config.databasePath);
 
-const server = createServer((request, response) => {
-  if (request.method === "GET" && request.url === "/healthz") {
-    response.writeHead(200, { "content-type": "application/json; charset=utf-8" });
-    response.end(JSON.stringify(healthPayload(version, startedAt)));
-    return;
-  }
+try {
+  runMigrations(db);
+} catch (error) {
+  db.close();
+  lock.release();
+  throw error;
+}
 
-  response.writeHead(404, { "content-type": "application/json; charset=utf-8" });
-  response.end(
-    JSON.stringify({ error: { code: "NOT_FOUND", message: "not found" } }),
-  );
+const app = buildApp({
+  logLevel: config.logLevel,
+  databaseStatus: () => (isDatabaseWritable(db) ? "ok" : "unavailable"),
 });
 
+let shuttingDown = false;
+
 function shutdown(): void {
-  server.close(() => process.exit(0));
-  setTimeout(() => process.exit(1), 10_000).unref();
+  if (shuttingDown) {
+    return;
+  }
+  shuttingDown = true;
+  const timer = setTimeout(() => process.exit(1), 10_000);
+  timer.unref();
+  void app.close().then(
+    () => {
+      db.close();
+      lock.release();
+      process.exit(0);
+    },
+    () => {
+      process.exit(1);
+    },
+  );
 }
 
 process.on("SIGTERM", shutdown);
 process.on("SIGINT", shutdown);
 
-server.listen(port, host, () => {
-  console.log(`agent-workbench listening on http://${host}:${port}`);
-});
+await app.listen({ host: config.host, port: config.port });

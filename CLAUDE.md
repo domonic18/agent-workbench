@@ -8,16 +8,17 @@
   - 产品形态是「控制台 + 飞书」双面并存：控制台管状态与权力，飞书管说话与拍板；控制台不承担 IM 功能
   - 事实源在控制台库（task / a2a_message / capability / agent_run）；**不使用飞书黑板，不做投影**（2026-10-29 裁决）
   - 控制台只绑定 127.0.0.1:8787，不自己处理 TLS；提供 `/healthz`；经 frp 以 `aw.example.com` 暴露
-  - frpc 两条独立规则：`aw.example.com → 8787`（http）、`tp.example.com → 443`（https/tcp，给 Teleport proxy），互不复用
+  - frpc 两条独立规则：`aw.example.com → 8787`（http）、`tp.example.com:8443 → 443`（tcp，给 Teleport proxy；443 已被 frps 的 HTTPS vhost 占用），互不复用
   - 跨机：每台运行 Agent 的机器各跑一个采集器（MacBook、macmini），launchd 常驻，只经 `/api/ingest` 单向推送；Teleport node agent 装目标机
   - 授权：SSH / 数据库访问走 Teleport CE + tbot 的 15 分钟短时证书，不自研证书签发；Teleport CE 为 AGPL-3.0，独立容器运行，只经 API 调用
+  - **三平面**：展示面（浏览器 B/S，不做任何约束判定）/ 控制面（策略、判定、审计）/ 执行面（每台机本地 C/S：采集器、MCP proxy、Claude Code 配置托管）。约束只在后两者执行；原生工具靠托管权限规则 + `PreToolUse` hook 拦截，hook 不可用即拒绝启动；**一期不做 OS 级沙箱**，终端直跑会话不受拦截（缺口见 06 O6）；托盘与进程急停不入一期（2026-10-31 裁决）
   - 不重写 Agent 运行时（Claude Code / cc-connect 是资产）
 
 ## 2. 项目结构
 
 **⚠️ 执行任何任务前,先读本文件;涉及哪一层,再读 docs/ 对应 arch 文档(按需,勿全量加载)。**
 
-- `src/` 服务端源码(server / domain / reliability / store / adapters / shared);技术选型定稿后各一级目录建专属 CLAUDE.md,在该目录工作前先读
+- `src/` 服务端源码(server / domain / reliability / store / adapters / config / shared);技术选型定稿后各一级目录建专属 CLAUDE.md,在该目录工作前先读
 - `web/` React SPA 源码(pages / components / api / stores / shared),产物 `dist/` 由后端同源托管
 - `collector/` 跨机采集器,独立构建产物;与 `src/shared` 共享协议类型
 - `scripts/` 运维与工具脚本(备份等)
@@ -26,7 +27,7 @@
 - `workspace/` 宿主机持久化数据(SQLite 库、备份、采集缓冲),gitignore 不入库
 
 工程入口:pnpm workspace(根包 + `web/` + `collector/`)、TypeScript、ESLint、Vitest;命令统一走 `Makefile`,`make check` 是唯一质量闸门。
-- 文档:requirement/(需求基准) arch/(终态方案) plan/development-plan.md(状态真相源) reference/(外部文档快照,不参与需求裁决)
+- 文档:requirement/(需求基准) arch/(终态方案) plan/development-plan.md(状态真相源) + plan/tasks/(M0~M4 任务清单,只描述任务与依赖,不记进度) reference/(外部文档快照,不参与需求裁决)
 
 **共享边界**:`src/shared` 只放服务端与采集器共用的协议类型、错误码、常量(web 以路径别名引用,不复制);`web/src/shared` 只放纯前端的展示映射与格式化。禁止两侧各维护一份业务枚举。
 
@@ -41,6 +42,7 @@
 | 授权与闸门（能力模型 / Teleport / 审批 / 调用策略） | docs/arch/05 |
 | 架构评审（缺口清单 / 复审结论 / 开放项） | docs/arch/06 |
 | 工程目录与维护约定 | docs/arch/07 |
+| 里程碑任务清单（开工前看对应 Mx） | docs/plan/tasks/ |
 
 ## 3. 通用编码规范与 AI 指令
 
