@@ -1,3 +1,5 @@
+import { FEISHU_EVENT_WINDOW } from "../../shared/constants.js";
+
 export interface InboundMessage {
   eventId: string;
   eventType: string;
@@ -31,9 +33,6 @@ export interface InboundDeps {
   log: InboundLogger;
 }
 
-const MAX_EVENT_AGE_MS = 24 * 60 * 60 * 1000;
-const MAX_FUTURE_SKEW_MS = 5 * 60 * 1000;
-
 export const DENIED_RECEIPT = "无权限：仅白名单用户可向控制台下指令";
 
 /**
@@ -47,8 +46,8 @@ export async function handleInboundMessage(
 ): Promise<InboundOutcome> {
   if (
     !Number.isFinite(event.createTime) ||
-    event.createTime - now > MAX_FUTURE_SKEW_MS ||
-    now - event.createTime > MAX_EVENT_AGE_MS
+    event.createTime - now > FEISHU_EVENT_WINDOW.maxFutureSkewMs ||
+    now - event.createTime > FEISHU_EVENT_WINDOW.maxAgeMs
   ) {
     deps.log.warn({ eventId: event.eventId }, "飞书事件时间戳超出窗口,丢弃");
     return "rejected";
