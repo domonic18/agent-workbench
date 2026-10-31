@@ -6,6 +6,7 @@ import { createCapabilityService, type CapabilityService } from "../domain/capab
 import { healthPayload, type DatabaseStatus } from "../shared/health.js";
 import type { Db } from "../store/database.js";
 import { createApprovalNotifier } from "./notification/approval.js";
+import { registerAuditRoutes } from "./routes/audit.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerCapabilityRoutes } from "./routes/capabilities.js";
 
@@ -54,6 +55,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     });
 
     registerAuthRoutes(app, { db, ...timing });
+    registerAuditRoutes(app, { db, ...timing });
     registerCapabilityRoutes(app, {
       db,
       teleport: options.teleport,

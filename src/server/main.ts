@@ -2,15 +2,18 @@ import { dirname, join } from "node:path";
 import * as Lark from "@larksuiteoapi/node-sdk";
 import { createCardSender } from "../adapters/feishu/card.js";
 import { startFeishuInbound, type FeishuInbound } from "../adapters/feishu/client.js";
+import { createTeleportAuditAdapter } from "../adapters/teleport/audit.js";
 import { createProcessRunner } from "../adapters/teleport/process-runner.js";
 import { createTeleportAdapter } from "../adapters/teleport/tctl.js";
 import { loadConfig } from "../config/env.js";
+import { createAuditReconciler } from "../domain/capability/audit-reconcile.js";
 import { createCapabilityService } from "../domain/capability/service.js";
 import { isDatabaseWritable, openDatabase } from "../store/database.js";
 import { acquireInstanceLock } from "../store/lock.js";
 import { runMigrations } from "../store/migrator.js";
 import { buildApp } from "./app.js";
 import { ensureConsoleCredential } from "./credential.js";
+import { startAuditReconciler } from "./jobs/audit-reconcile.js";
 import { startCapabilityReconciler } from "./jobs/reconcile.js";
 import { startOutboxSender, type OutboxSender } from "./jobs/send-worker.js";
 
@@ -43,6 +46,23 @@ const app = buildApp({
 
 const reconciler = startCapabilityReconciler(service, app.log);
 
+// 审计对账(05 §7):配置了 Teleport 审计日志路径才起;未配置只告警,不伪造缺口
+const auditReconciler =
+  config.teleport.auditLogPath === undefined
+    ? undefined
+    : startAuditReconciler(
+        createAuditReconciler({
+          db,
+          teleportAudit: createTeleportAuditAdapter({
+            auditLogPath: config.teleport.auditLogPath,
+          }),
+        }),
+        app.log,
+      );
+if (auditReconciler === undefined) {
+  app.log.warn("TELEPORT_AUDIT_LOG_PATH 未配置,审计对账作业不启动");
+}
+
 // 有飞书凭据才起投递作业;无凭据时发件箱照样可写,待配好凭据后补投
 const outbox: OutboxSender | undefined =
   config.feishu === undefined
@@ -64,6 +84,7 @@ function shutdown(): void {
   }
   shuttingDown = true;
   reconciler.stop();
+  auditReconciler?.stop();
   outbox?.stop();
   inbound?.stop();
   const timer = setTimeout(() => process.exit(1), 10_000);

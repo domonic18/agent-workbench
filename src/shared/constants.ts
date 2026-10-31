@@ -110,6 +110,10 @@ export type OutboxChannel = (typeof OUTBOX_CHANNELS)[number];
 export const OUTBOX_DELIVERY_CLASSES = ["business", "notification"] as const;
 export type OutboxDeliveryClass = (typeof OUTBOX_DELIVERY_CLASSES)[number];
 
+/** 审计对账缺口(05 §7):缺会话 / 任务对不上 / Teleport 侧多出的会话 */
+export const AUDIT_GAP_KINDS = ["missing_session", "ticket_mismatch", "orphan_session"] as const;
+export type AuditGapKind = (typeof AUDIT_GAP_KINDS)[number];
+
 /** 领取租约与通知类重试策略:拉长窗口覆盖同步 HTTP,失败指数退避到上限即判死 */
 export const OUTBOX_TIMEOUTS = {
   leaseMs: 30_000,
