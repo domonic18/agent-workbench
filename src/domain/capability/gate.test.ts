@@ -43,9 +43,17 @@ describe("decide", () => {
     expect(decision.level).toBe("L2");
   });
 
-  it("命中已生效授权时放行 L2", () => {
-    const decision = decide(context({ grants: ["fs.write"] }), { tool: "fs.write", args: {} });
-    expect(decision).toEqual({ verdict: "allow", level: "L2", reason: "命中已生效授权" });
+  it("命中已生效授权时放行 L2 并带回 capabilityId", () => {
+    const decision = decide(context({ grants: [{ tool: "fs.write", capabilityId: "cap_1" }] }), {
+      tool: "fs.write",
+      args: {},
+    });
+    expect(decision).toEqual({
+      verdict: "allow",
+      level: "L2",
+      reason: "命中已生效授权",
+      capabilityId: "cap_1",
+    });
   });
 
   it("用量硬停先于等级:超限后连 L0 只读也拒", () => {

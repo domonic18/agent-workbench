@@ -172,17 +172,23 @@ describe("gateway", () => {
     expect(upstream.calls).toHaveLength(0);
   });
 
-  it("命中已生效授权时不等审批", async () => {
+  it("命中已生效授权时不等审批,审计带回 capabilityId", async () => {
     const upstream = fakeUpstream("fs", ["exec"]);
+    const audited: NewToolCallLog[] = [];
     const gateway = createGateway({
-      ctx: context({ grants: ["fs.exec"] }),
+      ctx: context({ grants: [{ tool: "fs.exec", capabilityId: "cap_1" }] }),
       upstreams: [upstream],
-      audit: () => undefined,
+      audit: (entry) => audited.push(entry),
       toolMap: { fs: { exec: "fs.exec" } },
     });
     const result = await gateway.callTool("fs__exec", {});
     expect(result.isError).toBeUndefined();
     expect(upstream.calls).toHaveLength(1);
+    expect(audited[0]).toMatchObject({
+      tool: "fs.exec",
+      verdict: "allow",
+      capabilityId: "cap_1",
+    });
   });
 
   it("用量超限时即使 L0 也拒绝", async () => {

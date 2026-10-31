@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { RunContext } from "../../domain/capability/gate.js";
+import type { Grant, RunContext } from "../../domain/capability/gate.js";
 import type { UpstreamConfig } from "./upstream.js";
 
 const upstreamSchema = z.object({
@@ -31,11 +31,31 @@ export interface ProxyConfig {
   ctx: RunContext;
 }
 
-function parseList(value: string | undefined): string[] {
+/** `AW_GRANTS` 为逗号分隔的 `tool:capabilityId`;格式错误即启动失败,不静默跳过 */
+function parseGrants(value: string | undefined): Grant[] {
   if (value === undefined) {
     return [];
   }
-  return [...new Set(value.split(",").map((item) => item.trim()).filter((item) => item !== ""))];
+  const grants: Grant[] = [];
+  const seen = new Set<string>();
+  for (const raw of value.split(",")) {
+    const entry = raw.trim();
+    if (entry === "") {
+      continue;
+    }
+    const index = entry.indexOf(":");
+    const tool = index === -1 ? "" : entry.slice(0, index).trim();
+    const capabilityId = index === -1 ? "" : entry.slice(index + 1).trim();
+    if (tool === "" || capabilityId === "") {
+      throw new Error(`AW_GRANTS 条目格式应为 tool:capabilityId: ${entry}`);
+    }
+    if (seen.has(tool)) {
+      throw new Error(`AW_GRANTS 存在重复工具: ${tool}`);
+    }
+    seen.add(tool);
+    grants.push({ tool, capabilityId });
+  }
+  return grants;
 }
 
 function parseUpstreams(raw: string): z.infer<typeof upstreamSchema>[] {
@@ -91,7 +111,7 @@ export function loadProxyConfig(env: NodeJS.ProcessEnv = process.env): ProxyConf
       taskId: parsed.data.AW_TASK_ID,
       workspaceRoot: parsed.data.AW_WORKSPACE_ROOT,
       usage: { kind: "unlimited" },
-      grants: parseList(parsed.data.AW_GRANTS),
+      grants: parseGrants(parsed.data.AW_GRANTS),
     },
   };
 }

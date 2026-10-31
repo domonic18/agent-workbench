@@ -6,14 +6,20 @@ export type UsageState =
   | { kind: "metered"; usedTokens: number; dailyLimit: number }
   | { kind: "unavailable"; reason: string };
 
+/** 已生效授权:点分工具名 + 对应 capability id(审计据此追到 ticket_id) */
+export interface Grant {
+  tool: string;
+  capabilityId: string;
+}
+
 export interface RunContext {
   runId: string;
   agentId: string;
   taskId: string;
   workspaceRoot: string;
   usage: UsageState;
-  /** 已生效授权对应的点分工具名;命中即放行,免去逐次审批 */
-  grants: readonly string[];
+  /** 命中即放行,免去逐次审批;capabilityId 写入审计 */
+  grants: readonly Grant[];
 }
 
 export interface ToolCall {
@@ -23,7 +29,7 @@ export interface ToolCall {
 }
 
 export type Decision =
-  | { verdict: "allow"; level: ToolLevel; reason?: string }
+  | { verdict: "allow"; level: ToolLevel; reason?: string; capabilityId?: string }
   | { verdict: "require_approval"; level: "L2"; reason: string }
   | { verdict: "deny"; level: ToolLevel; reason: string };
 
@@ -73,8 +79,9 @@ export function decide(ctx: RunContext, call: ToolCall): Decision {
     if (level === "L0" || level === "L1") {
       return { verdict: "allow", level };
     }
-    if (ctx.grants.includes(call.tool)) {
-      return { verdict: "allow", level, reason: "命中已生效授权" };
+    const grant = ctx.grants.find((entry) => entry.tool === call.tool);
+    if (grant !== undefined) {
+      return { verdict: "allow", level, reason: "命中已生效授权", capabilityId: grant.capabilityId };
     }
     return {
       verdict: "require_approval",

@@ -72,6 +72,10 @@ export function createGateway(options: GatewayOptions): Gateway {
     const gateName = options.toolMap?.[target.upstream.id]?.[target.toolName] ?? target.toolName;
     const call: ToolCall = { tool: gateName, args };
     const decision = decide(ctx, call);
+    const capabilityId =
+      decision.verdict === "allow" && decision.capabilityId !== undefined
+        ? decision.capabilityId
+        : null;
 
     // 先落审计再执行:写失败即拒绝(05 §6.4),不放行「先跑后记」
     try {
@@ -84,7 +88,7 @@ export function createGateway(options: GatewayOptions): Gateway {
         level: decision.level,
         verdict: decision.verdict,
         reason: decision.reason ?? null,
-        capabilityId: null,
+        capabilityId,
         durationMs: null,
         occurredAt: now(),
       });
