@@ -17,13 +17,16 @@ describe("runMigrations", () => {
   it("空库执行建表并记账", () => {
     const db = openDatabase(":memory:");
 
-    expect(runMigrations(db)).toBe(1);
+    expect(runMigrations(db)).toBe(2);
     expect(tableNames(db)).toEqual(
-      expect.arrayContaining(["task", "task_event", "schema_migration"]),
+      expect.arrayContaining(["task", "task_event", "console_credential", "schema_migration"]),
     );
 
     const applied = db.prepare("SELECT version, name FROM schema_migration").all();
-    expect(applied).toEqual([{ version: 1, name: "task" }]);
+    expect(applied).toEqual([
+      { version: 1, name: "task" },
+      { version: 2, name: "console_credential" },
+    ]);
     db.close();
   });
 
