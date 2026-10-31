@@ -30,8 +30,8 @@
 ### M2: 能力授权
 
 - 目标: 基于 Teleport CE + tbot 落地 capability 审批与审计;SSH / 数据库经 15 分钟短时证书访问;审批入口先走飞书卡片
-- 验收标准: 生产资源零长期凭证;两通道分层验收(proxy 判定 / 权限+hook 拦截),不合并宣称 100%,终端直跑会话单列缺口不计入拦截率;证书 TTL 15 分钟且由 tbot 自动续期;审计可追溯 task_id
-- 状态: **进行中**:M2-1 已闭(`0005_capability` 迁移建 capability / capability_audit / tool_call_log,单向状态机含 `issuing` 补偿出口,审计表由触发器强制 append-only);M2-2 已闭(`src/adapters/teleport/` 落地,本地 Docker Teleport CE 18.7.3 实测签发 / 续期 / traits / SSH,记录见 [acceptance/M2-2.md](acceptance/M2-2.md));M2-3 已闭(`/api/capabilities` 申请 / 批准 / 拒绝 / 吊销 + `src/server/jobs/reconcile.ts` 对账作业;批准 saga 经 `issuing` 调 Teleport,失败转 `rejected` 返回 503;最小会话鉴权——登录 / 会话 / CSRF / 幂等键——随本项提前落地);M2-4 已闭(`0007_outbox` 发件箱 + `src/server/jobs/send-worker.ts` 投递 + 长连接 `card.action.trigger` 卡片回调;时间戳窗口 / `open_id` 白名单 / `event_id` 幂等三重校验,审批 actor 记审批人 `open_id`);真实点击已到达服务并触发 saga,本机无 `tctl` / Teleport,签发按设计转 `rejected`(`issue_failed`),`active` 路径待 Teleport 就绪;M2-5 已闭(`src/domain/capability/gate.ts` 唯一 `decide()`,判定顺序用量硬停 → 白名单/授权 → 等级,清单外一律 L2;`src/mcp/proxy/` 以 stdio 接管既有 MCP server,对外名 `<upstreamId>__<tool>` + `toolMap` 映射点分名,每次判定先写 `tool_call_log` 再转发、写失败即拒;L2 挂起 300s,超时/拒绝/通道异常均不转发)。M2 仅余 M2-6 / M2-7
+- 验收标准: 生产资源零长期凭证;MCP 工具调用经 proxy 全量判定(未知按 L2、审计写失败即拒),不宣称全量覆盖;**Claude Code 原生工具调用与终端直跑会话不在职责边界内**(2026-10-31 裁决,M2-6 取消);证书 TTL 15 分钟且由 tbot 自动续期;审计可追溯 task_id
+- 状态: **进行中**:M2-1 已闭(`0005_capability` 迁移建 capability / capability_audit / tool_call_log,单向状态机含 `issuing` 补偿出口,审计表由触发器强制 append-only);M2-2 已闭(`src/adapters/teleport/` 落地,本地 Docker Teleport CE 18.7.3 实测签发 / 续期 / traits / SSH,记录见 [acceptance/M2-2.md](acceptance/M2-2.md));M2-3 已闭(`/api/capabilities` 申请 / 批准 / 拒绝 / 吊销 + `src/server/jobs/reconcile.ts` 对账作业;批准 saga 经 `issuing` 调 Teleport,失败转 `rejected` 返回 503;最小会话鉴权——登录 / 会话 / CSRF / 幂等键——随本项提前落地);M2-4 已闭(`0007_outbox` 发件箱 + `src/server/jobs/send-worker.ts` 投递 + 长连接 `card.action.trigger` 卡片回调;时间戳窗口 / `open_id` 白名单 / `event_id` 幂等三重校验,审批 actor 记审批人 `open_id`);真实点击已到达服务并触发 saga,本机无 `tctl` / Teleport,签发按设计转 `rejected`(`issue_failed`),`active` 路径待 Teleport 就绪;M2-5 已闭(`src/domain/capability/gate.ts` 唯一 `decide()`,判定顺序用量硬停 → 白名单/授权 → 等级,清单外一律 L2;`src/mcp/proxy/` 以 stdio 接管既有 MCP server,对外名 `<upstreamId>__<tool>` + `toolMap` 映射点分名,每次判定先写 `tool_call_log` 再转发、写失败即拒;L2 挂起 300s,超时/拒绝/通道异常均不转发)。M2-6 已取消(原生工具调用不在职责边界内),M2 仅余 M2-7
 - 阻塞项: 公网 Teleport 部署(`tp.example.com` + frpc 第二条规则 + 通配证书挂载 + 目标机 node agent)按用户裁决推迟,不阻塞 M2 后续;M2-4 卡片链路已实测(审批群收卡、点击到达服务、白名单/去重通过、审计记审批人 `open_id`);本机容器未装 `tctl`、未起 Teleport,点击按 saga 失败分支落 `rejected` + `issue_failed`,`active` 需等 Teleport 部署;操作步骤见本机 gitignored 的 `docs/plan/feishu-card.local.md`;M2-5 的审批通道尚未接入(未注入 `ApprovalRequester` 时 L2 直接拒绝),真实审批随 M2.5-0 的控制台工具面落地;代理当前直连控制台库写 `tool_call_log`,容器部署下须与库同环境运行或等 Control Plane API 接入;原「资源清单明细(§12-4)」已由 M1-1 关闭
 - 说明: 授权粒度定为「目标 + 动作 + 命令白名单」,解析失败即拒绝;吊销以 TTL 自然过期为主
 
@@ -71,7 +71,7 @@
 | M0 | [tasks/M0.md](tasks/M0.md) | 3 | 立项书、调研报告、需求差异裁决 |
 | M1 | [tasks/M1.md](tasks/M1.md) | 9 | 资源清单、A/B/C 通道边界、技术选型定稿 |
 | M1.5 | [tasks/M1.5.md](tasks/M1.5.md) | 7 | 持久化基线、信封校验、飞书入站指令 |
-| M2 | [tasks/M2.md](tasks/M2.md) | 7 | 能力模型、Teleport 签发、MCP 闸门与审计 |
+| M2 | [tasks/M2.md](tasks/M2.md) | 6(+1 取消) | 能力模型、Teleport 签发、MCP 闸门与审计 |
 | M2.5 | [tasks/M2.5.md](tasks/M2.5.md) | 8 | MCP 工具面、身份域、发件箱状态机、信箱拉取与死信 |
 | M3 | [tasks/M3.md](tasks/M3.md) | 11 | token 记账、采集入库、投影与 SSE、总览与任务两屏 |
 | M3.5 | [tasks/M3.5.md](tasks/M3.5.md) | 9 | 授权屏与委派矩阵、知识状态机与索引链、知识写入与检索验收 |
@@ -86,7 +86,7 @@
 | # | 验证项 | 要回答的问题 | 归属任务 | 状态 |
 |---|--------|--------------|----------|------|
 | S1 | MCP proxy 接管既有 MCP server | stdio 透传 / 多路复用是否可行,还是要逐个重写 | M2-5、M2.5-0 | 已验证(2026-10-31) |
-| S2 | `PreToolUse` hook 覆盖面 | 原生工具有哪些拦不到、能否在会话内被关闭 | M2-6 | 已验证(managed-settings 未测) |
+| S2 | `PreToolUse` hook 覆盖面 | 原生工具有哪些拦不到、能否在会话内被关闭 | M2-6 | 已验证(managed-settings 未测);**M2-6 已取消,结论仅留存** |
 | S3 | Teleport 按 Agent 身份签发 | 每个 Agent 独立短时证书与 `aw-task-id` 标签在 CE 版是否成立 | M2-2 | 已验证(2026-10-31) |
 | S4 | 会话文件契约稳定性 | `~/.claude` jsonl 的字段(尤其 token 四维)与目录结构是否稳定 | M3-3 | 已验证(单版本) |
 | S5 | 归因率与未归因口径 | cc-connect 会话 id 反向归属的命中率、悬空与歧义;未归因流如何界定 | M3-3 | 已验证(2026-10-31,本机即 macmini);跨机留 M3-10 |
@@ -94,7 +94,7 @@
 **结论(2026-10-31)**
 
 - **S1 成立**:stdio 透传与多路复用可行,既有 server 不需要重写。实测单 upstream 8 个工具 / 20KB schema 经 proxy 后 schema 逐字不变,25 路并发无串扰,策略拒绝返 `isError` 且调用未到达上游。约束有两条:工具名必须加前缀,最终名 `mcp__<server>__<prefix>__<tool>` 即托管权限白名单的硬契约;`tools/list` 在启动时缓存,上游动态变更不生效。HTTP/SSE 型 MCP 不在 stdio 路径内,需另设入口。
-- **S2 成立,一处未测**:hook 同时覆盖原生工具与 MCP 工具(都在 `PreToolUse`,携带 `tool_name`/`tool_use_id`/`transcript_path`),exit 2 与 `permissionDecision: deny` 均生效;会话内改写 `.claude/settings*.json` 被 CC 自身拦下,中途关不掉 hook;`--bare` / `--setting-sources` 可在启动期绕过,属已接受的启动命令缺口。未测:managed-settings 路径需 root 写入,本机无免密 sudo。
+- **S2 成立,一处未测(历史留存;M2-6 已于 2026-10-31 取消,结论不再作为实现依据)**:hook 同时覆盖原生工具与 MCP 工具(都在 `PreToolUse`,携带 `tool_name`/`tool_use_id`/`transcript_path`),exit 2 与 `permissionDecision: deny` 均生效;会话内改写 `.claude/settings*.json` 被 CC 自身拦下,中途关不掉 hook;`--bare` / `--setting-sources` 可在启动期绕过,属已接受的启动命令缺口。未测:managed-settings 路径需 root 写入,本机无免密 sudo。
 - **S3 成立**:CE 18.7.3 全 Docker 部署(单容器 auth+proxy、自签 CA、仅 127.0.0.1)即可验证,无需许可;`role.options.cert_extensions`(v8)在 CE 生效并进入 SSH 证书。关键约束:`{{ external.aw_task_id }}` 会插值,`{{ internal.* }}` 原样保留字面量,模板必须用 `external.*`。身份模型 A/B 都有数据:A 每任务一个 bot(精确,单次建 bot+签发约 0.7s,Teleport 对象随任务数增长);B 每 Agent 一个 bot + 每任务一个 trait(无额外对象,证书随 renewal 生效——10s 间隔下改 trait 约 22s 反映到证书,偏差 ≤ 一个 renewal 周期)。证书 TTL 请求 15m 实发 16m(1m 时钟余量),可续期。真实 SSH 经 proxy 成立,登录名仅 `agentwork`,root 被拒;审计 `session.start` 的 `user_traits` 带 `aw_task_id`,归因按 traits/user,不依赖证书扩展项。trait 变更与证书续期不同步(审计立即反映新值,证书等下一周期),存在一个 renewal 窗口的不一致——要求证书与任务强一致时用每任务身份。tbot 在本机保存的身份材料是长期机器秘密,按密钥管理;`--oneshot` 不留持久状态。运维注意:同名节点重注册会残留重复 host 记录,tsh 按名寻址报二义,节点名需唯一;distroless 镜像无 shell。复现脚本在 `docker/spike/run.sh`(`up|ssh|report|down`)。口径已回写 05 §3/§4/§7/§9、M2-2/M2-7 与 CLAUDE.md。
 - **S4 成立**:74 个文件 / 26.7 万行 / 0 解析失败;jsonl 只有 token 四维(`input/output/cache_read/cache_creation`),**不含金额字段**——一期不做计价,正好只取这四个维度;模型名是网关别名(glm-5.3-flash、deepseek-flash、kimi-for-coding、`<synthetic>`),按原文存、不做归一,`<synthetic>` 不入账;子目录 cwd slug 不等于项目 slug,禁止从目录名反推项目;仅存在一个 CC 版本(2.1.123),跨版本未证;`~/.claude/sessions/<pid>.json` 可作运行中判定;子 Agent 的 tool 调用有 hook,但其 token 未进入 jsonl,token 存在少计风险。
 - **S5 成立,本机即 macmini**:按同一口径复测,66 个 cc-connect 会话 id(16 当前 + 50 历史)对 74 条 jsonl 流:38 条可归因(11 命中当前 id + 27 仅命中 past id)、28 个悬空指针、0 条多项目歧义。36 条未归因中 18 条是 `/private/tmp` 的试验会话,真实项目未归因约 18 条 → `unattributed_streams` 必须限定为「已登记 `agent_project` 下、本应接管却匹配不到」,禁止按目录名猜,否则任意 CLI 会话都会污染指标。另:cc-connect `config.toml` 只登记 4 个项目而会话状态有 6 个,「已登记」必须以控制台 `agent_project` 表为准,不能拿 cc-connect 配置当注册表。归因机制与机器无关,跨机同构性留到 M3-10 两台机验收。
@@ -160,3 +160,4 @@ P1 项(飞书长连接与回调穿 frp、SSE 穿 frp、中文 FTS5 与嵌入服�
 | 2026-10-31 | **M2-4 真实点击实测**:群内点击审批卡片后,卡片事件经长连接到达,时间窗 / 白名单 / `event_id` 幂等全部通过并调用 `service.approve(capabilityId, 审批人 open_id)`;因容器内无 `tctl`、未起 Teleport,签发失败,按 saga 落 `rejected` 并记 `approved` + `issue_failed` 两条审计(actor 为审批人 `open_id`)。同路径用编译产物在容器内复演确认落库;`active` 需 Teleport 就绪后复验 | 卡片链路与授权状态机的接缝(true 传输 → 服务 → 落库)是最容易「看起来通了其实没接上」的地方;执行环境缺少签发上游时,正确结果是失败分支而非跳过,这也顺带验证了补偿出口 |
 | 2026-10-31 | M2-4 交互补强:卡片回调同步返回 `{ toast, card }`,点击后即时反馈并把卡片就地替换为终态(去按钮,展示结果 / 审批人 / 到期时间);失败分支按实际结果提示「签发失败」,不做假成功;非白名单 / 非法载荷 / 超窗只弹 `toast`。`handleCardCallback` 返回值由字符串改为结构化结果(带裁决后快照与错误码),`ensureOk` 抽到独立模块避免 `client` ↔ `card` 循环依赖;单测覆盖各分支的 toast 与卡片模板 | 飞书回调只有返回响应体才会改变界面,`return undefined` 等于点完没反应;若一律回「已批准」,签发失败的授权会被 UI 谎报为成功 |
 | 2026-10-31 | M2-5 代码侧关闭:`src/domain/capability/gate.ts` 提供唯一 `decide()`——用量硬停 → 白名单/已生效授权 → 等级,清单外一律 L2,判定异常按 deny;`src/mcp/proxy/` 以 MCP stdio 接管既有上游 server(S1 路径),对外名 `<upstreamId>__<tool>`,`toolMap` 把上游工具名映射为闸门点分名;每次判定先写 `tool_call_log` 再转发,写失败即拒;L2 经 `awaitApproval` 挂起 300s,超时 / 拒绝 / 通道异常均不转发。单测覆盖用量、白名单、授权、审计失败与审批三态,协议层用内存传输验证。审批通道按缺省 fail-closed(真实审批随 M2.5-0),代理暂直连控制台库写审计 | 闸门必须先有唯一判定实现,否则 proxy 与 hook 各写一套必然漂移;审计若在执行后写,崩溃窗口会留下「已执行但无记录」,故固定先审计后执行;审批后端未就绪时放行比拒绝危险,缺省必须拒绝 |
+| 2026-10-31 | **M2-6 取消(用户裁决)**:原生工具拦截层(托管权限规则 + `PreToolUse` hook + 启动自检)不实施,执行面只保留采集器 + MCP proxy;M2 验收收窄为 MCP 通道,原生工具调用与终端直跑会话明确为范围外,不宣称拦截率;S2 结论仅作历史留存 | 控制台核心是 Agent 间协作与外部资源(尤其生产环境)授权;Claude Code 自身的工具调用不属于本项目职责边界,不在该层过度设计与实现 |
