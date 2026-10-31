@@ -1,0 +1,47 @@
+import { sweepDeadLetters } from "../../domain/a2a/dead-letter.js";
+import { A2A_DEAD_LETTER } from "../../shared/constants.js";
+import type { Db } from "../../store/database.js";
+import type { JobLogger } from "./reconcile.js";
+
+export interface DeadLetterSweeper {
+  stop(): void;
+}
+
+export interface DeadLetterSweeperOptions {
+  now?: () => number;
+  intervalMs?: number;
+  /** 回执落库后唤醒发起方的长轮询,须与路由共用同一 A2A 服务实例 */
+  wake?: (agentId: string) => void;
+}
+
+/** 死信巡检(01 §9):启动即扫一轮,此后每 60s 一次;失败只记日志,不影响主服务 */
+export function startDeadLetterSweeper(
+  db: Db,
+  logger: JobLogger,
+  options: DeadLetterSweeperOptions = {},
+): DeadLetterSweeper {
+  const sweep = (): void => {
+    try {
+      const result = sweepDeadLetters({
+        db,
+        ...(options.now === undefined ? {} : { now: options.now }),
+        ...(options.wake === undefined ? {} : { wake: options.wake }),
+      });
+      if (result.deadLettered > 0) {
+        logger.info(result, "A2A 死信巡检转入死信");
+      }
+    } catch (error) {
+      logger.error({ err: error }, "A2A 死信巡检失败");
+    }
+  };
+
+  sweep();
+  const timer = setInterval(sweep, options.intervalMs ?? A2A_DEAD_LETTER.sweepIntervalMs);
+  timer.unref();
+
+  return {
+    stop() {
+      clearInterval(timer);
+    },
+  };
+}

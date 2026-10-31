@@ -6,6 +6,7 @@ import { createTeleportAuditAdapter } from "../adapters/teleport/audit.js";
 import { createProcessRunner } from "../adapters/teleport/process-runner.js";
 import { createTeleportAdapter } from "../adapters/teleport/tctl.js";
 import { loadConfig } from "../config/env.js";
+import { createA2aService } from "../domain/a2a/service.js";
 import { createAuditReconciler } from "../domain/capability/audit-reconcile.js";
 import { createCapabilityService } from "../domain/capability/service.js";
 import { isDatabaseWritable, openDatabase } from "../store/database.js";
@@ -14,6 +15,7 @@ import { runMigrations } from "../store/migrator.js";
 import { buildApp } from "./app.js";
 import { ensureConsoleCredential } from "./credential.js";
 import { startAuditReconciler } from "./jobs/audit-reconcile.js";
+import { startDeadLetterSweeper } from "./jobs/dead-letter.js";
 import { startCapabilityReconciler } from "./jobs/reconcile.js";
 import { startOutboxSender, type OutboxSender } from "./jobs/send-worker.js";
 
@@ -34,6 +36,7 @@ try {
 
 const teleport = createTeleportAdapter(config.teleport, createProcessRunner());
 const service = createCapabilityService({ db, teleport });
+const a2a = createA2aService({ db });
 
 const app = buildApp({
   logLevel: config.logLevel,
@@ -41,10 +44,16 @@ const app = buildApp({
   db,
   teleport,
   service,
+  a2a,
   ...(config.feishu === undefined ? {} : { feishu: config.feishu }),
 });
 
 const reconciler = startCapabilityReconciler(service, app.log);
+
+// 死信巡检(01 §9):复用路由的 A2A 实例,回执落库后能直接唤醒发起方的长轮询
+const deadLetters = startDeadLetterSweeper(db, app.log, {
+  wake: (agentId) => a2a.wake(agentId),
+});
 
 // 审计对账(05 §7):配置了 Teleport 审计日志路径才起;未配置只告警,不伪造缺口
 const auditReconciler =
@@ -85,6 +94,7 @@ function shutdown(): void {
   shuttingDown = true;
   reconciler.stop();
   auditReconciler?.stop();
+  deadLetters.stop();
   outbox?.stop();
   inbound?.stop();
   const timer = setTimeout(() => process.exit(1), 10_000);

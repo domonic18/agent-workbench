@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import Fastify, { type FastifyInstance } from "fastify";
 import type { TeleportAdapter } from "../adapters/teleport/tctl.js";
 import type { FeishuConfig } from "../config/env.js";
+import type { A2aService } from "../domain/a2a/types.js";
 import { createCapabilityService, type CapabilityService } from "../domain/capability/service.js";
 import { healthPayload, type DatabaseStatus } from "../shared/health.js";
 import type { Db } from "../store/database.js";
@@ -29,6 +30,8 @@ export interface BuildAppOptions {
   teleport?: TeleportAdapter;
   /** 由启动方复用的授权服务;缺省时按 db + teleport 新建 */
   service?: CapabilityService;
+  /** 由启动方复用的 A2A 服务;死信回执要经同一实例唤醒长轮询 */
+  a2a?: A2aService;
   /** 飞书配置存在且带 approvalChatId 时,申请落库后推送审批卡片 */
   feishu?: FeishuConfig;
   now?: () => number;
@@ -54,7 +57,11 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     registerAuditRoutes(app, { db, ...timing });
     registerIdentityRoutes(app, { db, ...timing });
     registerTaskRoutes(app, { db, ...timing });
-    registerA2aRoutes(app, { db, ...timing });
+    registerA2aRoutes(app, {
+      db,
+      ...timing,
+      ...(options.a2a === undefined ? {} : { service: options.a2a }),
+    });
 
     // 授权路由依赖 Teleport 适配器;身份 / A2A / 审计只要库
     if (options.teleport !== undefined) {

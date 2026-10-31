@@ -4,6 +4,7 @@ import { formatKeysetCursor, parseKeysetCursor } from "../../shared/cursor.js";
 import { newPrefixedId } from "../../shared/ids.js";
 import { parseJsonStringArray } from "../../store/json.js";
 import {
+  findDeadLetterByMsgId,
   findMessageById,
   findThreadById,
   findThreadByInitiator,
@@ -267,6 +268,10 @@ export function createA2aService(deps: A2aServiceDeps): A2aService {
       }
       if (message.ackAt !== null) {
         return;
+      }
+      // 已进死信说明发起方已收到「重新发起」回执,迟到的 ACK 不能再改写结果
+      if (findDeadLetterByMsgId(db, msgId) !== undefined) {
+        throw new A2aError("CONFLICT", "消息已过期进入死信,请由发起方重新发送");
       }
       if (message.intent === "request" || message.intent === "escalate") {
         const taskId = input.taskId?.trim();

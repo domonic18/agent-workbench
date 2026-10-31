@@ -122,6 +122,66 @@ export function markAck(db: Db, id: string, now: number): boolean {
   );
 }
 
+export interface A2aDeadLetterRecord {
+  id: string;
+  msgId: string;
+  fromAgent: string;
+  toAgent: string;
+  taskId: string | null;
+  reason: string;
+  payloadJson: string;
+  createdAt: number;
+}
+
+export interface NewA2aDeadLetter {
+  id: string;
+  msgId: string;
+  fromAgent: string;
+  toAgent: string;
+  taskId: string | null;
+  reason: string;
+  payloadJson: string;
+  createdAt: number;
+}
+
+const DEAD_LETTER_COLUMNS = `
+  id, msg_id AS msgId, from_agent AS fromAgent, to_agent AS toAgent,
+  task_id AS taskId, reason, payload_json AS payloadJson, created_at AS createdAt
+`;
+
+export function insertDeadLetter(db: Db, row: NewA2aDeadLetter): void {
+  db.prepare(
+    `INSERT INTO a2a_dead_letter
+       (id, msg_id, from_agent, to_agent, task_id, reason, payload_json, created_at)
+     VALUES (@id, @msgId, @fromAgent, @toAgent, @taskId, @reason, @payloadJson, @createdAt)`,
+  ).run(row);
+}
+
+export function findDeadLetterByMsgId(db: Db, msgId: string): A2aDeadLetterRecord | undefined {
+  return db
+    .prepare(`SELECT ${DEAD_LETTER_COLUMNS} FROM a2a_dead_letter WHERE msg_id = ? LIMIT 1`)
+    .get(msgId) as A2aDeadLetterRecord | undefined;
+}
+
+/**
+ * 死信巡检候选(01 §9):deadline 已过、仍未 ACK、出箱尚未终结的消息。
+ * notify 无 deadline,天然不在结果内。
+ */
+export function listExpiredUnacked(db: Db, now: number, limit: number): A2aMessageRecord[] {
+  return db
+    .prepare(
+      `SELECT ${MESSAGE_COLUMNS} FROM a2a_message
+       WHERE deadline_at IS NOT NULL AND deadline_at <= @now AND ack_at IS NULL
+         AND EXISTS (
+           SELECT 1 FROM outbox o
+           WHERE o.msg_id = a2a_message.id AND o.channel = 'pull'
+             AND o.status IN ('pending', 'claimed', 'sending', 'retry_wait')
+         )
+       ORDER BY deadline_at ASC, id ASC LIMIT @limit`,
+    )
+    .all({ now, limit }) as A2aMessageRecord[];
+}
+
 export interface InboxQuery {
   /** 当前时间,用于判断 outbox 是否可见 */
   now: number;

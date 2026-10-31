@@ -179,6 +179,12 @@ export const A2A_INBOX = {
   pageSize: 20,
 } as const;
 
+/** 死信巡检(01 §9):每 60s 扫一次,单轮最多处理 100 条 */
+export const A2A_DEAD_LETTER = {
+  sweepIntervalMs: 60_000,
+  batchSize: 100,
+} as const;
+
 /** summary / expect 长度上限:信封是索引而非正文,长内容走 refs 指向的知识条目 */
 export const ENVELOPE_LIMITS = {
   summary: 200,

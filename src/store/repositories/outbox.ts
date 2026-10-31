@@ -137,6 +137,21 @@ export function markUncertain(db: Db, id: string, leaseToken: number): boolean {
   );
 }
 
+/**
+ * 死信路径:按 msg_id 把未终结的出箱行置 failed(01 §9)。
+ * 与 ACK 的 delivered 互斥——谁先到谁生效,后到者 CAS 失败。
+ */
+export function markFailedByMsgId(db: Db, msgId: string, lastError: string): boolean {
+  return (
+    db
+      .prepare(
+        `UPDATE outbox SET status = 'failed', lease_until = NULL, last_error = @lastError
+         WHERE msg_id = @msgId AND status IN ('pending', 'claimed', 'sending', 'retry_wait')`,
+      )
+      .run({ msgId, lastError }).changes > 0
+  );
+}
+
 /** ACK 路径:按 msg_id 把出箱标记为 delivered,不依赖当前租约 token */
 export function markDeliveredByMsgId(db: Db, msgId: string): boolean {
   return (
