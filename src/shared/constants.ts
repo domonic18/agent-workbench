@@ -126,6 +126,16 @@ export type ToolLevel = (typeof TOOL_LEVELS)[number];
 export const TOOL_VERDICTS = ["allow", "deny", "require_approval"] as const;
 export type ToolVerdict = (typeof TOOL_VERDICTS)[number];
 
+/**
+ * 分级白名单(05 §6.1):L0/L1 只收明确登记的点分名,清单外一律按 L2 审批。
+ * L2 审批挂起 300s,超时按拒绝处理。
+ */
+export const TOOL_GATE = {
+  approvalTimeoutMs: 5 * 60 * 1000,
+  l0: ["fs.read", "db.query", "kb.search", "a2a.inbox"],
+  l1: ["task.create", "task.update", "a2a.send", "a2a.ack", "kb.write"],
+} as const;
+
 export const A2A_PROTOCOL_VERSION = "1.0";
 
 /** summary / expect 长度上限:信封是索引而非正文,长内容走 refs 指向的知识条目 */
