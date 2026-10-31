@@ -24,7 +24,8 @@ export interface InboundDeps {
   expectedToken: string | undefined;
   isAllowed(openId: string): boolean;
   claimEvent(eventId: string, eventType: string): boolean;
-  reply(messageId: string, text: string): Promise<void>;
+  /** 回执按事件时间决定引用原消息还是发新消息(见 reply.ts) */
+  reply(event: InboundMessage, text: string): Promise<void>;
   /** M1.5-5 的指令解析入口;本阶段只记录,不产生任务 */
   onCommand(event: InboundMessage): void | Promise<void>;
   log: InboundLogger;
@@ -61,7 +62,7 @@ export async function handleInboundMessage(
   const openId = event.senderOpenId;
   if (openId === undefined || !deps.isAllowed(openId)) {
     try {
-      await deps.reply(event.messageId, DENIED_RECEIPT);
+      await deps.reply(event, DENIED_RECEIPT);
     } catch (error) {
       deps.log.error({ err: error, eventId: event.eventId }, "无权限回执发送失败");
     }

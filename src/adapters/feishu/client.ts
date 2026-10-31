@@ -5,9 +5,20 @@ import { claimFeishuEvent } from "../../store/repositories/feishu-event.js";
 import { createCommandHandler } from "./command-handler.js";
 import { handleInboundMessage, type InboundLogger } from "./inbound.js";
 import { toInboundMessage } from "./payload.js";
+import { createReplyer } from "./reply.js";
 
 export interface FeishuInbound {
   stop(): void;
+}
+
+function ensureOk(
+  response: { code?: number | undefined; msg?: string | undefined },
+  action: string,
+): void {
+  const code = response.code ?? 0;
+  if (code !== 0) {
+    throw new Error(`飞书${action}失败: code=${code} msg=${response.msg ?? ""}`);
+  }
 }
 
 /**
@@ -22,16 +33,25 @@ export async function startFeishuInbound(
   const allowed = new Set(config.allowedOpenIds);
   const client = new Lark.Client({ appId: config.appId, appSecret: config.appSecret });
 
-  const reply = async (messageId: string, text: string): Promise<void> => {
-    const response = await client.im.message.reply({
-      path: { message_id: messageId },
-      data: { msg_type: "text", content: JSON.stringify({ text }) },
-    });
-    const code = response.code ?? 0;
-    if (code !== 0) {
-      throw new Error(`飞书回执失败: code=${code} msg=${response.msg ?? ""}`);
-    }
-  };
+  const reply = createReplyer(
+    {
+      reply: async (messageId, text) => {
+        const response = await client.im.message.reply({
+          path: { message_id: messageId },
+          data: { msg_type: "text", content: JSON.stringify({ text }) },
+        });
+        ensureOk(response, "回执");
+      },
+      send: async (chatId, text) => {
+        const response = await client.im.message.create({
+          params: { receive_id_type: "chat_id" },
+          data: { receive_id: chatId, msg_type: "text", content: JSON.stringify({ text }) },
+        });
+        ensureOk(response, "发送新消息");
+      },
+    },
+    log,
+  );
 
   const deps = {
     expectedToken: config.verificationToken,

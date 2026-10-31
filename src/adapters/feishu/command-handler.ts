@@ -6,7 +6,7 @@ import type { InboundLogger, InboundMessage } from "./inbound.js";
 import { extractText } from "./text.js";
 
 export interface CommandHandlerDeps {
-  reply(messageId: string, text: string): Promise<void>;
+  reply(event: InboundMessage, text: string): Promise<void>;
   log: InboundLogger;
 }
 
@@ -44,7 +44,7 @@ export function createCommandHandler(
     }
 
     try {
-      await deps.reply(event.messageId, result.reply);
+      await deps.reply(event, result.reply);
     } catch (error) {
       deps.log.error({ err: error, eventId: event.eventId }, "指令回执发送失败");
     }

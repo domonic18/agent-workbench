@@ -59,7 +59,7 @@ describe("handleInboundMessage", () => {
     const deps = makeDeps({ isAllowed: () => false });
 
     await expect(handleInboundMessage(deps, makeEvent(), NOW)).resolves.toBe("denied");
-    expect(deps.reply).toHaveBeenCalledWith("om_1", DENIED_RECEIPT);
+    expect(deps.reply).toHaveBeenCalledWith(expect.objectContaining({ messageId: "om_1" }), DENIED_RECEIPT);
     expect(deps.claimEvent).not.toHaveBeenCalled();
   });
 

@@ -23,14 +23,14 @@ function event(overrides: Partial<InboundMessage> = {}): InboundMessage {
   };
 }
 
-function prepare(replyImpl: (messageId: string, text: string) => Promise<void>) {
+function prepare(replyImpl: (event: InboundMessage, text: string) => Promise<void>) {
   const db = openDatabase(":memory:");
   runMigrations(db);
   const replies: string[] = [];
   const handler = createCommandHandler(db, {
-    reply: async (messageId, text) => {
+    reply: async (event, text) => {
       replies.push(text);
-      await replyImpl(messageId, text);
+      await replyImpl(event, text);
     },
     log: silent,
   });
