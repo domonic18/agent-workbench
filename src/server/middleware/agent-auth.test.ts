@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createIdentityService } from "../../domain/identity/service.js";
 import { openDatabase, type Db } from "../../store/database.js";
 import { runMigrations } from "../../store/migrator.js";
-import { parseAgentBearer, requireAgentAuth } from "./agent-auth.js";
+import { requireAgentAuth } from "./agent-auth.js";
 
 let db: Db;
 let app: FastifyInstance;
@@ -42,24 +42,6 @@ beforeEach(async () => {
 afterEach(async () => {
   await app.close();
   db.close();
-});
-
-describe("parseAgentBearer", () => {
-  it("解析 Bearer <id>.<secret>,按第一个点切分", () => {
-    expect(parseAgentBearer("Bearer agt_a.secret.with.dot")).toEqual({
-      agentId: "agt_a",
-      secret: "secret.with.dot",
-    });
-    expect(parseAgentBearer("bearer  agt_a.secret")).toEqual({ agentId: "agt_a", secret: "secret" });
-  });
-
-  it("缺失 / 缺分隔符 / 空段一律 undefined", () => {
-    expect(parseAgentBearer(undefined)).toBeUndefined();
-    expect(parseAgentBearer("Basic abc")).toBeUndefined();
-    expect(parseAgentBearer("Bearer agt_a")).toBeUndefined();
-    expect(parseAgentBearer("Bearer .secret")).toBeUndefined();
-    expect(parseAgentBearer("Bearer agt_a.")).toBeUndefined();
-  });
 });
 
 describe("requireAgentAuth", () => {

@@ -16,6 +16,7 @@ import { buildApp } from "./app.js";
 import { ensureConsoleCredential } from "./credential.js";
 import { startAuditReconciler } from "./jobs/audit-reconcile.js";
 import { startDeadLetterSweeper } from "./jobs/dead-letter.js";
+import { startIngestReceiptCleaner } from "./jobs/ingest-receipt.js";
 import { startCapabilityReconciler } from "./jobs/reconcile.js";
 import { startOutboxSender, type OutboxSender } from "./jobs/send-worker.js";
 
@@ -54,6 +55,9 @@ const reconciler = startCapabilityReconciler(service, app.log);
 const deadLetters = startDeadLetterSweeper(db, app.log, {
   wake: (agentId) => a2a.wake(agentId),
 });
+
+// 采集去重回执按 7 天窗口滚动清理;窗口外的旧 seq 重放交给采集器重发
+const ingestReceipts = startIngestReceiptCleaner(db, app.log);
 
 // 审计对账(05 §7):配置了 Teleport 审计日志路径才起;未配置只告警,不伪造缺口
 const auditReconciler =
@@ -95,6 +99,7 @@ function shutdown(): void {
   reconciler.stop();
   auditReconciler?.stop();
   deadLetters.stop();
+  ingestReceipts.stop();
   outbox?.stop();
   inbound?.stop();
   const timer = setTimeout(() => process.exit(1), 10_000);
