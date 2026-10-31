@@ -15,6 +15,9 @@ const upstreamSchema = z.object({
 const envSchema = z.object({
   AW_RUN_ID: z.string().min(1),
   AW_AGENT_ID: z.string().min(1),
+  /** 与控制台的 Agent Bearer 密钥;原生工具经 HTTP 触达时使用 */
+  AW_AGENT_SECRET: z.string().min(1),
+  CONSOLE_URL: z.string().url().default("http://127.0.0.1:8787"),
   AW_TASK_ID: z.string().min(1),
   AW_WORKSPACE_ROOT: z.string().min(1),
   AW_UPSTREAMS: z.string().min(1),
@@ -25,6 +28,8 @@ const envSchema = z.object({
 
 export interface ProxyConfig {
   databasePath: string;
+  agentSecret: string;
+  consoleBaseUrl: string;
   approvalTimeoutMs: number | undefined;
   upstreams: UpstreamConfig[];
   toolMap: Record<string, Record<string, string>>;
@@ -97,6 +102,8 @@ export function loadProxyConfig(env: NodeJS.ProcessEnv = process.env): ProxyConf
 
   return {
     databasePath: parsed.data.DATABASE_PATH,
+    agentSecret: parsed.data.AW_AGENT_SECRET,
+    consoleBaseUrl: parsed.data.CONSOLE_URL,
     approvalTimeoutMs: parsed.data.AW_APPROVAL_TIMEOUT_MS,
     upstreams: entries.map((entry) => ({
       id: entry.id,

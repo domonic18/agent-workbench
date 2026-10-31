@@ -5,6 +5,7 @@ import { insertToolCallLog } from "../../store/repositories/tool-call-log.js";
 import { loadProxyConfig } from "./config.js";
 import { createGateway } from "./gateway.js";
 import { createStderrLogger } from "./logger.js";
+import { createNativeTools } from "./native.js";
 import { createProxyServer } from "./server.js";
 import { connectUpstream } from "./upstream.js";
 
@@ -13,10 +14,16 @@ export async function main(): Promise<void> {
   const log = createStderrLogger();
   const db = openDatabase(config.databasePath);
   const upstreams = await Promise.all(config.upstreams.map((entry) => connectUpstream(entry)));
+  const nativeTools = createNativeTools({
+    baseUrl: config.consoleBaseUrl,
+    agentId: config.ctx.agentId,
+    agentSecret: config.agentSecret,
+  });
 
   const gateway = createGateway({
     ctx: config.ctx,
     upstreams,
+    nativeTools,
     audit: (entry) => insertToolCallLog(db, entry),
     ...(config.approvalTimeoutMs === undefined
       ? {}

@@ -6,7 +6,7 @@ import { runMigrations } from "../../store/migrator.js";
 import { insertToolCallLog } from "../../store/repositories/tool-call-log.js";
 import type { NewToolCallLog } from "../../store/repositories/tool-call-log.js";
 import { createGateway, exposeToolName } from "./gateway.js";
-import type { Upstream } from "./types.js";
+import type { NativeTool, Upstream } from "./types.js";
 
 interface FakeUpstream extends Upstream {
   calls: Array<{ name: string; args: Record<string, unknown> }>;
@@ -209,5 +209,91 @@ describe("gateway", () => {
     const result = await gateway.callTool("fs__missing", {});
     expect(textOf(result)).toContain("未知工具");
     expect(upstream.calls).toHaveLength(0);
+  });
+});
+
+function fakeNative(
+  calls: Array<Record<string, unknown>>,
+  overrides: Partial<NativeTool> = {},
+): NativeTool {
+  return {
+    name: "task_create",
+    gateName: "task.create",
+    description: "建单",
+    inputSchema: { type: "object" },
+    execute: async (args) => {
+      calls.push(args);
+      return { content: [{ type: "text", text: "native:ok" }] };
+    },
+    ...overrides,
+  };
+}
+
+describe("gateway 原生工具", () => {
+  it("裸名排在 listTools 之前,且不带上游前缀", () => {
+    const upstream = fakeUpstream("fs", ["read"]);
+    const gateway = createGateway({
+      ctx: context(),
+      upstreams: [upstream],
+      nativeTools: [fakeNative([])],
+      audit: () => undefined,
+    });
+
+    expect(gateway.listTools().map((tool) => tool.name)).toEqual([
+      "task_create",
+      exposeToolName("fs", "read"),
+    ]);
+  });
+
+  it("用点分闸门名判定并审计,通过后执行原生工具", async () => {
+    const calls: Array<Record<string, unknown>> = [];
+    const audited: NewToolCallLog[] = [];
+    const gateway = createGateway({
+      ctx: context(),
+      upstreams: [],
+      nativeTools: [fakeNative(calls)],
+      audit: (entry) => audited.push(entry),
+    });
+
+    const result = await gateway.callTool("task_create", { title: "t" });
+
+    expect(textOf(result)).toBe("native:ok");
+    expect(calls).toEqual([{ title: "t" }]);
+    expect(audited[0]).toMatchObject({ tool: "task.create", level: "L1", verdict: "allow" });
+  });
+
+  it("原生工具抛错转 isError,不外抛", async () => {
+    const gateway = createGateway({
+      ctx: context(),
+      upstreams: [],
+      nativeTools: [
+        fakeNative([], {
+          execute: async () => {
+            throw new Error("boom");
+          },
+        }),
+      ],
+      audit: () => undefined,
+    });
+
+    const result = await gateway.callTool("task_create", {});
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain("boom");
+  });
+
+  it("审计写失败时原生工具同样不执行", async () => {
+    const calls: Array<Record<string, unknown>> = [];
+    const gateway = createGateway({
+      ctx: context(),
+      upstreams: [],
+      nativeTools: [fakeNative(calls)],
+      audit: () => {
+        throw new Error("disk full");
+      },
+    });
+
+    const result = await gateway.callTool("task_create", {});
+    expect(result.isError).toBe(true);
+    expect(calls).toHaveLength(0);
   });
 });

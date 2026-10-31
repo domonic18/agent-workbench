@@ -16,6 +16,15 @@ export interface Upstream {
 /** 审计写失败即拒绝执行,因此这里允许抛错 */
 export type AuditSink = (entry: NewToolCallLog) => void;
 
+/** 控制面原生工具:对外裸名,闸门用点分名,执行一律经 HTTP 触达控制台 */
+export interface NativeTool {
+  name: string;
+  description: string;
+  inputSchema: Tool["inputSchema"];
+  gateName: string;
+  execute(args: Record<string, unknown>): Promise<CallToolResult>;
+}
+
 export interface ProxyLogger {
   info(data: Record<string, unknown>, message: string): void;
   warn(data: Record<string, unknown>, message: string): void;
@@ -25,6 +34,8 @@ export interface ProxyLogger {
 export interface GatewayOptions {
   ctx: RunContext;
   upstreams: readonly Upstream[];
+  /** 控制面原生工具,对外裸名排在 listTools 前面 */
+  nativeTools?: readonly NativeTool[];
   audit: AuditSink;
   approval?: ApprovalRequester;
   approvalTimeoutMs?: number;

@@ -3,7 +3,7 @@ import { awaitApproval } from "../../domain/capability/approval.js";
 import { decide, type ToolCall } from "../../domain/capability/gate.js";
 import { TOOL_GATE } from "../../shared/constants.js";
 import { hashArgs } from "./hash.js";
-import type { GatewayOptions, Upstream } from "./types.js";
+import type { GatewayOptions, NativeTool, Upstream } from "./types.js";
 
 export interface Gateway {
   listTools(): Tool[];
@@ -42,13 +42,21 @@ function resolveTool(upstreams: readonly Upstream[], exposedName: string): Resol
 
 export function createGateway(options: GatewayOptions): Gateway {
   const { ctx, upstreams, audit } = options;
+  const nativeTools = options.nativeTools ?? [];
   const now = options.now ?? Date.now;
   const approvalTimeoutMs = options.approvalTimeoutMs ?? TOOL_GATE.approvalTimeoutMs;
 
   function listTools(): Tool[] {
-    return upstreams.flatMap((upstream) =>
-      upstream.tools().map((tool) => ({ ...tool, name: exposeToolName(upstream.id, tool.name) })),
-    );
+    return [
+      ...nativeTools.map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+      })),
+      ...upstreams.flatMap((upstream) =>
+        upstream.tools().map((tool) => ({ ...tool, name: exposeToolName(upstream.id, tool.name) })),
+      ),
+    ];
   }
 
   async function forward(
@@ -64,12 +72,21 @@ export function createGateway(options: GatewayOptions): Gateway {
     }
   }
 
-  async function callTool(name: string, args: Record<string, unknown>): Promise<CallToolResult> {
-    const target = resolveTool(upstreams, name);
-    if (target === undefined) {
-      return errorResult(`未知工具「${name}」,未转发`);
-    }
-    const gateName = options.toolMap?.[target.upstream.id]?.[target.toolName] ?? target.toolName;
+  function executeNative(tool: NativeTool, args: Record<string, unknown>): Promise<CallToolResult> {
+    return tool.execute(args).catch((error: unknown) => {
+      options.log?.warn({ err: error, tool: tool.name }, "原生工具调用失败");
+      return errorResult(
+        `原生工具调用失败:${error instanceof Error ? error.message : String(error)}`,
+      );
+    });
+  }
+
+  /** 原生工具与上游共用同一条判定链:decide → 审计 → (拒绝/审批) → 执行 */
+  async function runGated(
+    gateName: string,
+    args: Record<string, unknown>,
+    execute: () => Promise<CallToolResult>,
+  ): Promise<CallToolResult> {
     const call: ToolCall = { tool: gateName, args };
     const decision = decide(ctx, call);
     const capabilityId =
@@ -116,7 +133,20 @@ export function createGateway(options: GatewayOptions): Gateway {
         return errorResult(`「${gateName}」需人工审批,${why},已拒绝`);
       }
     }
-    return forward(target.upstream, target.toolName, args);
+    return execute();
+  }
+
+  async function callTool(name: string, args: Record<string, unknown>): Promise<CallToolResult> {
+    const native = nativeTools.find((tool) => tool.name === name);
+    if (native !== undefined) {
+      return runGated(native.gateName, args, () => executeNative(native, args));
+    }
+    const target = resolveTool(upstreams, name);
+    if (target === undefined) {
+      return errorResult(`未知工具「${name}」,未转发`);
+    }
+    const gateName = options.toolMap?.[target.upstream.id]?.[target.toolName] ?? target.toolName;
+    return runGated(gateName, args, () => forward(target.upstream, target.toolName, args));
   }
 
   return { listTools, callTool };

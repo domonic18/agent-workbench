@@ -5,6 +5,7 @@ function env(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
   return {
     AW_RUN_ID: "run_1",
     AW_AGENT_ID: "agt_1",
+    AW_AGENT_SECRET: "secret-1",
     AW_TASK_ID: "T-1",
     AW_WORKSPACE_ROOT: "/workspace",
     AW_UPSTREAMS: JSON.stringify([{ id: "fs", command: "npx" }]),
@@ -36,5 +37,25 @@ describe("loadProxyConfig 的 AW_GRANTS 解析", () => {
     expect(() => loadProxyConfig(env({ AW_GRANTS: "fs.read:cap_1,fs.read:cap_2" }))).toThrow(
       /重复工具/,
     );
+  });
+});
+
+describe("loadProxyConfig 的控制台触达配置", () => {
+  it("CONSOLE_URL 缺省指向本机控制台", () => {
+    const config = loadProxyConfig(env());
+    expect(config.consoleBaseUrl).toBe("http://127.0.0.1:8787");
+    expect(config.agentSecret).toBe("secret-1");
+  });
+
+  it("CONSOLE_URL 可覆盖,非法 URL 启动失败", () => {
+    expect(loadProxyConfig(env({ CONSOLE_URL: "http://console.test:9000" })).consoleBaseUrl).toBe(
+      "http://console.test:9000",
+    );
+    expect(() => loadProxyConfig(env({ CONSOLE_URL: "not-a-url" }))).toThrow(/CONSOLE_URL/);
+  });
+
+  it("缺 AW_AGENT_SECRET 启动失败", () => {
+    const { AW_AGENT_SECRET: _omit, ...rest } = env();
+    expect(() => loadProxyConfig(rest)).toThrow(/AW_AGENT_SECRET/);
   });
 });
