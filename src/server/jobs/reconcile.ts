@@ -5,6 +5,7 @@ const PENDING_INTERVAL_MS = 10 * 60_000;
 
 export interface JobLogger {
   info(obj: unknown, message?: string): void;
+  warn(obj: unknown, message?: string): void;
   error(obj: unknown, message?: string): void;
 }
 
