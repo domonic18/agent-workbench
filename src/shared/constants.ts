@@ -185,6 +185,13 @@ export const A2A_DEAD_LETTER = {
   batchSize: 100,
 } as const;
 
+/** run 末态(02 §3.2):running 是当前 run,ended 是已收尾的历史 run */
+export const RUN_STATUSES = ["running", "ended"] as const;
+export type RunStatus = (typeof RUN_STATUSES)[number];
+
+/** run 切分硬阈值:同一流相邻事件间隔 ≥30 分钟即开新 run,不做自适应(02 §3.2) */
+export const RUN_IDLE_GAP_MS = 30 * 60 * 1000;
+
 /** summary / expect 长度上限:信封是索引而非正文,长内容走 refs 指向的知识条目 */
 export const ENVELOPE_LIMITS = {
   summary: 200,
