@@ -17,7 +17,7 @@ describe("runMigrations", () => {
   it("空库执行建表并记账", () => {
     const db = openDatabase(":memory:");
 
-    expect(runMigrations(db)).toBe(12);
+    expect(runMigrations(db)).toBe(13);
     expect(tableNames(db)).toEqual(
       expect.arrayContaining([
         "task",
@@ -39,6 +39,7 @@ describe("runMigrations", () => {
         "agent_run",
         "timeline_event",
         "token_usage",
+        "ingest_receipt",
         "schema_migration",
       ]),
     );
@@ -57,6 +58,7 @@ describe("runMigrations", () => {
       { version: 10, name: "a2a" },
       { version: 11, name: "run" },
       { version: 12, name: "token_usage" },
+      { version: 13, name: "ingest_receipt" },
     ]);
     db.close();
   });

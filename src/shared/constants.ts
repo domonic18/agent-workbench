@@ -195,6 +195,16 @@ export const RUN_IDLE_GAP_MS = 30 * 60 * 1000;
 /** 内部记账伪模型:不是真实网关调用,不入 token_usage(02 §3.6) */
 export const SYNTHETIC_MODEL = "<synthetic>";
 
+/** 采集入库(01 §3.1 / 04 §4):批次上限、7 天去重窗口与清理周期 */
+export const INGEST = {
+  batchMax: 500,
+  receiptRetentionMs: 7 * 24 * 60 * 60 * 1000,
+  receiptSweepIntervalMs: 60 * 60 * 1000,
+} as const;
+
+/** token 用量事件类型:采集器按此 kind 上报四维用量(02 §3.6) */
+export const INGEST_TOKEN_USAGE_KIND = "token_usage";
+
 /** summary / expect 长度上限:信封是索引而非正文,长内容走 refs 指向的知识条目 */
 export const ENVELOPE_LIMITS = {
   summary: 200,
