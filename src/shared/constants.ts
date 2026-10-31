@@ -38,6 +38,10 @@ export type TaskEventKind = (typeof TASK_EVENT_KINDS)[number];
 export const A2A_INTENTS = ["request", "reply", "notify", "escalate"] as const;
 export type A2AIntent = (typeof A2A_INTENTS)[number];
 
+/** 飞书指令审计结果;与 feishu_command.outcome 的 CHECK 一致 */
+export const COMMAND_OUTCOMES = ["handled", "unsupported", "invalid"] as const;
+export type CommandOutcome = (typeof COMMAND_OUTCOMES)[number];
+
 export const A2A_PROTOCOL_VERSION = "1.0";
 
 /** summary / expect 长度上限:信封是索引而非正文,长内容走 refs 指向的知识条目 */

@@ -2,7 +2,8 @@ import * as Lark from "@larksuiteoapi/node-sdk";
 import type { FeishuConfig } from "../../config/env.js";
 import type { Db } from "../../store/database.js";
 import { claimFeishuEvent } from "../../store/repositories/feishu-event.js";
-import { handleInboundMessage, type InboundLogger, type InboundMessage } from "./inbound.js";
+import { createCommandHandler } from "./command-handler.js";
+import { handleInboundMessage, type InboundLogger } from "./inbound.js";
 import { toInboundMessage } from "./payload.js";
 
 export interface FeishuInbound {
@@ -21,27 +22,24 @@ export async function startFeishuInbound(
   const allowed = new Set(config.allowedOpenIds);
   const client = new Lark.Client({ appId: config.appId, appSecret: config.appSecret });
 
+  const reply = async (messageId: string, text: string): Promise<void> => {
+    const response = await client.im.message.reply({
+      path: { message_id: messageId },
+      data: { msg_type: "text", content: JSON.stringify({ text }) },
+    });
+    const code = response.code ?? 0;
+    if (code !== 0) {
+      throw new Error(`飞书回执失败: code=${code} msg=${response.msg ?? ""}`);
+    }
+  };
+
   const deps = {
     expectedToken: config.verificationToken,
     isAllowed: (openId: string): boolean => allowed.has(openId),
     claimEvent: (eventId: string, eventType: string): boolean =>
       claimFeishuEvent(db, eventId, eventType),
-    reply: async (messageId: string, text: string): Promise<void> => {
-      const response = await client.im.message.reply({
-        path: { message_id: messageId },
-        data: { msg_type: "text", content: JSON.stringify({ text }) },
-      });
-      const code = response.code ?? 0;
-      if (code !== 0) {
-        throw new Error(`飞书回执失败: code=${code} msg=${response.msg ?? ""}`);
-      }
-    },
-    onCommand: (event: InboundMessage): void => {
-      log.info(
-        { eventId: event.eventId, chatId: event.chatId, messageType: event.messageType },
-        "白名单指令已接收,解析待 M1.5-5",
-      );
-    },
+    reply,
+    onCommand: createCommandHandler(db, { reply, log }),
     log,
   };
 

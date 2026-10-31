@@ -17,13 +17,14 @@ describe("runMigrations", () => {
   it("空库执行建表并记账", () => {
     const db = openDatabase(":memory:");
 
-    expect(runMigrations(db)).toBe(3);
+    expect(runMigrations(db)).toBe(4);
     expect(tableNames(db)).toEqual(
       expect.arrayContaining([
         "task",
         "task_event",
         "console_credential",
         "feishu_event",
+        "feishu_command",
         "schema_migration",
       ]),
     );
@@ -33,6 +34,7 @@ describe("runMigrations", () => {
       { version: 1, name: "task" },
       { version: 2, name: "console_credential" },
       { version: 3, name: "feishu_event" },
+      { version: 4, name: "feishu_command" },
     ]);
     db.close();
   });
