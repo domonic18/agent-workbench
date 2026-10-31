@@ -20,7 +20,7 @@ export const TASK_STAGES = [
 ] as const;
 export type TaskStage = (typeof TASK_STAGES)[number];
 
-export const TASK_ORIGINS = ["feishu", "console", "a2a"] as const;
+export const TASK_ORIGINS = ["feishu", "a2a"] as const;
 export type TaskOrigin = (typeof TASK_ORIGINS)[number];
 
 export const TASK_EVENT_KINDS = [
