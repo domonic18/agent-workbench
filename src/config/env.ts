@@ -16,6 +16,11 @@ const envSchema = z.object({
   FEISHU_ALLOWED_OPEN_IDS: z.string().optional(),
   // 不启用加密;仅卡片回调校验来源 token,留空则跳过 token 比对
   FEISHU_VERIFICATION_TOKEN: z.string().optional(),
+  // 授权签发(05 §4):只经 tctl 写入 bot traits,真实证书由 tbot 持有
+  TELEPORT_TCTL_PATH: z.string().min(1).default("tctl"),
+  TELEPORT_IDENTITY_FILE: z.string().optional(),
+  TELEPORT_BOT_ROLE: z.string().min(1).default("aw-ext"),
+  TELEPORT_BOT_MAX_SESSION_TTL: z.string().min(1).default("12h"),
 });
 
 export interface FeishuConfig {
@@ -23,6 +28,13 @@ export interface FeishuConfig {
   appSecret: string;
   allowedOpenIds: string[];
   verificationToken: string | undefined;
+}
+
+export interface TeleportConfig {
+  tctlPath: string;
+  identityFile: string | undefined;
+  botRole: string;
+  botMaxSessionTtl: string;
 }
 
 export interface Config {
@@ -33,6 +45,7 @@ export interface Config {
   databasePath: string;
   consoleInitPassword: string | undefined;
   feishu: FeishuConfig | undefined;
+  teleport: TeleportConfig;
 }
 
 function optionalText(value: string | undefined): string | undefined {
@@ -86,5 +99,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     consoleInitPassword:
       initPassword === undefined || initPassword === "" ? undefined : initPassword,
     feishu: parseFeishu(parsed.data),
+    teleport: {
+      tctlPath: parsed.data.TELEPORT_TCTL_PATH,
+      identityFile: optionalText(parsed.data.TELEPORT_IDENTITY_FILE),
+      botRole: parsed.data.TELEPORT_BOT_ROLE,
+      botMaxSessionTtl: parsed.data.TELEPORT_BOT_MAX_SESSION_TTL,
+    },
   };
 }
