@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { AUDIT_GAP_KINDS, type AuditGapKind } from "../../shared/constants.js";
+import { AUDIT_GAP_KINDS, LIST_LIMITS, type AuditGapKind } from "../../shared/constants.js";
 import type { Db } from "../../store/database.js";
 import {
   listGaps,
@@ -7,8 +7,6 @@ import {
 } from "../../store/repositories/audit-reconcile.js";
 import { requireSession } from "../middleware/session.js";
 
-const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 200;
 
 export interface AuditRoutesOptions {
   db: Db;
@@ -79,10 +77,10 @@ export function registerAuditRoutes(app: FastifyInstance, options: AuditRoutesOp
         },
       });
     }
-    const limitText = typeof query.limit === "string" ? Number(query.limit) : DEFAULT_LIMIT;
-    if (!Number.isInteger(limitText) || limitText < 1 || limitText > MAX_LIMIT) {
+    const limitText = typeof query.limit === "string" ? Number(query.limit) : LIST_LIMITS.default;
+    if (!Number.isInteger(limitText) || limitText < 1 || limitText > LIST_LIMITS.max) {
       return reply.code(422).send({
-        error: { code: "VALIDATION_FAILED", message: `limit 必须为 1~${MAX_LIMIT} 的整数` },
+        error: { code: "VALIDATION_FAILED", message: `limit 必须为 1~${LIST_LIMITS.max} 的整数` },
       });
     }
     const before = typeof query.cursor === "string" ? parseCursor(query.cursor) : undefined;

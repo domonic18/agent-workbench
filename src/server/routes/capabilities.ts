@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   CAPABILITY_STATUSES,
   CAPABILITY_TTL,
+  LIST_LIMITS,
   type CapabilityStatus,
 } from "../../shared/constants.js";
 import type { Db } from "../../store/database.js";
@@ -20,8 +21,6 @@ import {
 } from "../middleware/session.js";
 
 const CONSOLE_ACTOR = "console";
-const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 200;
 
 const createSchema = z.object({
   subject: z.string(),
@@ -136,10 +135,10 @@ export function registerCapabilityRoutes(
         },
       });
     }
-    const limitText = typeof query.limit === "string" ? Number(query.limit) : DEFAULT_LIMIT;
-    if (!Number.isInteger(limitText) || limitText < 1 || limitText > MAX_LIMIT) {
+    const limitText = typeof query.limit === "string" ? Number(query.limit) : LIST_LIMITS.default;
+    if (!Number.isInteger(limitText) || limitText < 1 || limitText > LIST_LIMITS.max) {
       return reply.code(422).send({
-        error: { code: "VALIDATION_FAILED", message: `limit 必须为 1~${MAX_LIMIT} 的整数` },
+        error: { code: "VALIDATION_FAILED", message: `limit 必须为 1~${LIST_LIMITS.max} 的整数` },
       });
     }
     const before =

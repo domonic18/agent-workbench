@@ -42,6 +42,21 @@ export type A2AIntent = (typeof A2A_INTENTS)[number];
 export const COMMAND_OUTCOMES = ["handled", "unsupported", "invalid"] as const;
 export type CommandOutcome = (typeof COMMAND_OUTCOMES)[number];
 
+/** 机器与 Agent 吊销状态(01 §4):disabled 后下一次请求即 401,行保留不删 */
+export const IDENTITY_STATUSES = ["active", "disabled"] as const;
+export type IdentityStatus = (typeof IDENTITY_STATUSES)[number];
+
+/** 注册字段长度上限;id 由调用方给(machine)或服务端生成(agent) */
+export const IDENTITY_LIMITS = {
+  id: 128,
+  project: 128,
+  displayName: 128,
+  hostname: 256,
+  os: 64,
+  collectorVersion: 64,
+  allowedTargets: 64,
+} as const;
+
 /** 授权状态机(05 §2):单向,issuing 是「已批准、正在签发」的中间态 */
 export const CAPABILITY_STATUSES = [
   "pending",
@@ -140,7 +155,20 @@ export const TOOL_GATE = {
   l1: ["task.create", "task.update", "a2a.send", "a2a.ack", "kb.write"],
 } as const;
 
+/** 列表接口的统一分页边界:默认 50 条,单页最多 200 条 */
+export const LIST_LIMITS = {
+  default: 50,
+  max: 200,
+} as const;
+
 export const A2A_PROTOCOL_VERSION = "1.0";
+
+/** 信箱长轮询(01 §5.1):默认挂起 25s、上限 30s;单页最多 20 条 */
+export const A2A_INBOX = {
+  waitMs: 25_000,
+  maxWaitMs: 30_000,
+  pageSize: 20,
+} as const;
 
 /** summary / expect 长度上限:信封是索引而非正文,长内容走 refs 指向的知识条目 */
 export const ENVELOPE_LIMITS = {
