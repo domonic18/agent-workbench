@@ -158,6 +158,19 @@ describe("a2a send", () => {
     db.close();
   });
 
+  it("白名单拒绝时回带可达目标", () => {
+    const { db, service } = prepare();
+    try {
+      service.send(sendInput({ fromAgentId: "agt_b", taskId: "tsk_b", to: "agt_c" }));
+      throw new Error("预期被白名单拒绝");
+    } catch (error) {
+      expect(error).toBeInstanceOf(A2aError);
+      expect((error as A2aError).code).toBe("FORBIDDEN");
+      expect((error as A2aError).detail).toEqual({ allowedTargets: ["agt_a"] });
+    }
+    db.close();
+  });
+
   it("目标不在白名单、未注册、任务不属于自己都拒绝", () => {
     const { db, service } = prepare();
     expectCode(

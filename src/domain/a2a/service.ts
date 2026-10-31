@@ -144,8 +144,12 @@ export function createA2aService(deps: A2aServiceDeps): A2aService {
     if (target === undefined || target.status !== "active") {
       throw new A2aError("NOT_FOUND", `目标 Agent ${input.to} 不存在或已停用`);
     }
-    if (!parseJsonStringArray(sender.allowedTargetsJson).includes(input.to)) {
-      throw new A2aError("FORBIDDEN", `目标 Agent ${input.to} 不在委派白名单内`);
+    const allowedTargets = parseJsonStringArray(sender.allowedTargetsJson);
+    if (!allowedTargets.includes(input.to)) {
+      // 拒绝时回带可达目标,tool 层据此告诉模型该找谁
+      throw new A2aError("FORBIDDEN", `目标 Agent ${input.to} 不在委派白名单内`, {
+        allowedTargets,
+      });
     }
 
     if (findUncertainFence(db, input.taskId)) {

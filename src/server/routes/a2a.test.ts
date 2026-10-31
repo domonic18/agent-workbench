@@ -15,8 +15,8 @@ interface Fixture {
 function prepare(): Fixture {
   const db = openDatabase(":memory:");
   runMigrations(db);
-  const ids = ["agt_a", "agt_b"];
-  const secrets = ["secret-a", "secret-b"];
+  const ids = ["agt_a", "agt_b", "agt_c"];
+  const secrets = ["secret-a", "secret-b", "secret-c"];
   let idSeq = 0;
   let secretSeq = 0;
   const identity = createIdentityService({
@@ -37,6 +37,12 @@ function prepare(): Fixture {
     displayName: "Agent B",
     allowedTargets: ["agt_a"],
   });
+  const agentC = identity.registerAgent({
+    machineId: "m1",
+    project: "pc",
+    displayName: "Agent C",
+    allowedTargets: ["agt_a"],
+  });
   for (const [id, assignee] of [
     ["tsk_a", agentA.agent.id],
     ["tsk_b", agentB.agent.id],
@@ -51,6 +57,7 @@ function prepare(): Fixture {
     agents: {
       [agentA.agent.id]: agentA.secret,
       [agentB.agent.id]: agentB.secret,
+      [agentC.agent.id]: agentC.secret,
     },
   };
 }
@@ -126,6 +133,20 @@ describe("a2a 路由", () => {
     });
     expect(again.statusCode).toBe(201);
     expect((again.json() as { msg_id: string }).msg_id).toBe(firstBody.msg_id);
+  });
+
+  it("目标不在白名单 403 并回带可达目标", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/a2a/messages",
+      headers: { ...auth("agt_a"), "idempotency-key": `k-${++keySeq}` },
+      payload: messageBody({ to: "agt_c" }),
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({
+      error: { code: "FORBIDDEN", detail: { allowedTargets: ["agt_b"] } },
+    });
   });
 
   it("信封缺字段 422 并列出缺失项", async () => {
