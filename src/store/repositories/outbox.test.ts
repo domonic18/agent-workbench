@@ -3,11 +3,16 @@ import { openDatabase } from "../database.js";
 import { runMigrations } from "../migrator.js";
 import {
   claimDue,
+  claimPullByMsgId,
   findOutbox,
+  findUncertainFence,
   insertOutbox,
   markDelivered,
+  markDeliveredByMsgId,
   markFailed,
   markRetry,
+  markSending,
+  markUncertain,
   reconcileStaleLeases,
   type NewOutbox,
 } from "./outbox.js";
@@ -111,10 +116,103 @@ describe("outbox 仓储", () => {
     insertOutbox(db, newRow());
     claimDue(db, 1_000, 31_000);
 
-    expect(reconcileStaleLeases(db, 31_000)).toBe(0);
-    expect(reconcileStaleLeases(db, 31_001)).toBe(1);
+    expect(reconcileStaleLeases(db, 31_000)).toEqual({ retryWait: 0, uncertain: 0 });
+    expect(reconcileStaleLeases(db, 31_001)).toEqual({ retryWait: 1, uncertain: 0 });
     expect(findOutbox(db, "ob_1")?.status).toBe("retry_wait");
     expect(claimDue(db, 31_001, 61_000)?.status).toBe("claimed");
+    db.close();
+  });
+
+  it("按 channel 领取,push worker 不误领 pull 行", () => {
+    const db = prepare();
+    insertOutbox(
+      db,
+      newRow({
+        id: "ob_pull",
+        idempotencyKey: "pull-key",
+        channel: "pull",
+        deliveryClass: "business",
+        msgId: "msg_1",
+      }),
+    );
+    insertOutbox(db, newRow({ id: "ob_push", idempotencyKey: "push-key" }));
+
+    expect(claimDue(db, 1_000, 31_000)).toMatchObject({ id: "ob_push", channel: "push" });
+    expect(claimDue(db, 1_000, 31_000)).toBeUndefined();
+    expect(claimDue(db, 1_000, 31_000, "pull")).toMatchObject({ id: "ob_pull", channel: "pull" });
+    db.close();
+  });
+
+  it("claimed → sending → uncertain;sending 过期不再自动重放", () => {
+    const db = prepare();
+    insertOutbox(db, newRow());
+    const claimed = claimDue(db, 1_000, 31_000);
+
+    expect(markSending(db, "ob_1", claimed!.leaseToken + 1)).toBe(false);
+    expect(markSending(db, "ob_1", claimed!.leaseToken)).toBe(true);
+    expect(findOutbox(db, "ob_1")?.status).toBe("sending");
+
+    expect(markUncertain(db, "ob_1", claimed!.leaseToken)).toBe(true);
+    expect(findOutbox(db, "ob_1")).toMatchObject({ status: "uncertain", leaseUntil: null });
+    db.close();
+  });
+
+  it("sending 租约过期转 uncertain 而非 retry_wait", () => {
+    const db = prepare();
+    insertOutbox(db, newRow());
+    const claimed = claimDue(db, 1_000, 31_000);
+    markSending(db, "ob_1", claimed!.leaseToken);
+
+    expect(reconcileStaleLeases(db, 31_001)).toEqual({ retryWait: 0, uncertain: 1 });
+    expect(findOutbox(db, "ob_1")?.status).toBe("uncertain");
+    db.close();
+  });
+
+  it("ACK 按 msg_id 置 delivered,不依赖租约 token", () => {
+    const db = prepare();
+    insertOutbox(
+      db,
+      newRow({ id: "ob_pull", channel: "pull", deliveryClass: "business", msgId: "msg_1" }),
+    );
+
+    expect(markDeliveredByMsgId(db, "msg_1")).toBe(true);
+    expect(findOutbox(db, "ob_pull")?.status).toBe("delivered");
+    expect(markDeliveredByMsgId(db, "msg_1")).toBe(false);
+    db.close();
+  });
+
+  it("信箱按 msg_id 领取,未 ACK 的租约过期后重新可见", () => {
+    const db = prepare();
+    insertOutbox(
+      db,
+      newRow({ id: "ob_pull", channel: "pull", deliveryClass: "business", msgId: "msg_1" }),
+    );
+
+    const first = claimPullByMsgId(db, "msg_1", 1_000, 31_000);
+    expect(first).toMatchObject({ id: "ob_pull", status: "claimed" });
+    expect(claimPullByMsgId(db, "msg_1", 1_000, 31_000)).toBeUndefined();
+
+    reconcileStaleLeases(db, 31_001);
+    expect(claimPullByMsgId(db, "msg_1", 31_001, 61_000)?.id).toBe("ob_pull");
+    db.close();
+  });
+
+  it("uncertain 围栏只对同任务的 business 行生效", () => {
+    const db = prepare();
+    insertOutbox(
+      db,
+      newRow({
+        id: "ob_fence",
+        channel: "pull",
+        deliveryClass: "business",
+        msgId: "msg_1",
+        taskId: "T-1",
+      }),
+    );
+    db.prepare("UPDATE outbox SET status = 'uncertain' WHERE id = 'ob_fence'").run();
+
+    expect(findUncertainFence(db, "T-1")).toBe(true);
+    expect(findUncertainFence(db, "T-2")).toBe(false);
     db.close();
   });
 });

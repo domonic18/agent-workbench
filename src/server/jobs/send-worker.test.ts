@@ -22,6 +22,22 @@ function prepare() {
 }
 
 describe("drainOutbox", () => {
+  it("同步发送期间出箱置 sending", async () => {
+    const db = prepare();
+    let observed: string | undefined;
+    const sender: CardSender = {
+      async send() {
+        observed = findOutboxByKey(db, "cap:cap_1:requested")?.status;
+      },
+    };
+
+    await drainOutbox(db, sender, silentLogger, () => 0);
+
+    expect(observed).toBe("sending");
+    expect(findOutboxByKey(db, "cap:cap_1:requested")?.status).toBe("delivered");
+    db.close();
+  });
+
   it("投递成功置 delivered", async () => {
     const db = prepare();
     const sent: CardTarget[] = [];

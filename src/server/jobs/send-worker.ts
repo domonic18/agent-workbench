@@ -7,6 +7,7 @@ import {
   markDelivered,
   markFailed,
   markRetry,
+  markSending,
   reconcileStaleLeases,
   type OutboxRecord,
 } from "../../store/repositories/outbox.js";
@@ -35,6 +36,12 @@ async function deliverOne(
 ): Promise<void> {
   // payload_json 由 enqueuePush 写入且受 CHECK(json_valid) 约束,按既定形状直接解析
   const payload = JSON.parse(row.payloadJson) as OutboxPushPayload;
+
+  // 进入发送即置 sending:此后租约过期只能转 uncertain,不能再静默重投
+  if (!markSending(db, row.id, row.leaseToken)) {
+    logger.warn({ outboxId: row.id }, "发件箱租约已失效,跳过本轮投递");
+    return;
+  }
 
   try {
     await sender.send(payload);
@@ -65,8 +72,8 @@ export async function drainOutbox(
 ): Promise<void> {
   try {
     const reconciled = reconcileStaleLeases(db, now());
-    if (reconciled > 0) {
-      logger.info({ reconciled }, "发件箱过期租约回收");
+    if (reconciled.retryWait > 0 || reconciled.uncertain > 0) {
+      logger.info(reconciled, "发件箱过期租约回收");
     }
   } catch (error) {
     logger.error({ err: error }, "发件箱租约回收失败");
