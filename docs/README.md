@@ -47,6 +47,7 @@
 |------|------|
 | [development-plan.md](plan/development-plan.md) | 里程碑与完成状态;**只在此维护状态,不回填过程** |
 | [tasks/](plan/tasks/) | 分里程碑任务清单(M0 / M1 / M1.5 / M2 / M2.5 / M3 / M3.5 / M4):任务、产出、依赖、验收点;不记进度 |
+| [acceptance/](plan/acceptance/) | 按任务落档的验收记录(样本、实跑结果、缺口);点时快照,不回填新结论 |
 
 ## 背景速览(新会话先看这里)
 

@@ -10,7 +10,7 @@
   - 控制台只绑定 127.0.0.1:8787，不自己处理 TLS；提供 `/healthz`；经 frp 以 `aw.example.com` 暴露
   - frpc 两条独立规则：`aw.example.com → 8787`（http）、`tp.example.com:8443 → 443`（tcp，给 Teleport proxy；443 已被 frps 的 HTTPS vhost 占用），互不复用
   - 跨机：每台运行 Agent 的机器各跑一个采集器（MacBook、macmini），launchd 常驻，只经 `/api/ingest` 单向推送；Teleport node agent 装目标机
-  - 授权：SSH / 数据库访问走 Teleport CE + tbot 的 15 分钟短时证书，不自研证书签发；Teleport CE 为 AGPL-3.0，独立容器运行，只经 API 调用
+  - 授权：SSH / 数据库访问走 Teleport CE + tbot 的 15 分钟短时证书，不自研证书签发；身份按 Agent 建 bot、任务以 trait `aw_task_id` 携带，证书扩展用 `external.*` 插值（`internal.*` 不插值）；Teleport CE 为 AGPL-3.0，独立容器运行，只经 API 调用
   - **三平面**：展示面（浏览器 B/S，不做任何约束判定）/ 控制面（策略、判定、审计）/ 执行面（每台机本地 C/S：采集器、MCP proxy、Claude Code 配置托管）。约束只在后两者执行；原生工具靠托管权限规则 + `PreToolUse` hook 拦截，hook 不可用即拒绝启动；**一期不做 OS 级沙箱**，终端直跑会话不受拦截（缺口见 06 O6）；托盘与进程急停不入一期（2026-10-31 裁决）
   - 不重写 Agent 运行时（Claude Code / cc-connect 是资产）
 
@@ -50,7 +50,7 @@
 - KISS、YAGNI、DRY;单文件不超过 350 行,超限即拆分。
 - 未经用户批准不要提交到 git。不要主动创建 *.md/README。
 - 永远不要模拟、不要占位符、不要省略代码;对想法的好坏坦率诚实。
-- 安全:外部输入边界校验;系统密钥仅存 env(.env 不入库),Agent / 采集器密钥库中只存哈希,永不硬编码;日志记事件不记敏感值。
+- 安全:外部输入边界校验;系统密钥仅存 env(.env 不入库),Agent / 采集器密钥库中只存哈希,永不硬编码;日志记事件不记敏感值。**仓库是公开的**:文档与示例不写真实 IP、域名、主机名、SSH 路径与内网端口,真实值只放 gitignored 的 `docs/plan/*.local.md`。
 - 状态只更新 plan/development-plan.md,不回填过程。
 
 ### CodeReview(每轮迭代完成后必须执行)

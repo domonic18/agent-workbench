@@ -1,0 +1,24 @@
+name: aw-teleport-spike
+
+services:
+  auth:
+    image: public.ecr.aws/gravitational/teleport-distroless:18.7.3
+    container_name: aw-tp-auth
+    restart: "no"
+    environment:
+      SSL_CERT_FILE: /etc/teleport/pki/ca.crt
+    ports:
+      - "127.0.0.1:3025:3025"
+      - "127.0.0.1:3080:3080"
+    volumes:
+      - ./etc/teleport.yaml:/etc/teleport/teleport.yaml:ro
+      - ./pki:/etc/teleport/pki:ro
+      - aw-tp-data:/var/lib/teleport
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/teleport", "version"]
+      interval: 5s
+      timeout: 5s
+      retries: 6
+
+volumes:
+  aw-tp-data:

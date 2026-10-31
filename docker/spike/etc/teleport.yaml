@@ -1,0 +1,23 @@
+version: v3
+teleport:
+  nodename: aw-tp-auth
+  data_dir: /var/lib/teleport
+  log:
+    output: stderr
+    severity: INFO
+auth_service:
+  enabled: "yes"
+  cluster_name: aw-spike
+  listen_addr: 0.0.0.0:3025
+  proxy_listener_mode: multiplex
+proxy_service:
+  enabled: "yes"
+  web_listen_addr: 0.0.0.0:3080
+  # 必须与容器内可达地址一致:node/tbot 共用 auth 的 netns,故填 localhost
+  public_addr: localhost:3080
+  https_keypairs:
+    - key_file: /etc/teleport/pki/server.key
+      cert_file: /etc/teleport/pki/server.crt
+  acme: {}
+ssh_service:
+  enabled: "no"

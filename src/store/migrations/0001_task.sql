@@ -9,12 +9,12 @@ CREATE TABLE task (
   rework_count INTEGER NOT NULL DEFAULT 0 CHECK (rework_count >= 0),
   stage TEXT NOT NULL CHECK (stage IN ('intake', 'plan', 'exec', 'review', 'deliver', 'closed')),
   status TEXT NOT NULL CHECK (status IN ('pending', 'running', 'blocked', 'review', 'done', 'cancelled')),
-  origin TEXT NOT NULL CHECK (origin IN ('feishu', 'console', 'a2a')),
+  origin TEXT NOT NULL CHECK (origin IN ('feishu', 'a2a')),
   deadline_at INTEGER,
   output TEXT,
   started_at INTEGER,
   ended_at INTEGER,
-  cost_nanousd INTEGER NOT NULL DEFAULT 0 CHECK (cost_nanousd >= 0),
+  total_tokens INTEGER NOT NULL DEFAULT 0 CHECK (total_tokens >= 0),
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );

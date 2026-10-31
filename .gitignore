@@ -28,6 +28,10 @@ coverage/
 # 本地容器配置(从 frpc.toml.example 复制)
 docker/frpc.toml
 
+# Teleport spike 生成的 CA/证书/身份,只在本机跑
+docker/spike/pki/
+docker/spike/out/
+
 # IDE / 系统
 .DS_Store
 .idea/
@@ -35,3 +39,6 @@ docker/frpc.toml
 
 # 本机 Claude Code 配置:skills 是绝对路径软链,只对当前机器有效
 .claude/
+
+# 真实基础设施信息只在本机(公开仓库内一律用占位符)
+docs/plan/*.local.md

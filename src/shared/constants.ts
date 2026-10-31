@@ -20,7 +20,7 @@ export const TASK_STAGES = [
 ] as const;
 export type TaskStage = (typeof TASK_STAGES)[number];
 
-export const TASK_ORIGINS = ["feishu", "console", "a2a"] as const;
+export const TASK_ORIGINS = ["feishu", "a2a"] as const;
 export type TaskOrigin = (typeof TASK_ORIGINS)[number];
 
 export const TASK_EVENT_KINDS = [
@@ -37,6 +37,10 @@ export type TaskEventKind = (typeof TASK_EVENT_KINDS)[number];
 
 export const A2A_INTENTS = ["request", "reply", "notify", "escalate"] as const;
 export type A2AIntent = (typeof A2A_INTENTS)[number];
+
+/** 飞书指令审计结果;与 feishu_command.outcome 的 CHECK 一致 */
+export const COMMAND_OUTCOMES = ["handled", "unsupported", "invalid"] as const;
+export type CommandOutcome = (typeof COMMAND_OUTCOMES)[number];
 
 export const A2A_PROTOCOL_VERSION = "1.0";
 
