@@ -17,7 +17,7 @@ describe("runMigrations", () => {
   it("空库执行建表并记账", () => {
     const db = openDatabase(":memory:");
 
-    expect(runMigrations(db)).toBe(8);
+    expect(runMigrations(db)).toBe(10);
     expect(tableNames(db)).toEqual(
       expect.arrayContaining([
         "task",
@@ -31,6 +31,11 @@ describe("runMigrations", () => {
         "session",
         "outbox",
         "audit_reconcile_gap",
+        "machine",
+        "agent",
+        "a2a_thread",
+        "a2a_message",
+        "a2a_dead_letter",
         "schema_migration",
       ]),
     );
@@ -45,6 +50,8 @@ describe("runMigrations", () => {
       { version: 6, name: "session" },
       { version: 7, name: "outbox" },
       { version: 8, name: "audit_reconciliation" },
+      { version: 9, name: "identity" },
+      { version: 10, name: "a2a" },
     ]);
     db.close();
   });
