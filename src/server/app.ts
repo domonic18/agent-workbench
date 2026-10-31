@@ -11,6 +11,7 @@ import { registerAuditRoutes } from "./routes/audit.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerCapabilityRoutes } from "./routes/capabilities.js";
 import { registerIdentityRoutes } from "./routes/identity.js";
+import { registerTaskRoutes } from "./routes/task.js";
 
 // dist/server 与 src/server 到仓库根同为两级,容器内亦然
 function readVersion(): string {
@@ -52,6 +53,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     registerAuthRoutes(app, { db, ...timing });
     registerAuditRoutes(app, { db, ...timing });
     registerIdentityRoutes(app, { db, ...timing });
+    registerTaskRoutes(app, { db, ...timing });
     registerA2aRoutes(app, { db, ...timing });
 
     // 授权路由依赖 Teleport 适配器;身份 / A2A / 审计只要库

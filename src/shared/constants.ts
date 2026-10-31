@@ -35,6 +35,15 @@ export const TASK_EVENT_KINDS = [
 ] as const;
 export type TaskEventKind = (typeof TASK_EVENT_KINDS)[number];
 
+/** 建单 / 改单字段长度上限(01 §5.2);project 闭集校验留 M3 */
+export const TASK_LIMITS = {
+  title: 200,
+  assigner: 128,
+  project: 128,
+  output: 2048,
+  reason: 512,
+} as const;
+
 export const A2A_INTENTS = ["request", "reply", "notify", "escalate"] as const;
 export type A2AIntent = (typeof A2A_INTENTS)[number];
 
