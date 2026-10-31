@@ -17,7 +17,7 @@ describe("runMigrations", () => {
   it("空库执行建表并记账", () => {
     const db = openDatabase(":memory:");
 
-    expect(runMigrations(db)).toBe(6);
+    expect(runMigrations(db)).toBe(7);
     expect(tableNames(db)).toEqual(
       expect.arrayContaining([
         "task",
@@ -29,6 +29,7 @@ describe("runMigrations", () => {
         "capability_audit",
         "tool_call_log",
         "session",
+        "outbox",
         "schema_migration",
       ]),
     );
@@ -41,6 +42,7 @@ describe("runMigrations", () => {
       { version: 4, name: "feishu_command" },
       { version: 5, name: "capability" },
       { version: 6, name: "session" },
+      { version: 7, name: "outbox" },
     ]);
     db.close();
   });

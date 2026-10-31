@@ -41,6 +41,8 @@ export interface CapabilityRoutesOptions {
   teleport: TeleportAdapter;
   now?: () => number;
   service?: CapabilityService;
+  /** 申请成功后触发(入队飞书审批卡片);抛错不影响建单 */
+  onRequested?: (record: CapabilityRecord) => void;
 }
 
 interface CapabilityDto {
@@ -192,6 +194,13 @@ export function registerCapabilityRoutes(
       const row = service.request({ ...parsed.data, actor: CONSOLE_ACTOR });
       if (typeof key === "string") {
         createdByKey.set(key, row.id);
+      }
+      if (options.onRequested !== undefined) {
+        try {
+          options.onRequested(row);
+        } catch (error) {
+          request.log.error({ err: error, capabilityId: row.id }, "审批卡片入队失败");
+        }
       }
       return reply.code(201).send({ capability: toDto(row) });
     } catch (error) {

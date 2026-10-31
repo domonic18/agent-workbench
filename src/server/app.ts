@@ -1,8 +1,11 @@
 import { readFileSync } from "node:fs";
 import Fastify, { type FastifyInstance } from "fastify";
 import type { TeleportAdapter } from "../adapters/teleport/tctl.js";
+import type { FeishuConfig } from "../config/env.js";
+import { createCapabilityService, type CapabilityService } from "../domain/capability/service.js";
 import { healthPayload, type DatabaseStatus } from "../shared/health.js";
 import type { Db } from "../store/database.js";
+import { createApprovalNotifier } from "./notification/approval.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerCapabilityRoutes } from "./routes/capabilities.js";
 
@@ -20,6 +23,10 @@ export interface BuildAppOptions {
   /** 注入 db + teleport 才注册需要状态的业务路由;缺省时只有 /healthz */
   db?: Db;
   teleport?: TeleportAdapter;
+  /** 由启动方复用的授权服务;缺省时按 db + teleport 新建 */
+  service?: CapabilityService;
+  /** 飞书配置存在且带 approvalChatId 时,申请落库后推送审批卡片 */
+  feishu?: FeishuConfig;
   now?: () => number;
 }
 
@@ -36,9 +43,24 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   });
 
   if (options.db !== undefined && options.teleport !== undefined) {
+    const db = options.db;
     const timing = options.now === undefined ? {} : { now: options.now };
-    registerAuthRoutes(app, { db: options.db, ...timing });
-    registerCapabilityRoutes(app, { db: options.db, teleport: options.teleport, ...timing });
+    const service =
+      options.service ?? createCapabilityService({ db, teleport: options.teleport, ...timing });
+    const notify = createApprovalNotifier({
+      db,
+      approvalChatId: options.feishu?.approvalChatId,
+      ...timing,
+    });
+
+    registerAuthRoutes(app, { db, ...timing });
+    registerCapabilityRoutes(app, {
+      db,
+      teleport: options.teleport,
+      service,
+      ...timing,
+      ...(notify === undefined ? {} : { onRequested: notify }),
+    });
   }
 
   app.setNotFoundHandler((_request, reply) => {

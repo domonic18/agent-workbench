@@ -84,6 +84,41 @@ export const CAPABILITY_TIMEOUTS = {
 /** 控制台会话寿命(01 §3 注:刻意收紧为 12 小时,不采纳需求的 7 天滑动) */
 export const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 
+/** 飞书事件/卡片回调时间窗(01 §8):超过 24 小时或超前 5 分钟一律丢弃 */
+export const FEISHU_EVENT_WINDOW = {
+  maxAgeMs: 24 * 60 * 60 * 1000,
+  maxFutureSkewMs: 5 * 60 * 1000,
+} as const;
+
+/** 发件箱状态机(01 §6);sending / uncertain 由异步通道使用,push 同步发送不产生 */
+export const OUTBOX_STATUSES = [
+  "pending",
+  "claimed",
+  "sending",
+  "retry_wait",
+  "delivered",
+  "failed",
+  "uncertain",
+] as const;
+export type OutboxStatus = (typeof OUTBOX_STATUSES)[number];
+
+/** push = 飞书等推模式;pull = A2A 信箱,以 ACK 为投递判据 */
+export const OUTBOX_CHANNELS = ["push", "pull"] as const;
+export type OutboxChannel = (typeof OUTBOX_CHANNELS)[number];
+
+/** business = 失败围栏任务;notification = 只重试,不围栏 */
+export const OUTBOX_DELIVERY_CLASSES = ["business", "notification"] as const;
+export type OutboxDeliveryClass = (typeof OUTBOX_DELIVERY_CLASSES)[number];
+
+/** 领取租约与通知类重试策略:拉长窗口覆盖同步 HTTP,失败指数退避到上限即判死 */
+export const OUTBOX_TIMEOUTS = {
+  leaseMs: 30_000,
+  maxAttempts: 8,
+  retryBaseMs: 5_000,
+  retryMaxMs: 5 * 60 * 1000,
+  pollMs: 2_000,
+} as const;
+
 /** 工具调用分级与判定(05 §6.1);未知动作按 L2 处理 */
 export const TOOL_LEVELS = ["L0", "L1", "L2"] as const;
 export type ToolLevel = (typeof TOOL_LEVELS)[number];
