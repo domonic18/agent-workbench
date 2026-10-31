@@ -6,9 +6,11 @@ import { createCapabilityService, type CapabilityService } from "../domain/capab
 import { healthPayload, type DatabaseStatus } from "../shared/health.js";
 import type { Db } from "../store/database.js";
 import { createApprovalNotifier } from "./notification/approval.js";
+import { registerA2aRoutes } from "./routes/a2a.js";
 import { registerAuditRoutes } from "./routes/audit.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerCapabilityRoutes } from "./routes/capabilities.js";
+import { registerIdentityRoutes } from "./routes/identity.js";
 
 // dist/server 与 src/server 到仓库根同为两级,容器内亦然
 function readVersion(): string {
@@ -43,26 +45,33 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       .send(healthPayload(readVersion(), startedAt, db));
   });
 
-  if (options.db !== undefined && options.teleport !== undefined) {
+  if (options.db !== undefined) {
     const db = options.db;
     const timing = options.now === undefined ? {} : { now: options.now };
-    const service =
-      options.service ?? createCapabilityService({ db, teleport: options.teleport, ...timing });
-    const notify = createApprovalNotifier({
-      db,
-      approvalChatId: options.feishu?.approvalChatId,
-      ...timing,
-    });
 
     registerAuthRoutes(app, { db, ...timing });
     registerAuditRoutes(app, { db, ...timing });
-    registerCapabilityRoutes(app, {
-      db,
-      teleport: options.teleport,
-      service,
-      ...timing,
-      ...(notify === undefined ? {} : { onRequested: notify }),
-    });
+    registerIdentityRoutes(app, { db, ...timing });
+    registerA2aRoutes(app, { db, ...timing });
+
+    // 授权路由依赖 Teleport 适配器;身份 / A2A / 审计只要库
+    if (options.teleport !== undefined) {
+      const service =
+        options.service ?? createCapabilityService({ db, teleport: options.teleport, ...timing });
+      const notify = createApprovalNotifier({
+        db,
+        approvalChatId: options.feishu?.approvalChatId,
+        ...timing,
+      });
+
+      registerCapabilityRoutes(app, {
+        db,
+        teleport: options.teleport,
+        service,
+        ...timing,
+        ...(notify === undefined ? {} : { onRequested: notify }),
+      });
+    }
   }
 
   app.setNotFoundHandler((_request, reply) => {

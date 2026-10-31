@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { openDatabase } from "../store/database.js";
+import { runMigrations } from "../store/migrator.js";
 import { buildApp } from "./app.js";
 
 describe("buildApp", () => {
@@ -41,5 +43,17 @@ describe("buildApp", () => {
     });
 
     await app.close();
+  });
+
+  it("只注入 db 时也注册身份与 A2A 路由(返回 401 而非 404)", async () => {
+    const db = openDatabase(":memory:");
+    runMigrations(db);
+    const app = buildApp({ logLevel: "silent", db });
+
+    expect((await app.inject({ method: "GET", url: "/api/machines" })).statusCode).toBe(401);
+    expect((await app.inject({ method: "GET", url: "/api/a2a/inbox" })).statusCode).toBe(401);
+
+    await app.close();
+    db.close();
   });
 });
