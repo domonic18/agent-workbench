@@ -14,8 +14,15 @@ describe("loadConfig", () => {
         identityFile: undefined,
         botRole: "aw-ext",
         botMaxSessionTtl: "12h",
+        auditLogPath: undefined,
       },
     });
+  });
+
+  it("配置审计日志路径后写入 teleport 配置", () => {
+    expect(loadConfig({ TELEPORT_AUDIT_LOG_PATH: "/var/lib/teleport/log/events.log" }).teleport
+      .auditLogPath).toBe("/var/lib/teleport/log/events.log");
+    expect(loadConfig({ TELEPORT_AUDIT_LOG_PATH: "  " }).teleport.auditLogPath).toBeUndefined();
   });
 
   it("端口从字符串转数字", () => {

@@ -23,6 +23,8 @@ const envSchema = z.object({
   TELEPORT_IDENTITY_FILE: z.string().optional(),
   TELEPORT_BOT_ROLE: z.string().min(1).default("aw-ext"),
   TELEPORT_BOT_MAX_SESSION_TTL: z.string().min(1).default("12h"),
+  // 审计对账(05 §7):读 Teleport events.log 做 session.start 归因;留空则不对账
+  TELEPORT_AUDIT_LOG_PATH: z.string().optional(),
 });
 
 export interface FeishuConfig {
@@ -38,6 +40,7 @@ export interface TeleportConfig {
   identityFile: string | undefined;
   botRole: string;
   botMaxSessionTtl: string;
+  auditLogPath: string | undefined;
 }
 
 export interface Config {
@@ -108,6 +111,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       identityFile: optionalText(parsed.data.TELEPORT_IDENTITY_FILE),
       botRole: parsed.data.TELEPORT_BOT_ROLE,
       botMaxSessionTtl: parsed.data.TELEPORT_BOT_MAX_SESSION_TTL,
+      auditLogPath: optionalText(parsed.data.TELEPORT_AUDIT_LOG_PATH),
     },
   };
 }
