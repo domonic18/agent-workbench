@@ -31,8 +31,8 @@
 
 - 目标: 基于 Teleport CE + tbot 落地 capability 审批与审计;SSH / 数据库经 15 分钟短时证书访问;审批入口先走飞书卡片
 - 验收标准: 生产资源零长期凭证;两通道分层验收(proxy 判定 / 权限+hook 拦截),不合并宣称 100%,终端直跑会话单列缺口不计入拦截率;证书 TTL 15 分钟且由 tbot 自动续期;审计可追溯 task_id
-- 状态: **进行中**:M2-1 已闭(`0005_capability` 迁移建 capability / capability_audit / tool_call_log,单向状态机含 `issuing` 补偿出口,审计表由触发器强制 append-only);M2-2 已闭(`src/adapters/teleport/` 落地,本地 Docker Teleport CE 18.7.3 实测签发 / 续期 / traits / SSH,记录见 [acceptance/M2-2.md](acceptance/M2-2.md));M2-3 起未开
-- 阻塞项: 公网 Teleport 部署(`tp.example.com` + frpc 第二条规则 + 通配证书挂载 + 目标机 node agent)按用户裁决推迟,不阻塞 M2-3 起;原「资源清单明细(§12-4)」已由 M1-1 关闭
+- 状态: **进行中**:M2-1 已闭(`0005_capability` 迁移建 capability / capability_audit / tool_call_log,单向状态机含 `issuing` 补偿出口,审计表由触发器强制 append-only);M2-2 已闭(`src/adapters/teleport/` 落地,本地 Docker Teleport CE 18.7.3 实测签发 / 续期 / traits / SSH,记录见 [acceptance/M2-2.md](acceptance/M2-2.md));M2-3 已闭(`/api/capabilities` 申请 / 批准 / 拒绝 / 吊销 + `src/server/jobs/reconcile.ts` 对账作业;批准 saga 经 `issuing` 调 Teleport,失败转 `rejected` 返回 503;最小会话鉴权——登录 / 会话 / CSRF / 幂等键——随本项提前落地);M2-4 起未开
+- 阻塞项: 公网 Teleport 部署(`tp.example.com` + frpc 第二条规则 + 通配证书挂载 + 目标机 node agent)按用户裁决推迟,不阻塞 M2 后续;M2-4 另需卡片回调 `Verification Token` 与 `aw.example.com`;原「资源清单明细(§12-4)」已由 M1-1 关闭
 - 说明: 授权粒度定为「目标 + 动作 + 命令白名单」,解析失败即拒绝;吊销以 TTL 自然过期为主
 
 ### M2.5: A2A 通道(传输层)
@@ -47,7 +47,7 @@
 
 - 目标: 两类 Agent 同屏可见,只读看板优先;事实源在控制台库;每台机部署采集器
 - 验收标准: 首屏 3 秒内答出「谁在跑、跑到哪、用了多少 token」;任一任务能回答「卡在哪一环」;手机可访问;口令登录生效;两台机的会话数据齐全
-- 状态: **未开始**。库内口令初始化(`console_credential` + scrypt 哈希)与启动种子已预置,登录接口与会话中间件(M3-2)未开
+- 状态: **未开始**。库内口令初始化(`console_credential` + scrypt 哈希)与启动种子已预置;登录 / 会话 / CSRF / 幂等已随 M2-3 提前落地,`0006_session` 建会话表,M3-2 只剩 `Host` 白名单经 frp 实测、登录失败锁定与前端登录页
 - 阻塞项: 采集器实现、`aw.example.com` 的 DNS 与 frpc 代理、飞书应用凭据与 `open_id` 白名单(B6);两台机(MacBook / macmini)须在 M3-10 验收前完成注册与采集器部署
 
 ### M3.5: 控制台二期(授权屏 + 知识屏)
@@ -154,3 +154,4 @@ P1 项(飞书长连接与回调穿 frp、SSE 穿 frp、中文 FTS5 与嵌入服�
 | 2026-10-31 | **M1.5 关闭**:M1.5-7 抽检 20 条样本(13 收下 / 7 拒收)全部按预期判定,四要素逐条可读,拒收项逐条指向字段且多缺一次报全;记录落 `acceptance/M1.5-7.md` | 信封规则已有单测,但「人能否 10 秒读懂」只能用真实样本验;抽检同时暴露并确认了两个口径:`notify` 免 `deadline`、`round` 由服务端分配(客户端给 0 属非法) |
 | 2026-10-31 | M2-1 关闭:`0005_capability` 建 capability / capability_audit / tool_call_log;状态机单向(`pending → issuing → active / rejected`,`active → expired / revoked`),批准不经 `issuing` 一律非法,`issuing` 的补偿出口固定为 `rejected`;审计表用触发器强制 append-only,UPDATE/DELETE 直接 ABORT | 授权链路的核心风险是「审批状态与实际签发脱节」,状态机把不可能路径(直接 pending→active)在校验层堵死;append-only 若只靠「不写 update 函数」约束不了直连 SQL 的作业,用触发器兜底;保留期清理日后需删数据时改为显式迁移,留评审痕迹 |
 | 2026-10-31 | M2-2 关闭:`src/adapters/teleport/`(manifest 白名单渲染 / `tctl create --force -f -` / `execFile` 无 shell)落地;本地 Docker Teleport CE 18.7.3 实测:请求 15m 实发 16m、`aw-task-id` 与 `aw-ticket-id` 经 `{{ external.* }}` 正确插值、30s TTL 续期哈希变化、`agentwork` 可登 `root` 被拒;记录落 `acceptance/M2-2.md`。新发现 bot traits 异步同步到 user,同步前签发会写入字面量模板(约 229ms),已回写 05 §7 并要求 M2-3/M2-7 以对账确认「生效」 | 适配器只是「写 traits」,真正的风险在时序:写入成功不等于证书带新身份;若 M2-3 把 `active` 当作写入完成的同义词,会出现「审批已过、证书仍是旧任务」却不报警的空档 |
+| 2026-10-31 | M2-3 关闭 + M3-2 范围收窄:M2-3 落地 `/api/capabilities` 申请 / 批准 / 拒绝 / 吊销与对账作业;批准 saga 为 `pending→issuing`(写审计)→ 调 Teleport `applyTaskTraits` → 成功 `issuing→active`(`issued_at` / `expires_at`)、失败 `issuing→rejected` 并返回 503;`issuing` 超 60s 与待批超 24h 由定时作业条件更新收敛。**用户裁决:最小会话鉴权随 M2-3 提前落地**——`0006_session` 建会话表、登录 / 登出、`HttpOnly + SameSite=Lax` 12h cookie、非 GET 校验 `X-Requested-With` 与 `Origin`/`Host`、写操作要求 `Idempotency-Key`;M3-2 后续只补 `Host` 白名单经 frp 实测、登录失败锁定与前端登录页。`capability.subject` 仍是 Agent 身份串,`deriveBotName()` 以确定性规则映射为 Teleport bot 名,登记表映射留 M2.5 | 写接口没有会话就无法安全开放,而 M3-2 排在 M3 内会让 M2-3 长时间挂空;把鉴权拆成「最小可安全开放」与「生产加固」两段,前者随依赖提前,M3-2 只保留需真实流量与前端才能验的部分。幂等键目前是进程内 `Map`,落库随 M3-2 补,重放只保证单进程内一致 |
