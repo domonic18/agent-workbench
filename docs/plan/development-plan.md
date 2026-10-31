@@ -31,7 +31,7 @@
 
 - 目标: 基于 Teleport CE + tbot 落地 capability 审批与审计;SSH / 数据库经 15 分钟短时证书访问;审批入口先走飞书卡片
 - 验收标准: 生产资源零长期凭证;两通道分层验收(proxy 判定 / 权限+hook 拦截),不合并宣称 100%,终端直跑会话单列缺口不计入拦截率;证书 TTL 15 分钟且由 tbot 自动续期;审计可追溯 task_id
-- 状态: 未开始
+- 状态: **进行中**:M2-1 已闭(`0005_capability` 迁移建 capability / capability_audit / tool_call_log,单向状态机含 `issuing` 补偿出口,审计表由触发器强制 append-only);M2-2 起未开
 - 阻塞项: Teleport 部署本体(容器 / tbot 角色 / 通配证书挂载 / 目标机 node agent)——由 M1-5 移交,在 M2-2 一并验收;原「资源清单明细(§12-4)」已由 M1-1 关闭
 - 说明: 授权粒度定为「目标 + 动作 + 命令白名单」,解析失败即拒绝;吊销以 TTL 自然过期为主
 
@@ -152,3 +152,4 @@ P1 项(飞书长连接与回调穿 frp、SSE 穿 frp、中文 FTS5 与嵌入服�
 | 2026-10-31 | M1.5-5 关闭:指令语法定为英文斜杠命令(`/task list`、`/task <id>`、`/approve`、`/reject`、`/resend`),解析与执行分在 `src/domain/command/`,非斜杠与未登记命令回「不支持」,缺参回全部缺失项;新增 `feishu_command` 审计表(0004)记录原文、规范命令名、结果与回执;审批 / 重发校验任务存在后如实回执「尚未接入(M2)」,**不建单**。实测:群内 `/task list` 回「当前没有任务。」、`你好` 回「不支持该指令」,两条分别落审计为 `handled` / `unsupported` | 命令若走自然语言就要猜意图,与「未命中即不支持」冲突;审计与 7 天去重表分离,否则「为什么回不支持」会随去重清理一起消失;审批与重发的数据面在 M2 / M2.5,提前伪造成功回执会让验收失真 |
 | 2026-10-31 | M1.5-6 关闭:回执按事件时间选通道——24h 内 `reply` 原消息,超出改用 `chat_id` 新建;决策抽到 `src/adapters/feishu/reply.ts`(`chooseReplyMode`/`createReplyer`),超窗分支由单测覆盖。核对飞书文档后确认 `reply` 接口本身无 24h 限制,该窗口是本项目产品策略(避免引用失效),入站 24h 窗口使其只兜底延迟与边界 | 「回复有效期」原被当成接口约束,核对后是撤回接口的 24h;策略与接口限制要分开写,否则后续会按错误前提调大窗口 |
 | 2026-10-31 | **M1.5 关闭**:M1.5-7 抽检 20 条样本(13 收下 / 7 拒收)全部按预期判定,四要素逐条可读,拒收项逐条指向字段且多缺一次报全;记录落 `acceptance/M1.5-7.md` | 信封规则已有单测,但「人能否 10 秒读懂」只能用真实样本验;抽检同时暴露并确认了两个口径:`notify` 免 `deadline`、`round` 由服务端分配(客户端给 0 属非法) |
+| 2026-10-31 | M2-1 关闭:`0005_capability` 建 capability / capability_audit / tool_call_log;状态机单向(`pending → issuing → active / rejected`,`active → expired / revoked`),批准不经 `issuing` 一律非法,`issuing` 的补偿出口固定为 `rejected`;审计表用触发器强制 append-only,UPDATE/DELETE 直接 ABORT | 授权链路的核心风险是「审批状态与实际签发脱节」,状态机把不可能路径(直接 pending→active)在校验层堵死;append-only 若只靠「不写 update 函数」约束不了直连 SQL 的作业,用触发器兜底;保留期清理日后需删数据时改为显式迁移,留评审痕迹 |
