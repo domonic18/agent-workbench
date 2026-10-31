@@ -9,6 +9,12 @@ describe("loadConfig", () => {
       host: "127.0.0.1",
       port: 8787,
       databasePath: "./workspace/console.db",
+      teleport: {
+        tctlPath: "tctl",
+        identityFile: undefined,
+        botRole: "aw-ext",
+        botMaxSessionTtl: "12h",
+      },
     });
   });
 
