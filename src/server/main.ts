@@ -1,11 +1,15 @@
 import { dirname, join } from "node:path";
 import { startFeishuInbound, type FeishuInbound } from "../adapters/feishu/client.js";
+import { createProcessRunner } from "../adapters/teleport/process-runner.js";
+import { createTeleportAdapter } from "../adapters/teleport/tctl.js";
 import { loadConfig } from "../config/env.js";
+import { createCapabilityService } from "../domain/capability/service.js";
 import { isDatabaseWritable, openDatabase } from "../store/database.js";
 import { acquireInstanceLock } from "../store/lock.js";
 import { runMigrations } from "../store/migrator.js";
 import { buildApp } from "./app.js";
 import { ensureConsoleCredential } from "./credential.js";
+import { startCapabilityReconciler } from "./jobs/reconcile.js";
 
 // 启动顺序(01 §2):env → 单实例锁 → 打开库 → 迁移与口令初始化 → 注册路由 → 监听。
 // 锁先于开库:第二个进程不能在第一个进程的库上跑迁移。
@@ -22,10 +26,16 @@ try {
   throw error;
 }
 
+const teleport = createTeleportAdapter(config.teleport, createProcessRunner());
+
 const app = buildApp({
   logLevel: config.logLevel,
   databaseStatus: () => (isDatabaseWritable(db) ? "ok" : "unavailable"),
+  db,
+  teleport,
 });
+
+const reconciler = startCapabilityReconciler(createCapabilityService({ db, teleport }), app.log);
 
 let inbound: FeishuInbound | undefined;
 let shuttingDown = false;
@@ -35,6 +45,7 @@ function shutdown(): void {
     return;
   }
   shuttingDown = true;
+  reconciler.stop();
   inbound?.stop();
   const timer = setTimeout(() => process.exit(1), 10_000);
   timer.unref();

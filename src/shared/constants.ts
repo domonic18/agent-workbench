@@ -75,6 +75,15 @@ export const CAPABILITY_TTL = {
   maxSeconds: 14400,
 } as const;
 
+/** 补偿窗口(05 §5 / 01 §9):待批 24h 转驳回,issuing 超 60s 由对账收敛 */
+export const CAPABILITY_TIMEOUTS = {
+  pendingMs: 24 * 60 * 60 * 1000,
+  issuingMs: 60_000,
+} as const;
+
+/** 控制台会话寿命(01 §3 注:刻意收紧为 12 小时,不采纳需求的 7 天滑动) */
+export const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
+
 /** 工具调用分级与判定(05 §6.1);未知动作按 L2 处理 */
 export const TOOL_LEVELS = ["L0", "L1", "L2"] as const;
 export type ToolLevel = (typeof TOOL_LEVELS)[number];
