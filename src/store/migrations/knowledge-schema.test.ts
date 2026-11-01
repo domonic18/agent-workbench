@@ -28,7 +28,7 @@ function insertEntry(db: Database.Database, overrides: Record<string, unknown> =
 }
 
 describe("knowledge_entry 表约束", () => {
-  it("未给状态时落库为 draft,来源留空", () => {
+  it("未给状态时落库为 draft,来源留空,索引待嵌入", () => {
     const db = prepare();
     db.prepare(
       `INSERT INTO knowledge_entry (id, path, title, created_at, updated_at)
@@ -36,9 +36,19 @@ describe("knowledge_entry 表约束", () => {
     ).run(NOW, NOW);
     expect(
       db
-        .prepare("SELECT status, source_task_id, source_agent_id, deleted_at FROM knowledge_entry")
+        .prepare(
+          `SELECT status, source_task_id, source_agent_id, deleted_at, content_hash, embedding_status
+             FROM knowledge_entry`,
+        )
         .get(),
-    ).toEqual({ status: "draft", source_task_id: null, source_agent_id: null, deleted_at: null });
+    ).toEqual({
+      status: "draft",
+      source_task_id: null,
+      source_agent_id: null,
+      deleted_at: null,
+      content_hash: null,
+      embedding_status: "pending",
+    });
     db.close();
   });
 
@@ -54,6 +64,31 @@ describe("knowledge_entry 表约束", () => {
     const db = prepare();
     insertEntry(db);
     expect(() => insertEntry(db, { id: "kb_dup" })).toThrow(/UNIQUE constraint failed/);
+    db.close();
+  });
+
+  it("分块增删同步 FTS,删除条目级联删分块", () => {
+    const db = prepare();
+    insertEntry(db);
+    db.prepare(
+      "INSERT INTO knowledge_chunk (entry_id, chunk_no, content) VALUES ('kb_1', 0, ?)",
+    ).run("部署手册与回滚步骤");
+    const hits = (): number =>
+      (
+        db
+          .prepare("SELECT COUNT(*) AS n FROM knowledge_fts WHERE knowledge_fts MATCH ?")
+          .get('"部署手册"') as { n: number }
+      ).n;
+
+    expect(hits()).toBe(1);
+    db.prepare("DELETE FROM knowledge_chunk WHERE entry_id = 'kb_1'").run();
+    expect(hits()).toBe(0);
+
+    db.prepare(
+      "INSERT INTO knowledge_chunk (entry_id, chunk_no, content) VALUES ('kb_1', 0, ?)",
+    ).run("连接失败排查");
+    db.prepare("DELETE FROM knowledge_entry WHERE id = 'kb_1'").run();
+    expect(db.prepare("SELECT COUNT(*) AS n FROM knowledge_chunk").get()).toEqual({ n: 0 });
     db.close();
   });
 

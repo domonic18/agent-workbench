@@ -116,6 +116,17 @@ export const CAPABILITY_TIMEOUTS = {
 export const KNOWLEDGE_STATUSES = ["draft", "candidate", "active", "archived"] as const;
 export type KnowledgeStatus = (typeof KNOWLEDGE_STATUSES)[number];
 
+/** 向量索引状态(02 §3.5):pending 待嵌入 / ready 可检索 / failed 需重试 */
+export const KNOWLEDGE_EMBEDDING_STATUSES = ["pending", "ready", "failed"] as const;
+export type KnowledgeEmbeddingStatus = (typeof KNOWLEDGE_EMBEDDING_STATUSES)[number];
+
+/** 索引链(02 §3.5 / M3.5-4):维度固定 768,FTS 用 trigram 覆盖中文子串 */
+export const KNOWLEDGE_INDEX = {
+  dimensions: 768,
+  chunkMaxChars: 800,
+  embedBatchSize: 16,
+} as const;
+
 /** 控制台会话寿命(01 §3 注:刻意收紧为 12 小时,不采纳需求的 7 天滑动) */
 export const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 

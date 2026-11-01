@@ -17,7 +17,7 @@ describe("runMigrations", () => {
   it("空库执行建表并记账", () => {
     const db = openDatabase(":memory:");
 
-    expect(runMigrations(db)).toBe(17);
+    expect(runMigrations(db)).toBe(18);
     expect(tableNames(db)).toEqual(
       expect.arrayContaining([
         "task",
@@ -44,6 +44,8 @@ describe("runMigrations", () => {
         "idempotency_record",
         "scope_revision",
         "knowledge_entry",
+        "knowledge_chunk",
+        "knowledge_fts",
         "schema_migration",
       ]),
     );
@@ -67,6 +69,7 @@ describe("runMigrations", () => {
       { version: 15, name: "scope_revision" },
       { version: 16, name: "agent_feishu_bot" },
       { version: 17, name: "knowledge" },
+      { version: 18, name: "knowledge_index" },
     ]);
     db.close();
   });
