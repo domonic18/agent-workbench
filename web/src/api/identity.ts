@@ -73,6 +73,10 @@ export function fetchMachines(): Promise<MachineSummary[]> {
   return listAll<MachineSummary>("/api/machines");
 }
 
+export function fetchAgents(): Promise<AgentSummary[]> {
+  return listAll<AgentSummary>("/api/agents");
+}
+
 export function createAgent(input: CreateAgentInput): Promise<AgentSecret> {
   return api.post<AgentSecret>("/api/agents", input, {
     idempotencyKey: newIdempotencyKey(),

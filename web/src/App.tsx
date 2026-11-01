@@ -11,6 +11,8 @@ import { UNAUTHORIZED_EVENT } from "./api/client.js";
 import { AppShell } from "./components/layout/AppShell.js";
 import { LoginPage } from "./pages/LoginPage.js";
 import { OverviewPage } from "./pages/OverviewPage.js";
+import { TaskDrawerRoute } from "./pages/TaskDrawerRoute.js";
+import { TasksPage } from "./pages/TasksPage.js";
 
 /** 任意 API 401 统一回登录页,并记住原路径(03 §3) */
 function UnauthorizedRedirect() {
@@ -40,6 +42,9 @@ export function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route element={<AppShell />}>
           <Route path="/overview" element={<OverviewPage />} />
+          <Route path="/tasks" element={<TasksPage />}>
+            <Route path=":id" element={<TaskDrawerRoute />} />
+          </Route>
           <Route path="*" element={<Navigate to="/overview" replace />} />
         </Route>
       </Routes>

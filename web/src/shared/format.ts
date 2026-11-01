@@ -21,6 +21,24 @@ export function formatDateTime(at: number): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
 
+/** 耗时统一口径;负值按 0 处理,避免时钟回拨显示负数 */
+export function formatDuration(ms: number): string {
+  const value = Math.max(0, ms);
+  if (value < 60_000) {
+    return `${Math.floor(value / 1_000)} 秒`;
+  }
+  const minutes = Math.floor(value / 60_000);
+  if (minutes < 60) {
+    return `${minutes} 分钟`;
+  }
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return minutes % 60 === 0 ? `${hours} 小时` : `${hours} 小时 ${minutes % 60} 分`;
+  }
+  const days = Math.floor(hours / 24);
+  return hours % 24 === 0 ? `${days} 天` : `${days} 天 ${hours % 24} 小时`;
+}
+
 export function formatRelativeTime(at: number, now: number = Date.now()): string {
   const diff = now - at;
   if (diff < 10_000) {

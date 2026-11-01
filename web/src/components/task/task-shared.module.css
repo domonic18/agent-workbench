@@ -1,0 +1,93 @@
+/* 列表与抽屉共用的展示原语;各模块以 composes 引用,避免两处漂移 */
+.label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.mono {
+  margin-top: 2px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.output {
+  display: inline-block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  color: var(--accent);
+}
+
+.outputCode {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+.section {
+  margin-bottom: 22px;
+}
+
+.sectionTitle {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+.hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.kind {
+  font-weight: 600;
+}
+
+.time {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.loading {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.errorBox {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  border: 1px solid var(--danger-border);
+  border-radius: 10px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.retry {
+  padding: 6px 12px;
+  border: 1px solid var(--danger-border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--danger);
+  cursor: pointer;
+}
+
+.more {
+  margin-top: 10px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}

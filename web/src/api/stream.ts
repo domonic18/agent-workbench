@@ -58,6 +58,10 @@ export function useRealtimeStream(scopes: readonly string[]): RealtimeStatus {
       if (key.length > 0) {
         void queryClient.invalidateQueries({ queryKey: key });
       }
+      // 任务表的触发器同样推进 overview 水位,列表没有自己的作用域
+      if (scope === "overview") {
+        void queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      }
     };
 
     const connect = (): void => {

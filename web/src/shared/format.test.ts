@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatDateTime,
+  formatDuration,
   formatExactTokens,
   formatRelativeTime,
   formatTokens,
@@ -24,6 +25,16 @@ describe("时间格式化", () => {
   it("绝对时间按本地时区补零", () => {
     const at = new Date(2026, 10, 1, 8, 5, 3).getTime();
     expect(formatDateTime(at)).toBe("2026-11-01 08:05:03");
+  });
+
+  it("耗时按秒/分/时/天分档,负值归零", () => {
+    expect(formatDuration(-5_000)).toBe("0 秒");
+    expect(formatDuration(9_400)).toBe("9 秒");
+    expect(formatDuration(90_000)).toBe("1 分钟");
+    expect(formatDuration(3_600_000)).toBe("1 小时");
+    expect(formatDuration(5_400_000)).toBe("1 小时 30 分");
+    expect(formatDuration(86_400_000)).toBe("1 天");
+    expect(formatDuration(90_000_000)).toBe("1 天 1 小时");
   });
 
   it("相对时间分档", () => {

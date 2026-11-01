@@ -2,7 +2,7 @@ import { NavLink, Outlet, useNavigate } from "react-router";
 import { logout } from "../../api/auth.js";
 import styles from "./AppShell.module.css";
 
-const PENDING_SECTIONS = ["任务", "授权", "知识"] as const;
+const PENDING_SECTIONS = ["授权", "知识"] as const;
 
 export function AppShell() {
   const navigate = useNavigate();
@@ -24,6 +24,12 @@ export function AppShell() {
           className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ""}`}
         >
           总览
+        </NavLink>
+        <NavLink
+          to="/tasks"
+          className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ""}`}
+        >
+          任务
         </NavLink>
         {PENDING_SECTIONS.map((section) => (
           <span
