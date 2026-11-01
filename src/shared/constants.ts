@@ -109,6 +109,13 @@ export const CAPABILITY_TIMEOUTS = {
   issuingMs: 60_000,
 } as const;
 
+/**
+ * 知识条目状态(02 §3.5):candidate 只能由 kb_write 写入且服务端强制,
+ * 必须经人在知识屏采纳才转 active,避免 Agent 自己教自己。
+ */
+export const KNOWLEDGE_STATUSES = ["draft", "candidate", "active", "archived"] as const;
+export type KnowledgeStatus = (typeof KNOWLEDGE_STATUSES)[number];
+
 /** 控制台会话寿命(01 §3 注:刻意收紧为 12 小时,不采纳需求的 7 天滑动) */
 export const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 
