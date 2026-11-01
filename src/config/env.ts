@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { EmbeddingConfig } from "../domain/knowledge/embedding.js";
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -8,6 +9,12 @@ const envSchema = z.object({
   HOST: z.string().min(1).default("127.0.0.1"),
   PORT: z.coerce.number().int().min(1).max(65_535).default(8787),
   DATABASE_PATH: z.string().min(1).default("./workspace/console.db"),
+  // Markdown 知识条目目录(文本真相源);索引与元数据只是可重建的镜像
+  KNOWLEDGE_DIR: z.string().min(1).default("./workspace/knowledge"),
+  // OpenAI 兼容嵌入接口;未配齐则只建关键词索引,条目保持 pending
+  EMBEDDING_BASE_URL: z.string().optional(),
+  EMBEDDING_API_KEY: z.string().optional(),
+  EMBEDDING_MODEL: z.string().optional(),
   // 仅首次启动用于把口令哈希写入库;初始化后留空即可
   CONSOLE_INIT_PASSWORD: z.string().optional(),
   // 来源白名单只校验 Host(含端口),逗号分隔;留空 = 本机监听地址
@@ -54,6 +61,8 @@ export interface Config {
   host: string;
   port: number;
   databasePath: string;
+  knowledgeDir: string;
+  embedding: EmbeddingConfig | undefined;
   consoleInitPassword: string | undefined;
   allowedHosts: string[];
   feishu: FeishuConfig | undefined;
@@ -115,6 +124,18 @@ function parseFeishu(env: z.infer<typeof envSchema>): FeishuConfig | undefined {
   };
 }
 
+function parseEmbedding(env: z.infer<typeof envSchema>): EmbeddingConfig | undefined {
+  const baseUrl = optionalText(env.EMBEDDING_BASE_URL);
+  const model = optionalText(env.EMBEDDING_MODEL);
+  if (baseUrl === undefined && model === undefined) {
+    return undefined;
+  }
+  if (baseUrl === undefined || model === undefined) {
+    throw new Error("EMBEDDING_BASE_URL 与 EMBEDDING_MODEL 必须同时设置");
+  }
+  return { baseUrl, apiKey: optionalText(env.EMBEDDING_API_KEY), model };
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const parsed = envSchema.safeParse(env);
   if (!parsed.success) {
@@ -130,6 +151,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     host: parsed.data.HOST,
     port: parsed.data.PORT,
     databasePath: parsed.data.DATABASE_PATH,
+    knowledgeDir: parsed.data.KNOWLEDGE_DIR,
+    embedding: parseEmbedding(parsed.data),
     consoleInitPassword:
       initPassword === undefined || initPassword === "" ? undefined : initPassword,
     allowedHosts: parseAllowedHosts(

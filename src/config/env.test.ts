@@ -9,6 +9,8 @@ describe("loadConfig", () => {
       host: "127.0.0.1",
       port: 8787,
       databasePath: "./workspace/console.db",
+      knowledgeDir: "./workspace/knowledge",
+      embedding: undefined,
       allowedHosts: ["127.0.0.1:8787"],
       teleport: {
         tctlPath: "tctl",
@@ -61,6 +63,17 @@ describe("loadConfig", () => {
   it("未配置飞书凭据时不建立连接配置", () => {
     expect(loadConfig({}).feishu).toBeUndefined();
     expect(loadConfig({ FEISHU_APP_ID: "", FEISHU_APP_SECRET: "" }).feishu).toBeUndefined();
+  });
+
+  it("嵌入配置必须成对,缺一半启动即失败", () => {
+    expect(
+      loadConfig({ EMBEDDING_BASE_URL: "http://127.0.0.1:11434/v1", EMBEDDING_MODEL: "bge-m3" })
+        .embedding,
+    ).toEqual({ baseUrl: "http://127.0.0.1:11434/v1", model: "bge-m3", apiKey: undefined });
+    expect(() => loadConfig({ EMBEDDING_BASE_URL: "http://127.0.0.1:11434/v1" })).toThrow(
+      /必须同时设置/,
+    );
+    expect(() => loadConfig({ EMBEDDING_MODEL: "bge-m3" })).toThrow(/必须同时设置/);
   });
 
   it("飞书凭据必须成对,单边配置启动即失败", () => {

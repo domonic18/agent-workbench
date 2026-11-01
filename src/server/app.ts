@@ -4,6 +4,8 @@ import type { TeleportAdapter } from "../adapters/teleport/tctl.js";
 import type { FeishuConfig } from "../config/env.js";
 import type { A2aService } from "../domain/a2a/types.js";
 import { createCapabilityService, type CapabilityService } from "../domain/capability/service.js";
+import type { KnowledgeIndexService } from "../domain/knowledge/index-service.js";
+import type { KnowledgeRebuilder } from "../domain/knowledge/rebuild.js";
 import { healthPayload, type DatabaseStatus } from "../shared/health.js";
 import type { Db } from "../store/database.js";
 import { requireAllowedHost } from "./middleware/host.js";
@@ -15,6 +17,7 @@ import { registerAuthRoutes } from "./routes/auth.js";
 import { registerCapabilityRoutes } from "./routes/capabilities.js";
 import { registerIdentityRoutes } from "./routes/identity.js";
 import { registerIngestRoutes } from "./routes/ingest.js";
+import { registerKnowledgeRoutes } from "./routes/knowledge.js";
 import { registerOverviewRoutes } from "./routes/overview.js";
 import { registerWebRoutes } from "./routes/static.js";
 import { registerStreamRoutes } from "./routes/stream.js";
@@ -40,6 +43,10 @@ export interface BuildAppOptions {
   service?: CapabilityService;
   /** 由启动方复用的 A2A 服务;死信回执要经同一实例唤醒长轮询 */
   a2a?: A2aService;
+  /** 知识索引重建器;注入才注册重建接口(内存库无法跨线程共享) */
+  knowledgeRebuilder?: KnowledgeRebuilder;
+  /** 单条索引重试;缺省时只开放整库重建 */
+  knowledgeIndexer?: KnowledgeIndexService;
   /** 飞书配置存在且带 approvalChatId 时,申请落库后推送审批卡片 */
   feishu?: FeishuConfig;
   /** 前端构建产物目录;存在 index.html 时才注册静态托管与 SPA 回退 */
@@ -83,6 +90,16 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     registerTaskA2aRoutes(app, { db, ...timing });
     registerStreamRoutes(app, { db, ...timing });
     registerIngestRoutes(app, { db, ...timing });
+    if (options.knowledgeRebuilder !== undefined) {
+      registerKnowledgeRoutes(app, {
+        db,
+        rebuilder: options.knowledgeRebuilder,
+        ...(options.knowledgeIndexer === undefined
+          ? {}
+          : { indexer: options.knowledgeIndexer }),
+        ...timing,
+      });
+    }
     registerA2aRoutes(app, {
       db,
       ...timing,

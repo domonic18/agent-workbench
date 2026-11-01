@@ -10,6 +10,9 @@ import { loadConfig } from "../config/env.js";
 import { createA2aService } from "../domain/a2a/service.js";
 import { createAuditReconciler } from "../domain/capability/audit-reconcile.js";
 import { createCapabilityService } from "../domain/capability/service.js";
+import { createEmbeddingClient } from "../domain/knowledge/embedding.js";
+import { createKnowledgeIndexService } from "../domain/knowledge/index-service.js";
+import { createKnowledgeRebuilder } from "../domain/knowledge/rebuild.js";
 import { isDatabaseWritable, openDatabase } from "../store/database.js";
 import { acquireInstanceLock } from "../store/lock.js";
 import { runMigrations } from "../store/migrator.js";
@@ -40,6 +43,18 @@ try {
 const teleport = createTeleportAdapter(config.teleport, createProcessRunner());
 const service = createCapabilityService({ db, teleport });
 const a2a = createA2aService({ db });
+const knowledgeRebuilder = createKnowledgeRebuilder({
+  databasePath: config.databasePath,
+  knowledgeDir: config.knowledgeDir,
+  ...(config.embedding === undefined ? {} : { embedding: config.embedding }),
+});
+const knowledgeEmbedding =
+  config.embedding === undefined ? undefined : createEmbeddingClient(config.embedding);
+const knowledgeIndexer = createKnowledgeIndexService({
+  db,
+  knowledgeDir: config.knowledgeDir,
+  ...(knowledgeEmbedding === undefined ? {} : { embedding: knowledgeEmbedding }),
+});
 
 const app = buildApp({
   logLevel: config.logLevel,
@@ -48,6 +63,8 @@ const app = buildApp({
   teleport,
   service,
   a2a,
+  knowledgeRebuilder,
+  knowledgeIndexer,
   allowedHosts: config.allowedHosts,
   // src/server 与 dist/server 到仓库根同为两级目录
   webRoot: fileURLToPath(new URL("../../dist/web", import.meta.url)),
