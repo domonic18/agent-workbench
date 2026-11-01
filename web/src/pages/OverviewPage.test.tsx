@@ -105,7 +105,7 @@ describe("总览页", () => {
     );
     renderPage();
 
-    expect((await screen.findAllByText("构建 Agent")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("aw@build-box")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("运行中").length).toBeGreaterThan(0);
     expect(screen.getAllByText("实现接口契约").length).toBeGreaterThan(0);
     expect(FakeEventSource.lastUrl).toContain("scope=overview");

@@ -48,12 +48,33 @@ describe("Agent 卡片", () => {
 
     const cards = screen.getByRole("list", { name: "Agent 卡片" });
     const items = within(cards).getAllByRole("listitem");
-    expect(within(items[0] as HTMLElement).getByText("运行 Agent")).toBeTruthy();
+    expect(within(items[0] as HTMLElement).getByText("aw@build-box")).toBeTruthy();
     expect(within(cards).getByText("实现接口契约")).toBeTruthy();
     expect(within(cards).getByText(/执行 · 进行中/)).toBeTruthy();
     expect(within(cards).getByText("1.2M")).toBeTruthy();
     expect(within(cards).getByText("空闲")).toBeTruthy();
     expect(within(cards).getByText("当前没有进行中的任务")).toBeTruthy();
+  });
+
+  it("名称统一为 项目@机器名,不再重复展示项目与机器", () => {
+    render(
+      <AgentCards
+        agents={[
+          agent({
+            displayName: "MacBook cc-sysdev",
+            project: "cc-sysdev",
+            machineHostname: "MacBook Pro",
+            running: true,
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("cc-sysdev@MacBook Pro")).toBeTruthy();
+    expect(screen.queryByText("MacBook cc-sysdev")).toBeNull();
+    expect(screen.queryByText("项目 · cc-sysdev")).toBeNull();
+    expect(screen.queryByText("MacBook Pro")).toBeNull();
+    expect(screen.getByText(/最近运行 ·/)).toBeTruthy();
   });
 
   it("运行中但无任务归属不显示为空闲", () => {

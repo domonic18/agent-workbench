@@ -56,6 +56,11 @@ function statusLabel(value: string | null): string {
   return TASK_STATUS_LABEL[value as keyof typeof TASK_STATUS_LABEL] ?? value;
 }
 
+/** 统一为「项目@机器名」:自报名是自由文本,各机器写法不一,拼出来才可比 */
+function agentLabel(agent: OverviewAgent): string {
+  return `${agent.project}@${agent.machineHostname}`;
+}
+
 function sortAgents(agents: readonly OverviewAgent[]): OverviewAgent[] {
   return [...agents].sort((a, b) => {
     if (a.running !== b.running) {
@@ -76,12 +81,14 @@ export function AgentCards({ agents, now, onManageKey }: AgentCardsProps) {
         return (
           <li key={agent.id} className={styles.card}>
             <div className={styles.cardTop}>
-              <div className={styles.identity}>
-                <span className={styles.name} title={agent.displayName}>
-                  {agent.displayName}
-                </span>
-                <span className={styles.chip}>{agent.project}</span>
-              </div>
+              <span
+                className={styles.name}
+                title={
+                  agent.displayName === agentLabel(agent) ? undefined : agent.displayName
+                }
+              >
+                {agentLabel(agent)}
+              </span>
               <span className={`${styles.status} ${TONE_CLASS[tone]}`}>
                 <span className={styles.dot} aria-hidden="true" />
                 {statusText(agent)}
@@ -89,9 +96,8 @@ export function AgentCards({ agents, now, onManageKey }: AgentCardsProps) {
             </div>
 
             <div className={styles.meta}>
-              <span>{agent.machineHostname}</span>
-              <span>项目 · {agent.project}</span>
               <span title={agent.lastRunAt === null ? undefined : formatDateTime(agent.lastRunAt)}>
+                最近运行 ·{" "}
                 {agent.lastRunAt === null ? "从未运行" : formatRelativeTime(agent.lastRunAt, now)}
               </span>
             </div>
