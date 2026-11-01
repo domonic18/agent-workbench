@@ -79,11 +79,13 @@ export function createOverviewService(deps: OverviewServiceDeps): OverviewServic
     const idleSince = at - RUN_IDLE_GAP_MS;
     const heartbeatSince = at - MACHINE_HEARTBEAT.timeoutMs;
 
+    // 先取水位再读投影:期间发生的变更只会让 revision 更大,不会出现「新版本配旧数据」
+    const revision = currentRevision(db, OVERVIEW_SCOPE);
     const metrics = getOverviewMetrics(db, { since, idleSince, heartbeatSince });
     const rows = listAgentOverviewRows(db, { since, idleSince });
 
     return {
-      revision: currentRevision(db, OVERVIEW_SCOPE),
+      revision,
       generatedAt: at,
       todayStart: since,
       metrics,
