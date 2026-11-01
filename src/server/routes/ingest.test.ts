@@ -4,6 +4,7 @@ import { createIdentityService } from "../../domain/identity/service.js";
 import { openDatabase, type Db } from "../../store/database.js";
 import { runMigrations } from "../../store/migrator.js";
 import { hasIngestReceipt } from "../../store/repositories/ingest-receipt.js";
+import { findMachineById } from "../../store/repositories/identity.js";
 import { findRunningRunForStream, listTimelineEventsByRun } from "../../store/repositories/run.js";
 import { buildApp } from "../app.js";
 
@@ -167,5 +168,40 @@ describe("ingest 路由", () => {
         seq: 3,
       }),
     ).toBe(false);
+  });
+
+  it("心跳推进机器存活时间并回带已登记项目", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/ingest/heartbeat",
+      headers: headers(),
+      payload: { uptime: 12, pending_bytes: 0, unattributed_streams: 0 },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ ok: true, projects: ["pa"] });
+    expect(findMachineById(fixture.db, "m1")?.lastSeenAt).toBeTypeOf("number");
+  });
+
+  it("心跳与项目列表都要求采集器 Bearer", async () => {
+    const heartbeat = await app.inject({
+      method: "POST",
+      url: "/api/ingest/heartbeat",
+      payload: {},
+    });
+    expect(heartbeat.statusCode).toBe(401);
+
+    const projects = await app.inject({ method: "GET", url: "/api/ingest/projects" });
+    expect(projects.statusCode).toBe(401);
+  });
+
+  it("项目列表只返回本机已登记项目", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/ingest/projects",
+      headers: headers(),
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ projects: ["pa"] });
   });
 });

@@ -4,8 +4,22 @@ import { IngestError } from "../../domain/ingest/errors.js";
 import { createIngestService, type IngestService } from "../../domain/ingest/service.js";
 import { INGEST } from "../../shared/constants.js";
 import type { Db } from "../../store/database.js";
-import type { MachineRecord } from "../../store/repositories/identity.js";
+import {
+  listActiveAgentProjects,
+  type MachineRecord,
+  touchMachineLastSeen,
+} from "../../store/repositories/identity.js";
 import { requireMachineAuth } from "../middleware/machine-auth.js";
+
+const heartbeatSchema = z.object({
+  uptime: z.number().int().min(0).optional(),
+  pending_bytes: z.number().int().min(0).optional(),
+  unattributed_streams: z.number().int().min(0).optional(),
+  cpu: z.number().optional(),
+  mem: z.number().optional(),
+  last_error: z.string().nullable().optional(),
+  streams: z.array(z.unknown()).max(1000).optional(),
+});
 
 const itemSchema = z.object({
   seq: z.number().int().min(1),
@@ -71,6 +85,28 @@ export function registerIngestRoutes(app: FastifyInstance, options: IngestRoutes
   const db = options.db;
   const now = options.now ?? Date.now;
   const service = options.service ?? createIngestService({ db, now });
+
+  app.post("/api/ingest/heartbeat", { preHandler: [requireMachineAuth(db)] }, async (request, reply) => {
+    const machine = request.machine as MachineRecord;
+    const parsed = heartbeatSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return validationError(reply, parsed.error);
+    }
+    // 心跳只推进机器存活时间与取回可推送项目;CPU / 内存等指标不入库
+    touchMachineLastSeen(db, machine.id, now());
+    return reply.code(200).send({
+      ok: true,
+      projects: listActiveAgentProjects(db, machine.id),
+      server_time: now(),
+    });
+  });
+
+  app.get("/api/ingest/projects", { preHandler: [requireMachineAuth(db)] }, async (request, reply) => {
+    const machine = request.machine as MachineRecord;
+    return reply.code(200).send({
+      projects: listActiveAgentProjects(db, machine.id),
+    });
+  });
 
   app.post("/api/ingest", { preHandler: [requireMachineAuth(db)] }, async (request, reply) => {
     const machine = request.machine as MachineRecord;

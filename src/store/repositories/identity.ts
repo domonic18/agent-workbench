@@ -46,6 +46,23 @@ export function updateMachineSecretHash(db: Db, id: string, hash: string): boole
     .changes === 1;
 }
 
+/** 采集器心跳只推进机器存活时间;机器活着不等于 Agent 在跑 */
+export function touchMachineLastSeen(db: Db, id: string, now: number): boolean {
+  return db
+    .prepare("UPDATE machine SET last_seen_at = ? WHERE id = ? AND status = 'active'")
+    .run(now, id).changes === 1;
+}
+
+/** 采集器据此判断哪些项目已登记,未登记项目不推送 */
+export function listActiveAgentProjects(db: Db, machineId: string): string[] {
+  const rows = db
+    .prepare(
+      "SELECT project FROM agent WHERE machine_id = ? AND status = 'active' ORDER BY project",
+    )
+    .all(machineId) as Array<{ project: string }>;
+  return rows.map((row) => row.project);
+}
+
 export interface MachineListQuery {
   limit: number;
   /** keyset 游标:上一页最后一行的 (createdAt, id) */
