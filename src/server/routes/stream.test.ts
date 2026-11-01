@@ -224,7 +224,10 @@ describe("stream 路由", () => {
 
     await first.close();
     await second.close();
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    const deadline = Date.now() + 2000;
+    while (registry.clientCount() !== 0 && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
     expect(registry.clientCount()).toBe(0);
   });
 });
