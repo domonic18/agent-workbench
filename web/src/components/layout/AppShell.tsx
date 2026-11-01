@@ -58,6 +58,9 @@ function pageTitle(pathname: string): string {
   if (pathname.startsWith("/capabilities")) {
     return "授权";
   }
+  if (pathname.startsWith("/knowledge")) {
+    return "知识";
+  }
   return "总览";
 }
 
@@ -115,12 +118,15 @@ export function AppShell() {
             </span>
             授权
           </NavLink>
-          <span className={styles.disabled} aria-disabled="true" title="后续里程碑接入">
+          <NavLink
+            to="/knowledge"
+            className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ""}`}
+          >
             <span className={styles.icon}>
               <NavIcon name="knowledge" />
             </span>
             知识
-          </span>
+          </NavLink>
         </div>
       </nav>
 

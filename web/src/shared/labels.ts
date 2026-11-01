@@ -1,3 +1,7 @@
+import type {
+  KnowledgeEmbeddingStatus,
+  KnowledgeStatus,
+} from "../api/knowledge.js";
 import type { ChainRelation } from "../api/task-chain.js";
 import type {
   A2aIntent,
@@ -151,4 +155,30 @@ export const CHAIN_RELATION_LABEL: Record<ChainRelation, string> = {
   a2a: "A2A 交接",
   continuation: "本方续接",
   unknown: "上游关联",
+};
+
+export const KNOWLEDGE_STATUS_LABEL: Record<KnowledgeStatus, string> = {
+  draft: "草稿",
+  candidate: "待采纳",
+  active: "已生效",
+  archived: "已归档",
+};
+
+export const KNOWLEDGE_STATUS_TONE: Record<KnowledgeStatus, Tone> = {
+  draft: "muted",
+  candidate: "warning",
+  active: "positive",
+  archived: "muted",
+};
+
+export const KNOWLEDGE_EMBEDDING_LABEL: Record<KnowledgeEmbeddingStatus, string> = {
+  pending: "待索引",
+  ready: "已索引",
+  failed: "索引失败",
+};
+
+export const KNOWLEDGE_EMBEDDING_TONE: Record<KnowledgeEmbeddingStatus, Tone> = {
+  pending: "warning",
+  ready: "positive",
+  failed: "danger",
 };

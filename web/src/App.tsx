@@ -28,6 +28,14 @@ const CapabilitiesPage = lazy(async () => {
   const module = await import("./pages/CapabilitiesPage.js");
   return { default: module.CapabilitiesPage };
 });
+const KnowledgePage = lazy(async () => {
+  const module = await import("./pages/KnowledgePage.js");
+  return { default: module.KnowledgePage };
+});
+const KnowledgeDetailRoute = lazy(async () => {
+  const module = await import("./pages/KnowledgeDetailRoute.js");
+  return { default: module.KnowledgeDetailRoute };
+});
 
 /** 任意 API 401 统一回登录页,并记住原路径(03 §3) */
 function UnauthorizedRedirect() {
@@ -61,6 +69,9 @@ export function App() {
             <Route path=":id" element={<TaskDrawerRoute />} />
           </Route>
           <Route path="/capabilities" element={<CapabilitiesPage />} />
+          <Route path="/knowledge" element={<KnowledgePage />}>
+            <Route path=":id" element={<KnowledgeDetailRoute />} />
+          </Route>
           <Route path="*" element={<Navigate to="/overview" replace />} />
         </Route>
       </Routes>
