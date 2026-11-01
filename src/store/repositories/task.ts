@@ -35,6 +35,46 @@ export function findTaskSummary(db: Db, id: string): TaskSummary | undefined {
 }
 
 /** 归属谓词 = task.assignee;供 A2A 发送方校验「task_id 恒指自己的任务」 */
+export interface TaskListQuery {
+  status?: TaskStatus;
+  project?: string;
+  assignee?: string;
+  limit: number;
+  /** keyset 游标:上一页最后一行的 (createdAt, id) */
+  before?: { createdAt: number; id: string };
+}
+
+/** 控制台任务列表:按键集分页,不扫事件表(02 §4 投影口径) */
+export function listTasks(db: Db, query: TaskListQuery): TaskRecord[] {
+  const conditions: string[] = [];
+  const params: Record<string, unknown> = { limit: query.limit };
+  if (query.status !== undefined) {
+    conditions.push("status = @status");
+    params.status = query.status;
+  }
+  if (query.project !== undefined) {
+    conditions.push("project = @project");
+    params.project = query.project;
+  }
+  if (query.assignee !== undefined) {
+    conditions.push("assignee = @assignee");
+    params.assignee = query.assignee;
+  }
+  if (query.before !== undefined) {
+    conditions.push(
+      "(created_at < @beforeCreatedAt OR (created_at = @beforeCreatedAt AND id < @beforeId))",
+    );
+    params.beforeCreatedAt = query.before.createdAt;
+    params.beforeId = query.before.id;
+  }
+  const where = conditions.length === 0 ? "" : `WHERE ${conditions.join(" AND ")}`;
+  return db
+    .prepare(
+      `SELECT ${FULL_COLUMNS} FROM task ${where} ORDER BY created_at DESC, id DESC LIMIT @limit`,
+    )
+    .all(params) as TaskRecord[];
+}
+
 export function findTaskOwnedBy(
   db: Db,
   id: string,
@@ -66,6 +106,35 @@ export function findTaskParent(db: Db, id: string): string | null | undefined {
     | { parentTaskId: string | null }
     | undefined;
   return row?.parentTaskId;
+}
+
+export interface TaskEventRecord {
+  id: string;
+  taskId: string;
+  seq: number;
+  kind: TaskEventKind;
+  payloadJson: string;
+  occurredAt: number;
+}
+
+const EVENT_COLUMNS = `
+  id, task_id AS taskId, seq, kind, payload_json AS payloadJson, occurred_at AS occurredAt
+`;
+
+/** 快照(cursor=0)与增量共用:按 seq 升序,游标之后取 limit 条 */
+export function listTaskEvents(
+  db: Db,
+  taskId: string,
+  afterSeq: number,
+  limit: number,
+): TaskEventRecord[] {
+  return db
+    .prepare(
+      `SELECT ${EVENT_COLUMNS} FROM task_event
+        WHERE task_id = @taskId AND seq > @afterSeq
+        ORDER BY seq ASC LIMIT @limit`,
+    )
+    .all({ taskId, afterSeq, limit }) as TaskEventRecord[];
 }
 
 export interface NewTaskEvent {

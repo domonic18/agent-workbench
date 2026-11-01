@@ -81,6 +81,27 @@ export function listCapabilities(db: Db, query: CapabilityListQuery): Capability
     .all(params) as CapabilityRecord[];
 }
 
+export interface CapabilitySummary {
+  id: string;
+  target: string;
+  action: CapabilityAction;
+  scopeJson: string;
+  status: CapabilityStatus;
+  expiresAt: number | null;
+  createdAt: number;
+}
+
+/** 任务详情附带的授权摘要:不含 ticket 标识与证书内容 */
+export function listCapabilitySummariesByTask(db: Db, taskId: string): CapabilitySummary[] {
+  return db
+    .prepare(
+      `SELECT id, target, action, scope_json AS scopeJson, status,
+              expires_at AS expiresAt, created_at AS createdAt
+         FROM capability WHERE task_id = ? ORDER BY created_at DESC, id DESC`,
+    )
+    .all(taskId) as CapabilitySummary[];
+}
+
 export interface CapabilityTransition {
   id: string;
   from: CapabilityStatus;

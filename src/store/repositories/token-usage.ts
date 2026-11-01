@@ -85,6 +85,23 @@ export function sumTaskTokens(db: Db, taskId: string): number {
   return row.total;
 }
 
+export interface TaskTokenSummary {
+  total: number;
+  entries: number;
+}
+
+/** 任务详情的用量汇总:四维之和与明细条数,与 token_usage 可对账 */
+export function summarizeTaskTokens(db: Db, taskId: string): TaskTokenSummary {
+  return db
+    .prepare(
+      `SELECT COALESCE(SUM(
+         input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens
+       ), 0) AS total, COUNT(*) AS entries
+         FROM token_usage WHERE task_id = ?`,
+    )
+    .get(taskId) as TaskTokenSummary;
+}
+
 export function setTaskTotalTokens(db: Db, taskId: string, total: number): boolean {
   return (
     db.prepare("UPDATE task SET total_tokens = ? WHERE id = ?").run(total, taskId).changes === 1
