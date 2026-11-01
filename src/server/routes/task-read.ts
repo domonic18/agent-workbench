@@ -7,7 +7,8 @@ import type { Db } from "../../store/database.js";
 import type { CapabilitySummary } from "../../store/repositories/capability.js";
 import type { TaskEventRecord } from "../../store/repositories/task.js";
 import { requireSession } from "../middleware/session.js";
-import { invalid, sendError, toTaskDto } from "./task-dto.js";
+import { invalid } from "./http.js";
+import { sendError, toTaskDto } from "./task-dto.js";
 
 export interface TaskReadRoutesOptions {
   db: Db;

@@ -55,7 +55,3 @@ export function sendError(reply: FastifyReply, error: TaskError): FastifyReply {
     },
   });
 }
-
-export function invalid(reply: FastifyReply, message: string): FastifyReply {
-  return reply.code(422).send({ error: { code: "VALIDATION_FAILED", message } });
-}
