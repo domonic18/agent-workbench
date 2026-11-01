@@ -113,6 +113,11 @@ describe("stream 路由", () => {
   afterEach(async () => {
     app.server.closeAllConnections();
     await app.close();
+    // 连接关闭事件异步派发,未清完就关库会让轮询定时器撞上已关闭的 db
+    const deadline = Date.now() + 2000;
+    while (registry.clientCount() !== 0 && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
     db.close();
   });
 
