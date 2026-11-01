@@ -109,6 +109,21 @@ describe("A2A 线程读取", () => {
     db.close();
   });
 
+  it("ACK 交接出的下游任务能读到上游线程", () => {
+    const db = prepare();
+    addMessage(db, { round: 1, ackAt: 1_500 });
+    db.prepare("UPDATE task SET parent_task_id = 'tsk_a' WHERE id = 'tsk_b'").run();
+    db.prepare(
+      `INSERT INTO task_event (id, task_id, seq, kind, payload_json, occurred_at)
+       VALUES ('tev_1', 'tsk_b', 1, 'handoff',
+         '{"relation":"a2a","upstream_msg_id":"msg_1","upstream_task_id":"tsk_a"}', 1_500)`,
+    ).run();
+    const service = createA2aThreadReadService({ db, now: () => AT });
+
+    expect(service.byTask("tsk_b").map((row) => row.id)).toEqual(["thr_1"]);
+    db.close();
+  });
+
   it("任务不存在抛 NOT_FOUND", () => {
     const db = prepare();
     const service = createA2aThreadReadService({ db, now: () => AT });

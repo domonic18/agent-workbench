@@ -223,7 +223,10 @@ export function listInbox(db: Db, agentId: string, query: InboxQuery): A2aMessag
     .all(params) as A2aMessageRecord[];
 }
 
-/** 任务相关的线程:它发起的线程,或它以某条消息的 task_id 参与的线程(01 §4) */
+/**
+ * 任务相关的线程(01 §4):它发起的、它以消息 task_id 参与的,
+ * 或它是某条 ACK 交接出的下游任务(handoff 事件记 upstream_msg_id)。
+ */
 export function listThreadsForTask(db: Db, taskId: string): A2aThreadRecord[] {
   return db
     .prepare(
@@ -231,6 +234,14 @@ export function listThreadsForTask(db: Db, taskId: string): A2aThreadRecord[] {
        WHERE t.initiator_task_id = @taskId
          OR EXISTS (
            SELECT 1 FROM a2a_message m WHERE m.thread_id = t.id AND m.task_id = @taskId
+         )
+         OR EXISTS (
+           SELECT 1 FROM task_event e
+           JOIN a2a_message hm ON hm.id = json_extract(e.payload_json, '$.upstream_msg_id')
+           WHERE e.task_id = @taskId
+             AND e.kind = 'handoff'
+             AND json_extract(e.payload_json, '$.relation') = 'a2a'
+             AND hm.thread_id = t.id
          )
        ORDER BY t.created_at ASC, t.id ASC`,
     )
