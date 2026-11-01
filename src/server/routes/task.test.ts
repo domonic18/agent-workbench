@@ -1,18 +1,34 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, LightMyRequestResponse } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createIdentityService } from "../../domain/identity/service.js";
 import { openDatabase, type Db } from "../../store/database.js";
 import { runMigrations } from "../../store/migrator.js";
+import { insertCapability } from "../../store/repositories/capability.js";
+import { bindRunTaskIfEmpty, insertRun } from "../../store/repositories/run.js";
+import { insertTokenUsage } from "../../store/repositories/token-usage.js";
 import { buildApp } from "../app.js";
+import { ensureConsoleCredential } from "../credential.js";
+
+const PASSWORD = "secret123";
 
 interface Fixture {
   db: Db;
   secrets: Record<string, string>;
 }
 
+function cookieOf(response: LightMyRequestResponse): string {
+  const raw = response.headers["set-cookie"];
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (value === undefined) {
+    throw new Error("响应没有 set-cookie");
+  }
+  return value.split(";")[0] as string;
+}
+
 function prepare(): Fixture {
   const db = openDatabase(":memory:");
   runMigrations(db);
+  ensureConsoleCredential(db, PASSWORD);
   const ids = ["agt_a", "agt_b"];
   const secrets = ["secret-a", "secret-b"];
   let idSeq = 0;
@@ -170,5 +186,201 @@ describe("task 路由", () => {
     });
     expect(response.statusCode).toBe(422);
     expect(response.json().error.detail).toMatchObject({ dimension: "status" });
+  });
+
+  describe("控制台读取", () => {
+    async function consoleCookie(): Promise<string> {
+      const login = await app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { password: PASSWORD },
+      });
+      expect(login.statusCode).toBe(200);
+      return cookieOf(login);
+    }
+
+    function seedUsage(taskId: string): void {
+      insertRun(fixture.db, {
+        id: "run_1",
+        agentId: "agt_a",
+        machine: "m1",
+        project: "pa",
+        streamId: "s1",
+        startedAt: 1,
+      });
+      expect(bindRunTaskIfEmpty(fixture.db, "run_1", taskId)).toBe(true);
+      insertTokenUsage(fixture.db, {
+        id: "tu_1",
+        agentId: "agt_a",
+        taskId,
+        runId: "run_1",
+        provider: "anthropic",
+        model: "claude",
+        inputTokens: 100,
+        outputTokens: 50,
+        cacheReadTokens: 10,
+        cacheCreationTokens: 5,
+        source: "assistant_message",
+        sequence: 1,
+        receiptHash: "hash",
+        occurredAt: Date.now(),
+      });
+      insertCapability(fixture.db, {
+        id: "cap_1",
+        subject: "agt_a",
+        target: "db.prod",
+        action: "read",
+        scopeJson: '{"tables":["orders"]}',
+        ttlSeconds: 900,
+        taskId,
+        createdAt: Date.now(),
+      });
+    }
+
+    it("未登录读接口统一 401", async () => {
+      const taskId = await createTask();
+      for (const url of ["/api/tasks", `/api/tasks/${taskId}`, `/api/tasks/${taskId}/events`]) {
+        const response = await app.inject({ method: "GET", url });
+        expect(response.statusCode).toBe(401);
+      }
+    });
+
+    it("列表支持过滤、游标分页与参数校验", async () => {
+      await createTask("agt_a");
+      await createTask("agt_a");
+      await createTask("agt_b");
+      const cookie = await consoleCookie();
+
+      const all = await app.inject({
+        method: "GET",
+        url: "/api/tasks",
+        headers: { cookie },
+      });
+      expect(all.statusCode).toBe(200);
+      expect(all.json().items).toHaveLength(3);
+      expect(all.json().nextCursor).toBeNull();
+
+      const byB = await app.inject({
+        method: "GET",
+        url: "/api/tasks?assignee=agt_b",
+        headers: { cookie },
+      });
+      expect(byB.json().items).toHaveLength(1);
+      expect(byB.json().items[0].assignee).toBe("agt_b");
+
+      const byStatus = await app.inject({
+        method: "GET",
+        url: "/api/tasks?status=pending",
+        headers: { cookie },
+      });
+      expect(byStatus.json().items).toHaveLength(3);
+
+      const page1 = await app.inject({
+        method: "GET",
+        url: "/api/tasks?limit=2",
+        headers: { cookie },
+      });
+      expect(page1.json().items).toHaveLength(2);
+      const cursor = page1.json().nextCursor as string;
+      expect(cursor).toMatch(/^\d+:/);
+
+      const page2 = await app.inject({
+        method: "GET",
+        url: `/api/tasks?limit=2&cursor=${encodeURIComponent(cursor)}`,
+        headers: { cookie },
+      });
+      expect(page2.json().items).toHaveLength(1);
+      expect(page2.json().nextCursor).toBeNull();
+
+      const badStatus = await app.inject({
+        method: "GET",
+        url: "/api/tasks?status=nope",
+        headers: { cookie },
+      });
+      expect(badStatus.statusCode).toBe(422);
+
+      const badLimit = await app.inject({
+        method: "GET",
+        url: "/api/tasks?limit=0",
+        headers: { cookie },
+      });
+      expect(badLimit.statusCode).toBe(422);
+    });
+
+    it("详情一次返回任务、授权摘要与 token 汇总", async () => {
+      const taskId = await createTask();
+      seedUsage(taskId);
+      const cookie = await consoleCookie();
+
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/tasks/${taskId}`,
+        headers: { cookie },
+      });
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body.task).toMatchObject({ id: taskId, status: "pending" });
+      expect(body.tokens).toEqual({ total: 165, entries: 1 });
+      expect(body.capabilities).toEqual([
+        expect.objectContaining({
+          id: "cap_1",
+          target: "db.prod",
+          action: "read",
+          status: "pending",
+          scope: { tables: ["orders"] },
+        }),
+      ]);
+      // 不返回 ticket 标识与证书内容
+      expect(body.capabilities[0]).not.toHaveProperty("ticket_id");
+      expect(body.revision).toBeGreaterThan(0);
+    });
+
+    it("时间线支持快照与 seq 增量", async () => {
+      const taskId = await createTask();
+      const cookie = await consoleCookie();
+
+      const snapshot = await app.inject({
+        method: "GET",
+        url: `/api/tasks/${taskId}/events`,
+        headers: { cookie },
+      });
+      expect(snapshot.statusCode).toBe(200);
+      expect(snapshot.json().items).toEqual([
+        expect.objectContaining({ seq: 1, kind: "created" }),
+      ]);
+      expect(snapshot.json().nextCursor).toBeNull();
+
+      await app.inject({
+        method: "PATCH",
+        url: `/api/tasks/${taskId}`,
+        headers: headers("agt_a"),
+        payload: { status: "running" },
+      });
+
+      const delta = await app.inject({
+        method: "GET",
+        url: `/api/tasks/${taskId}/events?cursor=1`,
+        headers: { cookie },
+      });
+      expect(delta.json().items).toEqual([
+        expect.objectContaining({ seq: 2, kind: "resumed" }),
+      ]);
+      expect(delta.json().nextCursor).toBeNull();
+
+      const badCursor = await app.inject({
+        method: "GET",
+        url: `/api/tasks/${taskId}/events?cursor=abc`,
+        headers: { cookie },
+      });
+      expect(badCursor.statusCode).toBe(422);
+    });
+
+    it("不存在任务返回 404", async () => {
+      const cookie = await consoleCookie();
+      for (const url of ["/api/tasks/tsk_404", "/api/tasks/tsk_404/events"]) {
+        const response = await app.inject({ method: "GET", url, headers: { cookie } });
+        expect(response.statusCode).toBe(404);
+      }
+    });
   });
 });
