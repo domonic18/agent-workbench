@@ -1,0 +1,64 @@
+name: release-collector
+
+on:
+  push:
+    tags:
+      - "collector-v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "已有 tag(如 collector-v0.1.0),用它创建或更新 Release"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build macOS binaries
+        run: pnpm --filter @aw/collector run package
+
+      - name: Checksums
+        run: |
+          set -eu
+          cd collector/dist/bin
+          shasum -a 256 aw-collector-macos-arm64 aw-collector-macos-x64 > checksums.txt
+          cat checksums.txt
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          set -eu
+          cd collector/dist/bin
+          cp ../../../scripts/install-collector.sh .
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" --clobber aw-collector-macos-arm64 aw-collector-macos-x64 checksums.txt install-collector.sh
+          else
+            gh release create "$TAG" \
+              --title "Collector ${TAG#collector-}" \
+              --notes "采集器预编译产物(macOS arm64 / x64)。安装见 install-collector.sh。" \
+              aw-collector-macos-arm64 aw-collector-macos-x64 checksums.txt install-collector.sh
+          fi
