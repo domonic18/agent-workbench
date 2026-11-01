@@ -120,6 +120,18 @@ export type KnowledgeStatus = (typeof KNOWLEDGE_STATUSES)[number];
 export const KNOWLEDGE_EMBEDDING_STATUSES = ["pending", "ready", "failed"] as const;
 export type KnowledgeEmbeddingStatus = (typeof KNOWLEDGE_EMBEDDING_STATUSES)[number];
 
+/** 受保护文件(02 §3.5):控制台、Agent 写入工具、批量操作三条路径都拒绝改写 */
+export const KNOWLEDGE_PROTECTED_FILES = ["index.md", "log.md"] as const;
+
+/** 知识编辑字段上限;正文上限防止单次请求撑爆内存与文件系统 */
+export const KNOWLEDGE_LIMITS = {
+  title: 200,
+  summary: 512,
+  category: 64,
+  content: 500_000,
+  search: 200,
+} as const;
+
 /** 索引链(02 §3.5 / M3.5-4):维度固定 768,FTS 用 trigram 覆盖中文子串 */
 export const KNOWLEDGE_INDEX = {
   dimensions: 768,

@@ -1,5 +1,4 @@
 import { readFile } from "node:fs/promises";
-import { resolve, sep } from "node:path";
 import { KNOWLEDGE_INDEX, type KnowledgeEmbeddingStatus } from "../../shared/constants.js";
 import type { Db } from "../../store/database.js";
 import {
@@ -18,6 +17,7 @@ import {
 import { splitMarkdown } from "./chunk.js";
 import type { EmbeddingClient } from "./embedding.js";
 import { hashKnowledgeContent } from "./hash.js";
+import { resolveEntryPath } from "./paths.js";
 
 export interface KnowledgeIndexOptions {
   knowledgeDir: string;
@@ -34,15 +34,6 @@ export interface KnowledgeRebuildResult {
   skipped: number;
   failed: number;
   missing: number;
-}
-
-function resolveEntryPath(knowledgeDir: string, path: string): string {
-  const root = resolve(knowledgeDir);
-  const fullPath = resolve(root, path);
-  if (!fullPath.startsWith(root + sep)) {
-    throw new Error(`知识路径越出知识目录: ${path}`);
-  }
-  return fullPath;
 }
 
 async function embedChunks(

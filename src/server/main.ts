@@ -11,6 +11,7 @@ import { createA2aService } from "../domain/a2a/service.js";
 import { createAuditReconciler } from "../domain/capability/audit-reconcile.js";
 import { createCapabilityService } from "../domain/capability/service.js";
 import { createEmbeddingClient } from "../domain/knowledge/embedding.js";
+import { createKnowledgeEntryService } from "../domain/knowledge/entry-service.js";
 import { createKnowledgeIndexService } from "../domain/knowledge/index-service.js";
 import { createKnowledgeRebuilder } from "../domain/knowledge/rebuild.js";
 import { isDatabaseWritable, openDatabase } from "../store/database.js";
@@ -55,6 +56,11 @@ const knowledgeIndexer = createKnowledgeIndexService({
   knowledgeDir: config.knowledgeDir,
   ...(knowledgeEmbedding === undefined ? {} : { embedding: knowledgeEmbedding }),
 });
+const knowledgeEntries = createKnowledgeEntryService({
+  db,
+  knowledgeDir: config.knowledgeDir,
+  indexer: knowledgeIndexer,
+});
 
 const app = buildApp({
   logLevel: config.logLevel,
@@ -65,6 +71,7 @@ const app = buildApp({
   a2a,
   knowledgeRebuilder,
   knowledgeIndexer,
+  knowledgeEntries,
   allowedHosts: config.allowedHosts,
   // src/server 与 dist/server 到仓库根同为两级目录
   webRoot: fileURLToPath(new URL("../../dist/web", import.meta.url)),

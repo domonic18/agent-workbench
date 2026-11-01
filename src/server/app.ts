@@ -4,6 +4,7 @@ import type { TeleportAdapter } from "../adapters/teleport/tctl.js";
 import type { FeishuConfig } from "../config/env.js";
 import type { A2aService } from "../domain/a2a/types.js";
 import { createCapabilityService, type CapabilityService } from "../domain/capability/service.js";
+import type { KnowledgeEntryService } from "../domain/knowledge/entry-service.js";
 import type { KnowledgeIndexService } from "../domain/knowledge/index-service.js";
 import type { KnowledgeRebuilder } from "../domain/knowledge/rebuild.js";
 import { healthPayload, type DatabaseStatus } from "../shared/health.js";
@@ -47,6 +48,8 @@ export interface BuildAppOptions {
   knowledgeRebuilder?: KnowledgeRebuilder;
   /** 单条索引重试;缺省时只开放整库重建 */
   knowledgeIndexer?: KnowledgeIndexService;
+  /** 知识列表 / 详情 / 编辑 / 采纳;缺省时只开放索引重建 */
+  knowledgeEntries?: KnowledgeEntryService;
   /** 飞书配置存在且带 approvalChatId 时,申请落库后推送审批卡片 */
   feishu?: FeishuConfig;
   /** 前端构建产物目录;存在 index.html 时才注册静态托管与 SPA 回退 */
@@ -97,6 +100,9 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         ...(options.knowledgeIndexer === undefined
           ? {}
           : { indexer: options.knowledgeIndexer }),
+        ...(options.knowledgeEntries === undefined
+          ? {}
+          : { entries: options.knowledgeEntries }),
         ...timing,
       });
     }
