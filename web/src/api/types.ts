@@ -22,6 +22,8 @@ export interface OverviewAgent {
   currentTaskTitle: string | null;
   currentTaskStage: string | null;
   currentTaskStatus: string | null;
+  /** 无任务归属时的会话实况:当前 run 最近一条用户指令(已截断) */
+  currentInstruction: string | null;
   todayTokens: number;
 }
 

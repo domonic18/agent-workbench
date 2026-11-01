@@ -95,6 +95,7 @@ describe("总览页", () => {
                 currentTaskTitle: "实现接口契约",
                 currentTaskStage: "exec",
                 currentTaskStatus: "running",
+                currentInstruction: null,
                 todayTokens: 42,
               },
             ],

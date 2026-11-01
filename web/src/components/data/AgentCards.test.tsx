@@ -18,6 +18,7 @@ function agent(overrides: Partial<OverviewAgent> = {}): OverviewAgent {
     currentTaskTitle: null,
     currentTaskStage: null,
     currentTaskStatus: null,
+    currentInstruction: null,
     todayTokens: 0,
     ...overrides,
   };
@@ -53,6 +54,43 @@ describe("Agent 卡片", () => {
     expect(within(cards).getByText("1.2M")).toBeTruthy();
     expect(within(cards).getByText("空闲")).toBeTruthy();
     expect(within(cards).getByText("当前没有进行中的任务")).toBeTruthy();
+  });
+
+  it("运行中但无任务归属不显示为空闲", () => {
+    render(<AgentCards agents={[agent({ running: true })]} />);
+
+    expect(screen.getByText("运行中 · 当前会话未关联任务")).toBeTruthy();
+    expect(screen.queryByText("当前没有进行中的任务")).toBeNull();
+  });
+
+  it("运行中无任务归属时展示最近一条指令", () => {
+    render(
+      <AgentCards
+        agents={[agent({ running: true, currentInstruction: "把发件箱重试改成指数退避" })]}
+      />,
+    );
+
+    expect(screen.getByText("最近指令")).toBeTruthy();
+    expect(screen.getByText("· 把发件箱重试改成指数退避")).toBeTruthy();
+    expect(screen.queryByText("运行中 · 当前会话未关联任务")).toBeNull();
+  });
+
+  it("有任务归属时不展示最近指令", () => {
+    render(
+      <AgentCards
+        agents={[
+          agent({
+            running: true,
+            currentTaskId: "tsk_1",
+            currentTaskTitle: "实现接口契约",
+            currentInstruction: "把发件箱重试改成指数退避",
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.queryByText("最近指令")).toBeNull();
+    expect(screen.getByText("实现接口契约")).toBeTruthy();
   });
 
   it("心跳超时显示对应状态", () => {

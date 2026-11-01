@@ -97,7 +97,20 @@ export function AgentCards({ agents, now, onManageKey }: AgentCardsProps) {
             </div>
 
             {agent.currentTaskId === null ? (
-              <div className={styles.emptyTask}>当前没有进行中的任务</div>
+              // 未建单的运行会话用最近一条指令回答「在忙什么」,比一句「未关联任务」有用
+              agent.running && agent.currentInstruction !== null ? (
+                <div
+                  className={`${styles.emptyTask} ${styles.instruction}`}
+                  title={agent.currentInstruction}
+                >
+                  <span className={styles.instructionTag}>最近指令</span>
+                  <span className={styles.instructionText}>· {agent.currentInstruction}</span>
+                </div>
+              ) : (
+                <div className={styles.emptyTask}>
+                  {agent.running ? "运行中 · 当前会话未关联任务" : "当前没有进行中的任务"}
+                </div>
+              )
             ) : (
               <div className={styles.taskStrip}>
                 <span className={styles.taskId}>{agent.currentTaskId}</span>
