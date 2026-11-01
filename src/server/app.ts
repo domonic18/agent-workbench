@@ -15,6 +15,7 @@ import { registerCapabilityRoutes } from "./routes/capabilities.js";
 import { registerIdentityRoutes } from "./routes/identity.js";
 import { registerIngestRoutes } from "./routes/ingest.js";
 import { registerOverviewRoutes } from "./routes/overview.js";
+import { registerStreamRoutes } from "./routes/stream.js";
 import { registerTaskReadRoutes } from "./routes/task-read.js";
 import { registerTaskRoutes } from "./routes/task.js";
 
@@ -69,6 +70,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     registerOverviewRoutes(app, { db, ...timing });
     registerTaskRoutes(app, { db, ...timing });
     registerTaskReadRoutes(app, { db, ...timing });
+    registerStreamRoutes(app, { db, ...timing });
     registerIngestRoutes(app, { db, ...timing });
     registerA2aRoutes(app, {
       db,

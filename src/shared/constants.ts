@@ -198,6 +198,13 @@ export type RunStatus = (typeof RUN_STATUSES)[number];
 /** run 切分硬阈值:同一流相邻事件间隔 ≥30 分钟即开新 run,不做自适应(02 §3.2) */
 export const RUN_IDLE_GAP_MS = 30 * 60 * 1000;
 
+/** SSE(01 §7):20s 心跳防中间层断连,1s 轮询作用域水位,单用户最多 10 个客户端 */
+export const SSE = {
+  heartbeatMs: 20_000,
+  pollMs: 1000,
+  maxClients: 10,
+} as const;
+
 /** 心跳(04 §6):超过 5 分钟标「心跳超时」,超过 30 分钟标「离线」 */
 export const MACHINE_HEARTBEAT = {
   timeoutMs: 5 * 60 * 1000,
