@@ -88,13 +88,11 @@ describe("loadConfig", () => {
       loadConfig({
         ...base,
         FEISHU_ALLOWED_OPEN_IDS: " ou_a , ,ou_b,ou_a ",
-        FEISHU_VERIFICATION_TOKEN: " ",
       }).feishu,
     ).toEqual({
       appId: "cli_x",
       appSecret: "secret",
       allowedOpenIds: ["ou_a", "ou_b"],
-      verificationToken: undefined,
     });
   });
 });

@@ -3,7 +3,6 @@ import { FEISHU_EVENT_WINDOW } from "../../shared/constants.js";
 export interface InboundMessage {
   eventId: string;
   eventType: string;
-  token: string | undefined;
   createTime: number;
   senderOpenId: string | undefined;
   senderType: string;
@@ -23,7 +22,6 @@ export interface InboundLogger {
 }
 
 export interface InboundDeps {
-  expectedToken: string | undefined;
   isAllowed(openId: string): boolean;
   claimEvent(eventId: string, eventType: string): boolean;
   /** 回执按事件时间决定引用原消息还是发新消息(见 reply.ts) */
@@ -36,7 +34,7 @@ export interface InboundDeps {
 export const DENIED_RECEIPT = "无权限：仅白名单用户可向控制台下指令";
 
 /**
- * 入站顺序:时间窗 → 来源 token → 白名单 → event_id 去重 → 交给指令解析(01 §8.1)。
+ * 入站顺序:时间窗 → 白名单 → event_id 去重 → 交给指令解析(01 §8.1)。
  * 非白名单直接回执且不落库;白名单事件先认领 event_id,重复事件不再处理。
  */
 export async function handleInboundMessage(
@@ -50,11 +48,6 @@ export async function handleInboundMessage(
     now - event.createTime > FEISHU_EVENT_WINDOW.maxAgeMs
   ) {
     deps.log.warn({ eventId: event.eventId }, "飞书事件时间戳超出窗口,丢弃");
-    return "rejected";
-  }
-
-  if (deps.expectedToken !== undefined && event.token !== deps.expectedToken) {
-    deps.log.warn({ eventId: event.eventId }, "飞书事件来源 token 不符,丢弃");
     return "rejected";
   }
 

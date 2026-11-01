@@ -23,8 +23,6 @@ const envSchema = z.object({
   FEISHU_APP_SECRET: z.string().optional(),
   // 仅白名单 open_id 可下指令,逗号分隔;空 = 全部拒绝(fail-closed)
   FEISHU_ALLOWED_OPEN_IDS: z.string().optional(),
-  // 长连接由应用凭据认证;配置后作为入站消息事件的额外来源校验,留空则跳过
-  FEISHU_VERIFICATION_TOKEN: z.string().optional(),
   // 授权审批卡片固定投递的群;留空则不发卡片,改由控制台人工审批
   FEISHU_APPROVAL_CHAT_ID: z.string().optional(),
   // Agent 协作通知群;留空则 a2a_send / task_update 不返回 notify,群通知整体关闭
@@ -42,7 +40,6 @@ export interface FeishuConfig {
   appId: string;
   appSecret: string;
   allowedOpenIds: string[];
-  verificationToken: string | undefined;
   approvalChatId: string | undefined;
   collabChatId: string | undefined;
 }
@@ -118,7 +115,6 @@ function parseFeishu(env: z.infer<typeof envSchema>): FeishuConfig | undefined {
     appId,
     appSecret,
     allowedOpenIds: parseOpenIds(env.FEISHU_ALLOWED_OPEN_IDS),
-    verificationToken: optionalText(env.FEISHU_VERIFICATION_TOKEN),
     approvalChatId: optionalText(env.FEISHU_APPROVAL_CHAT_ID),
     collabChatId: optionalText(env.FEISHU_COLLAB_CHAT_ID),
   };

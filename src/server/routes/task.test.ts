@@ -15,7 +15,6 @@ const FEISHU = {
   appId: "cli_test",
   appSecret: "secret",
   allowedOpenIds: [],
-  verificationToken: undefined,
   approvalChatId: undefined,
   collabChatId: "oc_group",
 };

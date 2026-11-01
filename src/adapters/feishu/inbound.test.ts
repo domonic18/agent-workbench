@@ -13,7 +13,6 @@ function makeEvent(overrides: Partial<InboundMessage> = {}): InboundMessage {
   return {
     eventId: "evt_1",
     eventType: "im.message.receive_v1",
-    token: "token",
     createTime: NOW,
     senderOpenId: "ou_allowed",
     senderType: "user",
@@ -28,7 +27,6 @@ function makeEvent(overrides: Partial<InboundMessage> = {}): InboundMessage {
 
 function makeDeps(overrides: Partial<InboundDeps> = {}): InboundDeps {
   return {
-    expectedToken: undefined,
     isAllowed: (openId) => openId === "ou_allowed",
     claimEvent: vi.fn(() => true),
     reply: vi.fn(async () => undefined),
@@ -106,15 +104,5 @@ describe("handleInboundMessage", () => {
     await expect(
       handleInboundMessage(future, makeEvent({ createTime: NOW + 5 * MINUTE_MS + 1 }), NOW),
     ).resolves.toBe("rejected");
-  });
-
-  it("配置了来源 token 时比对不符即丢弃", async () => {
-    const deps = makeDeps({ expectedToken: "expected" });
-
-    await expect(handleInboundMessage(deps, makeEvent(), NOW)).resolves.toBe("rejected");
-    expect(deps.claimEvent).not.toHaveBeenCalled();
-
-    const ok = makeDeps({ expectedToken: "token" });
-    await expect(handleInboundMessage(ok, makeEvent(), NOW)).resolves.toBe("handled");
   });
 });

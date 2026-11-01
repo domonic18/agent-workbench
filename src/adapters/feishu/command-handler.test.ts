@@ -10,7 +10,6 @@ function event(overrides: Partial<InboundMessage> = {}): InboundMessage {
   return {
     eventId: "evt_1",
     eventType: "im.message.receive_v1",
-    token: undefined,
     createTime: Date.now(),
     senderOpenId: "ou_1",
     senderType: "user",

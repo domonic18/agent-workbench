@@ -3,7 +3,6 @@ import { toInboundMessage } from "./payload.js";
 
 const payload = {
   event_id: "evt_1",
-  token: "token",
   create_time: "1700000000000",
   event_type: "im.message.receive_v1",
   sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
@@ -22,7 +21,6 @@ describe("toInboundMessage", () => {
     expect(toInboundMessage(payload)).toEqual({
       eventId: "evt_1",
       eventType: "im.message.receive_v1",
-      token: "token",
       createTime: 1_700_000_000_000,
       senderOpenId: "ou_1",
       senderType: "user",
