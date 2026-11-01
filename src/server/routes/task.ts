@@ -2,11 +2,13 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import { TaskError } from "../../domain/task/errors.js";
 import { createTaskService, type TaskService } from "../../domain/task/service.js";
+import type { CollabNotify } from "../../shared/collab.js";
 import { TASK_STAGES, TASK_STATUSES } from "../../shared/constants.js";
 import type { Db } from "../../store/database.js";
 import type { AgentRecord } from "../../store/repositories/identity.js";
 import { requireAgentAuth } from "../middleware/agent-auth.js";
 import { requireIdempotencyKey } from "../middleware/session.js";
+import { buildCompletionNotify } from "../notification/collab.js";
 import { sendError, toTaskDto } from "./task-dto.js";
 
 const createSchema = z.object({
@@ -30,6 +32,8 @@ export interface TaskRoutesOptions {
   db: Db;
   now?: () => number;
   service?: TaskService;
+  /** 协作通知群;留空则响应不带 notify,proxy 不发群消息 */
+  collabChatId?: string;
 }
 
 function validationError(reply: FastifyReply, issues: z.ZodError): FastifyReply {
@@ -85,7 +89,17 @@ export function registerTaskRoutes(app: FastifyInstance, options: TaskRoutesOpti
       }
       try {
         const task = service.update({ ...parsed.data, taskId: id, assignee: agent.id });
-        return { task: toTaskDto(task) };
+        let notify: CollabNotify | undefined;
+        if (parsed.data.status === "done" && options.collabChatId !== undefined) {
+          const notice = service.completionNotice(task.id);
+          if (notice !== null) {
+            notify = buildCompletionNotify(notice, options.collabChatId);
+          }
+        }
+        return {
+          task: toTaskDto(task),
+          ...(notify === undefined ? {} : { notify }),
+        };
       } catch (error) {
         if (error instanceof TaskError) {
           return sendError(reply, error);

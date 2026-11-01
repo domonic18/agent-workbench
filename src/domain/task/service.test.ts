@@ -304,3 +304,61 @@ describe("createTaskService.update", () => {
     db.close();
   });
 });
+
+describe("completionNotice", () => {
+  function seed(db: Db): void {
+    db.prepare(
+      "INSERT INTO machine (id, hostname, os, collector_version, collector_secret_hash, status, created_at) VALUES ('m1', 'h', 'linux', '1', 'h', 'active', 0)",
+    ).run();
+    const agents: [string, string, string, string | null][] = [
+      ["agt_a", "pa", "Agent A", "ou_a"],
+      ["agt_b", "pb", "Agent B", null],
+    ];
+    for (const [id, project, name, openId] of agents) {
+      db.prepare(
+        `INSERT INTO agent (id, machine_id, project, display_name, secret_hash, status,
+           allowed_targets_json, feishu_bot_open_id, created_at, updated_at)
+         VALUES (?, 'm1', ?, ?, 'h', 'active', '[]', ?, 0, 0)`,
+      ).run(id, project, name, openId);
+    }
+    const tasks: [string, string, string, string | null][] = [
+      ["tsk_parent", "上游任务", "agt_a", null],
+      ["tsk_child", "下游任务", "agt_b", "tsk_parent"],
+      ["tsk_same", "同 Agent 续接", "agt_a", "tsk_parent"],
+      ["tsk_orphan", "无父任务", "agt_b", null],
+    ];
+    for (const [id, title, assignee, parent] of tasks) {
+      db.prepare(
+        `INSERT INTO task (id, title, assigner, assignee, project, parent_task_id,
+           stage, status, origin, created_at, updated_at)
+         VALUES (?, ?, 'console', ?, 'aw', ?, 'exec', 'running', 'a2a', 0, 0)`,
+      ).run(id, title, assignee, parent);
+    }
+  }
+
+  it("下游 done 时返回上游发起方与其 bot 身份", () => {
+    const { db, service } = prepare();
+    seed(db);
+    service.update({ taskId: "tsk_child", assignee: "agt_b", status: "done" });
+
+    expect(service.completionNotice("tsk_child")).toEqual({
+      taskId: "tsk_child",
+      title: "下游任务",
+      from: { id: "agt_b", displayName: "Agent B", botOpenId: null },
+      to: { id: "agt_a", displayName: "Agent A", botOpenId: "ou_a" },
+    });
+    db.close();
+  });
+
+  it("未完成、无父任务或同一 Agent 续接都返回 null", () => {
+    const { db, service } = prepare();
+    seed(db);
+
+    expect(service.completionNotice("tsk_child")).toBeNull();
+    service.update({ taskId: "tsk_same", assignee: "agt_a", status: "done" });
+    expect(service.completionNotice("tsk_same")).toBeNull();
+    db.prepare("UPDATE task SET status = 'done' WHERE id = 'tsk_orphan'").run();
+    expect(service.completionNotice("tsk_orphan")).toBeNull();
+    db.close();
+  });
+});

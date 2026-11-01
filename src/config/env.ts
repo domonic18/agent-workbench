@@ -20,6 +20,8 @@ const envSchema = z.object({
   FEISHU_VERIFICATION_TOKEN: z.string().optional(),
   // 授权审批卡片固定投递的群;留空则不发卡片,改由控制台人工审批
   FEISHU_APPROVAL_CHAT_ID: z.string().optional(),
+  // Agent 协作通知群;留空则 a2a_send / task_update 不返回 notify,群通知整体关闭
+  FEISHU_COLLAB_CHAT_ID: z.string().optional(),
   // 授权签发(05 §4):只经 tctl 写入 bot traits,真实证书由 tbot 持有
   TELEPORT_TCTL_PATH: z.string().min(1).default("tctl"),
   TELEPORT_IDENTITY_FILE: z.string().optional(),
@@ -35,6 +37,7 @@ export interface FeishuConfig {
   allowedOpenIds: string[];
   verificationToken: string | undefined;
   approvalChatId: string | undefined;
+  collabChatId: string | undefined;
 }
 
 export interface TeleportConfig {
@@ -108,6 +111,7 @@ function parseFeishu(env: z.infer<typeof envSchema>): FeishuConfig | undefined {
     allowedOpenIds: parseOpenIds(env.FEISHU_ALLOWED_OPEN_IDS),
     verificationToken: optionalText(env.FEISHU_VERIFICATION_TOKEN),
     approvalChatId: optionalText(env.FEISHU_APPROVAL_CHAT_ID),
+    collabChatId: optionalText(env.FEISHU_COLLAB_CHAT_ID),
   };
 }
 

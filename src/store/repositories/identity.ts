@@ -92,6 +92,8 @@ export interface AgentRecord {
   displayName: string;
   secretHash: string;
   feishuAppId: string | null;
+  feishuBotOpenId: string | null;
+  feishuBotName: string | null;
   status: IdentityStatus;
   allowedTargetsJson: string;
   createdAt: number;
@@ -100,7 +102,8 @@ export interface AgentRecord {
 
 const AGENT_COLUMNS = `
   id, machine_id AS machineId, project, display_name AS displayName,
-  secret_hash AS secretHash, feishu_app_id AS feishuAppId, status,
+  secret_hash AS secretHash, feishu_app_id AS feishuAppId,
+  feishu_bot_open_id AS feishuBotOpenId, feishu_bot_name AS feishuBotName, status,
   allowed_targets_json AS allowedTargetsJson, created_at AS createdAt, updated_at AS updatedAt
 `;
 
@@ -145,6 +148,21 @@ export function updateAgentSecretHash(db: Db, id: string, hash: string, now: num
   return db
     .prepare("UPDATE agent SET secret_hash = ?, updated_at = ? WHERE id = ?")
     .run(hash, now, id).changes === 1;
+}
+
+/** bot 身份由该 Agent 自己的 proxy 启动时注册;重复注册同一值天然幂等 */
+export function updateAgentFeishuBot(
+  db: Db,
+  id: string,
+  openId: string,
+  name: string,
+  now: number,
+): boolean {
+  return db
+    .prepare(
+      "UPDATE agent SET feishu_bot_open_id = ?, feishu_bot_name = ?, updated_at = ? WHERE id = ?",
+    )
+    .run(openId, name, now, id).changes === 1;
 }
 
 /** 委派白名单只由控制台会话写;保存即对下一次 a2a.send 判定生效 */

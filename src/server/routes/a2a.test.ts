@@ -7,6 +7,15 @@ import { buildApp } from "../app.js";
 
 const DEADLINE = "2026-10-30T12:00:00Z";
 
+const FEISHU = {
+  appId: "cli_test",
+  appSecret: "secret",
+  allowedOpenIds: [],
+  verificationToken: undefined,
+  approvalChatId: undefined,
+  collabChatId: "oc_group",
+};
+
 interface Fixture {
   db: Db;
   agents: Record<string, string>;
@@ -85,7 +94,7 @@ describe("a2a 路由", () => {
 
   beforeEach(() => {
     fixture = prepare();
-    app = buildApp({ logLevel: "silent", db: fixture.db });
+    app = buildApp({ logLevel: "silent", db: fixture.db, feishu: FEISHU });
   });
 
   afterEach(async () => {
@@ -133,6 +142,52 @@ describe("a2a 路由", () => {
     });
     expect(again.statusCode).toBe(201);
     expect((again.json() as { msg_id: string }).msg_id).toBe(firstBody.msg_id);
+  });
+
+  it("request 返回协作群 notify,@ 收件方且 uuid 取消息 id", async () => {
+    fixture.db
+      .prepare("UPDATE agent SET feishu_bot_open_id = 'ou_b', feishu_bot_name = 'Bot B' WHERE id = 'agt_b'")
+      .run();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/a2a/messages",
+      headers: { ...auth("agt_a"), "idempotency-key": `k-${++keySeq}` },
+      payload: messageBody(),
+    });
+
+    expect(response.statusCode).toBe(201);
+    const body = response.json() as { msg_id: string; thread_id: string; notify: unknown };
+    expect(body.notify).toEqual({
+      chat_id: "oc_group",
+      text: `<at user_id="ou_b">Agent B</at> 新任务交接:需要一份接口契约\n任务 tsk_a · 线程 ${body.thread_id}`,
+      uuid: body.msg_id,
+    });
+  });
+
+  it("reply 不触发交接通知", async () => {
+    const first = await app.inject({
+      method: "POST",
+      url: "/api/a2a/messages",
+      headers: { ...auth("agt_a"), "idempotency-key": `k-${++keySeq}` },
+      payload: messageBody(),
+    });
+    const threadId = (first.json() as { thread_id: string }).thread_id;
+
+    const reply = await app.inject({
+      method: "POST",
+      url: "/api/a2a/messages",
+      headers: { ...auth("agt_b"), "idempotency-key": `k-${++keySeq}` },
+      payload: messageBody({
+        task_id: "tsk_b",
+        to: "agt_a",
+        intent: "reply",
+        thread_id: threadId,
+      }),
+    });
+
+    expect(reply.statusCode).toBe(201);
+    expect(reply.json()).not.toHaveProperty("notify");
   });
 
   it("目标不在白名单 403 并回带可达目标", async () => {

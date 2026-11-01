@@ -9,6 +9,7 @@ import type { Db } from "../store/database.js";
 import { requireAllowedHost } from "./middleware/host.js";
 import { createApprovalNotifier } from "./notification/approval.js";
 import { registerA2aRoutes } from "./routes/a2a.js";
+import { registerAgentSelfRoutes } from "./routes/agent-self.js";
 import { registerAuditRoutes } from "./routes/audit.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerCapabilityRoutes } from "./routes/capabilities.js";
@@ -67,12 +68,17 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   if (options.db !== undefined) {
     const db = options.db;
     const timing = options.now === undefined ? {} : { now: options.now };
+    const collab =
+      options.feishu?.collabChatId === undefined
+        ? {}
+        : { collabChatId: options.feishu.collabChatId };
 
     registerAuthRoutes(app, { db, ...timing });
     registerAuditRoutes(app, { db, ...timing });
     registerIdentityRoutes(app, { db, ...timing });
+    registerAgentSelfRoutes(app, { db, ...timing });
     registerOverviewRoutes(app, { db, ...timing });
-    registerTaskRoutes(app, { db, ...timing });
+    registerTaskRoutes(app, { db, ...timing, ...collab });
     registerTaskReadRoutes(app, { db, ...timing });
     registerTaskA2aRoutes(app, { db, ...timing });
     registerStreamRoutes(app, { db, ...timing });
@@ -80,6 +86,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     registerA2aRoutes(app, {
       db,
       ...timing,
+      ...collab,
       ...(options.a2a === undefined ? {} : { service: options.a2a }),
     });
 

@@ -9,13 +9,17 @@ import {
   TASK_STATUSES,
   TOOL_GATE,
 } from "../../shared/constants.js";
-import { callConsole, type ConsoleClientConfig, type ConsoleRequest } from "./console-client.js";
+import { isCollabNotify, type CollabNotify } from "../../shared/collab.js";
+import {
+  callConsole,
+  type ConsoleClientConfig,
+  type ConsoleRequest,
+} from "./console-client.js";
 import type { NativeTool } from "./types.js";
 
-export interface NativeToolsConfig {
-  baseUrl: string;
-  agentId: string;
-  agentSecret: string;
+export interface NativeToolsConfig extends ConsoleClientConfig {
+  /** 控制台回的群通知;剥离后由 proxy 用本 Agent 的飞书凭据发送 */
+  onNotify?: (notify: CollabNotify) => void;
 }
 
 type Args = Record<string, unknown>;
@@ -67,6 +71,18 @@ function pick(args: Args, keys: readonly string[]): Record<string, unknown> {
   return body;
 }
 
+/** notify 是控制台给 proxy 的投递指令,不暴露给模型;无效值直接丢弃 */
+function stripNotify(config: NativeToolsConfig, body: unknown): unknown {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return body;
+  }
+  const { notify, ...rest } = body as Record<string, unknown>;
+  if (isCollabNotify(notify)) {
+    config.onNotify?.(notify);
+  }
+  return rest;
+}
+
 async function invoke(
   config: NativeToolsConfig,
   request: ConsoleRequest,
@@ -74,7 +90,7 @@ async function invoke(
   try {
     const response = await callConsole(config, request);
     if (response.status >= 200 && response.status < 300) {
-      return textResult(response.body);
+      return textResult(stripNotify(config, response.body));
     }
     return failureResult(response.status, response.body);
   } catch (error) {
@@ -90,12 +106,6 @@ function requiredId(args: Args, key: string): string | undefined {
 }
 
 export function createNativeTools(config: NativeToolsConfig): NativeTool[] {
-  const client: ConsoleClientConfig = {
-    baseUrl: config.baseUrl,
-    agentId: config.agentId,
-    agentSecret: config.agentSecret,
-  };
-
   const taskCreate: NativeTool = {
     name: "task_create",
     gateName: "task.create",
@@ -114,7 +124,7 @@ export function createNativeTools(config: NativeToolsConfig): NativeTool[] {
       required: ["title", "assigner", "project"],
     },
     execute: (args) =>
-      invoke(client, {
+      invoke(config, {
         method: "POST",
         path: "/api/tasks",
         body: pick(args, ["title", "assigner", "project", "deadlineAt", "output", "parentTaskId"]),
@@ -143,7 +153,7 @@ export function createNativeTools(config: NativeToolsConfig): NativeTool[] {
       if (taskId === undefined) {
         return errorResult("task_id 必填");
       }
-      return invoke(client, {
+      return invoke(config, {
         method: "PATCH",
         path: `/api/tasks/${encodeURIComponent(taskId)}`,
         body: pick(args, ["stage", "status", "output", "deadlineAt", "reason"]),
@@ -173,7 +183,7 @@ export function createNativeTools(config: NativeToolsConfig): NativeTool[] {
       required: ["task_id", "to", "intent", "summary", "expect"],
     },
     execute: (args) =>
-      invoke(client, {
+      invoke(config, {
         method: "POST",
         path: "/api/a2a/messages",
         body: pick(args, [
@@ -227,7 +237,7 @@ export function createNativeTools(config: NativeToolsConfig): NativeTool[] {
       } else {
         query.wait = `${DEFAULT_INBOX_WAIT_S}s`;
       }
-      return invoke(client, {
+      return invoke(config, {
         method: "GET",
         path: "/api/a2a/inbox",
         query,
@@ -253,7 +263,7 @@ export function createNativeTools(config: NativeToolsConfig): NativeTool[] {
       if (msgId === undefined) {
         return errorResult("msg_id 必填");
       }
-      return invoke(client, {
+      return invoke(config, {
         method: "POST",
         path: `/api/a2a/inbox/${encodeURIComponent(msgId)}/ack`,
         body: pick(args, ["task_id"]),

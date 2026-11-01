@@ -7,7 +7,7 @@ export interface ConsoleClientConfig {
 }
 
 export interface ConsoleRequest {
-  method: "GET" | "POST" | "PATCH";
+  method: "GET" | "POST" | "PATCH" | "PUT";
   path: string;
   body?: unknown;
   query?: Record<string, string>;

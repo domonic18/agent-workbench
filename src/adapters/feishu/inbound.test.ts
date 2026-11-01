@@ -63,6 +63,17 @@ describe("handleInboundMessage", () => {
     expect(deps.claimEvent).not.toHaveBeenCalled();
   });
 
+  it("机器人发送的消息直接忽略,不回执不认领", async () => {
+    const deps = makeDeps();
+
+    await expect(
+      handleInboundMessage(deps, makeEvent({ senderType: "app" }), NOW),
+    ).resolves.toBe("ignored");
+    expect(deps.reply).not.toHaveBeenCalled();
+    expect(deps.claimEvent).not.toHaveBeenCalled();
+    expect(deps.onCommand).not.toHaveBeenCalled();
+  });
+
   it("缺 open_id 按非白名单处理", async () => {
     const deps = makeDeps();
 

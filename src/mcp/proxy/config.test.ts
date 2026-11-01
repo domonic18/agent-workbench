@@ -65,3 +65,20 @@ describe("loadProxyConfig 的控制台触达配置", () => {
     expect(loadProxyConfig(env({ AW_UPSTREAMS: "[]" })).upstreams).toEqual([]);
   });
 });
+
+describe("loadProxyConfig 的飞书凭据", () => {
+  it("两者都配置时启用协作通知", () => {
+    const config = loadProxyConfig(env({ FEISHU_APP_ID: "cli_x", FEISHU_APP_SECRET: "s3cret" }));
+    expect(config.feishu).toEqual({ appId: "cli_x", appSecret: "s3cret" });
+  });
+
+  it("缺省或只有空白时关闭协作通知", () => {
+    expect(loadProxyConfig(env()).feishu).toBeUndefined();
+    expect(loadProxyConfig(env({ FEISHU_APP_ID: " ", FEISHU_APP_SECRET: "" })).feishu).toBeUndefined();
+  });
+
+  it("只配置一侧启动失败", () => {
+    expect(() => loadProxyConfig(env({ FEISHU_APP_ID: "cli_x" }))).toThrow(/FEISHU_APP_SECRET/);
+    expect(() => loadProxyConfig(env({ FEISHU_APP_SECRET: "s3cret" }))).toThrow(/FEISHU_APP_ID/);
+  });
+});

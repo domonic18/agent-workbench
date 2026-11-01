@@ -40,6 +40,8 @@ function parseArgs(argv) {
     "--out": "out",
     "--proxy": "proxy",
     "--secret-file": "secretFile",
+    "--feishu-app-id": "feishuAppId",
+    "--feishu-secret-file": "feishuSecretFile",
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -79,6 +81,8 @@ const HELP = `用法:
   --grants <pairs>      透传给 proxy 的 AW_GRANTS,如 fs.exec:cap_1
   --run-id <id>         透传给 proxy 的 AW_RUN_ID,默认随机
   --secret-file <path>  从文件读取密钥(替代 AW_AGENT_SECRET 环境变量)
+  --feishu-app-id <id>  该 Agent 自己的飞书应用 App ID;与飞书密钥同时提供才启用协作群通知
+  --feishu-secret-file <path>  从文件读取飞书 App Secret(替代 AW_FEISHU_APP_SECRET)
   --print-only          只打印配置,不写文件
 `;
 
@@ -123,6 +127,14 @@ async function main() {
       : readFileSync(options.secretFile, "utf8").trim();
   if (secret === "") {
     fail("未提供密钥:设置 AW_AGENT_SECRET 或使用 --secret-file(不要在命令行明文传密钥)");
+  }
+  const feishuSecret =
+    options.feishuSecretFile === undefined
+      ? (process.env.AW_FEISHU_APP_SECRET ?? "")
+      : readFileSync(options.feishuSecretFile, "utf8").trim();
+  const feishuEnabled = options.feishuAppId !== undefined || feishuSecret !== "";
+  if (feishuEnabled && (options.feishuAppId === undefined || feishuSecret === "")) {
+    fail("飞书凭据需同时提供 --feishu-app-id 与 AW_FEISHU_APP_SECRET/--feishu-secret-file");
   }
   const consoleUrl = options.consoleUrl.replace(/\/+$/, "");
   const name = sanitizeName(options.name ?? `aw-${options.project}`);
@@ -178,6 +190,12 @@ async function main() {
     ["AW_TASK_ID", taskId],
     ["AW_UPSTREAMS", JSON.stringify(upstreams)],
     ...(options.grants === undefined ? [] : [["AW_GRANTS", options.grants]]),
+    ...(feishuEnabled
+      ? [
+          ["FEISHU_APP_ID", options.feishuAppId],
+          ["FEISHU_APP_SECRET", feishuSecret],
+        ]
+      : []),
   ];
   const wrapperDir = resolve(options.out);
   const envPath = resolve(wrapperDir, `${name}.env`);

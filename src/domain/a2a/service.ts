@@ -28,6 +28,7 @@ import {
   findTaskSummary,
   setTaskParentIfEmpty,
 } from "../../store/repositories/task.js";
+import type { CollabAgentRef, HandoffNotice } from "../collab/notice.js";
 import { A2aError } from "./errors.js";
 import { toInboxItem } from "./inbox.js";
 import type {
@@ -312,5 +313,32 @@ export function createA2aService(deps: A2aServiceDeps): A2aService {
     })();
   }
 
-  return { send, inbox, ack, wake };
+  function agentRef(agent: AgentRecord): CollabAgentRef {
+    return { id: agent.id, displayName: agent.displayName, botOpenId: agent.feishuBotOpenId };
+  }
+
+  function handoffNotice(msgId: string): HandoffNotice | null {
+    const message = findMessageById(db, msgId);
+    if (
+      message === undefined ||
+      (message.intent !== "request" && message.intent !== "escalate")
+    ) {
+      return null;
+    }
+    const from = findAgentById(db, message.fromAgent);
+    const to = findAgentById(db, message.toAgent);
+    if (from === undefined || to === undefined) {
+      return null;
+    }
+    return {
+      msgId: message.id,
+      taskId: message.taskId,
+      threadId: message.threadId,
+      summary: message.summary,
+      from: agentRef(from),
+      to: agentRef(to),
+    };
+  }
+
+  return { send, inbox, ack, handoffNotice, wake };
 }

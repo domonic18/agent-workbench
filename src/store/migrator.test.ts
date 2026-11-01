@@ -17,7 +17,7 @@ describe("runMigrations", () => {
   it("空库执行建表并记账", () => {
     const db = openDatabase(":memory:");
 
-    expect(runMigrations(db)).toBe(15);
+    expect(runMigrations(db)).toBe(16);
     expect(tableNames(db)).toEqual(
       expect.arrayContaining([
         "task",
@@ -64,6 +64,7 @@ describe("runMigrations", () => {
       { version: 13, name: "ingest_receipt" },
       { version: 14, name: "console_auth" },
       { version: 15, name: "scope_revision" },
+      { version: 16, name: "agent_feishu_bot" },
     ]);
     db.close();
   });

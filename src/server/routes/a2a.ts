@@ -6,13 +6,17 @@ import { A2A_PROTOCOL_VERSION } from "../../shared/constants.js";
 import { validateEnvelope } from "../../shared/protocol.js";
 import type { Db } from "../../store/database.js";
 import type { AgentRecord } from "../../store/repositories/identity.js";
+import type { CollabNotify } from "../../shared/collab.js";
 import { requireAgentAuth } from "../middleware/agent-auth.js";
 import { requireIdempotencyKey } from "../middleware/session.js";
+import { buildHandoffNotify } from "../notification/collab.js";
 
 export interface A2aRoutesOptions {
   db: Db;
   now?: () => number;
   service?: A2aService;
+  /** 协作通知群;留空则响应不带 notify,proxy 不发群消息 */
+  collabChatId?: string;
 }
 
 function sendError(reply: FastifyReply, error: A2aError): FastifyReply {
@@ -109,10 +113,18 @@ export function registerA2aRoutes(app: FastifyInstance, options: A2aRoutesOption
           ...(rawThreadId === undefined ? {} : { threadId: rawThreadId }),
           ...(rawReplyTo === undefined ? {} : { replyToMsgId: rawReplyTo }),
         });
+        let notify: CollabNotify | undefined;
+        if (options.collabChatId !== undefined) {
+          const notice = service.handoffNotice(result.msgId);
+          if (notice !== null) {
+            notify = buildHandoffNotify(notice, options.collabChatId);
+          }
+        }
         return reply.code(201).send({
           msg_id: result.msgId,
           thread_id: result.threadId,
           round: result.round,
+          ...(notify === undefined ? {} : { notify }),
         });
       } catch (error) {
         if (error instanceof A2aError) {

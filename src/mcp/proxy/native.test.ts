@@ -188,3 +188,45 @@ describe("原生工具面", () => {
     expect(textOf(offline)).toContain("ECONNREFUSED");
   });
 });
+
+describe("协作通知钩子", () => {
+  function withNotify(onNotify: (notify: { chat_id: string; text: string; uuid: string }) => void) {
+    const found = createNativeTools({ ...CONFIG, onNotify }).find(
+      (entry) => entry.name === "task_update",
+    );
+    if (found === undefined) {
+      throw new Error("task_update 不存在");
+    }
+    return found;
+  }
+
+  it("2xx 响应里的 notify 被剥离并交给回调", async () => {
+    const onNotify = vi.fn();
+    stubFetch(async () =>
+      ok({
+        task: { id: "tsk_1" },
+        notify: { chat_id: "oc_1", text: "任务完成", uuid: "task_done:tsk_1" },
+      }),
+    );
+
+    const result = await withNotify(onNotify).execute({ task_id: "tsk_1", status: "done" });
+
+    expect(onNotify).toHaveBeenCalledOnce();
+    expect(onNotify).toHaveBeenCalledWith({
+      chat_id: "oc_1",
+      text: "任务完成",
+      uuid: "task_done:tsk_1",
+    });
+    expect(JSON.parse(textOf(result))).toEqual({ task: { id: "tsk_1" } });
+  });
+
+  it("非法 notify 丢弃且不回调,不透传给模型", async () => {
+    const onNotify = vi.fn();
+    stubFetch(async () => ok({ task: { id: "tsk_1" }, notify: { chat_id: "" } }));
+
+    const result = await withNotify(onNotify).execute({ task_id: "tsk_1", status: "done" });
+
+    expect(onNotify).not.toHaveBeenCalled();
+    expect(JSON.parse(textOf(result))).toEqual({ task: { id: "tsk_1" } });
+  });
+});

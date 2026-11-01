@@ -1,7 +1,10 @@
 import { pathToFileURL } from "node:url";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import * as Lark from "@larksuiteoapi/node-sdk";
 import { postToolCallAudit } from "./audit-client.js";
 import { loadProxyConfig } from "./config.js";
+import { callConsole } from "./console-client.js";
+import { createFeishuNotifier } from "./feishu.js";
 import { createGateway } from "./gateway.js";
 import { createStderrLogger } from "./logger.js";
 import { createNativeTools } from "./native.js";
@@ -17,7 +20,24 @@ export async function main(): Promise<void> {
     agentId: config.ctx.agentId,
     agentSecret: config.agentSecret,
   };
-  const nativeTools = createNativeTools(consoleClient);
+  const feishu =
+    config.feishu === undefined
+      ? undefined
+      : createFeishuNotifier(
+          new Lark.Client({ appId: config.feishu.appId, appSecret: config.feishu.appSecret }),
+        );
+  const nativeTools = createNativeTools({
+    ...consoleClient,
+    ...(feishu === undefined
+      ? {}
+      : {
+          onNotify: (notify) => {
+            void feishu.send(notify).catch((error: unknown) => {
+              log.error({ err: error, uuid: notify.uuid }, "协作通知发送失败");
+            });
+          },
+        }),
+  });
 
   const gateway = createGateway({
     ctx: config.ctx,
@@ -36,6 +56,27 @@ export async function main(): Promise<void> {
     { agentId: config.ctx.agentId, taskId: config.ctx.taskId, upstreams: upstreams.map((u) => u.id) },
     "MCP proxy 已就绪",
   );
+
+  // 自报 bot 身份失败只影响 <at> 渲染,不阻断工具通道
+  if (feishu !== undefined) {
+    void feishu
+      .identify()
+      .then((identity) =>
+        callConsole(consoleClient, {
+          method: "PUT",
+          path: "/api/agents/self/feishu-bot",
+          body: { open_id: identity.openId, name: identity.name },
+        }),
+      )
+      .then((response) => {
+        if (response.status < 200 || response.status >= 300) {
+          log.warn({ status: response.status }, "飞书 bot 身份注册失败");
+        }
+      })
+      .catch((error: unknown) => {
+        log.error({ err: error }, "飞书 bot 身份注册失败");
+      });
+  }
 
   const shutdown = async (): Promise<void> => {
     await Promise.allSettled(upstreams.map((upstream) => upstream.close()));

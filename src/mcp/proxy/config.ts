@@ -24,7 +24,15 @@ const envSchema = z.object({
   AW_UPSTREAMS: z.string().min(1).default("[]"),
   AW_GRANTS: z.string().optional(),
   AW_APPROVAL_TIMEOUT_MS: z.coerce.number().int().min(1).optional(),
+  // 各 Agent 自己的飞书应用凭据;两者同时配置才启用协作群通知
+  FEISHU_APP_ID: z.string().optional(),
+  FEISHU_APP_SECRET: z.string().optional(),
 });
+
+export interface FeishuCredentials {
+  appId: string;
+  appSecret: string;
+}
 
 export interface ProxyConfig {
   agentSecret: string;
@@ -32,7 +40,26 @@ export interface ProxyConfig {
   approvalTimeoutMs: number | undefined;
   upstreams: UpstreamConfig[];
   toolMap: Record<string, Record<string, string>>;
+  /** 未配置飞书凭据时不发协作群通知,工具调用照常 */
+  feishu?: FeishuCredentials;
   ctx: RunContext;
+}
+
+function optionalText(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed === undefined || trimmed === "" ? undefined : trimmed;
+}
+
+function parseFeishu(env: z.infer<typeof envSchema>): FeishuCredentials | undefined {
+  const appId = optionalText(env.FEISHU_APP_ID);
+  const appSecret = optionalText(env.FEISHU_APP_SECRET);
+  if (appId === undefined && appSecret === undefined) {
+    return undefined;
+  }
+  if (appId === undefined || appSecret === undefined) {
+    throw new Error("FEISHU_APP_ID 与 FEISHU_APP_SECRET 必须同时设置");
+  }
+  return { appId, appSecret };
 }
 
 /** `AW_GRANTS` 为逗号分隔的 `tool:capabilityId`;格式错误即启动失败,不静默跳过 */
@@ -92,6 +119,7 @@ export function loadProxyConfig(env: NodeJS.ProcessEnv = process.env): ProxyConf
     throw new Error(`代理环境变量校验失败: ${detail}`);
   }
   const entries = parseUpstreams(parsed.data.AW_UPSTREAMS);
+  const feishu = parseFeishu(parsed.data);
   const toolMap: Record<string, Record<string, string>> = {};
   for (const entry of entries) {
     if (entry.toolMap !== undefined) {
@@ -110,6 +138,7 @@ export function loadProxyConfig(env: NodeJS.ProcessEnv = process.env): ProxyConf
       ...(entry.env === undefined ? {} : { env: entry.env }),
     })),
     toolMap,
+    ...(feishu === undefined ? {} : { feishu }),
     ctx: {
       runId: parsed.data.AW_RUN_ID,
       agentId: parsed.data.AW_AGENT_ID,

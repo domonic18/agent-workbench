@@ -11,6 +11,15 @@ import { ensureConsoleCredential } from "../credential.js";
 
 const PASSWORD = "secret123";
 
+const FEISHU = {
+  appId: "cli_test",
+  appSecret: "secret",
+  allowedOpenIds: [],
+  verificationToken: undefined,
+  approvalChatId: undefined,
+  collabChatId: "oc_group",
+};
+
 interface Fixture {
   db: Db;
   secrets: Record<string, string>;
@@ -69,7 +78,7 @@ describe("task 路由", () => {
 
   beforeEach(() => {
     fixture = prepare();
-    app = buildApp({ logLevel: "silent", db: fixture.db });
+    app = buildApp({ logLevel: "silent", db: fixture.db, feishu: FEISHU });
   });
 
   afterEach(async () => {
@@ -174,6 +183,59 @@ describe("task 路由", () => {
       payload: { status: "running" },
     });
     expect(missing.statusCode).toBe(404);
+  });
+
+  it("下游任务完成时返回协作群 notify,@ 上游发起方", async () => {
+    fixture.db
+      .prepare(
+        `INSERT INTO task (id, title, assigner, assignee, project, parent_task_id, stage, status, origin, created_at, updated_at)
+         VALUES ('tsk_parent', '上游任务', 'console', 'agt_a', 'aw', NULL, 'exec', 'running', 'a2a', 0, 0)`,
+      )
+      .run();
+    fixture.db
+      .prepare(
+        `INSERT INTO task (id, title, assigner, assignee, project, parent_task_id, stage, status, origin, created_at, updated_at)
+         VALUES ('tsk_child', '下游任务', 'console', 'agt_b', 'aw', 'tsk_parent', 'exec', 'running', 'a2a', 0, 0)`,
+      )
+      .run();
+    fixture.db
+      .prepare(
+        "UPDATE agent SET feishu_bot_open_id = 'ou_a', feishu_bot_name = 'Bot A' WHERE id = 'agt_a'",
+      )
+      .run();
+
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/api/tasks/tsk_child",
+      headers: headers("agt_b"),
+      payload: { status: "done" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      task: { id: "tsk_child", status: "done" },
+      notify: {
+        chat_id: "oc_group",
+        text: '<at user_id="ou_a">A</at> 任务完成:下游任务(tsk_child)',
+        uuid: "task_done:tsk_child",
+      },
+    });
+  });
+
+  it("无父任务完成不返回 notify", async () => {
+    const taskId = await createTask();
+    for (const status of ["running", "done"] as const) {
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/api/tasks/${taskId}`,
+        headers: headers("agt_a"),
+        payload: { status },
+      });
+      expect(response.statusCode).toBe(200);
+      if (status === "done") {
+        expect(response.json()).not.toHaveProperty("notify");
+      }
+    }
   });
 
   it("非法跃迁 422 带维度信息", async () => {

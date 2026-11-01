@@ -14,7 +14,7 @@ export interface InboundMessage {
   content: string;
 }
 
-export type InboundOutcome = "handled" | "duplicate" | "denied" | "rejected";
+export type InboundOutcome = "handled" | "duplicate" | "denied" | "rejected" | "ignored";
 
 export interface InboundLogger {
   info(obj: Record<string, unknown>, msg: string): void;
@@ -56,6 +56,12 @@ export async function handleInboundMessage(
   if (deps.expectedToken !== undefined && event.token !== deps.expectedToken) {
     deps.log.warn({ eventId: event.eventId }, "飞书事件来源 token 不符,丢弃");
     return "rejected";
+  }
+
+  // 协作通知由各 Agent 的 bot 发到群里;机器人消息不能触发控制台指令或回执,否则互相刷屏
+  if (event.senderType === "app") {
+    deps.log.info({ eventId: event.eventId }, "忽略应用(机器人)发送的消息");
+    return "ignored";
   }
 
   const openId = event.senderOpenId;

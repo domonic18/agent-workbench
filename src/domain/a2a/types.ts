@@ -1,5 +1,6 @@
 import type { A2AIntent } from "../../shared/constants.js";
 import type { Db } from "../../store/database.js";
+import type { HandoffNotice } from "../collab/notice.js";
 
 export interface A2aSendInput {
   idempotencyKey: string;
@@ -52,6 +53,8 @@ export interface A2aService {
   send(input: A2aSendInput): A2aSendResult;
   inbox(agentId: string, opts?: { cursor?: string; waitMs?: number }): Promise<A2aInboxResult>;
   ack(agentId: string, msgId: string, input?: A2aAckInput): void;
+  /** 交接通知的渲染元数据;非 request/escalate 或消息/参与方缺失时返回 null */
+  handoffNotice(msgId: string): HandoffNotice | null;
   /** 发送落库后唤醒该收件方的长轮询 */
   wake(agentId: string): void;
 }

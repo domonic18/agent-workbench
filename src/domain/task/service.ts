@@ -6,6 +6,7 @@ import {
 } from "../../shared/constants.js";
 import { newPrefixedId } from "../../shared/ids.js";
 import type { Db } from "../../store/database.js";
+import { findAgentById, type AgentRecord } from "../../store/repositories/identity.js";
 import {
   bindRunTaskIfEmpty,
   findLatestUnboundRunningRunByAgent,
@@ -17,6 +18,7 @@ import {
   updateTask,
   type TaskRecord,
 } from "../../store/repositories/task.js";
+import type { CollabAgentRef, CompletionNotice } from "../collab/notice.js";
 import { TaskError } from "./errors.js";
 import {
   InvalidTransitionError,
@@ -54,6 +56,8 @@ export interface TaskUpdateInput {
 export interface TaskService {
   create(input: TaskCreateInput): TaskRecord;
   update(input: TaskUpdateInput): TaskRecord;
+  /** 下游任务完成时通知上游发起方;非 done、无父任务或同一 Agent 时返回 null */
+  completionNotice(taskId: string): CompletionNotice | null;
 }
 
 export interface TaskServiceDeps {
@@ -302,5 +306,31 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
     return updated;
   }
 
-  return { create, update };
+  function agentRef(agent: AgentRecord): CollabAgentRef {
+    return { id: agent.id, displayName: agent.displayName, botOpenId: agent.feishuBotOpenId };
+  }
+
+  function completionNotice(taskId: string): CompletionNotice | null {
+    const task = findTaskById(db, taskId);
+    if (task === undefined || task.status !== "done" || task.parentTaskId === null) {
+      return null;
+    }
+    const parent = findTaskById(db, task.parentTaskId);
+    if (parent === undefined || parent.assignee === task.assignee) {
+      return null;
+    }
+    const from = findAgentById(db, task.assignee);
+    const to = findAgentById(db, parent.assignee);
+    if (from === undefined || to === undefined) {
+      return null;
+    }
+    return {
+      taskId: task.id,
+      title: task.title,
+      from: agentRef(from),
+      to: agentRef(to),
+    };
+  }
+
+  return { create, update, completionNotice };
 }
