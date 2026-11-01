@@ -1,4 +1,5 @@
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import * as Lark from "@larksuiteoapi/node-sdk";
 import { createCardSender } from "../adapters/feishu/card.js";
 import { startFeishuInbound, type FeishuInbound } from "../adapters/feishu/client.js";
@@ -47,6 +48,8 @@ const app = buildApp({
   service,
   a2a,
   allowedHosts: config.allowedHosts,
+  // src/server 与 dist/server 到仓库根同为两级目录
+  webRoot: fileURLToPath(new URL("../../dist/web", import.meta.url)),
   ...(config.feishu === undefined ? {} : { feishu: config.feishu }),
 });
 

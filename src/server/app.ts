@@ -15,6 +15,7 @@ import { registerCapabilityRoutes } from "./routes/capabilities.js";
 import { registerIdentityRoutes } from "./routes/identity.js";
 import { registerIngestRoutes } from "./routes/ingest.js";
 import { registerOverviewRoutes } from "./routes/overview.js";
+import { registerWebRoutes } from "./routes/static.js";
 import { registerStreamRoutes } from "./routes/stream.js";
 import { registerTaskA2aRoutes } from "./routes/task-a2a.js";
 import { registerTaskReadRoutes } from "./routes/task-read.js";
@@ -40,6 +41,8 @@ export interface BuildAppOptions {
   a2a?: A2aService;
   /** 飞书配置存在且带 approvalChatId 时,申请落库后推送审批卡片 */
   feishu?: FeishuConfig;
+  /** 前端构建产物目录;存在 index.html 时才注册静态托管与 SPA 回退 */
+  webRoot?: string;
   /** 来源白名单(只校验 Host);未注入时不做限制,供路由层测试使用 */
   allowedHosts?: readonly string[];
   now?: () => number;
@@ -98,6 +101,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         ...(notify === undefined ? {} : { onRequested: notify }),
       });
     }
+  }
+
+  if (options.webRoot !== undefined) {
+    registerWebRoutes(app, options.webRoot);
   }
 
   app.setNotFoundHandler((_request, reply) => {
