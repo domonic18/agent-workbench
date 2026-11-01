@@ -1,6 +1,15 @@
-import { TASK_LIMITS, type TaskStage, type TaskStatus } from "../../shared/constants.js";
+import {
+  RUN_IDLE_GAP_MS,
+  TASK_LIMITS,
+  type TaskStage,
+  type TaskStatus,
+} from "../../shared/constants.js";
 import { newPrefixedId } from "../../shared/ids.js";
 import type { Db } from "../../store/database.js";
+import {
+  bindRunTaskIfEmpty,
+  findLatestUnboundRunningRunByAgent,
+} from "../../store/repositories/run.js";
 import {
   appendTaskEvent,
   findTaskById,
@@ -111,6 +120,17 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
   const newTaskId = deps.newTaskId ?? (() => newPrefixedId("tsk"));
   const newEventId = deps.newEventId ?? (() => newPrefixedId("tev"));
 
+  /**
+   * 「谁干活谁建单」落到具体 run:只认调用方最近活跃、尚未归属任务的 run。
+   * 找不到活动 run(或已有归属)时静默跳过,不影响任务本身落库。
+   */
+  function bindActiveRun(agentId: string, taskId: string, at: number): void {
+    const run = findLatestUnboundRunningRunByAgent(db, agentId, at - RUN_IDLE_GAP_MS);
+    if (run !== undefined) {
+      bindRunTaskIfEmpty(db, run.id, taskId);
+    }
+  }
+
   function create(input: TaskCreateInput): TaskRecord {
     const title = requireText(input.title, "title", TASK_LIMITS.title);
     const assigner = requireText(input.assigner, "assigner", TASK_LIMITS.assigner);
@@ -164,6 +184,7 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
           occurredAt: at,
         });
       }
+      bindActiveRun(assignee, id, at);
     })();
 
     const created = findTaskById(db, id);
@@ -267,6 +288,10 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
             occurredAt: at,
           });
         }
+      }
+      // 续接 / 返工可能换了新 run:未收尾的任务同样补一次绑定
+      if (nextStatus !== "done" && nextStatus !== "cancelled") {
+        bindActiveRun(task.assignee, task.id, at);
       }
     })();
 

@@ -4,12 +4,14 @@ import { runMigrations } from "../migrator.js";
 import {
   bindRunTaskIfEmpty,
   endRun,
+  findLatestUnboundRunningRunByAgent,
   findRunById,
   findRunningRunForStream,
   insertRun,
   insertTimelineEvent,
   listTimelineEventsByRun,
   maxBlockRev,
+  touchRunLastSeen,
   type NewAgentRun,
 } from "./run.js";
 
@@ -90,6 +92,24 @@ describe("agent_run 仓储", () => {
     expect(bindRunTaskIfEmpty(db, "run_1", "tsk_a")).toBe(false);
     expect(findRunById(db, "run_1")?.taskId).toBe("tsk_a");
     expect(bindRunTaskIfEmpty(db, "run_missing", "tsk_a")).toBe(false);
+    db.close();
+  });
+
+  it("取最近活跃且未绑定任务的 running run,跳过空闲与已绑定", () => {
+    const db = prepare();
+    insertRun(db, newRun({ id: "run_1", streamId: "s1" }));
+    insertRun(db, newRun({ id: "run_2", streamId: "s2" }));
+    touchRunLastSeen(db, "run_1", 2_400);
+    touchRunLastSeen(db, "run_2", 3_000);
+
+    expect(findLatestUnboundRunningRunByAgent(db, "agt_a", 2_000)?.id).toBe("run_2");
+    expect(bindRunTaskIfEmpty(db, "run_2", "tsk_a")).toBe(true);
+    expect(findLatestUnboundRunningRunByAgent(db, "agt_a", 2_000)?.id).toBe("run_1");
+    // 超出活跃窗口的 run 不再参与建单绑定
+    expect(findLatestUnboundRunningRunByAgent(db, "agt_a", 2_500)).toBeUndefined();
+
+    endRun(db, "run_1", 4_000);
+    expect(findLatestUnboundRunningRunByAgent(db, "agt_a", 2_000)).toBeUndefined();
     db.close();
   });
 });

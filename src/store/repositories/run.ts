@@ -81,6 +81,24 @@ export function endRun(db: Db, id: string, endedAt: number): boolean {
   );
 }
 
+/**
+ * 当前 Agent 最近活跃且尚未归属任务的 running run。
+ * 建单时用它把「谁干活谁建单」落到具体 run 上;空闲超过窗口的 run 不算。
+ */
+export function findLatestUnboundRunningRunByAgent(
+  db: Db,
+  agentId: string,
+  activeSince: number,
+): AgentRunRecord | undefined {
+  return db
+    .prepare(
+      `SELECT ${RUN_COLUMNS} FROM agent_run
+       WHERE agent_id = ? AND status = 'running' AND task_id IS NULL AND last_seen_at >= ?
+       ORDER BY last_seen_at DESC, id DESC LIMIT 1`,
+    )
+    .get(agentId, activeSince) as AgentRunRecord | undefined;
+}
+
 /** 一个 run 至多归属一条任务:首次绑定后不可覆盖(02 §3.1) */
 export function bindRunTaskIfEmpty(db: Db, id: string, taskId: string): boolean {
   return (

@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { TaskEventKind } from "../../shared/constants.js";
+import { RUN_IDLE_GAP_MS, type TaskEventKind } from "../../shared/constants.js";
 import { openDatabase, type Db } from "../../store/database.js";
 import { runMigrations } from "../../store/migrator.js";
+import {
+  bindRunTaskIfEmpty,
+  findRunById,
+  insertRun,
+} from "../../store/repositories/run.js";
 import { findTaskById } from "../../store/repositories/task.js";
 import { TaskError } from "./errors.js";
 import { createTaskService, type TaskCreateInput, type TaskService } from "./service.js";
@@ -23,6 +28,25 @@ function prepare(options: { now?: () => number } = {}): {
     newEventId: () => `tev_${++eventSeq}`,
   });
   return { db, service };
+}
+
+function addRun(db: Db, id: string, lastSeenAt: number): void {
+  db.prepare(
+    "INSERT OR IGNORE INTO machine (id, hostname, os, collector_version, collector_secret_hash, status, created_at) VALUES ('m1', 'h', 'linux', '1', 'h', 'active', 0)",
+  ).run();
+  db.prepare(
+    `INSERT OR IGNORE INTO agent (id, machine_id, project, display_name, secret_hash, status, allowed_targets_json, created_at, updated_at)
+     VALUES ('agt_a', 'm1', 'aw', 'agt_a', 'h', 'active', '[]', 0, 0)`,
+  ).run();
+  insertRun(db, {
+    id,
+    agentId: "agt_a",
+    machine: "m1",
+    project: "aw",
+    streamId: `s-${id}`,
+    startedAt: lastSeenAt,
+  });
+  db.prepare("UPDATE agent_run SET last_seen_at = ? WHERE id = ?").run(lastSeenAt, id);
 }
 
 function createInput(overrides: Partial<TaskCreateInput> = {}): TaskCreateInput {
@@ -111,6 +135,44 @@ describe("createTaskService.create", () => {
     const { db, service } = prepare();
     expectCode(() => service.create(createInput({ output: "自由文本" })), "VALIDATION_FAILED");
     expect(db.prepare("SELECT COUNT(*) AS n FROM task").get()).toEqual({ n: 0 });
+    db.close();
+  });
+
+  it("建单绑定调用方最近活跃的未归属 run", () => {
+    const { db, service } = prepare();
+    addRun(db, "run_old", NOW - 100);
+    addRun(db, "run_new", NOW - 50);
+
+    const task = service.create(createInput());
+
+    expect(findRunById(db, "run_new")?.taskId).toBe(task.id);
+    expect(findRunById(db, "run_old")?.taskId).toBeNull();
+    db.close();
+  });
+
+  it("已归属任务的 run 不被抢占,空闲超窗的 run 不参与绑定", () => {
+    const at = NOW + RUN_IDLE_GAP_MS + 1;
+    const { db, service } = prepare({ now: () => at });
+    db.prepare(
+      "INSERT INTO machine (id, hostname, os, collector_version, collector_secret_hash, status, created_at) VALUES ('m1', 'h', 'linux', '1', 'h', 'active', 0)",
+    ).run();
+    db.prepare(
+      `INSERT INTO agent (id, machine_id, project, display_name, secret_hash, status, allowed_targets_json, created_at, updated_at)
+       VALUES ('agt_a', 'm1', 'aw', 'agt_a', 'h', 'active', '[]', 0, 0)`,
+    ).run();
+    db.prepare(
+      `INSERT INTO task (id, title, assigner, assignee, project, stage, status, origin, created_at, updated_at)
+       VALUES ('tsk_other', 'tsk_other', 'console', 'agt_a', 'aw', 'intake', 'pending', 'a2a', 0, 0)`,
+    ).run();
+    addRun(db, "run_bound", at - 50);
+    expect(bindRunTaskIfEmpty(db, "run_bound", "tsk_other")).toBe(true);
+    addRun(db, "run_stale", NOW);
+
+    const task = service.create(createInput());
+
+    expect(findRunById(db, "run_bound")?.taskId).toBe("tsk_other");
+    expect(findRunById(db, "run_stale")?.taskId).toBeNull();
+    expect(task.id).not.toBe("tsk_other");
     db.close();
   });
 });
@@ -208,6 +270,18 @@ describe("createTaskService.update", () => {
       "CONFLICT",
     );
     expect(findTaskById(db, created.id)?.status).toBe("blocked");
+    db.close();
+  });
+
+  it("未收尾的任务在 update 时补绑新出现的 run", () => {
+    const { db, service } = prepare();
+    const created = service.create(createInput());
+    expect(findRunById(db, "run_late")).toBeUndefined();
+
+    addRun(db, "run_late", NOW - 10);
+    service.update({ taskId: created.id, assignee: "agt_a", status: "running" });
+
+    expect(findRunById(db, "run_late")?.taskId).toBe(created.id);
     db.close();
   });
 
