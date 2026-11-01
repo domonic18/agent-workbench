@@ -19,15 +19,14 @@ const envSchema = z.object({
   AW_AGENT_SECRET: z.string().min(1),
   CONSOLE_URL: z.string().url().default("http://127.0.0.1:8787"),
   AW_TASK_ID: z.string().min(1),
-  AW_WORKSPACE_ROOT: z.string().min(1),
-  AW_UPSTREAMS: z.string().min(1),
+  AW_WORKSPACE_ROOT: z.string().min(1).optional(),
+  /** 空数组 = 只挂原生工具,不接管任何上游 MCP server */
+  AW_UPSTREAMS: z.string().min(1).default("[]"),
   AW_GRANTS: z.string().optional(),
   AW_APPROVAL_TIMEOUT_MS: z.coerce.number().int().min(1).optional(),
-  DATABASE_PATH: z.string().min(1).default("./workspace/console.db"),
 });
 
 export interface ProxyConfig {
-  databasePath: string;
   agentSecret: string;
   consoleBaseUrl: string;
   approvalTimeoutMs: number | undefined;
@@ -70,7 +69,7 @@ function parseUpstreams(raw: string): z.infer<typeof upstreamSchema>[] {
   } catch {
     throw new Error("AW_UPSTREAMS 不是合法 JSON");
   }
-  const parsed = z.array(upstreamSchema).min(1).safeParse(decoded);
+  const parsed = z.array(upstreamSchema).safeParse(decoded);
   if (!parsed.success) {
     const detail = parsed.error.issues
       .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`)
@@ -101,7 +100,6 @@ export function loadProxyConfig(env: NodeJS.ProcessEnv = process.env): ProxyConf
   }
 
   return {
-    databasePath: parsed.data.DATABASE_PATH,
     agentSecret: parsed.data.AW_AGENT_SECRET,
     consoleBaseUrl: parsed.data.CONSOLE_URL,
     approvalTimeoutMs: parsed.data.AW_APPROVAL_TIMEOUT_MS,
@@ -116,7 +114,7 @@ export function loadProxyConfig(env: NodeJS.ProcessEnv = process.env): ProxyConf
       runId: parsed.data.AW_RUN_ID,
       agentId: parsed.data.AW_AGENT_ID,
       taskId: parsed.data.AW_TASK_ID,
-      workspaceRoot: parsed.data.AW_WORKSPACE_ROOT,
+      workspaceRoot: parsed.data.AW_WORKSPACE_ROOT ?? process.cwd(),
       usage: { kind: "unlimited" },
       grants: parseGrants(parsed.data.AW_GRANTS),
     },

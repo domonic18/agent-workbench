@@ -1,7 +1,7 @@
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
 import type { ApprovalRequester } from "../../domain/capability/approval.js";
 import type { RunContext } from "../../domain/capability/gate.js";
-import type { NewToolCallLog } from "../../store/repositories/tool-call-log.js";
+import type { ToolCallAudit } from "../../shared/audit.js";
 
 export const PROXY_VERSION = "0.1.0";
 
@@ -13,8 +13,8 @@ export interface Upstream {
   close(): Promise<void>;
 }
 
-/** 审计写失败即拒绝执行,因此这里允许抛错 */
-export type AuditSink = (entry: NewToolCallLog) => void;
+/** 审计写失败即拒绝执行,因此这里允许抛错;经 HTTP 落库时是异步的。agent_id 由服务端按 Bearer 注入 */
+export type AuditSink = (entry: ToolCallAudit) => void | Promise<void>;
 
 /** 控制面原生工具:对外裸名,闸门用点分名,执行一律经 HTTP 触达控制台 */
 export interface NativeTool {

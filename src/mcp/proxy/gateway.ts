@@ -96,9 +96,8 @@ export function createGateway(options: GatewayOptions): Gateway {
 
     // 先落审计再执行:写失败即拒绝(05 §6.4),不放行「先跑后记」
     try {
-      audit({
+      await audit({
         runId: ctx.runId,
-        agentId: ctx.agentId,
         taskId: ctx.taskId,
         tool: gateName,
         argsHash: hashArgs(args),

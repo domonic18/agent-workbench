@@ -58,4 +58,10 @@ describe("loadProxyConfig 的控制台触达配置", () => {
     const { AW_AGENT_SECRET: _omit, ...rest } = env();
     expect(() => loadProxyConfig(rest)).toThrow(/AW_AGENT_SECRET/);
   });
+
+  it("AW_UPSTREAMS 缺省或空数组时只挂原生工具", () => {
+    const { AW_UPSTREAMS: _omit, ...rest } = env();
+    expect(loadProxyConfig(rest).upstreams).toEqual([]);
+    expect(loadProxyConfig(env({ AW_UPSTREAMS: "[]" })).upstreams).toEqual([]);
+  });
 });

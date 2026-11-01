@@ -1,18 +1,9 @@
-import type { ToolLevel, ToolVerdict } from "../../shared/constants.js";
+import type { ToolCallAudit } from "../../shared/audit.js";
 import type { Db } from "../database.js";
 
-export interface NewToolCallLog {
-  runId: string;
+/** agentId 由服务端按 Bearer 身份注入,不随 proxy 负载传入 */
+export interface NewToolCallLog extends ToolCallAudit {
   agentId: string;
-  taskId: string;
-  tool: string;
-  argsHash: string;
-  level: ToolLevel;
-  verdict: ToolVerdict;
-  reason: string | null;
-  capabilityId: string | null;
-  durationMs: number | null;
-  occurredAt: number;
 }
 
 /** append-only:触发器拒绝 UPDATE/DELETE,这里只提供 INSERT */

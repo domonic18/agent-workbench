@@ -1,13 +1,38 @@
-import type { FastifyInstance } from "fastify";
-import { AUDIT_GAP_KINDS, LIST_LIMITS, type AuditGapKind } from "../../shared/constants.js";
+import type { FastifyInstance, FastifyReply } from "fastify";
+import { z } from "zod";
+import {
+  AUDIT_GAP_KINDS,
+  LIST_LIMITS,
+  TOOL_LEVELS,
+  TOOL_VERDICTS,
+  type AuditGapKind,
+} from "../../shared/constants.js";
 import { parseJsonObject } from "../../shared/json.js";
 import type { Db } from "../../store/database.js";
 import {
   listGaps,
   type AuditGapRecord,
 } from "../../store/repositories/audit-reconcile.js";
+import { findCapability } from "../../store/repositories/capability.js";
+import type { AgentRecord } from "../../store/repositories/identity.js";
+import { findTaskById, type TaskRecord } from "../../store/repositories/task.js";
+import { insertToolCallLog } from "../../store/repositories/tool-call-log.js";
+import { requireAgentAuth } from "../middleware/agent-auth.js";
 import { requireSession } from "../middleware/session.js";
 
+/** proxy 判定后落审计(05 §6.4);agent_id 不在负载里,按 Bearer 身份注入 */
+const toolCallSchema = z.object({
+  runId: z.string().min(1),
+  taskId: z.string().min(1),
+  tool: z.string().min(1),
+  argsHash: z.string().regex(/^[0-9a-f]{64}$/),
+  level: z.enum(TOOL_LEVELS),
+  verdict: z.enum(TOOL_VERDICTS),
+  reason: z.string().nullish(),
+  capabilityId: z.string().nullish(),
+  durationMs: z.number().int().min(0).nullish(),
+  occurredAt: z.number().int().positive(),
+});
 
 export interface AuditRoutesOptions {
   db: Db;
@@ -54,10 +79,70 @@ function parseCursor(cursor: string): { detectedAt: number; id: number } | undef
   return { detectedAt, id };
 }
 
+function forbidden(reply: FastifyReply, message: string): FastifyReply {
+  return reply.code(403).send({ error: { code: "FORBIDDEN", message } });
+}
+
+/** 审计行必须落在调用方自己的任务上;否则等同伪造他人审计 */
+function ownedTask(
+  reply: FastifyReply,
+  db: Db,
+  taskId: string,
+  agentId: string,
+): TaskRecord | undefined {
+  const task = findTaskById(db, taskId);
+  if (task === undefined) {
+    void reply.code(404).send({ error: { code: "NOT_FOUND", message: `任务 ${taskId} 不存在` } });
+    return undefined;
+  }
+  if (task.assignee !== agentId) {
+    void forbidden(reply, `任务 ${taskId} 不属于当前 Agent`);
+    return undefined;
+  }
+  return task;
+}
+
 export function registerAuditRoutes(app: FastifyInstance, options: AuditRoutesOptions): void {
   const db = options.db;
   const now = options.now ?? Date.now;
   const session = requireSession(db, now);
+
+  app.post(
+    "/api/audit/tool-calls",
+    { preHandler: requireAgentAuth(db) },
+    async (request, reply) => {
+      const agent = request.agent as AgentRecord;
+      const parsed = toolCallSchema.safeParse(request.body ?? {});
+      if (!parsed.success) {
+        return reply.code(422).send({
+          error: {
+            code: "VALIDATION_FAILED",
+            message: "字段缺失或类型错误",
+            detail: parsed.error.issues.map((issue) => ({
+              path: issue.path.join("."),
+              message: issue.message,
+            })),
+          },
+        });
+      }
+      const task = ownedTask(reply, db, parsed.data.taskId, agent.id);
+      if (task === undefined) {
+        return reply;
+      }
+      const capabilityId = parsed.data.capabilityId ?? null;
+      if (capabilityId !== null && findCapability(db, capabilityId)?.taskId !== task.id) {
+        return forbidden(reply, `授权 ${capabilityId} 不属于任务 ${task.id}`);
+      }
+      insertToolCallLog(db, {
+        ...parsed.data,
+        reason: parsed.data.reason ?? null,
+        capabilityId,
+        durationMs: parsed.data.durationMs ?? null,
+        agentId: agent.id,
+      });
+      return reply.code(201).send({ ok: true });
+    },
+  );
 
   app.get("/api/audit/gaps", { preHandler: session }, async (request, reply) => {
     const query = request.query as Record<string, unknown>;

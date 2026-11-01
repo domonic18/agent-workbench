@@ -1,7 +1,6 @@
 import { pathToFileURL } from "node:url";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { openDatabase } from "../../store/database.js";
-import { insertToolCallLog } from "../../store/repositories/tool-call-log.js";
+import { postToolCallAudit } from "./audit-client.js";
 import { loadProxyConfig } from "./config.js";
 import { createGateway } from "./gateway.js";
 import { createStderrLogger } from "./logger.js";
@@ -12,19 +11,19 @@ import { connectUpstream } from "./upstream.js";
 export async function main(): Promise<void> {
   const config = loadProxyConfig();
   const log = createStderrLogger();
-  const db = openDatabase(config.databasePath);
   const upstreams = await Promise.all(config.upstreams.map((entry) => connectUpstream(entry)));
-  const nativeTools = createNativeTools({
+  const consoleClient = {
     baseUrl: config.consoleBaseUrl,
     agentId: config.ctx.agentId,
     agentSecret: config.agentSecret,
-  });
+  };
+  const nativeTools = createNativeTools(consoleClient);
 
   const gateway = createGateway({
     ctx: config.ctx,
     upstreams,
     nativeTools,
-    audit: (entry) => insertToolCallLog(db, entry),
+    audit: (entry) => postToolCallAudit(consoleClient, entry),
     ...(config.approvalTimeoutMs === undefined
       ? {}
       : { approvalTimeoutMs: config.approvalTimeoutMs }),
@@ -40,7 +39,6 @@ export async function main(): Promise<void> {
 
   const shutdown = async (): Promise<void> => {
     await Promise.allSettled(upstreams.map((upstream) => upstream.close()));
-    db.close();
     process.exit(0);
   };
   process.on("SIGINT", () => void shutdown());

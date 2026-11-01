@@ -4,7 +4,7 @@ import type { RunContext } from "../../domain/capability/gate.js";
 import { openDatabase } from "../../store/database.js";
 import { runMigrations } from "../../store/migrator.js";
 import { insertToolCallLog } from "../../store/repositories/tool-call-log.js";
-import type { NewToolCallLog } from "../../store/repositories/tool-call-log.js";
+import type { ToolCallAudit } from "../../shared/audit.js";
 import { createGateway, exposeToolName } from "./gateway.js";
 import type { NativeTool, Upstream } from "./types.js";
 
@@ -48,11 +48,13 @@ function textOf(result: CallToolResult): string {
 
 function setup(toolNames: readonly string[] = ["read", "exec"]) {
   const upstream = fakeUpstream("fs", toolNames);
-  const audited: NewToolCallLog[] = [];
+  const audited: ToolCallAudit[] = [];
   const gateway = createGateway({
     ctx: context(),
     upstreams: [upstream],
-    audit: (entry) => audited.push(entry),
+    audit: (entry) => {
+      audited.push(entry);
+    },
     toolMap: { fs: { read: "fs.read" } },
   });
   return { upstream, audited, gateway };
@@ -114,7 +116,7 @@ describe("gateway", () => {
     const gateway = createGateway({
       ctx: context({ taskId: "T-missing" }),
       upstreams: [upstream],
-      audit: (entry) => insertToolCallLog(db, entry),
+      audit: (entry) => insertToolCallLog(db, { ...entry, agentId: "agt_1" }),
       toolMap: { fs: { read: "fs.read" } },
     });
 
@@ -136,11 +138,13 @@ describe("gateway", () => {
 
   it("审批通过后转发", async () => {
     const upstream = fakeUpstream("fs", ["exec"]);
-    const audited: NewToolCallLog[] = [];
+    const audited: ToolCallAudit[] = [];
     const gateway = createGateway({
       ctx: context(),
       upstreams: [upstream],
-      audit: (entry) => audited.push(entry),
+      audit: (entry) => {
+      audited.push(entry);
+    },
       approval: async () => true,
     });
 
@@ -174,11 +178,13 @@ describe("gateway", () => {
 
   it("命中已生效授权时不等审批,审计带回 capabilityId", async () => {
     const upstream = fakeUpstream("fs", ["exec"]);
-    const audited: NewToolCallLog[] = [];
+    const audited: ToolCallAudit[] = [];
     const gateway = createGateway({
       ctx: context({ grants: [{ tool: "fs.exec", capabilityId: "cap_1" }] }),
       upstreams: [upstream],
-      audit: (entry) => audited.push(entry),
+      audit: (entry) => {
+      audited.push(entry);
+    },
       toolMap: { fs: { exec: "fs.exec" } },
     });
     const result = await gateway.callTool("fs__exec", {});
@@ -247,12 +253,14 @@ describe("gateway 原生工具", () => {
 
   it("用点分闸门名判定并审计,通过后执行原生工具", async () => {
     const calls: Array<Record<string, unknown>> = [];
-    const audited: NewToolCallLog[] = [];
+    const audited: ToolCallAudit[] = [];
     const gateway = createGateway({
       ctx: context(),
       upstreams: [],
       nativeTools: [fakeNative(calls)],
-      audit: (entry) => audited.push(entry),
+      audit: (entry) => {
+      audited.push(entry);
+    },
     });
 
     const result = await gateway.callTool("task_create", { title: "t" });
@@ -294,6 +302,23 @@ describe("gateway 原生工具", () => {
 
     const result = await gateway.callTool("task_create", {});
     expect(result.isError).toBe(true);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("异步审计失败同样拒绝执行", async () => {
+    const calls: Array<Record<string, unknown>> = [];
+    const gateway = createGateway({
+      ctx: context(),
+      upstreams: [],
+      nativeTools: [fakeNative(calls)],
+      audit: async () => {
+        throw new Error("console unreachable");
+      },
+    });
+
+    const result = await gateway.callTool("task_create", {});
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain("审计写入失败");
     expect(calls).toHaveLength(0);
   });
 });
