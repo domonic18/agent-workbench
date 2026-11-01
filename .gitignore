@@ -32,6 +32,9 @@ docker/frpc.toml
 docker/spike/pki/
 docker/spike/out/
 
+# 浏览器自动化产物(Playwright MCP)
+.playwright-mcp/
+
 # IDE / 系统
 .DS_Store
 .idea/
