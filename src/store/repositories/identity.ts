@@ -147,6 +147,18 @@ export function updateAgentSecretHash(db: Db, id: string, hash: string, now: num
     .run(hash, now, id).changes === 1;
 }
 
+/** 委派白名单只由控制台会话写;保存即对下一次 a2a.send 判定生效 */
+export function updateAgentAllowedTargets(
+  db: Db,
+  id: string,
+  allowedTargetsJson: string,
+  now: number,
+): boolean {
+  return db
+    .prepare("UPDATE agent SET allowed_targets_json = ?, updated_at = ? WHERE id = ?")
+    .run(allowedTargetsJson, now, id).changes === 1;
+}
+
 export interface AgentListQuery {
   limit: number;
   before?: { createdAt: number; id: string };

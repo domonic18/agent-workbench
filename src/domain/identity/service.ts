@@ -9,6 +9,7 @@ import {
   insertMachine,
   listAgents,
   listMachines,
+  updateAgentAllowedTargets,
   updateAgentSecretHash,
   updateMachineSecretHash,
   type AgentListQuery,
@@ -50,6 +51,8 @@ export interface IdentityService {
   registerAgent(input: RegisterAgentInput): RegisteredAgent;
   rotateMachineSecret(id: string): RegisteredMachine;
   rotateAgentSecret(id: string): RegisteredAgent;
+  /** 控制台会话维护委派白名单;Agent 的 Bearer 无权改自己的名单 */
+  setAllowedTargets(id: string, targets: string[]): AgentRecord;
   listMachines(query: MachineListQuery): MachineRecord[];
   listAgents(query: AgentListQuery): AgentRecord[];
 }
@@ -185,11 +188,34 @@ export function createIdentityService(deps: IdentityServiceDeps): IdentityServic
     return { agent, secret };
   }
 
+  function setAllowedTargets(id: string, targets: string[]): AgentRecord {
+    if (findAgentById(db, id) === undefined) {
+      throw new IdentityError("NOT_FOUND", `Agent ${id} 未注册`);
+    }
+    const normalized = normalizeTargets(targets);
+    if (normalized.includes(id)) {
+      throw new IdentityError("VALIDATION_FAILED", "不能委派给自身");
+    }
+    const unknown = normalized.filter((target) => findAgentById(db, target) === undefined);
+    if (unknown.length > 0) {
+      throw new IdentityError("VALIDATION_FAILED", `委派目标不存在: ${unknown.join(", ")}`);
+    }
+    if (!updateAgentAllowedTargets(db, id, JSON.stringify(normalized), now())) {
+      throw new IdentityError("NOT_FOUND", `Agent ${id} 未注册`);
+    }
+    const agent = findAgentById(db, id);
+    if (agent === undefined) {
+      throw new Error(`Agent 更新后读不到记录: ${id}`);
+    }
+    return agent;
+  }
+
   return {
     registerMachine,
     registerAgent,
     rotateMachineSecret,
     rotateAgentSecret,
+    setAllowedTargets,
     listMachines: (query) => listMachines(db, query),
     listAgents: (query) => listAgents(db, query),
   };

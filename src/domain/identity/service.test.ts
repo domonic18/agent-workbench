@@ -167,3 +167,41 @@ describe("身份注册", () => {
     db.close();
   });
 });
+
+describe("委派白名单", () => {
+  function prepareAgents() {
+    const context = prepare();
+    context.service.registerMachine({
+      id: "m1",
+      hostname: "h",
+      os: "linux",
+      collectorVersion: "1",
+    });
+    const a = context.service.registerAgent({ machineId: "m1", project: "a", displayName: "A" });
+    const b = context.service.registerAgent({ machineId: "m1", project: "b", displayName: "B" });
+    const c = context.service.registerAgent({ machineId: "m1", project: "c", displayName: "C" });
+    return { ...context, a: a.agent, b: b.agent, c: c.agent };
+  }
+
+  it("保存去重后的目标,空数组清空", () => {
+    const { db, service, a, b, c } = prepareAgents();
+    const updated = service.setAllowedTargets(a.id, [b.id, b.id, c.id]);
+    expect(JSON.parse(updated.allowedTargetsJson)).toEqual([b.id, c.id]);
+
+    const reloaded = service.listAgents({ limit: 10 }).find((row) => row.id === a.id);
+    expect(reloaded === undefined ? null : JSON.parse(reloaded.allowedTargetsJson)).toEqual([
+      b.id,
+      c.id,
+    ]);
+    expect(JSON.parse(service.setAllowedTargets(a.id, []).allowedTargetsJson)).toEqual([]);
+    db.close();
+  });
+
+  it("自我委派、未知目标与未知发起方都拒绝", () => {
+    const { db, service, a } = prepareAgents();
+    expectCode(() => service.setAllowedTargets(a.id, [a.id]), "VALIDATION_FAILED");
+    expectCode(() => service.setAllowedTargets(a.id, ["agt_missing"]), "VALIDATION_FAILED");
+    expectCode(() => service.setAllowedTargets("agt_missing", [a.id]), "NOT_FOUND");
+    db.close();
+  });
+});

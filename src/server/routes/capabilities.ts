@@ -26,6 +26,18 @@ const CONSOLE_ACTOR = "console";
 /** 幂等键作用域:同键在不同接口下互不影响 */
 const CREATE_SCOPE = "capability.create";
 
+/** 授权屏三视图的 URL 口径(03 §4.3);issuing 归「待批」以免签发中掉出视野 */
+const CAPABILITY_VIEW_STATUSES = {
+  pending: ["pending", "issuing"],
+  active: ["active"],
+  history: ["expired", "revoked", "rejected"],
+} as const;
+type CapabilityView = keyof typeof CAPABILITY_VIEW_STATUSES;
+
+function isCapabilityView(value: string): value is CapabilityView {
+  return Object.hasOwn(CAPABILITY_VIEW_STATUSES, value);
+}
+
 const createSchema = z.object({
   subject: z.string(),
   target: z.string(),
@@ -122,11 +134,25 @@ export function registerCapabilityRoutes(
   app.get("/api/capabilities", { preHandler: session }, async (request, reply) => {
     const query = request.query as Record<string, unknown>;
     const status = typeof query.status === "string" ? query.status : undefined;
+    const view = typeof query.view === "string" ? query.view : undefined;
+    if (status !== undefined && view !== undefined) {
+      return reply.code(422).send({
+        error: { code: "VALIDATION_FAILED", message: "status 与 view 只能二选一" },
+      });
+    }
     if (status !== undefined && !CAPABILITY_STATUSES.includes(status as CapabilityStatus)) {
       return reply.code(422).send({
         error: {
           code: "VALIDATION_FAILED",
           message: `status 只接受 ${CAPABILITY_STATUSES.join(" / ")}`,
+        },
+      });
+    }
+    if (view !== undefined && !isCapabilityView(view)) {
+      return reply.code(422).send({
+        error: {
+          code: "VALIDATION_FAILED",
+          message: `view 只接受 ${Object.keys(CAPABILITY_VIEW_STATUSES).join(" / ")}`,
         },
       });
     }
@@ -144,11 +170,18 @@ export function registerCapabilityRoutes(
       });
     }
 
-    const rows = service.list({
-      ...(status === undefined ? {} : { status: status as CapabilityStatus }),
-      limit: limitText,
-      ...(before === undefined ? {} : { before }),
-    });
+    const rows =
+      view !== undefined && isCapabilityView(view)
+        ? service.list({
+            statuses: CAPABILITY_VIEW_STATUSES[view],
+            limit: limitText,
+            ...(before === undefined ? {} : { before }),
+          })
+        : service.list({
+            ...(status === undefined ? {} : { status: status as CapabilityStatus }),
+            limit: limitText,
+            ...(before === undefined ? {} : { before }),
+          });
     const items = rows.map(toDto);
     const last = rows.at(-1);
     return {

@@ -55,6 +55,8 @@ export function findCapability(db: Db, id: string): CapabilityRecord | undefined
 
 export interface CapabilityListQuery {
   status?: CapabilityStatus;
+  /** 三视图:一次取一组状态(待批 = pending+issuing,历史 = expired+revoked+rejected) */
+  statuses?: readonly CapabilityStatus[];
   limit: number;
   /** keyset 游标:上一页最后一行的 (createdAt, id) */
   before?: { createdAt: number; id: string };
@@ -64,7 +66,13 @@ export interface CapabilityListQuery {
 export function listCapabilities(db: Db, query: CapabilityListQuery): CapabilityRecord[] {
   const conditions: string[] = [];
   const params: Record<string, unknown> = { limit: query.limit };
-  if (query.status !== undefined) {
+  if (query.statuses !== undefined && query.statuses.length > 0) {
+    const placeholders = query.statuses.map((status, index) => {
+      params[`status${index}`] = status;
+      return `@status${index}`;
+    });
+    conditions.push(`status IN (${placeholders.join(", ")})`);
+  } else if (query.status !== undefined) {
     conditions.push("status = @status");
     params.status = query.status;
   }

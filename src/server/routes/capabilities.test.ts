@@ -236,6 +236,56 @@ describe("capabilities 路由", () => {
     expect(badStatus.statusCode).toBe(422);
   });
 
+  it("三视图按状态集合返回,issuing 归入待批", async () => {
+    async function createId(key: string): Promise<string> {
+      const response = await write("/api/capabilities", key, createBody);
+      expect(response.statusCode).toBe(201);
+      return (response.json().capability as { id: string }).id;
+    }
+    async function viewIds(view: string): Promise<string[]> {
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/capabilities?view=${view}`,
+        headers: { cookie },
+      });
+      expect(response.statusCode).toBe(200);
+      return (response.json().items as { id: string }[]).map((item) => item.id).sort();
+    }
+
+    const pendingId = await createId("v1");
+
+    const activeId = await createId("v2");
+    await write(`/api/capabilities/${activeId}/approve`, "v3");
+
+    const revokedId = await createId("v4");
+    await write(`/api/capabilities/${revokedId}/approve`, "v5");
+    await write(`/api/capabilities/${revokedId}/revoke`, "v6");
+
+    const rejectedId = await createId("v7");
+    await write(`/api/capabilities/${rejectedId}/reject`, "v8");
+
+    const issuingId = await createId("v9");
+    db.prepare("UPDATE capability SET status = 'issuing' WHERE id = ?").run(issuingId);
+
+    expect(await viewIds("pending")).toEqual([pendingId, issuingId].sort());
+    expect(await viewIds("active")).toEqual([activeId]);
+    expect(await viewIds("history")).toEqual([revokedId, rejectedId].sort());
+
+    const badView = await app.inject({
+      method: "GET",
+      url: "/api/capabilities?view=unknown",
+      headers: { cookie },
+    });
+    expect(badView.statusCode).toBe(422);
+
+    const both = await app.inject({
+      method: "GET",
+      url: "/api/capabilities?status=pending&view=pending",
+      headers: { cookie },
+    });
+    expect(both.statusCode).toBe(422);
+  });
+
   it("登出后会话失效", async () => {
     const logout = await app.inject({
       method: "POST",

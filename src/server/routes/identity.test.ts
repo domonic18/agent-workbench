@@ -50,6 +50,21 @@ describe("identity 路由", () => {
     db.close();
   });
 
+  async function registerAgent(
+    machineId: string,
+    project: string,
+    displayName: string,
+  ): Promise<{ agent: { id: string }; secret: string }> {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/agents",
+      headers: writeHeaders(),
+      payload: { machineId, project, displayName },
+    });
+    expect(response.statusCode).toBe(201);
+    return response.json() as { agent: { id: string }; secret: string };
+  }
+
   it("未登录 / 缺幂等键都拒绝", async () => {
     expect((await app.inject({ method: "GET", url: "/api/machines" })).statusCode).toBe(401);
 
@@ -169,5 +184,74 @@ describe("identity 路由", () => {
       headers: writeHeaders(),
     });
     expect(unknown.statusCode).toBe(404);
+  });
+
+  it("保存委派白名单:仅控制台会话可写,自我与未知目标被拒", async () => {
+    await app.inject({
+      method: "POST",
+      url: "/api/machines",
+      headers: writeHeaders(),
+      payload: { id: "m1", hostname: "h", os: "linux", collectorVersion: "1" },
+    });
+    const a = await registerAgent("m1", "a", "Agent A");
+    const b = await registerAgent("m1", "b", "Agent B");
+    const c = await registerAgent("m1", "c", "Agent C");
+    const url = `/api/agents/${a.agent.id}/targets`;
+
+    const saved = await app.inject({
+      method: "PUT",
+      url,
+      headers: writeHeaders(),
+      payload: { targets: [b.agent.id, c.agent.id] },
+    });
+    expect(saved.statusCode).toBe(200);
+    expect(saved.json()).toMatchObject({
+      agent: { id: a.agent.id, allowedTargets: [b.agent.id, c.agent.id] },
+    });
+
+    const self = await app.inject({
+      method: "PUT",
+      url,
+      headers: writeHeaders(),
+      payload: { targets: [a.agent.id] },
+    });
+    expect(self.statusCode).toBe(422);
+
+    const unknownTarget = await app.inject({
+      method: "PUT",
+      url,
+      headers: writeHeaders(),
+      payload: { targets: [b.agent.id, "agt_missing"] },
+    });
+    expect(unknownTarget.statusCode).toBe(422);
+
+    const badShape = await app.inject({
+      method: "PUT",
+      url,
+      headers: writeHeaders(),
+      payload: { targets: b.agent.id },
+    });
+    expect(badShape.statusCode).toBe(422);
+
+    const noKey = await app.inject({
+      method: "PUT",
+      url,
+      headers: { cookie, "x-requested-with": "fetch" },
+      payload: { targets: [] },
+    });
+    expect(noKey.statusCode).toBe(422);
+
+    // Agent 自己的 Bearer 没有控制台会话,无权改自己的白名单
+    const agentBearer = await app.inject({
+      method: "PUT",
+      url,
+      headers: {
+        authorization: `Bearer ${a.agent.id}.${a.secret}`,
+        "x-requested-with": "fetch",
+        "idempotency-key": "agent-key",
+      },
+      payload: { targets: [b.agent.id] },
+    });
+    expect(agentBearer.statusCode).toBe(401);
   });
 });

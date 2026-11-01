@@ -24,6 +24,10 @@ const agentCreateSchema = z.object({
   allowedTargets: z.array(z.string()).optional(),
 });
 
+const agentTargetsSchema = z.object({
+  targets: z.array(z.string()),
+});
+
 export interface IdentityRoutesOptions {
   db: Db;
   now?: () => number;
@@ -193,6 +197,23 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
     try {
       const { secret } = service.rotateAgentSecret(id);
       return { secret };
+    } catch (error) {
+      if (error instanceof IdentityError) {
+        return sendError(reply, error);
+      }
+      throw error;
+    }
+  });
+
+  app.put("/api/agents/:id/targets", { preHandler: writeGuards }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const parsed = agentTargetsSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return validationError(reply, parsed.error);
+    }
+    try {
+      const agent = service.setAllowedTargets(id, parsed.data.targets);
+      return { agent: toAgentDto(agent) };
     } catch (error) {
       if (error instanceof IdentityError) {
         return sendError(reply, error);
