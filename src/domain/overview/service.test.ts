@@ -9,7 +9,11 @@ import { runMigrations } from "../../store/migrator.js";
 import { insertCapability } from "../../store/repositories/capability.js";
 import { insertAgent, insertMachine } from "../../store/repositories/identity.js";
 import { currentRevision } from "../../store/repositories/revision.js";
-import { bindRunTaskIfEmpty, insertRun } from "../../store/repositories/run.js";
+import {
+  bindRunTaskIfEmpty,
+  insertRun,
+  insertTimelineEvent,
+} from "../../store/repositories/run.js";
 import { insertTask, updateTask } from "../../store/repositories/task.js";
 import { insertTokenUsage } from "../../store/repositories/token-usage.js";
 import { createOverviewService, heartbeatState, startOfLocalDay } from "./service.js";
@@ -235,6 +239,7 @@ describe("overview 服务", () => {
       currentTaskId: "t1",
       currentTaskTitle: "t1",
       currentTaskStatus: "running",
+      currentInstruction: null,
       todayTokens: 165,
     });
     expect(agents[1]).toMatchObject({
@@ -255,7 +260,61 @@ describe("overview 服务", () => {
       machineLastSeenAt: null,
       running: false,
       lastRunAt: null,
+      currentInstruction: null,
       todayTokens: 0,
+    });
+  });
+
+  it("无任务归属时带出当前 run 最近一条用户指令并压平空白", () => {
+    addMachine(db, "m-live", AT - 60_000);
+    addAgent(db, "a-live", "m-live");
+    addRun(db, "r-live", "a-live", "m-live", AT - 60_000);
+    const base = {
+      runId: "r-live",
+      turnId: "turn-live",
+      blockId: "blk-live",
+      blockRev: 1,
+      offset: null,
+    };
+    insertTimelineEvent(db, {
+      ...base,
+      id: "tle-old",
+      ord: 1,
+      kind: "user_message",
+      payload: { text: "更早的指令" },
+      occurredAt: AT - 50_000,
+    });
+    insertTimelineEvent(db, {
+      ...base,
+      id: "tle-new",
+      ord: 2,
+      kind: "user_message",
+      payload: { text: "  先看一下\n\n发件箱的重试策略  " },
+      occurredAt: AT - 30_000,
+    });
+    insertTimelineEvent(db, {
+      ...base,
+      id: "tle-reply",
+      ord: 3,
+      kind: "assistant_text",
+      payload: { text: "好的" },
+      occurredAt: AT - 20_000,
+    });
+    // 运行时注入的尖括号块也走 user_message,但不算人的指令
+    insertTimelineEvent(db, {
+      ...base,
+      id: "tle-injected",
+      ord: 4,
+      kind: "user_message",
+      payload: { text: "<task-notification>后台任务完成</task-notification>" },
+      occurredAt: AT - 10_000,
+    });
+
+    const agents = createOverviewService({ db, now: () => AT }).get().agents;
+    expect(agents.find((agent) => agent.id === "a-live")).toMatchObject({
+      running: true,
+      currentTaskId: null,
+      currentInstruction: "先看一下 发件箱的重试策略",
     });
   });
 });

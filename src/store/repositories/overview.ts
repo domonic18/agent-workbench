@@ -51,6 +51,8 @@ export interface AgentOverviewRow {
   currentTaskTitle: string | null;
   currentTaskStage: string | null;
   currentTaskStatus: string | null;
+  /** 当前 run 最近一条用户指令的开头;没有任务归属时用来回答「在忙什么」 */
+  currentInstruction: string | null;
   todayTokens: number;
 }
 
@@ -82,6 +84,12 @@ export function listAgentOverviewRows(
          t.title AS currentTaskTitle,
          t.stage AS currentTaskStage,
          t.status AS currentTaskStatus,
+         (SELECT substr(json_extract(e.payload_json, '$.text'), 1, 200)
+            FROM timeline_event e
+           WHERE e.run_id = r.id AND e.kind = 'user_message'
+             -- 运行时注入的 <task-notification> 之类也记为 user_message,不代表人的指令
+             AND ltrim(json_extract(e.payload_json, '$.text')) NOT LIKE '<%'
+           ORDER BY e.occurred_at DESC, e.ord DESC LIMIT 1) AS currentInstruction,
          COALESCE(tok.totalTokens, 0) AS todayTokens
        FROM agent a
        JOIN machine m ON m.id = a.machine_id

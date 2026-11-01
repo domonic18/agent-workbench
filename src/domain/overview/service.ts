@@ -25,6 +25,8 @@ export interface OverviewAgent {
   currentTaskTitle: string | null;
   currentTaskStage: string | null;
   currentTaskStatus: string | null;
+  /** 无任务归属时的会话实况:当前 run 最近一条用户指令(已压平空白,截断 200 字符) */
+  currentInstruction: string | null;
   todayTokens: number;
 }
 
@@ -52,6 +54,14 @@ export function startOfLocalDay(at: number): number {
   const date = new Date(at);
   date.setHours(0, 0, 0, 0);
   return date.getTime();
+}
+
+function instructionText(value: string | null): string | null {
+  if (value === null) {
+    return null;
+  }
+  const text = value.replace(/\s+/g, " ").trim();
+  return text === "" ? null : text;
 }
 
 export function heartbeatState(lastSeenAt: number | null, at: number): HeartbeatState {
@@ -103,6 +113,7 @@ export function createOverviewService(deps: OverviewServiceDeps): OverviewServic
         currentTaskTitle: row.currentTaskTitle,
         currentTaskStage: row.currentTaskStage,
         currentTaskStatus: row.currentTaskStatus,
+        currentInstruction: instructionText(row.currentInstruction),
         todayTokens: row.todayTokens,
       })),
     };
