@@ -51,15 +51,11 @@ export function TasksPage() {
 
   return (
     <div className={styles.page}>
-      <header className={styles.header}>
-        <div>
-          <h1 className={styles.title}>任务</h1>
-          <p className={styles.subtitle}>每个任务的阶段、卡点与开销</p>
-        </div>
-        <StatusBadge tone={REALTIME_TONE[realtime]} text={REALTIME_LABEL[realtime]} />
-      </header>
-
-      <TaskFiltersForm />
+      <TaskFiltersForm
+        statusSlot={
+          <StatusBadge tone={REALTIME_TONE[realtime]} text={REALTIME_LABEL[realtime]} />
+        }
+      />
 
       {tasksQuery.isPending ? <p className={styles.loading}>加载中…</p> : null}
 

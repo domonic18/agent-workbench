@@ -39,6 +39,24 @@ export function formatDuration(ms: number): string {
   return hours % 24 === 0 ? `${days} 天` : `${days} 天 ${hours % 24} 小时`;
 }
 
+/** 表格窄列用的紧凑口径;完整口径放 title */
+export function formatCompactDuration(ms: number): string {
+  const value = Math.max(0, ms);
+  if (value < 60_000) {
+    return `${Math.floor(value / 1_000)}s`;
+  }
+  const minutes = Math.floor(value / 60_000);
+  if (minutes < 60) {
+    return `${minutes}m`;
+  }
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return minutes % 60 === 0 ? `${hours}h` : `${hours}h${minutes % 60}m`;
+  }
+  const days = Math.floor(hours / 24);
+  return hours % 24 === 0 ? `${days}d` : `${days}d${hours % 24}h`;
+}
+
 export function formatRelativeTime(at: number, now: number = Date.now()): string {
   const diff = now - at;
   if (diff < 10_000) {

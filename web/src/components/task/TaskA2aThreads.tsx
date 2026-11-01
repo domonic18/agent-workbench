@@ -23,34 +23,32 @@ export function TaskA2aThreads({ threads, loading, error, agentNames }: TaskA2aT
   }
 
   return (
-    <section className={styles.section} aria-label="A2A 线程">
-      <h3 className={styles.sectionTitle}>A2A 往返</h3>
+    <div className={styles.threads} aria-label="A2A 线程">
       {loading ? <p className={styles.loading}>加载 A2A 线程…</p> : null}
-      {error === null ? null : <p className={styles.chainMissing}>{error}</p>}
+      {error === null ? null : <p className={styles.threadMissing}>{error}</p>}
       {!loading && error === null && threads.length === 0 ? (
         <p className={styles.muted}>该任务没有 A2A 往返。</p>
       ) : null}
       {threads.map((thread) => (
         <article key={thread.thread_id} className={styles.thread}>
           <div className={styles.threadHeader}>
-            <h4 className={styles.threadTitle}>
-              线程 <code className={styles.outputCode}>{thread.thread_id}</code>
-            </h4>
+            <span className={styles.participants}>
+              {agentLabel(thread.initiator_agent)} → {agentLabel(thread.responder_agent)} ·{" "}
+              {formatDateTime(thread.created_at)}
+            </span>
             <StatusBadge
               tone={A2A_THREAD_STATUS_TONE[thread.status]}
               text={A2A_THREAD_STATUS_LABEL[thread.status]}
             />
           </div>
-          <div className={styles.participants}>
-            {agentLabel(thread.initiator_agent)} → {agentLabel(thread.responder_agent)} ·{" "}
-            {formatDateTime(thread.created_at)}
+          <div className={styles.messages}>
+            {thread.messages.map((message) => (
+              <Message key={message.msg_id} message={message} agentLabel={agentLabel} />
+            ))}
           </div>
-          {thread.messages.map((message) => (
-            <Message key={message.msg_id} message={message} agentLabel={agentLabel} />
-          ))}
         </article>
       ))}
-    </section>
+    </div>
   );
 }
 
@@ -63,12 +61,15 @@ function Message({
 }) {
   return (
     <div className={styles.message}>
-      <div className={styles.messageHeader}>
-        <span className={styles.messageRound}>第 {message.round} 轮</span>
-        <span className={styles.kind}>{A2A_INTENT_LABEL[message.intent]}</span>
-        <span className={styles.muted}>
-          {agentLabel(message.from)} → {agentLabel(message.to)}
-        </span>
+      <div className={styles.messageStamp}>
+        <span>{formatDateTime(message.created_at)}</span>
+        <span className={styles.sep}>·</span>
+        <span>{A2A_INTENT_LABEL[message.intent]}</span>
+        <span className={styles.sep}>·</span>
+        <span>第 {message.round} 轮</span>
+      </div>
+      <div className={styles.messageFrom}>
+        {agentLabel(message.from)} → {agentLabel(message.to)}
       </div>
       <div className={styles.messageBody}>{message.summary}</div>
       <div className={styles.messageMeta}>

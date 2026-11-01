@@ -1,35 +1,37 @@
 import type { ReactNode } from "react";
-import type { TaskCapability, TaskDto, TaskTokenSummary } from "../../api/tasks.js";
+import type { TaskCapability, TaskDto, TaskEventDto, TaskTokenSummary } from "../../api/tasks.js";
 import {
+  formatCompactDuration,
   formatDateTime,
-  formatDuration,
   formatExactTokens,
   formatTokens,
 } from "../../shared/format.js";
 import {
   CAPABILITY_STATUS_LABEL,
   CAPABILITY_STATUS_TONE,
-  TASK_ORIGIN_LABEL,
+  TASK_EVENT_LABEL,
   TASK_STAGE_LABEL,
-  TASK_STATUS_LABEL,
-  TASK_STATUS_TONE,
 } from "../../shared/labels.js";
 import { StatusBadge } from "../data/StatusBadge.js";
+import { describeTaskEvent, latestEventReason } from "./task-event.js";
 import styles from "./task-drawer.module.css";
 
 export interface TaskDetailSummaryProps {
   task: TaskDto;
   capabilities: readonly TaskCapability[];
   tokens: TaskTokenSummary;
+  events: readonly TaskEventDto[];
   agentNames: ReadonlyMap<string, string>;
   now: number;
 }
 
-function SummaryItem({ label, children }: { label: string; children: ReactNode }) {
+const TERMINAL_STATUSES: readonly TaskDto["status"][] = ["done", "cancelled"];
+
+function SummaryRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className={styles.gridItem}>
-      <dt className={styles.gridLabel}>{label}</dt>
-      <dd className={styles.gridValue}>{children}</dd>
+    <div className={styles.summaryRow}>
+      <dt className={styles.summaryLabel}>{label}</dt>
+      <dd className={styles.summaryValue}>{children}</dd>
     </div>
   );
 }
@@ -56,54 +58,57 @@ export function TaskDetailSummary({
   task,
   capabilities,
   tokens,
+  events,
   agentNames,
   now,
 }: TaskDetailSummaryProps) {
   const assigneeName = agentNames.get(task.assignee);
+  const last = events.at(-1);
+  const terminal = TERMINAL_STATUSES.includes(task.status);
+  const reason = task.status === "blocked" ? latestEventReason(events) : null;
+  const since = last?.occurred_at ?? task.updated_at;
 
   return (
-    <section className={styles.section} aria-label="任务摘要">
-      <h3 className={styles.sectionTitle}>摘要</h3>
-      <dl className={styles.grid}>
-        <SummaryItem label="任务 ID">
-          <code className={styles.outputCode}>{task.id}</code>
-        </SummaryItem>
-        <SummaryItem label="项目">{task.project}</SummaryItem>
-        <SummaryItem label="下发人">{task.assigner}</SummaryItem>
-        <SummaryItem label="承接">
+    <section className={styles.summary} aria-label="任务摘要">
+      <dl className={styles.summaryRows}>
+        <SummaryRow label="项目">{task.project}</SummaryRow>
+        <SummaryRow label="承接">
           {assigneeName ?? task.assignee}
           {assigneeName === undefined ? null : (
-            <div className={styles.mono}>{task.assignee}</div>
+            <span className={styles.inlineMono}>{task.assignee}</span>
           )}
-        </SummaryItem>
-        <SummaryItem label="轮次">
+        </SummaryRow>
+        <SummaryRow label="下发">{task.assigner}</SummaryRow>
+        <SummaryRow label="阶段">{TASK_STAGE_LABEL[task.stage]}</SummaryRow>
+        <SummaryRow label="轮次">
           第 {task.round} 轮
           {task.rework_count > 0 ? ` · 返工 ${task.rework_count} 次` : ""}
-        </SummaryItem>
-        <SummaryItem label="阶段">{TASK_STAGE_LABEL[task.stage]}</SummaryItem>
-        <SummaryItem label="状态">
-          <StatusBadge
-            tone={TASK_STATUS_TONE[task.status]}
-            text={TASK_STATUS_LABEL[task.status]}
-          />
-        </SummaryItem>
-        <SummaryItem label="来源">{TASK_ORIGIN_LABEL[task.origin]}</SummaryItem>
-        <SummaryItem label="截止">
-          {task.deadline_at === null ? "—" : formatDateTime(task.deadline_at)}
-        </SummaryItem>
-        <SummaryItem label="创建">{formatDateTime(task.created_at)}</SummaryItem>
-        <SummaryItem label="更新">{formatDateTime(task.updated_at)}</SummaryItem>
-        <SummaryItem label="耗时">
-          {formatDuration((task.ended_at ?? now) - task.created_at)}
-        </SummaryItem>
-        <SummaryItem label="产出">
+        </SummaryRow>
+        <SummaryRow label="成本">
+          <span title={formatExactTokens(tokens.total)}>{formatTokens(tokens.total)} tok</span> · 耗时{" "}
+          {formatCompactDuration((task.ended_at ?? now) - task.created_at)}
+        </SummaryRow>
+        <SummaryRow label="产出">
           <OutputValue output={task.output} />
-        </SummaryItem>
-        <SummaryItem label="Token">
-          <span title={formatExactTokens(tokens.total)}>{formatTokens(tokens.total)}</span>
-          <div className={styles.mono}>{tokens.entries} 条用量记录</div>
-        </SummaryItem>
+        </SummaryRow>
+        <SummaryRow label="截止">
+          {task.deadline_at === null ? "—" : formatDateTime(task.deadline_at)}
+        </SummaryRow>
+        <SummaryRow label="最后事件">
+          {last === undefined
+            ? "暂无事件"
+            : `#${last.seq} ${TASK_EVENT_LABEL[last.kind]} · ${formatDateTime(last.occurred_at)}`}
+        </SummaryRow>
+        <SummaryRow label="阻塞原因">
+          {task.status !== "blocked"
+            ? "当前未阻塞"
+            : reason ?? "未记录原因（事件 payload 无 reason）"}
+        </SummaryRow>
+        <SummaryRow label="已等待">
+          {terminal ? "已收尾" : formatCompactDuration(now - since)}
+        </SummaryRow>
       </dl>
+      {last === undefined ? null : <p className={styles.hint}>{describeTaskEvent(last)}</p>}
 
       <div className={styles.inlineSection}>
         <h4 className={styles.inlineTitle}>关联凭证</h4>

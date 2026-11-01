@@ -14,14 +14,12 @@ import {
   REALTIME_LABEL,
   REALTIME_TONE,
   TASK_STATUS_LABEL,
-  TASK_STATUS_TONE,
 } from "../../shared/labels.js";
 import { useNow } from "../../shared/useNow.js";
 import { StatusBadge } from "../data/StatusBadge.js";
 import { TaskA2aThreads } from "./TaskA2aThreads.js";
 import { TaskChainView } from "./TaskChainView.js";
 import { TaskDetailSummary } from "./TaskDetailSummary.js";
-import { TaskFocusPanel } from "./TaskFocusPanel.js";
 import { TaskTimeline } from "./TaskTimeline.js";
 import styles from "./task-drawer.module.css";
 
@@ -88,6 +86,9 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
     return () => window.removeEventListener("keydown", handleKey);
   }, [onClose]);
 
+  const assigneeName =
+    task === undefined ? taskId : agentNames.get(task.assignee) ?? task.assignee;
+
   return (
     <div className={styles.drawerOverlay} onClick={onClose}>
       <aside
@@ -99,19 +100,17 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
       >
         <header className={styles.drawerHeader}>
           <div className={styles.drawerHeading}>
-            <h2 className={styles.drawerTitle}>{task?.title ?? "任务详情"}</h2>
+            <h2 className={styles.drawerTitle}>
+              {task === undefined ? taskId : `${task.id} · ${task.title}`}
+            </h2>
             <div className={styles.drawerMeta}>
               {task === undefined ? (
-                <span className={styles.mono}>{taskId}</span>
+                <span className={styles.drawerSubtitle}>加载中…</span>
               ) : (
-                <>
-                  <StatusBadge
-                    tone={TASK_STATUS_TONE[task.status]}
-                    text={TASK_STATUS_LABEL[task.status]}
-                  />
-                  <span className={styles.mono}>{task.id}</span>
-                  <span className={styles.muted}>{task.project}</span>
-                </>
+                <span className={styles.drawerSubtitle}>
+                  {task.assigner} → {assigneeName} · 第 {task.round} 轮 ·{" "}
+                  {TASK_STATUS_LABEL[task.status]}
+                </span>
               )}
               <StatusBadge tone={REALTIME_TONE[realtime]} text={REALTIME_LABEL[realtime]} />
             </div>
@@ -134,26 +133,36 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
 
           {detail.data === undefined ? null : (
             <>
-              <TaskChainView
-                chain={chain.data}
-                loading={chain.isPending}
-                error={
-                  chain.isError ? errorMessage(chain.error, "来源链加载失败") : null
-                }
-                currentTaskId={detail.data.task.id}
-              />
-              <TaskFocusPanel
-                task={detail.data.task}
-                events={taskEvents}
-                now={now}
-              />
               <TaskDetailSummary
                 task={detail.data.task}
                 capabilities={detail.data.capabilities}
                 tokens={detail.data.tokens}
+                events={taskEvents}
                 agentNames={agentNames}
                 now={now}
               />
+
+              <section className={styles.inlineSection} aria-label="轮次链">
+                <div className={styles.sectionHeading}>
+                  <h3 className={styles.inlineTitle}>轮次链</h3>
+                  <span className={styles.sectionHint}>A2A 内容只在这里，不进群</span>
+                </div>
+                <TaskChainView
+                  chain={chain.data}
+                  loading={chain.isPending}
+                  error={
+                    chain.isError ? errorMessage(chain.error, "来源链加载失败") : null
+                  }
+                  currentTaskId={detail.data.task.id}
+                />
+                <TaskA2aThreads
+                  threads={a2a.data?.threads ?? []}
+                  loading={a2a.isPending}
+                  error={a2a.isError ? errorMessage(a2a.error, "A2A 线程加载失败") : null}
+                  agentNames={agentNames}
+                />
+              </section>
+
               {events.isError ? (
                 <div className={styles.errorBox} role="alert">
                   <span>{errorMessage(events.error, "事件加载失败")}</span>
@@ -173,12 +182,6 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
                   onLoadMore={() => void events.fetchNextPage()}
                 />
               )}
-              <TaskA2aThreads
-                threads={a2a.data?.threads ?? []}
-                loading={a2a.isPending}
-                error={a2a.isError ? errorMessage(a2a.error, "A2A 线程加载失败") : null}
-                agentNames={agentNames}
-              />
             </>
           )}
         </div>

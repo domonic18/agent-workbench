@@ -57,7 +57,7 @@ describe("任务表格", () => {
     expect(within(table).getByText("agt_a")).toBeTruthy();
     expect(within(table).getByText("执行")).toBeTruthy();
     expect(within(table).getByText("返工 2 次")).toBeTruthy();
-    expect(within(table).getByText("1 分钟")).toBeTruthy();
+    expect(within(table).getByText("1m")).toBeTruthy();
     expect(within(table).getByText("1.2M")).toBeTruthy();
     expect(within(table).getByText("A2A")).toBeTruthy();
   });

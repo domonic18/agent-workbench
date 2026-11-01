@@ -1,9 +1,17 @@
+.threads {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .thread {
-  padding: 12px;
-  margin-bottom: 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg);
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.thread:first-child {
+  padding-top: 0;
+  border-top: none;
 }
 
 .threadHeader {
@@ -11,81 +19,113 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  margin-bottom: 4px;
-}
-
-.threadTitle {
-  margin: 0;
-  font-size: 13px;
+  margin-bottom: 8px;
 }
 
 .participants {
-  margin-bottom: 10px;
-  font-size: 12px;
-  color: var(--muted);
+  font-size: 11px;
+  color: var(--subtle);
+}
+
+.messages {
+  position: relative;
+  padding-left: 14px;
+}
+
+.messages::before {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  left: 3px;
+  width: 1px;
+  background: var(--line-soft);
+  content: "";
 }
 
 .message {
-  padding: 10px;
-  margin-bottom: 8px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
+  position: relative;
+  padding-bottom: 10px;
 }
 
 .message:last-child {
-  margin-bottom: 0;
+  padding-bottom: 0;
 }
 
-.messageHeader {
+.message::before {
+  position: absolute;
+  top: 5px;
+  left: -14px;
+  width: 5px;
+  height: 5px;
+  border: 1.5px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  content: "";
+}
+
+.message:first-child::before {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.messageStamp {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 10.5px;
+  color: var(--subtle);
 }
 
-.messageRound {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
+.sep {
+  color: var(--border);
+}
+
+.messageFrom {
+  margin-top: 1px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.messageBody {
+  font-size: 12px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.messageBody::before {
   color: var(--muted);
+  content: "：";
 }
 
 .messageMeta {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 14px;
-  margin-top: 6px;
-  font-size: 12px;
+  margin-top: 5px;
+  font-size: 10.5px;
   color: var(--muted);
 }
 
-.messageBody {
-  font-size: 13px;
-  overflow-wrap: anywhere;
-}
-
 .refs {
-  margin-top: 6px;
-  font-size: 12px;
+  margin-top: 5px;
+  font-size: 10.5px;
+  color: var(--muted);
 }
 
 .refList {
   margin: 0;
-  padding-left: 18px;
-  font-size: 12px;
+  padding-left: 16px;
 }
 
 .refItem {
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
-.section {
-  composes: section from "./task-shared.module.css";
-}
-
-.sectionTitle {
-  composes: sectionTitle from "./task-shared.module.css";
+.threadMissing {
+  color: var(--warning);
+  font-size: 12px;
 }
 
 .loading {
@@ -98,8 +138,4 @@
 
 .outputCode {
   composes: outputCode from "./task-shared.module.css";
-}
-
-.kind {
-  composes: kind from "./task-shared.module.css";
 }

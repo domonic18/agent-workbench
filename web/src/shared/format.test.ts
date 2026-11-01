@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatCompactDuration,
   formatDateTime,
   formatDuration,
   formatExactTokens,
@@ -35,6 +36,15 @@ describe("时间格式化", () => {
     expect(formatDuration(5_400_000)).toBe("1 小时 30 分");
     expect(formatDuration(86_400_000)).toBe("1 天");
     expect(formatDuration(90_000_000)).toBe("1 天 1 小时");
+  });
+
+  it("紧凑耗时用于窄列", () => {
+    expect(formatCompactDuration(9_400)).toBe("9s");
+    expect(formatCompactDuration(90_000)).toBe("1m");
+    expect(formatCompactDuration(3_600_000)).toBe("1h");
+    expect(formatCompactDuration(4_320_000)).toBe("1h12m");
+    expect(formatCompactDuration(86_400_000)).toBe("1d");
+    expect(formatCompactDuration(97_200_000)).toBe("1d3h");
   });
 
   it("相对时间分档", () => {

@@ -67,7 +67,7 @@ describe("总览页", () => {
 
     expect(await screen.findByText("采集器未上报")).toBeTruthy();
     expect(screen.getByText(/控制台只看到自报的与自己的会话/)).toBeTruthy();
-    expect(screen.getByText("运行中 Agent")).toBeTruthy();
+    expect(screen.getByText("Agent 在线")).toBeTruthy();
     expect(screen.getByText("今日 Token")).toBeTruthy();
     expect(screen.getByText("1.2M")).toBeTruthy();
     expect(screen.getByRole("button", { name: "机器登记" })).toBeTruthy();
@@ -105,7 +105,7 @@ describe("总览页", () => {
     renderPage();
 
     expect((await screen.findAllByText("构建 Agent")).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("在线").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("运行中").length).toBeGreaterThan(0);
     expect(screen.getAllByText("实现接口契约").length).toBeGreaterThan(0);
     expect(FakeEventSource.lastUrl).toContain("scope=overview");
     expect(FakeEventSource.lastUrl).toContain("client_id=");

@@ -15,7 +15,6 @@ export function TaskChainView({ chain, loading, error, currentTaskId }: TaskChai
 
   return (
     <nav className={styles.chain} aria-label="任务来源链">
-      <div className={styles.label}>来源链</div>
       {loading ? <p className={styles.loading}>加载来源链…</p> : null}
       {error === null ? null : <p className={styles.chainMissing}>{error}</p>}
       {chain === undefined ? null : (

@@ -12,23 +12,24 @@ export interface TaskTimelineProps {
 }
 
 export function TaskTimeline({ events, hasMore, loadingMore, onLoadMore }: TaskTimelineProps) {
+  const ordered = [...events].reverse();
   return (
-    <section className={styles.section} aria-label="事件时间线">
-      <h3 className={styles.sectionTitle}>事件时间线</h3>
+    <section className={styles.section} aria-label="事件流">
+      <div className={styles.header}>
+        <h3 className={styles.sectionTitle}>事件流</h3>
+        <span className={styles.caption}>
+          最近 {events.length} 条{hasMore ? " · 还有更早事件" : ""}
+        </span>
+      </div>
       {events.length === 0 ? (
         <p className={styles.muted}>暂无事件。</p>
       ) : (
         <ol className={styles.timeline}>
-          {events.map((event) => (
+          {ordered.map((event) => (
             <li key={event.id} className={styles.timelineItem}>
-              <span className={styles.seq}>#{event.seq}</span>
-              <div className={styles.timelineBody}>
-                <div className={styles.eventTitle}>
-                  <span className={styles.kind}>{TASK_EVENT_LABEL[event.kind]}</span>
-                  <span className={styles.time}>{formatDateTime(event.occurred_at)}</span>
-                </div>
-                <div className={styles.desc}>{describeTaskEvent(event)}</div>
-              </div>
+              <span className={styles.kind}>{TASK_EVENT_LABEL[event.kind]}</span>
+              <span className={styles.time}>{formatDateTime(event.occurred_at)}</span>
+              <span className={styles.desc}>{describeTaskEvent(event)}</span>
             </li>
           ))}
         </ol>

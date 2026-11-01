@@ -1,4 +1,7 @@
 .card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   padding: 14px 16px;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -6,13 +9,22 @@
 }
 
 .label {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--muted);
 }
 
 .value {
-  margin-top: 6px;
-  font-size: 24px;
-  font-weight: 600;
+  font-size: 23px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--text);
   font-variant-numeric: tabular-nums;
+}
+
+.sub {
+  font-size: 11px;
+  color: var(--subtle);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

@@ -1,6 +1,11 @@
 import { Link, useNavigate } from "react-router";
 import type { TaskDto } from "../../api/tasks.js";
-import { formatDuration, formatExactTokens, formatTokens } from "../../shared/format.js";
+import {
+  formatCompactDuration,
+  formatDuration,
+  formatExactTokens,
+  formatTokens,
+} from "../../shared/format.js";
 import { TASK_ORIGIN_LABEL, TASK_STAGE_LABEL, TASK_STATUS_LABEL, TASK_STATUS_TONE } from "../../shared/labels.js";
 import { StatusBadge } from "../data/StatusBadge.js";
 import styles from "./task-list.module.css";
@@ -74,10 +79,12 @@ export function TaskTable({ tasks, agentNames, search, now = Date.now() }: TaskT
                       to={url}
                       onClick={(event) => event.stopPropagation()}
                     >
-                      <div className={styles.primary}>{task.title}</div>
+                      <span className={styles.primary}>{task.title}</span>
                     </Link>
-                    <div className={styles.mono}>{task.id}</div>
-                    <div className={styles.muted}>{TASK_ORIGIN_LABEL[task.origin]}</div>
+                    <div className={styles.subline}>
+                      <code className={styles.mono}>{task.id}</code>
+                      <span className={styles.origin}>{TASK_ORIGIN_LABEL[task.origin]}</span>
+                    </div>
                   </td>
                   <td>{task.assigner}</td>
                   <td>
@@ -102,8 +109,11 @@ export function TaskTable({ tasks, agentNames, search, now = Date.now() }: TaskT
                   <td>
                     <OutputCell output={task.output} />
                   </td>
-                  <td className={styles.numeric}>
-                    {formatDuration((task.ended_at ?? now) - task.created_at)}
+                  <td
+                    className={styles.numeric}
+                    title={formatDuration((task.ended_at ?? now) - task.created_at)}
+                  >
+                    {formatCompactDuration((task.ended_at ?? now) - task.created_at)}
                   </td>
                   <td className={styles.numeric} title={formatExactTokens(task.total_tokens)}>
                     {formatTokens(task.total_tokens)}
