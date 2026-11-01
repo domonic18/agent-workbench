@@ -24,6 +24,10 @@ const TaskDrawerRoute = lazy(async () => {
   const module = await import("./pages/TaskDrawerRoute.js");
   return { default: module.TaskDrawerRoute };
 });
+const CapabilitiesPage = lazy(async () => {
+  const module = await import("./pages/CapabilitiesPage.js");
+  return { default: module.CapabilitiesPage };
+});
 
 /** 任意 API 401 统一回登录页,并记住原路径(03 §3) */
 function UnauthorizedRedirect() {
@@ -56,6 +60,7 @@ export function App() {
           <Route path="/tasks" element={<TasksPage />}>
             <Route path=":id" element={<TaskDrawerRoute />} />
           </Route>
+          <Route path="/capabilities" element={<CapabilitiesPage />} />
           <Route path="*" element={<Navigate to="/overview" replace />} />
         </Route>
       </Routes>

@@ -3,8 +3,6 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { logout } from "../../api/auth.js";
 import styles from "./AppShell.module.css";
 
-const PENDING_SECTIONS = ["授权", "知识"] as const;
-
 function NavIcon({ name }: { name: "overview" | "tasks" | "auth" | "knowledge" }) {
   const common = {
     width: 14,
@@ -54,7 +52,13 @@ function NavIcon({ name }: { name: "overview" | "tasks" | "auth" | "knowledge" }
 }
 
 function pageTitle(pathname: string): string {
-  return pathname.startsWith("/tasks") ? "任务" : "总览";
+  if (pathname.startsWith("/tasks")) {
+    return "任务";
+  }
+  if (pathname.startsWith("/capabilities")) {
+    return "授权";
+  }
+  return "总览";
 }
 
 function environment(): { label: string; local: boolean } {
@@ -102,19 +106,21 @@ export function AppShell() {
             </span>
             任务
           </NavLink>
-          {PENDING_SECTIONS.map((section) => (
-            <span
-              key={section}
-              className={styles.disabled}
-              aria-disabled="true"
-              title="后续里程碑接入"
-            >
-              <span className={styles.icon}>
-                <NavIcon name={section === "授权" ? "auth" : "knowledge"} />
-              </span>
-              {section}
+          <NavLink
+            to="/capabilities"
+            className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ""}`}
+          >
+            <span className={styles.icon}>
+              <NavIcon name="auth" />
             </span>
-          ))}
+            授权
+          </NavLink>
+          <span className={styles.disabled} aria-disabled="true" title="后续里程碑接入">
+            <span className={styles.icon}>
+              <NavIcon name="knowledge" />
+            </span>
+            知识
+          </span>
         </div>
       </nav>
 

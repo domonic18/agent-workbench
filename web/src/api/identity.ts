@@ -96,3 +96,15 @@ export function rotateAgentKey(id: string): Promise<{ secret: string }> {
     { idempotencyKey: newIdempotencyKey() },
   );
 }
+
+/** 委派白名单只走控制台会话;保存即对下一次 a2a.send 判定生效 */
+export function setAgentTargets(
+  id: string,
+  targets: string[],
+): Promise<{ agent: AgentSummary }> {
+  return api.put<{ agent: AgentSummary }>(
+    `/api/agents/${encodeURIComponent(id)}/targets`,
+    { targets },
+    { idempotencyKey: newIdempotencyKey() },
+  );
+}
