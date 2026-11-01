@@ -141,6 +141,25 @@ describe("capabilities 路由", () => {
     expect(listCapabilities(db, { limit: 10 })).toHaveLength(1);
   });
 
+  it("幂等键落库,重启后同键仍返回首次资源", async () => {
+    const first = await write("/api/capabilities", "k-persist", createBody);
+    const created = first.json().capability as { id: string };
+
+    await app.close();
+    app = buildApp({ logLevel: "silent", db, teleport: teleport.adapter });
+    const login = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { password: PASSWORD },
+    });
+    cookie = cookieOf(login);
+
+    const replay = await write("/api/capabilities", "k-persist", createBody);
+    expect(replay.statusCode).toBe(201);
+    expect((replay.json().capability as { id: string }).id).toBe(created.id);
+    expect(listCapabilities(db, { limit: 10 })).toHaveLength(1);
+  });
+
   it("非法字段返回 422 明细", async () => {
     const bad = await write("/api/capabilities", "k1", { ...createBody, action: "delete" });
     expect(bad.statusCode).toBe(422);

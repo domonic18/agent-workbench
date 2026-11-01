@@ -13,6 +13,7 @@ import {
   createCapabilityService,
   type CapabilityService,
 } from "../../domain/capability/service.js";
+import { createIdempotencyService } from "../../domain/security/idempotency.js";
 import type { TeleportAdapter } from "../../adapters/teleport/tctl.js";
 import {
   requireCsrf,
@@ -21,6 +22,8 @@ import {
 } from "../middleware/session.js";
 
 const CONSOLE_ACTOR = "console";
+/** 幂等键作用域:同键在不同接口下互不影响 */
+const CREATE_SCOPE = "capability.create";
 
 const createSchema = z.object({
   subject: z.string(),
@@ -119,10 +122,9 @@ export function registerCapabilityRoutes(
   const now = options.now ?? Date.now;
   const service =
     options.service ?? createCapabilityService({ db, teleport: options.teleport, now });
+  const idempotency = createIdempotencyService({ db, now });
   const session = requireSession(db, now);
   const writeGuards = [session, requireCsrf(), requireIdempotencyKey()];
-  // 申请接口的幂等键 → 首次生成的 capability id;M3-2 落库后改为持久化
-  const createdByKey = new Map<string, string>();
 
   app.get("/api/capabilities", { preHandler: session }, async (request, reply) => {
     const query = request.query as Record<string, unknown>;
@@ -164,14 +166,13 @@ export function registerCapabilityRoutes(
   });
 
   app.post("/api/capabilities", { preHandler: writeGuards }, async (request, reply) => {
-    const key = request.headers["idempotency-key"];
-    if (typeof key === "string") {
-      const existing = createdByKey.get(key);
-      if (existing !== undefined) {
-        const previous = service.find(existing);
-        if (previous !== undefined) {
-          return reply.code(201).send({ capability: toDto(previous) });
-        }
+    // requireIdempotencyKey 已保证存在且非空
+    const key = request.headers["idempotency-key"] as string;
+    const existingId = idempotency.find(CREATE_SCOPE, key);
+    if (existingId !== undefined) {
+      const previous = service.find(existingId);
+      if (previous !== undefined) {
+        return reply.code(201).send({ capability: toDto(previous) });
       }
     }
 
@@ -190,10 +191,10 @@ export function registerCapabilityRoutes(
     }
 
     try {
-      const row = service.request({ ...parsed.data, actor: CONSOLE_ACTOR });
-      if (typeof key === "string") {
-        createdByKey.set(key, row.id);
-      }
+      // 建单与幂等键同事务:崩溃窗口内不会留下「已建单但重放又建一单」
+      const row = idempotency.run(CREATE_SCOPE, key, () =>
+        service.request({ ...parsed.data, actor: CONSOLE_ACTOR }),
+      );
       if (options.onRequested !== undefined) {
         try {
           options.onRequested(row);
