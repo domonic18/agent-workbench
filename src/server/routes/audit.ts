@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { AUDIT_GAP_KINDS, LIST_LIMITS, type AuditGapKind } from "../../shared/constants.js";
+import { parseJsonObject } from "../../shared/json.js";
 import type { Db } from "../../store/database.js";
 import {
   listGaps,
@@ -25,14 +26,6 @@ interface AuditGapDto {
   detectedAt: number;
 }
 
-function parseDetail(json: string): unknown {
-  try {
-    return JSON.parse(json) as unknown;
-  } catch {
-    return {};
-  }
-}
-
 function toDto(row: AuditGapRecord): AuditGapDto {
   return {
     id: row.id,
@@ -42,7 +35,7 @@ function toDto(row: AuditGapRecord): AuditGapDto {
     taskId: row.taskId,
     ticketId: row.ticketId,
     sid: row.sid,
-    detail: parseDetail(row.detailJson),
+    detail: parseJsonObject(row.detailJson),
     detectedAt: row.detectedAt,
   };
 }

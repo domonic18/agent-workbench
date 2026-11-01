@@ -1,5 +1,6 @@
 import type * as Lark from "@larksuiteoapi/node-sdk";
 import type { CapabilityStatus } from "../../shared/constants.js";
+import { parseJsonObject } from "../../shared/json.js";
 import type { CardCallbackResult, CapabilitySnapshot } from "./callback.js";
 import { ensureOk } from "./response.js";
 
@@ -79,14 +80,6 @@ interface StatusView {
   title: string;
   template: string;
   result: string;
-}
-
-function parseScope(scopeJson: string): unknown {
-  try {
-    return JSON.parse(scopeJson) as unknown;
-  } catch {
-    return {};
-  }
 }
 
 function statusView(input: ResolvedCardInput): StatusView {
@@ -193,7 +186,7 @@ function toResolvedInput(
     subject: capability.subject,
     target: capability.target,
     action: capability.action,
-    scope: parseScope(capability.scopeJson),
+    scope: parseJsonObject(capability.scopeJson),
     ttlSeconds: capability.ttlSeconds,
     taskId: capability.taskId,
     status: capability.status,

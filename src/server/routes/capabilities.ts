@@ -6,6 +6,7 @@ import {
   LIST_LIMITS,
   type CapabilityStatus,
 } from "../../shared/constants.js";
+import { parseJsonObject } from "../../shared/json.js";
 import type { Db } from "../../store/database.js";
 import type { CapabilityRecord } from "../../store/repositories/capability.js";
 import { CapabilityError } from "../../domain/capability/errors.js";
@@ -64,21 +65,13 @@ interface CapabilityDto {
   updatedAt: number;
 }
 
-function parseScope(scopeJson: string): unknown {
-  try {
-    return JSON.parse(scopeJson) as unknown;
-  } catch {
-    return {};
-  }
-}
-
 function toDto(row: CapabilityRecord): CapabilityDto {
   return {
     id: row.id,
     subject: row.subject,
     target: row.target,
     action: row.action,
-    scope: parseScope(row.scopeJson),
+    scope: parseJsonObject(row.scopeJson),
     ttlSeconds: row.ttlSeconds,
     status: row.status,
     ticketId: row.ticketId,
