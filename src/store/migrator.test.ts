@@ -17,7 +17,7 @@ describe("runMigrations", () => {
   it("空库执行建表并记账", () => {
     const db = openDatabase(":memory:");
 
-    expect(runMigrations(db)).toBe(14);
+    expect(runMigrations(db)).toBe(15);
     expect(tableNames(db)).toEqual(
       expect.arrayContaining([
         "task",
@@ -42,6 +42,7 @@ describe("runMigrations", () => {
         "ingest_receipt",
         "login_failure",
         "idempotency_record",
+        "scope_revision",
         "schema_migration",
       ]),
     );
@@ -62,6 +63,7 @@ describe("runMigrations", () => {
       { version: 12, name: "token_usage" },
       { version: 13, name: "ingest_receipt" },
       { version: 14, name: "console_auth" },
+      { version: 15, name: "scope_revision" },
     ]);
     db.close();
   });

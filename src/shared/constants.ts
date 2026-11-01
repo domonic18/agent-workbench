@@ -198,6 +198,12 @@ export type RunStatus = (typeof RUN_STATUSES)[number];
 /** run 切分硬阈值:同一流相邻事件间隔 ≥30 分钟即开新 run,不做自适应(02 §3.2) */
 export const RUN_IDLE_GAP_MS = 30 * 60 * 1000;
 
+/** 心跳(04 §6):超过 5 分钟标「心跳超时」,超过 30 分钟标「离线」 */
+export const MACHINE_HEARTBEAT = {
+  timeoutMs: 5 * 60 * 1000,
+  offlineMs: 30 * 60 * 1000,
+} as const;
+
 /** 内部记账伪模型:不是真实网关调用,不入 token_usage(02 §3.6) */
 export const SYNTHETIC_MODEL = "<synthetic>";
 
