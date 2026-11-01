@@ -12,9 +12,10 @@ import styles from "./AgentTable.module.css";
 export interface AgentTableProps {
   agents: readonly OverviewAgent[];
   now?: number;
+  onManageKey?: (agent: OverviewAgent) => void;
 }
 
-export function AgentTable({ agents, now }: AgentTableProps) {
+export function AgentTable({ agents, now, onManageKey }: AgentTableProps) {
   return (
     <div className={styles.wrap}>
       <table className={styles.table}>
@@ -27,6 +28,7 @@ export function AgentTable({ agents, now }: AgentTableProps) {
             <th>状态</th>
             <th>最近事件</th>
             <th className={styles.numeric}>今日 Token</th>
+            {onManageKey === undefined ? null : <th>密钥</th>}
           </tr>
         </thead>
         <tbody>
@@ -68,6 +70,18 @@ export function AgentTable({ agents, now }: AgentTableProps) {
               <td className={styles.numeric} title={formatExactTokens(agent.todayTokens)}>
                 {formatTokens(agent.todayTokens)}
               </td>
+              {onManageKey === undefined ? null : (
+                <td>
+                  <button
+                    type="button"
+                    className={styles.keyButton}
+                    onClick={() => onManageKey(agent)}
+                    aria-label={`管理 ${agent.displayName} 的密钥`}
+                  >
+                    密钥
+                  </button>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

@@ -16,7 +16,21 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+export interface RequestOptions {
+  /** 写接口幂等键(01 §4);缺失时服务端 422 */
+  idempotencyKey?: string;
+}
+
+export function newIdempotencyKey(): string {
+  return crypto.randomUUID();
+}
+
+async function request<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  options?: RequestOptions,
+): Promise<T> {
   const headers: Record<string, string> = { Accept: "application/json" };
   if (body !== undefined) {
     headers["Content-Type"] = "application/json";
@@ -24,6 +38,9 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   // 会话 Cookie 走同源;非只读请求带 CSRF 头(01 §6)
   if (method !== "GET") {
     headers["X-Requested-With"] = "XMLHttpRequest";
+  }
+  if (options?.idempotencyKey !== undefined) {
+    headers["Idempotency-Key"] = options.idempotencyKey;
   }
 
   const response = await fetch(path, {
@@ -61,7 +78,7 @@ export const api = {
   get<T>(path: string): Promise<T> {
     return request<T>("GET", path);
   },
-  post<T>(path: string, body?: unknown): Promise<T> {
-    return request<T>("POST", path, body);
+  post<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {
+    return request<T>("POST", path, body, options);
   },
 };

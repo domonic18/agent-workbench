@@ -70,6 +70,8 @@ describe("总览页", () => {
     expect(screen.getByText("运行中 Agent")).toBeTruthy();
     expect(screen.getByText("今日 Token")).toBeTruthy();
     expect(screen.getByText("1.2M")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "机器登记" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "注册 Agent" })).toBeTruthy();
   });
 
   it("订阅 overview 作用域并展示 Agent 行", async () => {

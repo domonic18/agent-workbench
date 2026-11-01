@@ -1,11 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { ApiError } from "../api/client.js";
 import { fetchOverview } from "../api/overview.js";
 import { useRealtimeStream } from "../api/stream.js";
+import type { OverviewAgent } from "../api/types.js";
 import { AgentTable } from "../components/data/AgentTable.js";
 import { EmptyState } from "../components/data/EmptyState.js";
 import { MetricCard } from "../components/data/MetricCard.js";
 import { StatusBadge } from "../components/data/StatusBadge.js";
+import { AgentRegisterDialog } from "../components/identity/AgentRegisterDialog.js";
+import { AgentRotateDialog } from "../components/identity/AgentRotateDialog.js";
+import { MachineRegisterDialog } from "../components/identity/MachineRegisterDialog.js";
 import { formatExactTokens, formatTokens } from "../shared/format.js";
 import {
   REALTIME_LABEL,
@@ -18,6 +23,8 @@ const OVERVIEW_SCOPES: readonly string[] = ["overview"];
 
 export function OverviewPage() {
   const realtime = useRealtimeStream(OVERVIEW_SCOPES);
+  const [registerDialog, setRegisterDialog] = useState<"agent" | "machine" | null>(null);
+  const [rotateAgent, setRotateAgent] = useState<OverviewAgent | null>(null);
   const { data, isPending, isError, error, refetch } = useQuery({
     queryKey: ["overview"],
     queryFn: fetchOverview,
@@ -61,16 +68,44 @@ export function OverviewPage() {
           </section>
 
           <section className={styles.section}>
-            <h2 className={styles.sectionTitle}>Agent</h2>
+            <div className={styles.sectionHeader}>
+              <h2 className={styles.sectionTitle}>Agent</h2>
+              <div className={styles.sectionActions}>
+                <button
+                  type="button"
+                  className={styles.action}
+                  onClick={() => setRegisterDialog("machine")}
+                >
+                  机器登记
+                </button>
+                <button
+                  type="button"
+                  className={styles.actionPrimary}
+                  onClick={() => setRegisterDialog("agent")}
+                >
+                  注册 Agent
+                </button>
+              </div>
+            </div>
             {data.agents.length === 0 ? (
               <EmptyState
                 title="采集器未上报"
                 description="没有在线 Agent 的上报数据。请确认采集器已启动，并完成机器登记。"
               />
             ) : (
-              <AgentTable agents={data.agents} />
+              <AgentTable agents={data.agents} onManageKey={setRotateAgent} />
             )}
           </section>
+
+          {registerDialog === "agent" ? (
+            <AgentRegisterDialog onClose={() => setRegisterDialog(null)} />
+          ) : null}
+          {registerDialog === "machine" ? (
+            <MachineRegisterDialog onClose={() => setRegisterDialog(null)} />
+          ) : null}
+          {rotateAgent === null ? null : (
+            <AgentRotateDialog agent={rotateAgent} onClose={() => setRotateAgent(null)} />
+          )}
         </>
       )}
 

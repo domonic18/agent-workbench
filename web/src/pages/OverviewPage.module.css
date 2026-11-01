@@ -32,9 +32,46 @@
   margin-bottom: 20px;
 }
 
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
 .sectionTitle {
-  margin: 0 0 10px;
+  margin: 0;
   font-size: 15px;
+}
+
+.sectionActions {
+  display: flex;
+  gap: 8px;
+}
+
+.action,
+.actionPrimary {
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.action {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+}
+
+.action:hover {
+  background: var(--surface);
+}
+
+.actionPrimary {
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
 }
 
 .state {

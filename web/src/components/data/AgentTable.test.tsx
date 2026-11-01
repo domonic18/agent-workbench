@@ -1,5 +1,5 @@
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { OverviewAgent } from "../../api/types.js";
 import { AgentTable } from "./AgentTable.js";
 
@@ -65,5 +65,19 @@ describe("Agent 表格", () => {
     expect(screen.getByText("空闲")).toBeTruthy();
     expect(screen.getByText("从未运行")).toBeTruthy();
     expect(screen.getByText("—")).toBeTruthy();
+  });
+
+  it("提供回调时行内出现密钥入口", () => {
+    const onManageKey = vi.fn();
+    const agentRow = agent();
+    render(<AgentTable agents={[agentRow]} onManageKey={onManageKey} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "管理 构建 Agent 的密钥" }));
+    expect(onManageKey).toHaveBeenCalledWith(agentRow);
+  });
+
+  it("无回调时不渲染密钥列", () => {
+    render(<AgentTable agents={[agent()]} />);
+    expect(screen.queryByRole("button", { name: /密钥/ })).toBeNull();
   });
 });
