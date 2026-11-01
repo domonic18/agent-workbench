@@ -2,5 +2,18 @@
   "name": "@aw/collector",
   "version": "0.1.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "bin": {
+    "aw-collector": "dist/aw-collector.cjs"
+  },
+  "scripts": {
+    "bundle": "esbuild src/main.ts --bundle --platform=node --target=node22 --format=cjs --outfile=dist/aw-collector.cjs --banner:js='#!/usr/bin/env node'",
+    "build": "pnpm run bundle",
+    "package:arm64": "bun build src/main.ts --compile --minify --target=bun-darwin-arm64 --outfile dist/bin/aw-collector-macos-arm64",
+    "package:x64": "bun build src/main.ts --compile --minify --target=bun-darwin-x64 --outfile dist/bin/aw-collector-macos-x64",
+    "package": "pnpm run package:arm64 && pnpm run package:x64"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
 }

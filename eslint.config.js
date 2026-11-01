@@ -9,6 +9,7 @@ export default tseslint.config(
       "node_modules/**",
       "workspace/**",
       "web/dist/**",
+      "collector/dist/**",
     ],
   },
   js.configs.recommended,
