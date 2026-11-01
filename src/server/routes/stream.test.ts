@@ -39,25 +39,29 @@ function openSse(response: Response): {
   const queue: SseFrame[] = [];
   let buffer = "";
   void (async () => {
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) {
-        return;
+    try {
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) {
+          return;
+        }
+        buffer += decoder.decode(value, { stream: true });
+        let index = buffer.indexOf("\n\n");
+        while (index >= 0) {
+          const raw = buffer.slice(0, index);
+          buffer = buffer.slice(index + 2);
+          const lines = raw.split("\n");
+          const event = lines.find((line) => line.startsWith("event: "))?.slice(7) ?? "message";
+          const data = lines
+            .filter((line) => line.startsWith("data: "))
+            .map((line) => line.slice(6))
+            .join("\n");
+          queue.push({ event, data: JSON.parse(data) as unknown });
+          index = buffer.indexOf("\n\n");
+        }
       }
-      buffer += decoder.decode(value, { stream: true });
-      let index = buffer.indexOf("\n\n");
-      while (index >= 0) {
-        const raw = buffer.slice(0, index);
-        buffer = buffer.slice(index + 2);
-        const lines = raw.split("\n");
-        const event = lines.find((line) => line.startsWith("event: "))?.slice(7) ?? "message";
-        const data = lines
-          .filter((line) => line.startsWith("data: "))
-          .map((line) => line.slice(6))
-          .join("\n");
-        queue.push({ event, data: JSON.parse(data) as unknown });
-        index = buffer.indexOf("\n\n");
-      }
+    } catch {
+      // 测试清理时连接被强制关闭,读取中断属预期
     }
   })();
   return {
@@ -182,7 +186,12 @@ describe("stream 路由", () => {
       createdAt: AT,
     });
 
-    expect(await sse.next()).toEqual({
+    // heartbeat 与轮询各自独立计时,delta 前可能先到一条 heartbeat
+    let frame = await sse.next();
+    while (frame.event !== "delta") {
+      frame = await sse.next();
+    }
+    expect(frame).toEqual({
       event: "delta",
       data: { scope: "overview", revision: 1 },
     });
