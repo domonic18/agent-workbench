@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { Suspense, useMemo } from "react";
 import { Outlet, useLocation } from "react-router";
 import { ApiError } from "../api/client.js";
 import { fetchAgents } from "../api/identity.js";
@@ -115,7 +115,10 @@ export function TasksPage() {
         仅显示已自报的任务——Agent 判断不需要建单的活不会出现在这里。
       </p>
 
-      <Outlet />
+      {/* 详情抽屉独立分包,加载时保留列表视图不闪烁 */}
+      <Suspense fallback={null}>
+        <Outlet />
+      </Suspense>
     </div>
   );
 }

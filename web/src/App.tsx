@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { lazy, useEffect } from "react";
 import {
   BrowserRouter,
   Navigate,
@@ -10,9 +10,20 @@ import {
 import { UNAUTHORIZED_EVENT } from "./api/client.js";
 import { AppShell } from "./components/layout/AppShell.js";
 import { LoginPage } from "./pages/LoginPage.js";
-import { OverviewPage } from "./pages/OverviewPage.js";
-import { TaskDrawerRoute } from "./pages/TaskDrawerRoute.js";
-import { TasksPage } from "./pages/TasksPage.js";
+
+/** 路由级懒加载:首屏只带导航与登录,总览/任务/详情按需加载(03 §8) */
+const OverviewPage = lazy(async () => {
+  const module = await import("./pages/OverviewPage.js");
+  return { default: module.OverviewPage };
+});
+const TasksPage = lazy(async () => {
+  const module = await import("./pages/TasksPage.js");
+  return { default: module.TasksPage };
+});
+const TaskDrawerRoute = lazy(async () => {
+  const module = await import("./pages/TaskDrawerRoute.js");
+  return { default: module.TaskDrawerRoute };
+});
 
 /** 任意 API 401 统一回登录页,并记住原路径(03 §3) */
 function UnauthorizedRedirect() {

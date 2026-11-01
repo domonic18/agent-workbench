@@ -66,6 +66,11 @@
   padding: 24px 32px;
 }
 
+.pageLoading {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 @media (max-width: 767px) {
   .shell {
     flex-direction: column;
@@ -90,7 +95,10 @@
 
   .link,
   .logout {
-    padding: 10px 12px;
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 10px 14px;
     white-space: nowrap;
   }
 

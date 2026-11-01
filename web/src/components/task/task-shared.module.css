@@ -91,3 +91,10 @@
   color: var(--text);
   cursor: pointer;
 }
+
+@media (max-width: 767px) {
+  .retry,
+  .more {
+    min-height: 44px;
+  }
+}

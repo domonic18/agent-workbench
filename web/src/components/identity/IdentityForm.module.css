@@ -132,3 +132,23 @@
 .hints li {
   margin-top: 4px;
 }
+
+@media (max-width: 767px) {
+  .input,
+  .select,
+  .submit,
+  .cancel,
+  .copy,
+  .secretCode {
+    min-height: 44px;
+  }
+
+  .actions {
+    flex-direction: column-reverse;
+  }
+
+  .submit,
+  .cancel {
+    width: 100%;
+  }
+}

@@ -35,7 +35,14 @@
 }
 
 .close {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
   border: none;
+  border-radius: 8px;
   background: transparent;
   color: var(--muted);
   font-size: 20px;
@@ -44,5 +51,6 @@
 }
 
 .close:hover {
+  background: var(--bg);
   color: var(--text);
 }

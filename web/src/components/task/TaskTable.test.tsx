@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 import type { TaskDto } from "../../api/tasks.js";
@@ -50,15 +50,26 @@ describe("任务表格", () => {
       new Map([["agt_a", "构建 Agent"]]),
     );
 
-    const link = screen.getByRole("link", { name: "实现任务屏" });
+    const table = screen.getByRole("table");
+    const link = within(table).getByRole("link", { name: "实现任务屏" });
     expect(link.getAttribute("href")).toBe("/tasks/tsk_1?status=blocked");
-    expect(screen.getByText("构建 Agent")).toBeTruthy();
-    expect(screen.getByText("agt_a")).toBeTruthy();
-    expect(screen.getByText("执行")).toBeTruthy();
-    expect(screen.getByText("返工 2 次")).toBeTruthy();
-    expect(screen.getByText("1 分钟")).toBeTruthy();
-    expect(screen.getByText("1.2M")).toBeTruthy();
-    expect(screen.getByText("A2A")).toBeTruthy();
+    expect(within(table).getByText("构建 Agent")).toBeTruthy();
+    expect(within(table).getByText("agt_a")).toBeTruthy();
+    expect(within(table).getByText("执行")).toBeTruthy();
+    expect(within(table).getByText("返工 2 次")).toBeTruthy();
+    expect(within(table).getByText("1 分钟")).toBeTruthy();
+    expect(within(table).getByText("1.2M")).toBeTruthy();
+    expect(within(table).getByText("A2A")).toBeTruthy();
+  });
+
+  it("移动端卡片保留任务、承接与状态三列", () => {
+    renderTable([task()], new Map([["agt_a", "构建 Agent"]]));
+
+    const cards = screen.getByRole("list", { name: "任务卡片" });
+    const link = within(cards).getByRole("link", { name: "实现任务屏" });
+    expect(link.getAttribute("href")).toBe("/tasks/tsk_1?status=blocked");
+    expect(within(cards).getByText("构建 Agent")).toBeTruthy();
+    expect(within(cards).getByText("进行中")).toBeTruthy();
   });
 
   it("HTTP 产出渲染为外链,其余按代码展示,缺失给占位", () => {
@@ -68,9 +79,10 @@ describe("任务表格", () => {
       task({ id: "tsk_none", title: "无产出任务", output: null }),
     ]);
 
-    const anchor = screen.getByRole("link", { name: "https://example.com/report" });
+    const table = screen.getByRole("table");
+    const anchor = within(table).getByRole("link", { name: "https://example.com/report" });
     expect(anchor.getAttribute("target")).toBe("_blank");
-    expect(screen.getByTitle("kb_abc123").textContent).toBe("kb_abc123");
-    expect(screen.getByText("—")).toBeTruthy();
+    expect(within(table).getByTitle("kb_abc123").textContent).toBe("kb_abc123");
+    expect(within(table).getByText("—")).toBeTruthy();
   });
 });

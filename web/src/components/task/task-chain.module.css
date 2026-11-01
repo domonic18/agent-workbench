@@ -1,0 +1,71 @@
+.chain {
+  margin-bottom: 20px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.chainList {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+
+.chainItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chainRelation {
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--surface);
+  font-size: 11px;
+}
+
+.chainNode {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.chainNode:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.chainCurrent {
+  font-weight: 600;
+}
+
+.chainMissing {
+  color: var(--warning);
+}
+
+.label {
+  composes: label from "./task-shared.module.css";
+}
+
+.loading {
+  composes: loading from "./task-shared.module.css";
+}
+
+.hint {
+  composes: hint from "./task-shared.module.css";
+}
+
+@media (max-width: 767px) {
+  .chainNode {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}

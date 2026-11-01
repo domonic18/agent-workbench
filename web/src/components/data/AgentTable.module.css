@@ -67,3 +67,61 @@
   background: var(--accent-soft);
   color: var(--accent);
 }
+
+.cards {
+  display: none;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.cardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cardTask {
+  font-size: 13px;
+}
+
+.cardLabel {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.cardMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+@media (max-width: 767px) {
+  .wrap {
+    display: none;
+  }
+
+  .cards {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .keyButton {
+    min-height: 44px;
+  }
+}

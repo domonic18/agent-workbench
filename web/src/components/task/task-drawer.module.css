@@ -45,7 +45,14 @@
 }
 
 .close {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
   border: none;
+  border-radius: 8px;
   background: transparent;
   color: var(--muted);
   font-size: 22px;
@@ -54,6 +61,7 @@
 }
 
 .close:hover {
+  background: var(--bg);
   color: var(--text);
 }
 
@@ -116,194 +124,14 @@
   font-size: 13px;
 }
 
-.capList,
-.refList {
+.capList {
   margin: 0;
   padding-left: 18px;
   font-size: 12px;
 }
 
-.capItem,
-.refItem {
+.capItem {
   margin-bottom: 4px;
-}
-
-.chain {
-  margin-bottom: 20px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg);
-}
-
-.chainList {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: 12px;
-}
-
-.chainItem {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.chainRelation {
-  padding: 1px 7px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  color: var(--muted);
-  background: var(--surface);
-  font-size: 11px;
-}
-
-.chainNode {
-  color: var(--text);
-  text-decoration: none;
-}
-
-.chainNode:hover {
-  color: var(--accent);
-  text-decoration: underline;
-}
-
-.chainCurrent {
-  font-weight: 600;
-}
-
-.chainMissing {
-  color: var(--warning);
-}
-
-.timeline {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  border-left: 2px solid var(--border);
-}
-
-.timelineItem {
-  position: relative;
-  display: flex;
-  gap: 10px;
-  padding: 0 0 14px 14px;
-}
-
-.timelineItem::before {
-  position: absolute;
-  top: 5px;
-  left: -5px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
-  content: "";
-}
-
-.seq {
-  flex: 0 0 auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.timelineBody {
-  min-width: 0;
-}
-
-.eventTitle {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.desc {
-  margin-top: 2px;
-  font-size: 12px;
-  color: var(--text);
-  overflow-wrap: anywhere;
-}
-
-.thread {
-  padding: 12px;
-  margin-bottom: 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg);
-}
-
-.threadHeader {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-
-.threadTitle {
-  margin: 0;
-  font-size: 13px;
-}
-
-.participants {
-  margin-bottom: 10px;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.message {
-  padding: 10px;
-  margin-bottom: 8px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-}
-
-.message:last-child {
-  margin-bottom: 0;
-}
-
-.messageHeader {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-
-.messageRound {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.messageMeta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.messageBody {
-  font-size: 13px;
-  overflow-wrap: anywhere;
-}
-
-.refs {
-  margin-top: 6px;
-  font-size: 12px;
-}
-
-.label {
-  composes: label from "./task-shared.module.css";
 }
 
 .mono {
@@ -334,10 +162,6 @@
   composes: retry from "./task-shared.module.css";
 }
 
-.more {
-  composes: more from "./task-shared.module.css";
-}
-
 .section {
   composes: section from "./task-shared.module.css";
 }
@@ -350,21 +174,24 @@
   composes: hint from "./task-shared.module.css";
 }
 
-.kind {
-  composes: kind from "./task-shared.module.css";
-}
-
-.time {
-  composes: time from "./task-shared.module.css";
-}
-
 @media (max-width: 767px) {
+  .drawerOverlay {
+    height: 100dvh;
+  }
+
   .drawer {
     width: 100%;
+    max-width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
     border-left: none;
   }
 
+  .drawerHeader {
+    padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 12px;
+  }
+
   .drawerBody {
-    padding: 14px 14px 24px;
+    padding: 14px 16px calc(28px + env(safe-area-inset-bottom, 0px));
   }
 }

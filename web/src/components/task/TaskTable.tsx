@@ -46,76 +46,102 @@ export function TaskTable({ tasks, agentNames, search, now = Date.now() }: TaskT
   const navigate = useNavigate();
 
   return (
-    <div className={styles.tableWrap}>
-      <table className={styles.table}>
-        <thead>
-          <tr>
-            <th>任务</th>
-            <th>下发人</th>
-            <th>承接</th>
-            <th>轮次</th>
-            <th>阶段</th>
-            <th>状态</th>
-            <th>产出</th>
-            <th className={styles.numeric}>耗时</th>
-            <th className={styles.numeric}>Token</th>
-          </tr>
-        </thead>
-        <tbody>
-          {tasks.map((task) => {
-            const url = taskUrl(task.id, search);
-            const assigneeName = agentNames.get(task.assignee);
-            return (
-              <tr
-                key={task.id}
-                className={styles.row}
-                onClick={() => navigate(url)}
+    <>
+      <div className={styles.tableWrap}>
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th>任务</th>
+              <th>下发人</th>
+              <th>承接</th>
+              <th>轮次</th>
+              <th>阶段</th>
+              <th>状态</th>
+              <th>产出</th>
+              <th className={styles.numeric}>耗时</th>
+              <th className={styles.numeric}>Token</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tasks.map((task) => {
+              const url = taskUrl(task.id, search);
+              const assigneeName = agentNames.get(task.assignee);
+              return (
+                <tr key={task.id} className={styles.row} onClick={() => navigate(url)}>
+                  <td>
+                    <Link
+                      className={styles.rowLink}
+                      to={url}
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <div className={styles.primary}>{task.title}</div>
+                    </Link>
+                    <div className={styles.mono}>{task.id}</div>
+                    <div className={styles.muted}>{TASK_ORIGIN_LABEL[task.origin]}</div>
+                  </td>
+                  <td>{task.assigner}</td>
+                  <td>
+                    <div>{assigneeName ?? task.assignee}</div>
+                    {assigneeName === undefined ? null : (
+                      <div className={styles.mono}>{task.assignee}</div>
+                    )}
+                  </td>
+                  <td>
+                    第 {task.round} 轮
+                    {task.rework_count > 0 ? (
+                      <div className={styles.muted}>返工 {task.rework_count} 次</div>
+                    ) : null}
+                  </td>
+                  <td>{TASK_STAGE_LABEL[task.stage]}</td>
+                  <td>
+                    <StatusBadge
+                      tone={TASK_STATUS_TONE[task.status]}
+                      text={TASK_STATUS_LABEL[task.status]}
+                    />
+                  </td>
+                  <td>
+                    <OutputCell output={task.output} />
+                  </td>
+                  <td className={styles.numeric}>
+                    {formatDuration((task.ended_at ?? now) - task.created_at)}
+                  </td>
+                  <td className={styles.numeric} title={formatExactTokens(task.total_tokens)}>
+                    {formatTokens(task.total_tokens)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* 移动端只留最关键三列:任务 / 承接 / 状态,其余进详情抽屉(03 §8) */}
+      <ul className={styles.cards} aria-label="任务卡片">
+        {tasks.map((task) => {
+          const assigneeName = agentNames.get(task.assignee);
+          return (
+            <li key={task.id} className={styles.card}>
+              <Link
+                className={styles.cardLink}
+                to={taskUrl(task.id, search)}
+                aria-label={task.title}
               >
-                <td>
-                  <Link
-                    className={styles.rowLink}
-                    to={url}
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    <div className={styles.primary}>{task.title}</div>
-                  </Link>
-                  <div className={styles.mono}>{task.id}</div>
-                  <div className={styles.muted}>{TASK_ORIGIN_LABEL[task.origin]}</div>
-                </td>
-                <td>{task.assigner}</td>
-                <td>
-                  <div>{assigneeName ?? task.assignee}</div>
-                  {assigneeName === undefined ? null : (
-                    <div className={styles.mono}>{task.assignee}</div>
-                  )}
-                </td>
-                <td>
-                  第 {task.round} 轮
-                  {task.rework_count > 0 ? (
-                    <div className={styles.muted}>返工 {task.rework_count} 次</div>
-                  ) : null}
-                </td>
-                <td>{TASK_STAGE_LABEL[task.stage]}</td>
-                <td>
+                <span className={styles.cardTop}>
+                  <span className={styles.cardTitle}>{task.title}</span>
                   <StatusBadge
                     tone={TASK_STATUS_TONE[task.status]}
                     text={TASK_STATUS_LABEL[task.status]}
                   />
-                </td>
-                <td>
-                  <OutputCell output={task.output} />
-                </td>
-                <td className={styles.numeric}>
-                  {formatDuration((task.ended_at ?? now) - task.created_at)}
-                </td>
-                <td className={styles.numeric} title={formatExactTokens(task.total_tokens)}>
-                  {formatTokens(task.total_tokens)}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+                </span>
+                <span className={styles.cardMeta}>
+                  <span className={styles.cardMetaLabel}>承接</span>
+                  <span>{assigneeName ?? task.assignee}</span>
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </>
   );
 }

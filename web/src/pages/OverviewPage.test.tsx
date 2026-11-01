@@ -104,9 +104,9 @@ describe("总览页", () => {
     );
     renderPage();
 
-    expect(await screen.findByText("构建 Agent")).toBeTruthy();
-    expect(screen.getByText("在线")).toBeTruthy();
-    expect(screen.getByText("实现接口契约")).toBeTruthy();
+    expect((await screen.findAllByText("构建 Agent")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("在线").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("实现接口契约").length).toBeGreaterThan(0);
     expect(FakeEventSource.lastUrl).toContain("scope=overview");
     expect(FakeEventSource.lastUrl).toContain("client_id=");
   });

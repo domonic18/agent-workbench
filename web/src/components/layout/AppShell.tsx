@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router";
 import { logout } from "../../api/auth.js";
 import styles from "./AppShell.module.css";
@@ -47,7 +48,15 @@ export function AppShell() {
         </button>
       </nav>
       <main className={styles.main}>
-        <Outlet />
+        <Suspense
+          fallback={
+            <p className={styles.pageLoading} role="status">
+              加载中…
+            </p>
+          }
+        >
+          <Outlet />
+        </Suspense>
       </main>
     </div>
   );

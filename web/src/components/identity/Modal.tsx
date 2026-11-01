@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import styles from "./Modal.module.css";
 
 export interface ModalProps {
@@ -10,18 +10,21 @@ export interface ModalProps {
 }
 
 export function Modal({ title, onClose, dismissible = true, children }: ModalProps) {
+  // 监听只注册一次并读最新 dismissible:密钥揭示后即使旧闭包尚未清理,Esc 也不会误关
+  const dismissibleRef = useRef(dismissible);
+  const onCloseRef = useRef(onClose);
+  dismissibleRef.current = dismissible;
+  onCloseRef.current = onClose;
+
   useEffect(() => {
-    if (!dismissible) {
-      return undefined;
-    }
     function handleKey(event: KeyboardEvent): void {
-      if (event.key === "Escape") {
-        onClose();
+      if (event.key === "Escape" && dismissibleRef.current) {
+        onCloseRef.current();
       }
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [dismissible, onClose]);
+  }, []);
 
   return (
     <div

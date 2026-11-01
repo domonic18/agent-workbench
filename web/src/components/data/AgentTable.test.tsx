@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { OverviewAgent } from "../../api/types.js";
 import { AgentTable } from "./AgentTable.js";
@@ -31,13 +31,23 @@ describe("Agent 表格", () => {
   it("展示状态双编码、相对时间与缩写 token", () => {
     render(<AgentTable agents={[agent()]} now={NOW} />);
 
-    expect(screen.getByText("在线")).toBeTruthy();
-    expect(screen.getByText("运行中")).toBeTruthy();
-    expect(screen.getByText("30 秒前")).toBeTruthy();
-    expect(screen.getByText("1.2M")).toBeTruthy();
-    expect(screen.getByTitle("1,234,567")).toBeTruthy();
-    expect(screen.getByText("实现接口契约")).toBeTruthy();
-    expect(screen.getByText("exec · running")).toBeTruthy();
+    const table = screen.getByRole("table");
+    expect(within(table).getByText("在线")).toBeTruthy();
+    expect(within(table).getByText("运行中")).toBeTruthy();
+    expect(within(table).getByText("30 秒前")).toBeTruthy();
+    expect(within(table).getByText("1.2M")).toBeTruthy();
+    expect(within(table).getByTitle("1,234,567")).toBeTruthy();
+    expect(within(table).getByText("实现接口契约")).toBeTruthy();
+    expect(within(table).getByText("exec · running")).toBeTruthy();
+  });
+
+  it("移动端卡片保留 Agent、当前任务与状态", () => {
+    render(<AgentTable agents={[agent()]} now={NOW} />);
+
+    const cards = screen.getByRole("list", { name: "Agent 卡片" });
+    expect(within(cards).getByText("构建 Agent")).toBeTruthy();
+    expect(within(cards).getByText("在线")).toBeTruthy();
+    expect(within(cards).getByText("实现接口契约")).toBeTruthy();
   });
 
   it("心跳超时与未运行单独标注", () => {
@@ -61,10 +71,11 @@ describe("Agent 表格", () => {
       />,
     );
 
-    expect(screen.getByText("心跳超时")).toBeTruthy();
-    expect(screen.getByText("空闲")).toBeTruthy();
-    expect(screen.getByText("从未运行")).toBeTruthy();
-    expect(screen.getByText("—")).toBeTruthy();
+    const table = screen.getByRole("table");
+    expect(within(table).getByText("心跳超时")).toBeTruthy();
+    expect(within(table).getByText("空闲")).toBeTruthy();
+    expect(within(table).getByText("从未运行")).toBeTruthy();
+    expect(within(table).getByText("—")).toBeTruthy();
   });
 
   it("提供回调时行内出现密钥入口", () => {
@@ -72,7 +83,8 @@ describe("Agent 表格", () => {
     const agentRow = agent();
     render(<AgentTable agents={[agentRow]} onManageKey={onManageKey} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "管理 构建 Agent 的密钥" }));
+    const table = screen.getByRole("table");
+    fireEvent.click(within(table).getByRole("button", { name: "管理 构建 Agent 的密钥" }));
     expect(onManageKey).toHaveBeenCalledWith(agentRow);
   });
 

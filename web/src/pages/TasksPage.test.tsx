@@ -86,7 +86,7 @@ describe("任务列表页", () => {
     const fetchMock = stubApi([task()]);
     renderPage("/tasks?status=running&project=aw");
 
-    expect(await screen.findByText("实现任务屏")).toBeTruthy();
+    expect((await screen.findAllByText("实现任务屏")).length).toBeGreaterThan(0);
     const requested = fetchMock.mock.calls.map((call) => String(call[0]));
     expect(requested.some((url) => url.includes("status=running") && url.includes("project=aw"))).toBe(
       true,

@@ -1,7 +1,7 @@
 import { Link, useLocation } from "react-router";
 import type { TaskChainResult } from "../../api/task-chain.js";
 import { CHAIN_RELATION_LABEL } from "../../shared/labels.js";
-import styles from "./task-drawer.module.css";
+import styles from "./task-chain.module.css";
 
 export interface TaskChainViewProps {
   chain: TaskChainResult | undefined;

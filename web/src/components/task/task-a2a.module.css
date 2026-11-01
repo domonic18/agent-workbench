@@ -1,0 +1,105 @@
+.thread {
+  padding: 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.threadHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.threadTitle {
+  margin: 0;
+  font-size: 13px;
+}
+
+.participants {
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.message {
+  padding: 10px;
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.message:last-child {
+  margin-bottom: 0;
+}
+
+.messageHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.messageRound {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.messageMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.messageBody {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.refs {
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+.refList {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+}
+
+.refItem {
+  margin-bottom: 4px;
+}
+
+.section {
+  composes: section from "./task-shared.module.css";
+}
+
+.sectionTitle {
+  composes: sectionTitle from "./task-shared.module.css";
+}
+
+.loading {
+  composes: loading from "./task-shared.module.css";
+}
+
+.muted {
+  composes: muted from "./task-shared.module.css";
+}
+
+.outputCode {
+  composes: outputCode from "./task-shared.module.css";
+}
+
+.kind {
+  composes: kind from "./task-shared.module.css";
+}

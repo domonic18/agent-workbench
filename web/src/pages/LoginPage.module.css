@@ -69,3 +69,10 @@
   opacity: 0.6;
   cursor: default;
 }
+
+@media (max-width: 767px) {
+  .input,
+  .submit {
+    min-height: 44px;
+  }
+}

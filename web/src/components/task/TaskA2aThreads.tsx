@@ -8,7 +8,7 @@ import {
   DELIVERY_STATUS_TONE,
 } from "../../shared/labels.js";
 import { StatusBadge } from "../data/StatusBadge.js";
-import styles from "./task-drawer.module.css";
+import styles from "./task-a2a.module.css";
 
 export interface TaskA2aThreadsProps {
   threads: readonly A2aThread[];

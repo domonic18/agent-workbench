@@ -2,7 +2,7 @@ import type { TaskEventDto } from "../../api/tasks.js";
 import { formatDateTime } from "../../shared/format.js";
 import { TASK_EVENT_LABEL } from "../../shared/labels.js";
 import { describeTaskEvent } from "./task-event.js";
-import styles from "./task-drawer.module.css";
+import styles from "./task-timeline.module.css";
 
 export interface TaskTimelineProps {
   events: readonly TaskEventDto[];
