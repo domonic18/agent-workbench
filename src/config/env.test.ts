@@ -9,6 +9,7 @@ describe("loadConfig", () => {
       host: "127.0.0.1",
       port: 8787,
       databasePath: "./workspace/console.db",
+      allowedHosts: ["127.0.0.1:8787"],
       teleport: {
         tctlPath: "tctl",
         identityFile: undefined,
@@ -23,6 +24,22 @@ describe("loadConfig", () => {
     expect(loadConfig({ TELEPORT_AUDIT_LOG_PATH: "/var/lib/teleport/log/events.log" }).teleport
       .auditLogPath).toBe("/var/lib/teleport/log/events.log");
     expect(loadConfig({ TELEPORT_AUDIT_LOG_PATH: "  " }).teleport.auditLogPath).toBeUndefined();
+  });
+
+  it("来源白名单默认含监听地址,配置后去空白去重转小写", () => {
+    expect(loadConfig({ HOST: "0.0.0.0", PORT: "9000" }).allowedHosts).toEqual([
+      "0.0.0.0:9000",
+      "127.0.0.1:9000",
+    ]);
+    expect(
+      loadConfig({
+        CONSOLE_ALLOWED_HOSTS: " AW.Example.com:8787 , ,aw.example.com:8787,console:8787 ",
+      }).allowedHosts,
+    ).toEqual(["aw.example.com:8787", "console:8787"]);
+  });
+
+  it("白名单配置全为空时报错,不静默回退", () => {
+    expect(() => loadConfig({ CONSOLE_ALLOWED_HOSTS: " , " })).toThrow(/CONSOLE_ALLOWED_HOSTS/);
   });
 
   it("端口从字符串转数字", () => {

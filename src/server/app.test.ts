@@ -33,6 +33,26 @@ describe("buildApp", () => {
     await app.close();
   });
 
+  it("配置 allowedHosts 后,Host 不在白名单的请求被拒", async () => {
+    const app = buildApp({ logLevel: "silent", allowedHosts: ["127.0.0.1:8787"] });
+
+    const allowed = await app.inject({
+      method: "GET",
+      url: "/healthz",
+      headers: { host: "127.0.0.1:8787" },
+    });
+    expect(allowed.statusCode).toBe(200);
+
+    const denied = await app.inject({
+      method: "GET",
+      url: "/healthz",
+      headers: { host: "evil.example.com:8787" },
+    });
+    expect(denied.statusCode).toBe(403);
+
+    await app.close();
+  });
+
   it("未知路由返回 404 错误信封", async () => {
     const app = buildApp({ logLevel: "silent" });
     const response = await app.inject({ method: "GET", url: "/nope" });

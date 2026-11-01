@@ -10,6 +10,8 @@ const envSchema = z.object({
   DATABASE_PATH: z.string().min(1).default("./workspace/console.db"),
   // 仅首次启动用于把口令哈希写入库;初始化后留空即可
   CONSOLE_INIT_PASSWORD: z.string().optional(),
+  // 来源白名单只校验 Host(含端口),逗号分隔;留空 = 本机监听地址
+  CONSOLE_ALLOWED_HOSTS: z.string().optional(),
   FEISHU_APP_ID: z.string().optional(),
   FEISHU_APP_SECRET: z.string().optional(),
   // 仅白名单 open_id 可下指令,逗号分隔;空 = 全部拒绝(fail-closed)
@@ -50,6 +52,7 @@ export interface Config {
   port: number;
   databasePath: string;
   consoleInitPassword: string | undefined;
+  allowedHosts: string[];
   feishu: FeishuConfig | undefined;
   teleport: TeleportConfig;
 }
@@ -68,6 +71,26 @@ function parseOpenIds(value: string | undefined): string[] {
     return [];
   }
   return [...new Set(text.split(",").map((id) => id.trim()).filter((id) => id !== ""))];
+}
+
+function parseAllowedHosts(
+  value: string | undefined,
+  host: string,
+  port: number,
+): string[] {
+  const text = optionalText(value);
+  const hosts =
+    text === undefined
+      ? [`${host}:${port}`, `127.0.0.1:${port}`]
+      : text
+          .split(",")
+          .map((item) => item.trim().toLowerCase())
+          .filter((item) => item !== "");
+  const unique = [...new Set(hosts.map((item) => item.toLowerCase()))];
+  if (unique.length === 0) {
+    throw new Error("CONSOLE_ALLOWED_HOSTS 不能为空");
+  }
+  return unique;
 }
 
 function parseFeishu(env: z.infer<typeof envSchema>): FeishuConfig | undefined {
@@ -105,6 +128,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     databasePath: parsed.data.DATABASE_PATH,
     consoleInitPassword:
       initPassword === undefined || initPassword === "" ? undefined : initPassword,
+    allowedHosts: parseAllowedHosts(
+      parsed.data.CONSOLE_ALLOWED_HOSTS,
+      parsed.data.HOST,
+      parsed.data.PORT,
+    ),
     feishu: parseFeishu(parsed.data),
     teleport: {
       tctlPath: parsed.data.TELEPORT_TCTL_PATH,

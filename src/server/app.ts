@@ -6,6 +6,7 @@ import type { A2aService } from "../domain/a2a/types.js";
 import { createCapabilityService, type CapabilityService } from "../domain/capability/service.js";
 import { healthPayload, type DatabaseStatus } from "../shared/health.js";
 import type { Db } from "../store/database.js";
+import { requireAllowedHost } from "./middleware/host.js";
 import { createApprovalNotifier } from "./notification/approval.js";
 import { registerA2aRoutes } from "./routes/a2a.js";
 import { registerAuditRoutes } from "./routes/audit.js";
@@ -35,6 +36,8 @@ export interface BuildAppOptions {
   a2a?: A2aService;
   /** 飞书配置存在且带 approvalChatId 时,申请落库后推送审批卡片 */
   feishu?: FeishuConfig;
+  /** 来源白名单(只校验 Host);未注入时不做限制,供路由层测试使用 */
+  allowedHosts?: readonly string[];
   now?: () => number;
 }
 
@@ -42,6 +45,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const startedAt = options.startedAt ?? Date.now();
   const databaseStatus = options.databaseStatus ?? (() => "ok" as const);
   const app = Fastify({ logger: { level: options.logLevel ?? "info" } });
+
+  if (options.allowedHosts !== undefined) {
+    app.addHook("onRequest", requireAllowedHost(options.allowedHosts));
+  }
 
   app.get("/healthz", (_request, reply) => {
     const db = databaseStatus();

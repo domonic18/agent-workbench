@@ -46,6 +46,7 @@ const app = buildApp({
   teleport,
   service,
   a2a,
+  allowedHosts: config.allowedHosts,
   ...(config.feishu === undefined ? {} : { feishu: config.feishu }),
 });
 
