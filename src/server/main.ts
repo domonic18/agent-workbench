@@ -18,6 +18,7 @@ import { ensureConsoleCredential } from "./credential.js";
 import { startAuditReconciler } from "./jobs/audit-reconcile.js";
 import { startDeadLetterSweeper } from "./jobs/dead-letter.js";
 import { startIngestReceiptCleaner } from "./jobs/ingest-receipt.js";
+import { startOutboxReclaimer } from "./jobs/outbox-reclaim.js";
 import { startCapabilityReconciler } from "./jobs/reconcile.js";
 import { startOutboxSender, type OutboxSender } from "./jobs/send-worker.js";
 
@@ -54,6 +55,9 @@ const app = buildApp({
 });
 
 const reconciler = startCapabilityReconciler(service, app.log);
+
+// 租约回收独立于 push worker:未配置飞书时 pull 通道的过期租约同样要回收
+const outboxReclaimer = startOutboxReclaimer(db, app.log);
 
 // 死信巡检(01 §9):复用路由的 A2A 实例,回执落库后能直接唤醒发起方的长轮询
 const deadLetters = startDeadLetterSweeper(db, app.log, {
@@ -101,6 +105,7 @@ function shutdown(): void {
   }
   shuttingDown = true;
   reconciler.stop();
+  outboxReclaimer.stop();
   auditReconciler?.stop();
   deadLetters.stop();
   ingestReceipts.stop();

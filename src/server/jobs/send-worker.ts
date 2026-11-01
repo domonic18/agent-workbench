@@ -8,7 +8,6 @@ import {
   markFailed,
   markRetry,
   markSending,
-  reconcileStaleLeases,
   type OutboxRecord,
 } from "../../store/repositories/outbox.js";
 import type { JobLogger } from "./reconcile.js";
@@ -61,8 +60,9 @@ async function deliverOne(
 }
 
 /**
- * 跑一轮完整投递(01 §6 / §9):先回收过期租约,再逐条领取到期记录并同步发送。
+ * 跑一轮完整投递(01 §6 / §9):逐条领取到期的 push 记录并同步发送。
  * 全部错误按可重试处理,超过 attempts 上限才判 failed(通知类只重试、不围栏任务)。
+ * 过期租约回收由 outbox-reclaim 作业独立负责,pull 通道无 push worker 时同样生效。
  */
 export async function drainOutbox(
   db: Db,
@@ -70,15 +70,6 @@ export async function drainOutbox(
   logger: JobLogger,
   now: () => number = Date.now,
 ): Promise<void> {
-  try {
-    const reconciled = reconcileStaleLeases(db, now());
-    if (reconciled.retryWait > 0 || reconciled.uncertain > 0) {
-      logger.info(reconciled, "发件箱过期租约回收");
-    }
-  } catch (error) {
-    logger.error({ err: error }, "发件箱租约回收失败");
-  }
-
   for (;;) {
     const at = now();
     const row = claimDue(db, at, at + OUTBOX_TIMEOUTS.leaseMs);
