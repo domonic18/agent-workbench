@@ -1,4 +1,4 @@
-import type { A2AIntent } from "../../shared/constants.js";
+import type { A2AIntent, OutboxStatus } from "../../shared/constants.js";
 import type { Db } from "../database.js";
 
 export interface A2aThreadRecord {
@@ -67,12 +67,17 @@ export interface A2aMessageRecord {
   createdAt: number;
 }
 
-const MESSAGE_COLUMNS = `
-  id, thread_id AS threadId, task_id AS taskId, round,
-  reply_to_msg_id AS replyToMsgId, from_agent AS fromAgent, to_agent AS toAgent,
-  intent, summary, expect, deadline_at AS deadlineAt, refs_json AS refsJson,
-  auth_ticket AS authTicket, ack_at AS ackAt, created_at AS createdAt
+function messageColumns(alias: string): string {
+  return `
+  ${alias}.id, ${alias}.thread_id AS threadId, ${alias}.task_id AS taskId, ${alias}.round,
+  ${alias}.reply_to_msg_id AS replyToMsgId, ${alias}.from_agent AS fromAgent,
+  ${alias}.to_agent AS toAgent, ${alias}.intent, ${alias}.summary, ${alias}.expect,
+  ${alias}.deadline_at AS deadlineAt, ${alias}.refs_json AS refsJson,
+  ${alias}.auth_ticket AS authTicket, ${alias}.ack_at AS ackAt, ${alias}.created_at AS createdAt
 `;
+}
+
+const MESSAGE_COLUMNS = messageColumns("a2a_message");
 
 export interface NewA2aMessage {
   id: string;
@@ -216,4 +221,49 @@ export function listInbox(db: Db, agentId: string, query: InboxQuery): A2aMessag
        ORDER BY created_at ASC, id ASC LIMIT @limit`,
     )
     .all(params) as A2aMessageRecord[];
+}
+
+/** 任务相关的线程:它发起的线程,或它以某条消息的 task_id 参与的线程(01 §4) */
+export function listThreadsForTask(db: Db, taskId: string): A2aThreadRecord[] {
+  return db
+    .prepare(
+      `SELECT ${THREAD_COLUMNS} FROM a2a_thread t
+       WHERE t.initiator_task_id = @taskId
+         OR EXISTS (
+           SELECT 1 FROM a2a_message m WHERE m.thread_id = t.id AND m.task_id = @taskId
+         )
+       ORDER BY t.created_at ASC, t.id ASC`,
+    )
+    .all({ taskId }) as A2aThreadRecord[];
+}
+
+export interface A2aThreadMessageRecord extends A2aMessageRecord {
+  /** 同一条消息多次重投只取最新一条出箱行;从未入队为 null */
+  deliveryStatus: OutboxStatus | null;
+  deliveryAttempts: number | null;
+  deliveryError: string | null;
+}
+
+export function listMessagesByThreadIds(
+  db: Db,
+  threadIds: readonly string[],
+): A2aThreadMessageRecord[] {
+  if (threadIds.length === 0) {
+    return [];
+  }
+  const placeholders = threadIds.map(() => "?").join(", ");
+  return db
+    .prepare(
+      `SELECT ${messageColumns("m")},
+              o.status AS deliveryStatus, o.attempts AS deliveryAttempts,
+              o.last_error AS deliveryError
+       FROM a2a_message m
+       LEFT JOIN outbox o ON o.id = (
+         SELECT o2.id FROM outbox o2 WHERE o2.msg_id = m.id
+         ORDER BY o2.created_at DESC, o2.id DESC LIMIT 1
+       )
+       WHERE m.thread_id IN (${placeholders})
+       ORDER BY m.thread_id ASC, m.round ASC`,
+    )
+    .all(...threadIds) as A2aThreadMessageRecord[];
 }

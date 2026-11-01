@@ -9,6 +9,8 @@ import {
   insertMessage,
   insertThread,
   listInbox,
+  listMessagesByThreadIds,
+  listThreadsForTask,
   markAck,
   maxRound,
   type NewA2aMessage,
@@ -166,6 +168,42 @@ describe("a2a 线程与消息仓储", () => {
       after: { createdAt: first[1]!.createdAt, id: first[1]!.id },
     });
     expect(second.map((row) => row.id)).toEqual(["msg_3"]);
+    db.close();
+  });
+});
+
+describe("按任务读取线程", () => {
+  it("发起方任务与消息 task_id 所属任务都能看到同一线程", () => {
+    const db = prepare();
+    insertThread(db, thread());
+    insertMessage(db, message({ id: "msg_1", round: 1 }));
+    insertMessage(db, message({ id: "msg_2", round: 2, taskId: "tsk_b", intent: "reply" }));
+
+    const initiator = listThreadsForTask(db, "tsk_a");
+    expect(initiator.map((row) => row.id)).toEqual(["thr_1"]);
+    expect(listThreadsForTask(db, "tsk_b").map((row) => row.id)).toEqual(["thr_1"]);
+    expect(listThreadsForTask(db, "tsk_missing")).toEqual([]);
+    db.close();
+  });
+
+  it("消息按 round 升序,投递状态取该 msg_id 最新一条出箱行", () => {
+    const db = prepare();
+    insertThread(db, thread());
+    insertMessage(db, message({ id: "msg_1", round: 2 }));
+    insertMessage(db, message({ id: "msg_2", round: 1 }));
+    insertOutbox(db, outbox("msg_1", { id: "ob_old", idempotencyKey: "key_old", createdAt: 1_000 }));
+    db.prepare("UPDATE outbox SET status = 'retry_wait' WHERE id = 'ob_old'").run();
+    insertOutbox(db, outbox("msg_1", { id: "ob_new", idempotencyKey: "key_new", createdAt: 2_000 }));
+    db.prepare("UPDATE outbox SET status = 'failed', last_error = 'boom' WHERE id = 'ob_new'").run();
+
+    const rows = listMessagesByThreadIds(db, ["thr_1"]);
+    expect(rows.map((row) => row.id)).toEqual(["msg_2", "msg_1"]);
+    expect(rows[1]).toMatchObject({
+      deliveryStatus: "failed",
+      deliveryError: "boom",
+    });
+    expect(rows[0]).toMatchObject({ deliveryStatus: null });
+    expect(listMessagesByThreadIds(db, [])).toEqual([]);
     db.close();
   });
 });

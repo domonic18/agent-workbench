@@ -47,6 +47,10 @@ export const TASK_LIMITS = {
 export const A2A_INTENTS = ["request", "reply", "notify", "escalate"] as const;
 export type A2AIntent = (typeof A2A_INTENTS)[number];
 
+/** 线程状态不落库(02 §3.3),读取时按消息与投递记录现算 */
+export const A2A_THREAD_STATUSES = ["open", "awaiting_reply", "completed", "expired"] as const;
+export type A2aThreadStatus = (typeof A2A_THREAD_STATUSES)[number];
+
 /** 飞书指令审计结果;与 feishu_command.outcome 的 CHECK 一致 */
 export const COMMAND_OUTCOMES = ["handled", "unsupported", "invalid"] as const;
 export type CommandOutcome = (typeof COMMAND_OUTCOMES)[number];
