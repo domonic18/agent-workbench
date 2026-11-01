@@ -258,7 +258,12 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
             id: newEventId(),
             taskId: task.id,
             kind,
-            payload: { from: task.status, to: nextStatus },
+            // 阻塞原因必须落在 blocked 事件上,否则控制台只能显示「未记录」
+            payload: {
+              from: task.status,
+              to: nextStatus,
+              ...(kind === "blocked" && reason !== null ? { reason } : {}),
+            },
             occurredAt: at,
           });
         }

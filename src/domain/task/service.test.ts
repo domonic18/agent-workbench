@@ -148,6 +148,21 @@ describe("createTaskService.update", () => {
     db.close();
   });
 
+  it("阻塞事件携带原因", () => {
+    const { db, service } = prepare();
+    const created = service.create(createInput());
+    service.update({ taskId: created.id, assignee: "agt_a", status: "running" });
+    service.update({
+      taskId: created.id,
+      assignee: "agt_a",
+      status: "blocked",
+      reason: "等待审批补签",
+    });
+
+    expect(events(db, created.id).at(-1)?.payload).toContain("等待审批补签");
+    db.close();
+  });
+
   it("非法状态跃迁 422,非本人 403,不存在 404", () => {
     const { db, service } = prepare();
     const created = service.create(createInput());
