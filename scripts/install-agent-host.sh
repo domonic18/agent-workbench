@@ -45,6 +45,9 @@ if [ "$SKIP_DISPATCH" = 0 ] && [ -n "$AGENT_ID" ] && [ -n "$AGENT_SECRET" ] && [
 [ "$HAVE_COLLECTOR" = 1 ] || [ "$HAVE_DISPATCH" = 1 ] || { echo "采集器与调度器至少装一个(相应 id/secret 缺失)"; exit 1; }
 
 command -v node >/dev/null || { echo "需要 node ≥18"; exit 1; }
+if [ -n "$AGENT_WORKDIR" ] && [ "$DRY_RUN" != 1 ] && [ ! -d "$AGENT_WORKDIR" ]; then
+  echo "--agent-workdir 不存在: $AGENT_WORKDIR(调度器会话的工作目录,须为目标机上真实仓库)"; exit 1
+fi
 ARCH="$(uname -m | sed 's/x86_64/x64/')"
 TARBALL="aw-agent-host-darwin-${ARCH}.tar.gz"
 TMP="$(mktemp -d)"

@@ -113,6 +113,10 @@ const PROMPT = `这是一次由执行面调度器发起的协作唤醒:你的 a2
 过程与结论只写进回执与任务字段。全部步骤完成后,最终回复用一句话概述处理结果(消息条数与任务 id)。`;
 
 function runSession(options, mcpConfigPath, serverName) {
+  const cwd = options.cwd ?? process.cwd();
+  if (!existsSync(cwd)) {
+    throw new Error(`--cwd 不存在: ${cwd};请改为目标机器上真实存在的仓库目录`);
+  }
   const allowed = ["Read", "Grep", "Glob", "Bash", `mcp__${serverName}`];
   // launchd 环境 PATH 极简:claude(npm 包,shebang 为 `env node`)与 node 本体
   // 可能都在 nvm/volta 等目录,子进程 PATH 注入两者目录,否则 shebang 解析 ENOENT
@@ -133,7 +137,7 @@ function runSession(options, mcpConfigPath, serverName) {
       allowed.join(","),
     ],
     {
-      cwd: options.cwd ?? process.cwd(),
+      cwd,
       env: { ...process.env, PATH: childPath },
       stdio: ["ignore", "pipe", "pipe"],
       timeout: SESSION_TIMEOUT_MS,
