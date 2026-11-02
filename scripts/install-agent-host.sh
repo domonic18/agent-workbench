@@ -11,7 +11,7 @@ set -euo pipefail
 
 CONSOLE_URL="" MACHINE_ID="" MACHINE_SECRET="" PROJECTS=""
 AGENT_ID="" AGENT_SECRET="" AGENT_PROJECT="" AGENT_WORKDIR=""
-NAME="" SKIP_COLLECTOR=0 SKIP_DISPATCH=0 DRY_RUN=0
+NAME="" CLI_OVERRIDE="" SKIP_COLLECTOR=0 SKIP_DISPATCH=0 DRY_RUN=0
 
 usage() { grep '^#' "$0" | head -9; exit 1; }
 while [ $# -gt 0 ]; do
@@ -25,6 +25,7 @@ while [ $# -gt 0 ]; do
     --project) AGENT_PROJECT="$2"; shift 2 ;;
     --agent-workdir) AGENT_WORKDIR="$2"; shift 2 ;;
     --name) NAME="$2"; shift 2 ;;
+    --claude) CLI_OVERRIDE="$2"; shift 2 ;;
     --skip-collector) SKIP_COLLECTOR=1; shift ;;
     --skip-dispatch) SKIP_DISPATCH=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
@@ -68,10 +69,12 @@ run install -m 0755 "$TMP/aw-dispatch.mjs" "$BIN_DIR/aw-dispatch.mjs"
 run install -m 0644 "$TMP/enroll-agent.mjs" "$WORK_DIR/enroll-agent.mjs"
 
 # claude 逐候选验证真实可执行(断链符号链接会被 -x 排除,ENOENT 实证过)
-CLI=""
-for c in "$(command -v claude 2>/dev/null || true)" "$HOME/.local/bin/claude" "$HOME/.claude/local/claude" /opt/homebrew/bin/claude /usr/local/bin/claude; do
-  [ -n "$c" ] && [ -x "$c" ] && CLI="$c" && break
-done
+CLI="$CLI_OVERRIDE"
+if [ -z "$CLI" ]; then
+  for c in "$(command -v claude 2>/dev/null || true)" "$HOME/.local/bin/claude" "$HOME/.claude/local/claude" /opt/homebrew/bin/claude /usr/local/bin/claude; do
+    [ -n "$c" ] && [ -x "$c" ] && CLI="$c" && break
+  done
+fi
 NODE_BIN="$(command -v node)"
 ENROLL_ENV=""
 
