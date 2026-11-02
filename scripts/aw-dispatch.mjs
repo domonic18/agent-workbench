@@ -4,6 +4,7 @@
 // 用法: node scripts/aw-dispatch.mjs --env workspace/mcp/aw-demo.env [--cwd /path/to/repo] [--mcp-config workspace/mcp/aw-demo.mcp.json]
 
 import { spawnSync } from "node:child_process";
+import path from "node:path";
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -113,6 +114,13 @@ const PROMPT = `这是一次由执行面调度器发起的协作唤醒:你的 a2
 
 function runSession(options, mcpConfigPath, serverName) {
   const allowed = ["Read", "Grep", "Glob", "Bash", `mcp__${serverName}`];
+  // launchd 环境 PATH 极简:claude(npm 包,shebang 为 `env node`)与 node 本体
+  // 可能都在 nvm/volta 等目录,子进程 PATH 注入两者目录,否则 shebang 解析 ENOENT
+  const childPath = [
+    path.dirname(path.resolve(options.claude ?? "claude")),
+    path.dirname(process.execPath),
+    process.env.PATH || "/usr/local/bin:/usr/bin:/bin",
+  ].join(":");
   const result = spawnSync(
     options.claude ?? "claude",
     [
@@ -126,6 +134,7 @@ function runSession(options, mcpConfigPath, serverName) {
     ],
     {
       cwd: options.cwd ?? process.cwd(),
+      env: { ...process.env, PATH: childPath },
       stdio: ["ignore", "pipe", "pipe"],
       timeout: SESSION_TIMEOUT_MS,
       encoding: "utf8",
