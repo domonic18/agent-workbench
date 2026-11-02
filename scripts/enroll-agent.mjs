@@ -42,6 +42,7 @@ function parseArgs(argv) {
     "--secret-file": "secretFile",
     "--feishu-app-id": "feishuAppId",
     "--feishu-secret-file": "feishuSecretFile",
+    "--feishu-cc-config": "feishuCcConfig",
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -83,7 +84,11 @@ const HELP = `用法:
   --secret-file <path>  从文件读取密钥(替代 AW_AGENT_SECRET 环境变量)
   --feishu-app-id <id>  该 Agent 自己的飞书应用 App ID;与飞书密钥同时提供才启用协作群通知
   --feishu-secret-file <path>  从文件读取飞书 App Secret(替代 AW_FEISHU_APP_SECRET)
+  --feishu-cc-config <path>    指定 cc-connect 配置路径;省略时 proxy 按默认路径自动探测
   --print-only          只打印配置,不写文件
+
+飞书凭据也可不传:proxy 启动时会按 --project 到 cc-connect 配置里找同名项目的
+feishu 应用(app_id/app_secret)自动启用协作群通知;secret 只留在本机进程内存。
 `;
 
 function shellQuote(value) {
@@ -188,8 +193,12 @@ async function main() {
     ["AW_AGENT_SECRET", secret],
     ["CONSOLE_URL", consoleUrl],
     ["AW_TASK_ID", taskId],
+    ["AW_PROJECT", options.project],
     ["AW_UPSTREAMS", JSON.stringify(upstreams)],
     ...(options.grants === undefined ? [] : [["AW_GRANTS", options.grants]]),
+    ...(options.feishuCcConfig === undefined
+      ? []
+      : [["FEISHU_CC_CONFIG", options.feishuCcConfig]]),
     ...(feishuEnabled
       ? [
           ["FEISHU_APP_ID", options.feishuAppId],
@@ -200,6 +209,7 @@ async function main() {
   const wrapperDir = resolve(options.out);
   const envPath = resolve(wrapperDir, `${name}.env`);
   const wrapperPath = resolve(wrapperDir, `${name}.sh`);
+  const mcpConfigPath = resolve(wrapperDir, `${name}.mcp.json`);
   const wrapper = `#!/bin/sh
 set -eu
 set -a
@@ -207,6 +217,7 @@ set -a
 set +a
 exec node "${options.proxy}"
 `;
+  const mcpConfig = `${JSON.stringify({ mcpServers: { [name]: { command: wrapperPath } } }, null, 2)}\n`;
 
   if (!options.printOnly) {
     mkdirSync(wrapperDir, { recursive: true, mode: 0o700 });
@@ -214,8 +225,10 @@ exec node "${options.proxy}"
       mode: 0o600,
     });
     writeFileSync(wrapperPath, wrapper, { mode: 0o700 });
+    writeFileSync(mcpConfigPath, mcpConfig, { mode: 0o600 });
     chmodSync(envPath, 0o600);
     chmodSync(wrapperPath, 0o700);
+    chmodSync(mcpConfigPath, 0o600);
   }
 
   process.stdout.write(
@@ -228,6 +241,9 @@ exec node "${options.proxy}"
       "",
       "在项目目录注册到 Claude Code(仅本机、仅当前项目):",
       `  claude mcp add --scope local ${name} -- ${wrapperPath}`,
+      "",
+      "协作唤醒调度(2026-11-02 裁决:群 @ 不再唤醒,收件箱确定性拉起):",
+      `  cc-connect cron add --cron "* * * * *" --exec "node ${resolve(ROOT, "scripts/aw-dispatch.mjs")} --env ${envPath} --cwd <项目仓库目录>" --desc "aw-dispatch ${options.project}"`,
       "",
       "验证:",
       "  claude mcp list",
