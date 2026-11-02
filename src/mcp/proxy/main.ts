@@ -1,6 +1,5 @@
 import { pathToFileURL } from "node:url";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import * as Lark from "@larksuiteoapi/node-sdk";
 import { postToolCallAudit } from "./audit-client.js";
 import { loadProxyConfig } from "./config.js";
 import { callConsole } from "./console-client.js";
@@ -24,9 +23,7 @@ export async function main(): Promise<void> {
   const feishu =
     config.feishu === undefined
       ? undefined
-      : createFeishuNotifier(
-          new Lark.Client({ appId: config.feishu.appId, appSecret: config.feishu.appSecret }),
-        );
+      : createFeishuNotifier(config.feishu.appId, config.feishu.appSecret);
   const nativeTools = createNativeTools({ ...consoleClient });
 
   const gateway = createGateway({

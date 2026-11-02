@@ -74,6 +74,7 @@ const app = buildApp({
   knowledgeEntries,
   allowedHosts: config.allowedHosts,
   // src/server 与 dist/server 到仓库根同为两级目录
+  artifactsRoot: fileURLToPath(new URL("../../workspace/artifacts", import.meta.url)),
   webRoot: fileURLToPath(new URL("../../dist/web", import.meta.url)),
   ...(config.feishu === undefined ? {} : { feishu: config.feishu }),
 });

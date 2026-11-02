@@ -20,7 +20,7 @@ import { registerIdentityRoutes } from "./routes/identity.js";
 import { registerIngestRoutes } from "./routes/ingest.js";
 import { registerKnowledgeRoutes } from "./routes/knowledge.js";
 import { registerOverviewRoutes } from "./routes/overview.js";
-import { registerWebRoutes } from "./routes/static.js";
+import { registerArtifactRoutes, registerWebRoutes } from "./routes/static.js";
 import { registerStreamRoutes } from "./routes/stream.js";
 import { registerTaskA2aRoutes } from "./routes/task-a2a.js";
 import { registerTaskReadRoutes } from "./routes/task-read.js";
@@ -52,6 +52,8 @@ export interface BuildAppOptions {
   knowledgeEntries?: KnowledgeEntryService;
   /** 飞书配置存在且带 approvalChatId 时,申请落库后推送审批卡片 */
   feishu?: FeishuConfig;
+  /** 执行面部署包目录;存在时按 /artifacts/* 匿名直读(新机器一键安装的取件口) */
+  artifactsRoot?: string;
   /** 前端构建产物目录;存在 index.html 时才注册静态托管与 SPA 回退 */
   webRoot?: string;
   /** 来源白名单(只校验 Host);未注入时不做限制,供路由层测试使用 */
@@ -133,6 +135,9 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     }
   }
 
+  if (options.artifactsRoot !== undefined) {
+    registerArtifactRoutes(app, options.artifactsRoot);
+  }
   if (options.webRoot !== undefined) {
     registerWebRoutes(app, options.webRoot);
   }
