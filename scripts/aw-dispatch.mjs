@@ -19,7 +19,7 @@ function fail(message) {
 
 function parseArgs(argv) {
   const options = {};
-  const names = ["--env", "--cwd", "--mcp-config", "--claude"];
+  const names = ["--env", "--cwd", "--mcp-config", "--claude", "--model"];
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (!names.includes(arg)) {
@@ -130,6 +130,7 @@ function runSession(options, mcpConfigPath, serverName) {
     [
       "-p",
       PROMPT,
+      ...(options.model ? ["--model", options.model] : []),
       "--mcp-config",
       mcpConfigPath,
       "--strict-mcp-config",

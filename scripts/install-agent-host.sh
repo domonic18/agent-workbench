@@ -11,7 +11,7 @@ set -euo pipefail
 
 CONSOLE_URL="" MACHINE_ID="" MACHINE_SECRET="" PROJECTS=""
 AGENT_ID="" AGENT_SECRET="" AGENT_PROJECT="" AGENT_WORKDIR=""
-NAME="" CLI_OVERRIDE="" SKIP_COLLECTOR=0 SKIP_DISPATCH=0 DRY_RUN=0
+NAME="" CLI_OVERRIDE="" MODEL_OVERRIDE="" SKIP_COLLECTOR=0 SKIP_DISPATCH=0 DRY_RUN=0
 
 usage() { grep '^#' "$0" | head -9; exit 1; }
 while [ $# -gt 0 ]; do
@@ -26,6 +26,7 @@ while [ $# -gt 0 ]; do
     --agent-workdir) AGENT_WORKDIR="$2"; shift 2 ;;
     --name) NAME="$2"; shift 2 ;;
     --claude) CLI_OVERRIDE="$2"; shift 2 ;;
+    --model) MODEL_OVERRIDE="$2"; shift 2 ;;
     --skip-collector) SKIP_COLLECTOR=1; shift ;;
     --skip-dispatch) SKIP_DISPATCH=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
@@ -141,7 +142,8 @@ if [ "$HAVE_DISPATCH" = 1 ]; then
     <string>$NODE_BIN</string><string>$BIN_DIR/aw-dispatch.mjs</string>
     <string>--env</string><string>$ENROLL_ENV</string>
     <string>--cwd</string><string>$AGENT_WORKDIR</string>${CLI:+
-    <string>--claude</string><string>$CLI</string>}
+    <string>--claude</string><string>$CLI</string>}${MODEL_OVERRIDE:+
+    <string>--model</string><string>$MODEL_OVERRIDE</string>}
   </array>
   <key>StartInterval</key><integer>60</integer><key>RunAtLoad</key><true/>
   <key>StandardOutPath</key><string>$HOME/.aw-collector/dispatch.log</string>
