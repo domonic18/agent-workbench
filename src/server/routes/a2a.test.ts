@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createIdentityService } from "../../domain/identity/service.js";
 import { openDatabase, type Db } from "../../store/database.js";
 import { runMigrations } from "../../store/migrator.js";
+import { findOutboxByKey } from "../../store/repositories/outbox.js";
 import { buildApp } from "../app.js";
 
 const DEADLINE = "2026-10-30T12:00:00Z";
@@ -143,11 +144,7 @@ describe("a2a 路由", () => {
     expect((again.json() as { msg_id: string }).msg_id).toBe(firstBody.msg_id);
   });
 
-  it("request 返回协作群 notify,@ 收件方且 uuid 取消息 id", async () => {
-    fixture.db
-      .prepare("UPDATE agent SET feishu_bot_open_id = 'ou_b', feishu_bot_name = 'Bot B' WHERE id = 'agt_b'")
-      .run();
-
+  it("request 入队交接播报(无 @),响应不再带 notify", async () => {
     const response = await app.inject({
       method: "POST",
       url: "/api/a2a/messages",
@@ -156,10 +153,13 @@ describe("a2a 路由", () => {
     });
 
     expect(response.statusCode).toBe(201);
-    const body = response.json() as { msg_id: string; thread_id: string; notify: unknown };
-    expect(body.notify).toEqual({
-      chat_id: "oc_group",
-      text: `<at user_id="ou_b">Agent B</at> 新任务交接:需要一份接口契约\n任务 tsk_a · 线程 ${body.thread_id}`,
+    const body = response.json() as { msg_id: string; thread_id: string };
+    expect(body).not.toHaveProperty("notify");
+    const row = findOutboxByKey(fixture.db, `collab:${body.msg_id}`);
+    expect(row?.kind).toBe("collab_bulletin");
+    expect(JSON.parse(row?.payloadJson ?? "{}")).toEqual({
+      chatId: "oc_group",
+      text: "〔交接〕Agent A → Agent B:需要一份接口契约 · 任务 tsk_a",
       uuid: body.msg_id,
     });
   });

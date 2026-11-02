@@ -9,7 +9,6 @@ import {
   TASK_STATUSES,
   TOOL_GATE,
 } from "../../shared/constants.js";
-import { isCollabNotify, type CollabNotify } from "../../shared/collab.js";
 import {
   callConsole,
   type ConsoleClientConfig,
@@ -17,10 +16,7 @@ import {
 } from "./console-client.js";
 import type { NativeTool } from "./types.js";
 
-export interface NativeToolsConfig extends ConsoleClientConfig {
-  /** 控制台回的群通知;剥离后由 proxy 用本 Agent 的飞书凭据发送 */
-  onNotify?: (notify: CollabNotify) => void;
-}
+export type NativeToolsConfig = ConsoleClientConfig;
 
 type Args = Record<string, unknown>;
 
@@ -71,18 +67,6 @@ function pick(args: Args, keys: readonly string[]): Record<string, unknown> {
   return body;
 }
 
-/** notify 是控制台给 proxy 的投递指令,不暴露给模型;无效值直接丢弃 */
-function stripNotify(config: NativeToolsConfig, body: unknown): unknown {
-  if (typeof body !== "object" || body === null || Array.isArray(body)) {
-    return body;
-  }
-  const { notify, ...rest } = body as Record<string, unknown>;
-  if (isCollabNotify(notify)) {
-    config.onNotify?.(notify);
-  }
-  return rest;
-}
-
 async function invoke(
   config: NativeToolsConfig,
   request: ConsoleRequest,
@@ -90,7 +74,7 @@ async function invoke(
   try {
     const response = await callConsole(config, request);
     if (response.status >= 200 && response.status < 300) {
-      return textResult(stripNotify(config, response.body));
+      return textResult(response.body);
     }
     return failureResult(response.status, response.body);
   } catch (error) {

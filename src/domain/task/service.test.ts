@@ -188,7 +188,8 @@ describe("createTaskService.update", () => {
       stage: "plan",
       status: "running",
     });
-    expect(running).toMatchObject({ stage: "plan", status: "running", startedAt: NOW });
+    expect(running.task).toMatchObject({ stage: "plan", status: "running", startedAt: NOW });
+    expect(running.autoClosed).toEqual([]);
 
     service.update({ taskId: created.id, assignee: "agt_a", stage: "exec", status: "review" });
     const reworked = service.update({
@@ -197,7 +198,7 @@ describe("createTaskService.update", () => {
       status: "running",
       reason: "评审发现边界遗漏",
     });
-    expect(reworked).toMatchObject({ status: "running", reworkCount: 1 });
+    expect(reworked.task).toMatchObject({ status: "running", reworkCount: 1 });
 
     expect(events(db, created.id).map((event) => event.kind)).toEqual([
       "created",
@@ -295,7 +296,7 @@ describe("createTaskService.update", () => {
       output: "https://example.com/spec",
     });
 
-    expect(updated).toMatchObject({
+    expect(updated.task).toMatchObject({
       stage: "intake",
       status: "pending",
       deadlineAt: 42_000,
@@ -336,7 +337,7 @@ describe("completionNotice", () => {
     }
   }
 
-  it("下游 done 时返回上游发起方与其 bot 身份", () => {
+  it("下游 done 时返回上游发起方(播报由控制台直发,不再带 bot open_id)", () => {
     const { db, service } = prepare();
     seed(db);
     service.update({ taskId: "tsk_child", assignee: "agt_b", status: "done" });
@@ -344,8 +345,8 @@ describe("completionNotice", () => {
     expect(service.completionNotice("tsk_child")).toEqual({
       taskId: "tsk_child",
       title: "下游任务",
-      from: { id: "agt_b", displayName: "Agent B", botOpenId: null },
-      to: { id: "agt_a", displayName: "Agent A", botOpenId: "ou_a" },
+      from: { id: "agt_b", displayName: "Agent B" },
+      to: { id: "agt_a", displayName: "Agent A" },
     });
     db.close();
   });

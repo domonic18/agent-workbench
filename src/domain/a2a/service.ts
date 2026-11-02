@@ -24,11 +24,14 @@ import {
 } from "../../store/repositories/outbox.js";
 import {
   appendTaskEvent,
+  findTaskById,
   findTaskParent,
   findTaskSummary,
   setTaskParentIfEmpty,
+  type TaskRecord,
 } from "../../store/repositories/task.js";
-import type { CollabAgentRef, HandoffNotice } from "../collab/notice.js";
+import type { AcceptNotice, CollabAgentRef, HandoffNotice } from "../collab/notice.js";
+import { closeAncestorsIfComplete } from "../task/auto-close.js";
 import { A2aError } from "./errors.js";
 import { toInboxItem } from "./inbox.js";
 import type {
@@ -257,9 +260,9 @@ export function createA2aService(deps: A2aServiceDeps): A2aService {
     return takeVisible(agentId, after);
   }
 
-  function ack(agentId: string, msgId: string, input: A2aAckInput = {}): void {
+  function ack(agentId: string, msgId: string, input: A2aAckInput = {}): TaskRecord[] {
     const at = now();
-    db.transaction(() => {
+    return db.transaction(() => {
       const message = findMessageById(db, msgId);
       if (message === undefined) {
         throw new A2aError("NOT_FOUND", `消息 ${msgId} 不存在`);
@@ -268,7 +271,7 @@ export function createA2aService(deps: A2aServiceDeps): A2aService {
         throw new A2aError("FORBIDDEN", "只能 ACK 发给自己的消息");
       }
       if (message.ackAt !== null) {
-        return;
+        return [];
       }
       // 已进死信说明发起方已收到「重新发起」回执,迟到的 ACK 不能再改写结果
       if (findDeadLetterByMsgId(db, msgId) !== undefined) {
@@ -310,11 +313,14 @@ export function createA2aService(deps: A2aServiceDeps): A2aService {
       }
       markAck(db, msgId, at);
       markDeliveredByMsgId(db, msgId);
+      // 回执确认可能补齐收口条件(下游全部终态+回执已确认),沿 parent 链收口(2026-11-02 裁决);
+      // request/escalate 的 ack 走到这也是空操作(根任务无 parent 或子任务未终态)
+      return closeAncestorsIfComplete(db, message.taskId, at);
     })();
   }
 
   function agentRef(agent: AgentRecord): CollabAgentRef {
-    return { id: agent.id, displayName: agent.displayName, botOpenId: agent.feishuBotOpenId };
+    return { id: agent.id, displayName: agent.displayName };
   }
 
   function handoffNotice(msgId: string): HandoffNotice | null {
@@ -340,5 +346,35 @@ export function createA2aService(deps: A2aServiceDeps): A2aService {
     };
   }
 
-  return { send, inbox, ack, handoffNotice, wake };
+  /** 接单播报的渲染元数据;非 request/escalate、未 ack 或参与方缺失时返回 null */
+  function acceptNotice(msgId: string, childTaskId?: string): AcceptNotice | null {
+    const message = findMessageById(db, msgId);
+    if (
+      message === undefined ||
+      message.ackAt === null ||
+      (message.intent !== "request" && message.intent !== "escalate")
+    ) {
+      return null;
+    }
+    const from = findAgentById(db, message.fromAgent);
+    const to = findAgentById(db, message.toAgent);
+    if (from === undefined || to === undefined) {
+      return null;
+    }
+    const root = findTaskById(db, message.taskId);
+    if (root === undefined) {
+      return null;
+    }
+    // 标题优先取承接方自建的下游任务,回退发起方根任务
+    const child = childTaskId === undefined ? undefined : findTaskById(db, childTaskId);
+    return {
+      msgId: message.id,
+      taskId: child?.id ?? message.taskId,
+      title: child?.title ?? root.title,
+      from: agentRef(from),
+      to: agentRef(to),
+    };
+  }
+
+  return { send, inbox, ack, handoffNotice, acceptNotice, wake };
 }

@@ -4,6 +4,7 @@ import { createIdentityService } from "../../domain/identity/service.js";
 import { openDatabase, type Db } from "../../store/database.js";
 import { runMigrations } from "../../store/migrator.js";
 import { insertCapability } from "../../store/repositories/capability.js";
+import { findOutboxByKey } from "../../store/repositories/outbox.js";
 import { bindRunTaskIfEmpty, insertRun } from "../../store/repositories/run.js";
 import { insertTokenUsage } from "../../store/repositories/token-usage.js";
 import { buildApp } from "../app.js";
@@ -184,7 +185,7 @@ describe("task 路由", () => {
     expect(missing.statusCode).toBe(404);
   });
 
-  it("下游任务完成时返回协作群 notify,@ 上游发起方", async () => {
+  it("下游完成入队完成播报,根任务自动收口并入队验收播报(响应不带 notify)", async () => {
     fixture.db
       .prepare(
         `INSERT INTO task (id, title, assigner, assignee, project, parent_task_id, stage, status, origin, created_at, updated_at)
@@ -197,11 +198,6 @@ describe("task 路由", () => {
          VALUES ('tsk_child', '下游任务', 'console', 'agt_b', 'aw', 'tsk_parent', 'exec', 'running', 'a2a', 0, 0)`,
       )
       .run();
-    fixture.db
-      .prepare(
-        "UPDATE agent SET feishu_bot_open_id = 'ou_a', feishu_bot_name = 'Bot A' WHERE id = 'agt_a'",
-      )
-      .run();
 
     const response = await app.inject({
       method: "PATCH",
@@ -211,14 +207,24 @@ describe("task 路由", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({
-      task: { id: "tsk_child", status: "done" },
-      notify: {
-        chat_id: "oc_group",
-        text: '<at user_id="ou_a">A</at> 任务完成:下游任务(tsk_child)',
-        uuid: "task_done:tsk_child",
-      },
+    expect(response.json()).toMatchObject({ task: { id: "tsk_child", status: "done" } });
+    expect(response.json()).not.toHaveProperty("notify");
+
+    const completion = findOutboxByKey(fixture.db, "collab:task_done:tsk_child");
+    expect(JSON.parse(completion?.payloadJson ?? "{}")).toEqual({
+      chatId: "oc_group",
+      text: "〔完成〕B 已完成「下游任务」,结论已同步给 A · 任务 tsk_child",
+      uuid: "task_done:tsk_child",
     });
+    const closure = findOutboxByKey(fixture.db, "collab:task_closed:tsk_parent");
+    expect(JSON.parse(closure?.payloadJson ?? "{}")).toEqual({
+      chatId: "oc_group",
+      text: "〔验收〕任务「上游任务」已闭环 · 任务 tsk_parent",
+      uuid: "task_closed:tsk_parent",
+    });
+    expect(
+      fixture.db.prepare("SELECT status FROM task WHERE id = 'tsk_parent'").get(),
+    ).toEqual({ status: "done" });
   });
 
   it("无父任务完成不返回 notify", async () => {

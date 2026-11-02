@@ -6,16 +6,20 @@ import { A2A_PROTOCOL_VERSION } from "../../shared/constants.js";
 import { validateEnvelope } from "../../shared/protocol.js";
 import type { Db } from "../../store/database.js";
 import type { AgentRecord } from "../../store/repositories/identity.js";
-import type { CollabNotify } from "../../shared/collab.js";
 import { requireAgentAuth } from "../middleware/agent-auth.js";
 import { requireIdempotencyKey } from "../middleware/session.js";
-import { buildHandoffNotify } from "../notification/collab.js";
+import {
+  buildAcceptBulletin,
+  buildClosureBulletin,
+  buildHandoffBulletin,
+  enqueueCollabBulletin,
+} from "../notification/collab.js";
 
 export interface A2aRoutesOptions {
   db: Db;
   now?: () => number;
   service?: A2aService;
-  /** 协作通知群;留空则响应不带 notify,proxy 不发群消息 */
+  /** 协作播报群;留空则不入队播报 */
   collabChatId?: string;
 }
 
@@ -113,18 +117,21 @@ export function registerA2aRoutes(app: FastifyInstance, options: A2aRoutesOption
           ...(rawThreadId === undefined ? {} : { threadId: rawThreadId }),
           ...(rawReplyTo === undefined ? {} : { replyToMsgId: rawReplyTo }),
         });
-        let notify: CollabNotify | undefined;
+        // ① 交接播报:控制台经发件箱直发协作群,不返回 notify 给 proxy(2026-11-02 裁决)
         if (options.collabChatId !== undefined) {
           const notice = service.handoffNotice(result.msgId);
           if (notice !== null) {
-            notify = buildHandoffNotify(notice, options.collabChatId);
+            enqueueCollabBulletin(
+              db,
+              buildHandoffBulletin(notice, options.collabChatId),
+              options.now?.(),
+            );
           }
         }
         return reply.code(201).send({
           msg_id: result.msgId,
           thread_id: result.threadId,
           round: result.round,
-          ...(notify === undefined ? {} : { notify }),
         });
       } catch (error) {
         if (error instanceof A2aError) {
@@ -192,7 +199,28 @@ export function registerA2aRoutes(app: FastifyInstance, options: A2aRoutesOption
       return validationFailed(reply, "task_id 必须是非空字符串");
     }
     try {
-      service.ack(agent.id, msgId, taskId === undefined ? {} : { taskId });
+      const autoClosed = service.ack(agent.id, msgId, taskId === undefined ? {} : { taskId });
+      // ② 接单播报 + ④ 验收播报:控制台直发,fire-and-forget 不影响 ack 语义
+      if (options.collabChatId !== undefined) {
+        const accept = service.acceptNotice(msgId, taskId);
+        if (accept !== null) {
+          enqueueCollabBulletin(
+            db,
+            buildAcceptBulletin(accept, options.collabChatId),
+            options.now?.(),
+          );
+        }
+        for (const closed of autoClosed) {
+          enqueueCollabBulletin(
+            db,
+            buildClosureBulletin(
+              { taskId: closed.id, title: closed.title },
+              options.collabChatId,
+            ),
+            options.now?.(),
+          );
+        }
+      }
       return { ok: true };
     } catch (error) {
       if (error instanceof A2aError) {

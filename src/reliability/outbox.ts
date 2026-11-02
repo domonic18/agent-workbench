@@ -3,10 +3,12 @@ import { newPrefixedId } from "../shared/ids.js";
 import type { Db } from "../store/database.js";
 import { insertOutbox, type OutboxRecord } from "../store/repositories/outbox.js";
 
-/** push 通道落地载荷:目标会话 + 卡片 JSON,worker 只按此投递,不感知业务 */
+/** push 通道落地载荷:审批卡片或纯文本播报(带 uuid 供飞书侧去重),worker 只按此投递,不感知业务 */
 export interface OutboxPushPayload {
   chatId: string;
-  card: unknown;
+  card?: unknown;
+  text?: string;
+  uuid?: string;
 }
 
 export interface EnqueuePushInput {
@@ -14,7 +16,10 @@ export interface EnqueuePushInput {
   kind: string;
   taskId?: string | null;
   chatId: string;
-  card: unknown;
+  /** 卡片与文本二选一;text 用于协作群播报,uuid 透传飞书做幂等去重 */
+  card?: unknown;
+  text?: string;
+  uuid?: string;
   now?: number;
 }
 
@@ -31,7 +36,12 @@ export interface EnqueuePullInput {
 
 /** 入队一条飞书推送(notification 类,失败只重试);同幂等键只保留首条 */
 export function enqueuePush(db: Db, input: EnqueuePushInput): OutboxRecord {
-  const payload: OutboxPushPayload = { chatId: input.chatId, card: input.card };
+  const payload: OutboxPushPayload = {
+    chatId: input.chatId,
+    ...(input.card === undefined ? {} : { card: input.card }),
+    ...(input.text === undefined ? {} : { text: input.text }),
+    ...(input.uuid === undefined ? {} : { uuid: input.uuid }),
+  };
   const payloadJson = JSON.stringify(payload);
   const now = input.now ?? Date.now();
   return insertOutbox(db, {

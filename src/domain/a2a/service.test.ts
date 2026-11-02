@@ -321,12 +321,8 @@ describe("a2a ack", () => {
 });
 
 describe("handoffNotice", () => {
-  it("request 返回参与方与已注册的 bot open_id", () => {
+  it("request 返回参与方(播报由控制台直发,不再带 bot open_id)", () => {
     const { db, service } = prepare();
-    db.prepare(
-      "UPDATE agent SET feishu_bot_open_id = 'ou_b', feishu_bot_name = 'Bot B' WHERE id = 'agt_b'",
-    ).run();
-
     const { msgId } = service.send(sendInput());
 
     expect(service.handoffNotice(msgId)).toEqual({
@@ -334,8 +330,8 @@ describe("handoffNotice", () => {
       taskId: "tsk_a",
       threadId: "thr_1",
       summary: "需要一份接口契约",
-      from: { id: "agt_a", displayName: "agt_a", botOpenId: null },
-      to: { id: "agt_b", displayName: "agt_b", botOpenId: "ou_b" },
+      from: { id: "agt_a", displayName: "agt_a" },
+      to: { id: "agt_b", displayName: "agt_b" },
     });
     db.close();
   });

@@ -2,13 +2,16 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import { TaskError } from "../../domain/task/errors.js";
 import { createTaskService, type TaskService } from "../../domain/task/service.js";
-import type { CollabNotify } from "../../shared/collab.js";
 import { TASK_STAGES, TASK_STATUSES } from "../../shared/constants.js";
 import type { Db } from "../../store/database.js";
 import type { AgentRecord } from "../../store/repositories/identity.js";
 import { requireAgentAuth } from "../middleware/agent-auth.js";
 import { requireIdempotencyKey } from "../middleware/session.js";
-import { buildCompletionNotify } from "../notification/collab.js";
+import {
+  buildClosureBulletin,
+  buildCompletionBulletin,
+  enqueueCollabBulletin,
+} from "../notification/collab.js";
 import { sendError, toTaskDto } from "./task-dto.js";
 
 const createSchema = z.object({
@@ -32,7 +35,7 @@ export interface TaskRoutesOptions {
   db: Db;
   now?: () => number;
   service?: TaskService;
-  /** 协作通知群;留空则响应不带 notify,proxy 不发群消息 */
+  /** 协作播报群;留空则不入队播报 */
   collabChatId?: string;
 }
 
@@ -88,18 +91,32 @@ export function registerTaskRoutes(app: FastifyInstance, options: TaskRoutesOpti
         return validationError(reply, parsed.error);
       }
       try {
-        const task = service.update({ ...parsed.data, taskId: id, assignee: agent.id });
-        let notify: CollabNotify | undefined;
-        if (parsed.data.status === "done" && options.collabChatId !== undefined) {
-          const notice = service.completionNotice(task.id);
-          if (notice !== null) {
-            notify = buildCompletionNotify(notice, options.collabChatId);
+        const { task, autoClosed } = service.update({
+          ...parsed.data,
+          taskId: id,
+          assignee: agent.id,
+        });
+        // ③ 完成播报 + ④ 验收播报:控制台经发件箱直发,不返回 notify 给 proxy(2026-11-02 裁决)
+        if (options.collabChatId !== undefined) {
+          if (task.status === "done") {
+            const notice = service.completionNotice(task.id);
+            if (notice !== null) {
+              enqueueCollabBulletin(
+                db,
+                buildCompletionBulletin(notice, options.collabChatId),
+                options.now?.(),
+              );
+            }
+          }
+          for (const closed of autoClosed) {
+            enqueueCollabBulletin(
+              db,
+              buildClosureBulletin({ taskId: closed.id, title: closed.title }, options.collabChatId),
+              options.now?.(),
+            );
           }
         }
-        return {
-          task: toTaskDto(task),
-          ...(notify === undefined ? {} : { notify }),
-        };
+        return { task: toTaskDto(task) };
       } catch (error) {
         if (error instanceof TaskError) {
           return sendError(reply, error);

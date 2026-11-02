@@ -189,44 +189,16 @@ describe("原生工具面", () => {
   });
 });
 
-describe("协作通知钩子", () => {
-  function withNotify(onNotify: (notify: { chat_id: string; text: string; uuid: string }) => void) {
-    const found = createNativeTools({ ...CONFIG, onNotify }).find(
+describe("控制台响应透传", () => {
+  it("2xx 响应原样透传给模型(播报已改由控制台直发,响应不含 notify)", async () => {
+    stubFetch(async () => ok({ task: { id: "tsk_1", status: "done" } }));
+    const found = createNativeTools({ ...CONFIG }).find(
       (entry) => entry.name === "task_update",
     );
     if (found === undefined) {
       throw new Error("task_update 不存在");
     }
-    return found;
-  }
-
-  it("2xx 响应里的 notify 被剥离并交给回调", async () => {
-    const onNotify = vi.fn();
-    stubFetch(async () =>
-      ok({
-        task: { id: "tsk_1" },
-        notify: { chat_id: "oc_1", text: "任务完成", uuid: "task_done:tsk_1" },
-      }),
-    );
-
-    const result = await withNotify(onNotify).execute({ task_id: "tsk_1", status: "done" });
-
-    expect(onNotify).toHaveBeenCalledOnce();
-    expect(onNotify).toHaveBeenCalledWith({
-      chat_id: "oc_1",
-      text: "任务完成",
-      uuid: "task_done:tsk_1",
-    });
-    expect(JSON.parse(textOf(result))).toEqual({ task: { id: "tsk_1" } });
-  });
-
-  it("非法 notify 丢弃且不回调,不透传给模型", async () => {
-    const onNotify = vi.fn();
-    stubFetch(async () => ok({ task: { id: "tsk_1" }, notify: { chat_id: "" } }));
-
-    const result = await withNotify(onNotify).execute({ task_id: "tsk_1", status: "done" });
-
-    expect(onNotify).not.toHaveBeenCalled();
-    expect(JSON.parse(textOf(result))).toEqual({ task: { id: "tsk_1" } });
+    const result = await found.execute({ task_id: "tsk_1", status: "done" });
+    expect(JSON.parse(textOf(result))).toEqual({ task: { id: "tsk_1", status: "done" } });
   });
 });

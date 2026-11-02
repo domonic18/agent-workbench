@@ -1,5 +1,4 @@
 import * as Lark from "@larksuiteoapi/node-sdk";
-import type { CollabNotify } from "../../shared/collab.js";
 
 export interface FeishuBotIdentity {
   openId: string;
@@ -7,9 +6,8 @@ export interface FeishuBotIdentity {
 }
 
 export interface FeishuNotifier {
-  /** /bot/v3/info 自报 open_id 与展示名,供控制台渲染 <at> */
+  /** /bot/v3/info 自报 open_id 与展示名,控制台据此维护身份映射(2026-11-02 裁决后不再发群) */
   identify(): Promise<FeishuBotIdentity>;
-  send(notify: CollabNotify): Promise<void>;
 }
 
 interface BotInfoResponse {
@@ -42,19 +40,6 @@ export function createFeishuNotifier(client: Lark.Client): FeishuNotifier {
         throw new Error("飞书 bot 信息缺 open_id 或 app_name");
       }
       return { openId, name };
-    },
-    send: async (notify) => {
-      const response = await client.im.message.create({
-        params: { receive_id_type: "chat_id" },
-        data: {
-          receive_id: notify.chat_id,
-          msg_type: "text",
-          content: JSON.stringify({ text: notify.text }),
-          // 飞书侧按 uuid 去重,控制台重试不会在群里刷出重复通知
-          uuid: notify.uuid,
-        },
-      });
-      ensureOk(response, "发送协作通知");
     },
   };
 }

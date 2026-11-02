@@ -20,24 +20,14 @@ export async function main(): Promise<void> {
     agentId: config.ctx.agentId,
     agentSecret: config.agentSecret,
   };
+  // 飞书凭据只用于自报 bot 身份(identity registration);协作群播报由控制台直发(2026-11-02 裁决)
   const feishu =
     config.feishu === undefined
       ? undefined
       : createFeishuNotifier(
           new Lark.Client({ appId: config.feishu.appId, appSecret: config.feishu.appSecret }),
         );
-  const nativeTools = createNativeTools({
-    ...consoleClient,
-    ...(feishu === undefined
-      ? {}
-      : {
-          onNotify: (notify) => {
-            void feishu.send(notify).catch((error: unknown) => {
-              log.error({ err: error, uuid: notify.uuid }, "协作通知发送失败");
-            });
-          },
-        }),
-  });
+  const nativeTools = createNativeTools({ ...consoleClient });
 
   const gateway = createGateway({
     ctx: config.ctx,
@@ -56,8 +46,14 @@ export async function main(): Promise<void> {
     { agentId: config.ctx.agentId, taskId: config.ctx.taskId, upstreams: upstreams.map((u) => u.id) },
     "MCP proxy 已就绪",
   );
+  if (config.feishuWarning !== undefined) {
+    log.warn({ reason: config.feishuWarning }, "飞书凭据未自动发现");
+  } else if (config.feishuSource !== undefined) {
+    log.info({ source: config.feishuSource }, "飞书凭据已加载");
+  }
 
   // 自报 bot 身份失败只影响 <at> 渲染,不阻断工具通道
+  const feishuAppId = config.feishu?.appId;
   if (feishu !== undefined) {
     void feishu
       .identify()
@@ -65,7 +61,11 @@ export async function main(): Promise<void> {
         callConsole(consoleClient, {
           method: "PUT",
           path: "/api/agents/self/feishu-bot",
-          body: { open_id: identity.openId, name: identity.name },
+          body: {
+            open_id: identity.openId,
+            name: identity.name,
+            ...(feishuAppId === undefined ? {} : { app_id: feishuAppId }),
+          },
         }),
       )
       .then((response) => {
