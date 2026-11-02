@@ -87,11 +87,17 @@ fi
 launchd_write() { # $1=label $2=plist 内容
   [ "$DRY_RUN" = 1 ] && { echo "[dry-run] 写 $LAUNCH_DIR/$1.plist"; return; }
   printf '%s' "$2" > "$LAUNCH_DIR/$1.plist"; chmod 0644 "$LAUNCH_DIR/$1.plist"
+  if ! plutil -lint "$LAUNCH_DIR/$1.plist" >/dev/null 2>&1; then
+    echo "plist 校验失败: $LAUNCH_DIR/$1.plist"; cat "$LAUNCH_DIR/$1.plist"; exit 1
+  fi
 }
 launchd_load() { # $1=label
   [ "$DRY_RUN" = 1 ] && { echo "[dry-run] launchctl bootout/bootstrap $1"; return; }
   launchctl bootout "gui/$(id -u)/$1" 2>/dev/null || true
-  launchctl bootstrap "gui/$(id -u)" "$LAUNCH_DIR/$1.plist"
+  if ! launchctl bootstrap "gui/$(id -u)" "$LAUNCH_DIR/$1.plist" 2>/dev/null; then
+    echo "   bootstrap 失败(5),回退 launchctl load -w"
+    launchctl load -w "$LAUNCH_DIR/$1.plist"
+  fi
 }
 
 if [ "$HAVE_COLLECTOR" = 1 ]; then
