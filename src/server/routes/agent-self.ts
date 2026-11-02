@@ -10,6 +10,8 @@ import { requireAgentAuth } from "../middleware/agent-auth.js";
 const feishuBotSchema = z.object({
   open_id: z.string().trim().min(1).max(128),
   name: z.string().trim().min(1).max(128),
+  /** 该 bot 所属应用;由 proxy 从自己的凭据来源上报,非敏感 */
+  app_id: z.string().trim().min(1).max(128).optional(),
 });
 
 export interface AgentSelfRoutesOptions {
@@ -39,6 +41,7 @@ export function registerAgentSelfRoutes(
       agent.id,
       parsed.data.open_id,
       parsed.data.name,
+      parsed.data.app_id ?? null,
       now(),
     );
     if (!applied) {

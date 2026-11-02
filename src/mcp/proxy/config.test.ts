@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import { loadProxyConfig } from "./config.js";
 
 function env(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
@@ -70,6 +73,7 @@ describe("loadProxyConfig 的飞书凭据", () => {
   it("两者都配置时启用协作通知", () => {
     const config = loadProxyConfig(env({ FEISHU_APP_ID: "cli_x", FEISHU_APP_SECRET: "s3cret" }));
     expect(config.feishu).toEqual({ appId: "cli_x", appSecret: "s3cret" });
+    expect(config.feishuSource).toBe("env");
   });
 
   it("缺省或只有空白时关闭协作通知", () => {
@@ -80,5 +84,76 @@ describe("loadProxyConfig 的飞书凭据", () => {
   it("只配置一侧启动失败", () => {
     expect(() => loadProxyConfig(env({ FEISHU_APP_ID: "cli_x" }))).toThrow(/FEISHU_APP_SECRET/);
     expect(() => loadProxyConfig(env({ FEISHU_APP_SECRET: "s3cret" }))).toThrow(/FEISHU_APP_ID/);
+  });
+});
+
+describe("loadProxyConfig 的 cc-connect 自动发现", () => {
+  const dirs: string[] = [];
+
+  function ccConfig(content: string): string {
+    const dir = mkdtempSync(join(tmpdir(), "cc-config-"));
+    dirs.push(dir);
+    const path = join(dir, "config.toml");
+    writeFileSync(path, content, "utf8");
+    return path;
+  }
+
+  afterEach(() => {
+    for (const dir of dirs.splice(0)) {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  const CONFIG = `
+[[projects]]
+name = "agent-sims"
+
+[[projects.platforms]]
+type = "feishu"
+
+[projects.platforms.options]
+app_id = "cli_cc"
+app_secret = "cc-secret"
+`;
+
+  it("无显式凭据时按 AW_PROJECT 从 cc-connect 解析", () => {
+    const config = loadProxyConfig(
+      env({ AW_PROJECT: "agent-sims", FEISHU_CC_CONFIG: ccConfig(CONFIG) }),
+    );
+    expect(config.feishu).toEqual({ appId: "cli_cc", appSecret: "cc-secret" });
+    expect(config.feishuSource).toBe("cc-config");
+  });
+
+  it("显式 env 凭据优先于 cc-connect", () => {
+    const config = loadProxyConfig(
+      env({
+        AW_PROJECT: "agent-sims",
+        FEISHU_CC_CONFIG: ccConfig(CONFIG),
+        FEISHU_APP_ID: "cli_env",
+        FEISHU_APP_SECRET: "env-secret",
+      }),
+    );
+    expect(config.feishu).toEqual({ appId: "cli_env", appSecret: "env-secret" });
+    expect(config.feishuSource).toBe("env");
+  });
+
+  it("没有 AW_PROJECT 时静默关闭通知", () => {
+    const config = loadProxyConfig(env({ FEISHU_CC_CONFIG: ccConfig(CONFIG) }));
+    expect(config.feishu).toBeUndefined();
+    expect(config.feishuWarning).toBeUndefined();
+  });
+
+  it("项目或配置缺失时给出 warning 且关闭通知", () => {
+    const missingProject = loadProxyConfig(
+      env({ AW_PROJECT: "nope", FEISHU_CC_CONFIG: ccConfig(CONFIG) }),
+    );
+    expect(missingProject.feishu).toBeUndefined();
+    expect(missingProject.feishuWarning).toContain("找不到项目 nope");
+
+    const missingFile = loadProxyConfig(
+      env({ AW_PROJECT: "agent-sims", FEISHU_CC_CONFIG: "/nonexistent/cc.toml" }),
+    );
+    expect(missingFile.feishu).toBeUndefined();
+    expect(missingFile.feishuWarning).toContain("无法读取");
   });
 });

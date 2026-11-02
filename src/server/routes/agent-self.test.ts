@@ -50,13 +50,13 @@ describe("PUT /api/agents/self/feishu-bot", () => {
     fixture.db.close();
   });
 
-  it("自报 bot 身份写入库,重复上报覆盖同值", async () => {
+  it("自报 bot 身份与 app_id 写入库,重复上报覆盖同值", async () => {
     for (let i = 0; i < 2; i += 1) {
       const response = await app.inject({
         method: "PUT",
         url: "/api/agents/self/feishu-bot",
         headers: headers(),
-        payload: { open_id: "ou_bot_a", name: "Agent A Bot" },
+        payload: { open_id: "ou_bot_a", name: "Agent A Bot", app_id: "cli_a" },
       });
       expect(response.statusCode).toBe(200);
       expect(response.json()).toEqual({ ok: true });
@@ -65,6 +65,28 @@ describe("PUT /api/agents/self/feishu-bot", () => {
     expect(findAgentById(fixture.db, "agt_a")).toMatchObject({
       feishuBotOpenId: "ou_bot_a",
       feishuBotName: "Agent A Bot",
+      feishuAppId: "cli_a",
+    });
+  });
+
+  it("未上报 app_id 时保留原值", async () => {
+    await app.inject({
+      method: "PUT",
+      url: "/api/agents/self/feishu-bot",
+      headers: headers(),
+      payload: { open_id: "ou_bot_a", name: "Agent A Bot", app_id: "cli_a" },
+    });
+    const response = await app.inject({
+      method: "PUT",
+      url: "/api/agents/self/feishu-bot",
+      headers: headers(),
+      payload: { open_id: "ou_bot_b", name: "Agent A Bot 2" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(findAgentById(fixture.db, "agt_a")).toMatchObject({
+      feishuBotOpenId: "ou_bot_b",
+      feishuBotName: "Agent A Bot 2",
+      feishuAppId: "cli_a",
     });
   });
 

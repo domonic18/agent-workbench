@@ -150,19 +150,23 @@ export function updateAgentSecretHash(db: Db, id: string, hash: string, now: num
     .run(hash, now, id).changes === 1;
 }
 
-/** bot 身份由该 Agent 自己的 proxy 启动时注册;重复注册同一值天然幂等 */
+/** bot 身份由该 Agent 自己的 proxy 启动时注册;重复注册同一值天然幂等。appId 为空时保留原值 */
 export function updateAgentFeishuBot(
   db: Db,
   id: string,
   openId: string,
   name: string,
+  appId: string | null,
   now: number,
 ): boolean {
   return db
     .prepare(
-      "UPDATE agent SET feishu_bot_open_id = ?, feishu_bot_name = ?, updated_at = ? WHERE id = ?",
+      `UPDATE agent
+         SET feishu_bot_open_id = ?, feishu_bot_name = ?,
+             feishu_app_id = COALESCE(?, feishu_app_id), updated_at = ?
+       WHERE id = ?`,
     )
-    .run(openId, name, now, id).changes === 1;
+    .run(openId, name, appId, now, id).changes === 1;
 }
 
 /** 委派白名单只由控制台会话写;保存即对下一次 a2a.send 判定生效 */

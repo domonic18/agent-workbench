@@ -1,5 +1,10 @@
 import { z } from "zod";
 import type { Grant, RunContext } from "../../domain/capability/gate.js";
+import {
+  locateCcConfig,
+  readFeishuCredentials,
+  type FeishuCredentials,
+} from "./feishu-cc.js";
 import type { UpstreamConfig } from "./upstream.js";
 
 const upstreamSchema = z.object({
@@ -24,15 +29,14 @@ const envSchema = z.object({
   AW_UPSTREAMS: z.string().min(1).default("[]"),
   AW_GRANTS: z.string().optional(),
   AW_APPROVAL_TIMEOUT_MS: z.coerce.number().int().min(1).optional(),
+  /** 该 Agent 的 cc-connect 项目名;未显式配置飞书凭据时据此自动发现 */
+  AW_PROJECT: z.string().min(1).optional(),
   // 各 Agent 自己的飞书应用凭据;两者同时配置才启用协作群通知
   FEISHU_APP_ID: z.string().optional(),
   FEISHU_APP_SECRET: z.string().optional(),
+  /** cc-connect 配置路径;留空按默认候选路径探测 */
+  FEISHU_CC_CONFIG: z.string().optional(),
 });
-
-export interface FeishuCredentials {
-  appId: string;
-  appSecret: string;
-}
 
 export interface ProxyConfig {
   agentSecret: string;
@@ -42,6 +46,10 @@ export interface ProxyConfig {
   toolMap: Record<string, Record<string, string>>;
   /** 未配置飞书凭据时不发协作群通知,工具调用照常 */
   feishu?: FeishuCredentials;
+  /** 凭据来源:显式 env 或从 cc-connect 配置自动发现 */
+  feishuSource?: "env" | "cc-config";
+  /** 自动发现失败的原因,供启动日志记录;不影响工具通道 */
+  feishuWarning?: string;
   ctx: RunContext;
 }
 
@@ -50,16 +58,39 @@ function optionalText(value: string | undefined): string | undefined {
   return trimmed === undefined || trimmed === "" ? undefined : trimmed;
 }
 
-function parseFeishu(env: z.infer<typeof envSchema>): FeishuCredentials | undefined {
-  const appId = optionalText(env.FEISHU_APP_ID);
-  const appSecret = optionalText(env.FEISHU_APP_SECRET);
-  if (appId === undefined && appSecret === undefined) {
-    return undefined;
+interface FeishuResolution {
+  feishu?: FeishuCredentials;
+  source?: "env" | "cc-config";
+  warning?: string;
+}
+
+/**
+ * 优先级:显式 env 凭据 → AW_PROJECT 对应的 cc-connect 配置 → 关闭协作通知。
+ * cc-config 只在本机读取,secret 不进日志、不落库。
+ */
+function parseFeishu(data: z.infer<typeof envSchema>): FeishuResolution {
+  const appId = optionalText(data.FEISHU_APP_ID);
+  const appSecret = optionalText(data.FEISHU_APP_SECRET);
+  if (appId !== undefined || appSecret !== undefined) {
+    if (appId === undefined || appSecret === undefined) {
+      throw new Error("FEISHU_APP_ID 与 FEISHU_APP_SECRET 必须同时设置");
+    }
+    return { feishu: { appId, appSecret }, source: "env" };
   }
-  if (appId === undefined || appSecret === undefined) {
-    throw new Error("FEISHU_APP_ID 与 FEISHU_APP_SECRET 必须同时设置");
+
+  const project = optionalText(data.AW_PROJECT);
+  if (project === undefined) {
+    return {};
   }
-  return { appId, appSecret };
+  const configPath = locateCcConfig(data);
+  if (configPath === undefined) {
+    return { warning: "未找到 cc-connect 配置,飞书协作通知关闭" };
+  }
+  const result = readFeishuCredentials(configPath, project);
+  if (result.credentials === undefined) {
+    return { warning: result.reason ?? "未解析到飞书凭据,协作通知关闭" };
+  }
+  return { feishu: result.credentials, source: "cc-config" };
 }
 
 /** `AW_GRANTS` 为逗号分隔的 `tool:capabilityId`;格式错误即启动失败,不静默跳过 */
@@ -138,7 +169,9 @@ export function loadProxyConfig(env: NodeJS.ProcessEnv = process.env): ProxyConf
       ...(entry.env === undefined ? {} : { env: entry.env }),
     })),
     toolMap,
-    ...(feishu === undefined ? {} : { feishu }),
+    ...(feishu.feishu === undefined ? {} : { feishu: feishu.feishu }),
+    ...(feishu.source === undefined ? {} : { feishuSource: feishu.source }),
+    ...(feishu.warning === undefined ? {} : { feishuWarning: feishu.warning }),
     ctx: {
       runId: parsed.data.AW_RUN_ID,
       agentId: parsed.data.AW_AGENT_ID,
