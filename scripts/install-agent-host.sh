@@ -68,6 +68,7 @@ run install -m 0755 "$TMP/aw-dispatch.mjs" "$BIN_DIR/aw-dispatch.mjs"
 run install -m 0644 "$TMP/enroll-agent.mjs" "$WORK_DIR/enroll-agent.mjs"
 
 CLI="$(command -v claude || true)"
+NODE_BIN="$(command -v node)"
 ENROLL_ENV=""
 
 if [ "$HAVE_DISPATCH" = 1 ]; then
@@ -127,7 +128,7 @@ if [ "$HAVE_DISPATCH" = 1 ]; then
 <plist version=\"1.0\"><dict>
   <key>Label</key><string>com.agent-workbench.dispatch</string>
   <key>ProgramArguments</key><array>
-    <string>node</string><string>$BIN_DIR/aw-dispatch.mjs</string>
+    <string>$NODE_BIN</string><string>$BIN_DIR/aw-dispatch.mjs</string>
     <string>--env</string><string>$ENROLL_ENV</string>
     <string>--cwd</string><string>$AGENT_WORKDIR</string>${CLI:+
     <string>--claude</string><string>$CLI</string>}
