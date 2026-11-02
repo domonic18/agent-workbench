@@ -34,8 +34,13 @@ while [ $# -gt 0 ]; do
 done
 
 [ -n "$CONSOLE_URL" ] || { echo "缺少 --console-url"; exit 1; }
-HAVE_COLLECTOR=0; [ "$SKIP_COLLECTOR" = 0 ] && [ -n "$MACHINE_ID" ] && [ -n "$MACHINE_SECRET" ] && HAVE_COLLECTOR=1
-HAVE_DISPATCH=0; [ "$SKIP_DISPATCH" = 0 ] && [ -n "$AGENT_ID" ] && [ -n "$AGENT_SECRET" ] && [ -n "$AGENT_PROJECT" ] && [ -n "$AGENT_WORKDIR" ] && HAVE_DISPATCH=1
+# 密钥支持三种传法:flag 显式 / 空 flag 回退 env / 环境变量直接注入(不传 flag)
+MACHINE_SECRET="${MACHINE_SECRET:-${AW_MACHINE_SECRET:-}}"
+AGENT_SECRET="${AGENT_SECRET:-${AW_AGENT_SECRET:-}}"
+HAVE_COLLECTOR=0
+HAVE_DISPATCH=0
+if [ "$SKIP_COLLECTOR" = 0 ] && [ -n "$MACHINE_ID" ] && [ -n "$MACHINE_SECRET" ]; then HAVE_COLLECTOR=1; fi
+if [ "$SKIP_DISPATCH" = 0 ] && [ -n "$AGENT_ID" ] && [ -n "$AGENT_SECRET" ] && [ -n "$AGENT_PROJECT" ] && [ -n "$AGENT_WORKDIR" ]; then HAVE_DISPATCH=1; fi
 [ "$HAVE_COLLECTOR" = 1 ] || [ "$HAVE_DISPATCH" = 1 ] || { echo "采集器与调度器至少装一个(相应 id/secret 缺失)"; exit 1; }
 
 command -v node >/dev/null || { echo "需要 node ≥18"; exit 1; }
