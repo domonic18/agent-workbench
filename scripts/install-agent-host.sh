@@ -67,7 +67,11 @@ run install -m 0644 "$TMP/aw-proxy.mjs" "$BIN_DIR/aw-proxy.mjs"
 run install -m 0755 "$TMP/aw-dispatch.mjs" "$BIN_DIR/aw-dispatch.mjs"
 run install -m 0644 "$TMP/enroll-agent.mjs" "$WORK_DIR/enroll-agent.mjs"
 
-CLI="$(command -v claude || true)"
+# claude 逐候选验证真实可执行(断链符号链接会被 -x 排除,ENOENT 实证过)
+CLI=""
+for c in "$(command -v claude 2>/dev/null || true)" "$HOME/.local/bin/claude" "$HOME/.claude/local/claude" /opt/homebrew/bin/claude /usr/local/bin/claude; do
+  [ -n "$c" ] && [ -x "$c" ] && CLI="$c" && break
+done
 NODE_BIN="$(command -v node)"
 ENROLL_ENV=""
 
