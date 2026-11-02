@@ -107,6 +107,7 @@ P1 项(飞书长连接与回调穿 frp、SSE 穿 frp、中文 FTS5 与嵌入服�
 - A 类只读 API 代理（云资源查询 / 监控）：通道契约保留在 05 §1.1 §3，一期无任务；没有真实上游的只读代理不先做
 - 任务级 token 上限与超支降级（一期只做按 Agent 的日 token 上限 + 硬停）
 - 树形 handoff 可视化（一期为面包屑）
+- **执行面部署包行业对标补强（2026-11-02 评估，待实施）**：当前实现适合自托管场景（two-step 下载校验安装、用户态 launchd、幂等升级、SHA256 校验），对标 Teleport/Tailscale/Sigstore 实践有六项差距——① P1 版本化与回滚：artifacts 为 always-latest 单版本覆盖，改版本戳文件名 + manifest(版本/git SHA/构建时间) + 保留 N 版 + `install.sh --version`；② P1 独立信任锚：SHASUMS 与 tarball 同源（只防传输损坏不防源头被攻破），最低成本=哈希发布到第二通道（git tag/repo commit），进阶=cosign keyless 签名或 SLSA provenance；③ P2 `install.sh --uninstall` 卸载路径；④ P2 macOS LaunchAgent 依赖用户登录会话（重启后需自动登录），部署注意事项需明示，或评估 LaunchDaemon；⑤ P2 enroll-token 一次性加入令牌（对齐 Teleport join token，让「Agent 密钥只出现一次」体验闭环）；⑥ P3 Linux systemd 模板 + 安装后自检（healthz 断言）与 plist XML 值转义。评估对标来源：teleport managed updates v2 / tailscale installer.sh / curl|sh 供应链争议（rust-lang#1572）/ SLSA provenance
 
 ## 状态图例
 
