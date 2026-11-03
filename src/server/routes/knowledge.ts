@@ -103,7 +103,7 @@ function validationError(reply: FastifyReply, issues: z.ZodError): FastifyReply 
 export function registerKnowledgeRoutes(
   app: FastifyInstance,
   options: KnowledgeRoutesOptions,
-): void {
+): Promise<void>{
   const session = requireSession(options.db, options.now ?? Date.now);
   const writeGuards = [session, requireCsrf(), requireIdempotencyKey()];
   const indexer = options.indexer;

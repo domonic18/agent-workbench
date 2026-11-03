@@ -102,7 +102,7 @@ types.setTypeParser(20, (value: string) => Number.parseInt(value, 10));
 export type { QueryResult };
 
 /** 生产连接池。连接串来自 DATABASE_URL(env),池大小按单机部署默认 10 */
-export function createDb(connectionString: string, poolSize = 10): Db {
+export function createDb(connectionString: string, poolSize = 10): Promise<Db>{
   const pool = new Pool({ connectionString, max: poolSize });
   return new PgHandle(pool, async () => {
     await pool.end();

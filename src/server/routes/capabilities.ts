@@ -122,7 +122,7 @@ function parseCursor(cursor: string): { createdAt: number; id: string } | undefi
 export function registerCapabilityRoutes(
   app: FastifyInstance,
   options: CapabilityRoutesOptions,
-): void {
+): Promise<void>{
   const db = options.db;
   const now = options.now ?? Date.now;
   const service =

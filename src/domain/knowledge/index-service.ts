@@ -31,7 +31,7 @@ export interface KnowledgeIndexService {
 
 export function createKnowledgeIndexService(
   options: KnowledgeIndexServiceOptions,
-): KnowledgeIndexService {
+): Promise<KnowledgeIndexService>{
   return {
     async reindexEntry(id) {
       const entry = findKnowledgeEntry(options.db, id);

@@ -8,8 +8,8 @@ export interface CredentialInit {
 }
 
 /** 首次启动把口令哈希写入库;已存在则忽略种子,不再改写。 */
-export function ensureConsoleCredential(db: Db, initialPassword?: string): CredentialInit {
-  const existing = db.prepare("SELECT 1 FROM console_credential WHERE id = 1").get();
+export function ensureConsoleCredential(db: Db, initialPassword?: string): Promise<CredentialInit>{
+  const existing = await db.get("SELECT 1 FROM console_credential WHERE id = 1");
   if (existing !== undefined) {
     return { created: false };
   }
@@ -19,16 +19,14 @@ export function ensureConsoleCredential(db: Db, initialPassword?: string): Crede
     );
   }
   const now = Date.now();
-  db.prepare(
+  await db.run(
     "INSERT INTO console_credential (id, password_hash, created_at, updated_at) VALUES (1, ?, ?, ?)",
-  ).run(hashSecret(initialPassword), now, now);
+  , hashSecret(initialPassword), now, now);
   return { created: true };
 }
 
-export function verifyConsolePassword(db: Db, password: string): boolean {
-  const row = db
-    .prepare("SELECT password_hash FROM console_credential WHERE id = 1")
-    .get() as { password_hash: string } | undefined;
+export function verifyConsolePassword(db: Db, password: string): Promise<boolean>{
+  const row = await db.get("SELECT password_hash FROM console_credential WHERE id = 1") as { password_hash: string } | undefined;
   if (row === undefined) {
     return false;
   }

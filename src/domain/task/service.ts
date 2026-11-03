@@ -120,7 +120,7 @@ function eventsForStatusChange(to: TaskStatus): "blocked" | "resumed" | "complet
   return null;
 }
 
-export function createTaskService(deps: TaskServiceDeps): TaskService {
+export function createTaskService(deps: TaskServiceDeps): Promise<TaskService>{
   const { db } = deps;
   const now = deps.now ?? Date.now;
   const newTaskId = deps.newTaskId ?? (() => newPrefixedId("tsk"));

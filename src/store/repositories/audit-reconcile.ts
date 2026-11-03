@@ -41,15 +41,13 @@ export interface CapabilityTicket {
 }
 
 /** append-only:INSERT OR IGNORE 按 dedup_key 去重,返回是否真新增 */
-export function insertGap(db: Db, gap: NewAuditGap): boolean {
-  const result = db
-    .prepare(
+export function insertGap(db: Db, gap: NewAuditGap): Promise<boolean>{
+  const result = await db.run(
       `INSERT OR IGNORE INTO audit_reconcile_gap
          (dedup_key, kind, tool_call_log_id, capability_id, task_id, ticket_id, sid, detail_json, detected_at)
        VALUES
          (@dedupKey, @kind, @toolCallLogId, @capabilityId, @taskId, @ticketId, @sid, @detailJson, @detectedAt)`,
-    )
-    .run({
+    , {
       dedupKey: gap.dedupKey,
       kind: gap.kind,
       toolCallLogId: gap.toolCallLogId,
@@ -67,27 +65,23 @@ export function insertGap(db: Db, gap: NewAuditGap): boolean {
 export function findToolCallsWithCapability(
   db: Db,
   query: { since: number },
-): ToolCallWithCapability[] {
-  return db
-    .prepare(
+): Promise<ToolCallWithCapability[]>{
+  return await db.all(
       `SELECT t.id AS toolCallLogId, t.task_id AS taskId, c.ticket_id AS ticketId,
               t.capability_id AS capabilityId
        FROM tool_call_log t
        JOIN capability c ON c.id = t.capability_id
        WHERE t.capability_id IS NOT NULL AND t.occurred_at >= @since
        ORDER BY t.id ASC`,
-    )
-    .all(query) as ToolCallWithCapability[];
+    , query) as ToolCallWithCapability[];
 }
 
 /** 库中所有已签发票据,用于判定 Teleport 侧是否为「多出来的会话」 */
-export function listCapabilityTickets(db: Db): CapabilityTicket[] {
-  return db
-    .prepare(
+export function listCapabilityTickets(db: Db): Promise<CapabilityTicket[]>{
+  return await db.all(
       `SELECT id AS capabilityId, ticket_id AS ticketId, task_id AS taskId
        FROM capability WHERE ticket_id IS NOT NULL`,
-    )
-    .all() as CapabilityTicket[];
+    ) as CapabilityTicket[];
 }
 
 const COLUMNS = `
@@ -104,7 +98,7 @@ export interface GapListQuery {
 }
 
 /** 按键集分页:`detected_at DESC, id DESC`,不用 offset */
-export function listGaps(db: Db, query: GapListQuery): AuditGapRecord[] {
+export function listGaps(db: Db, query: GapListQuery): Promise<AuditGapRecord[]>{
   const conditions: string[] = [];
   const params: Record<string, unknown> = { limit: query.limit };
   if (query.kind !== undefined) {
@@ -119,9 +113,7 @@ export function listGaps(db: Db, query: GapListQuery): AuditGapRecord[] {
     params.beforeId = query.before.id;
   }
   const where = conditions.length === 0 ? "" : `WHERE ${conditions.join(" AND ")}`;
-  return db
-    .prepare(
+  return await db.all(
       `SELECT ${COLUMNS} FROM audit_reconcile_gap ${where} ORDER BY detected_at DESC, id DESC LIMIT @limit`,
-    )
-    .all(params) as AuditGapRecord[];
+    , params) as AuditGapRecord[];
 }
