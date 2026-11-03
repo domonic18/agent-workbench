@@ -106,10 +106,10 @@ describe("采集入库", () => {
     service.ingestBatch(batch([1]));
 
     const run = findRunningRunForStream(db, agentId, "claude-session:s1")!;
-    db.prepare(
+    await db.run(
       `INSERT INTO task (id, title, assigner, assignee, project, stage, status, origin, created_at, updated_at)
        VALUES ('tsk_a', 'tsk_a', 'console', 'agt_a', 'aw', 'exec', 'running', 'a2a', 0, 0)`,
-    ).run();
+    );
     expect(runService.bindTask(run.id, "tsk_a")).toBe(true);
 
     const result = service.ingestBatch(

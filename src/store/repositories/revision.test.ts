@@ -152,7 +152,7 @@ describe("scope_revision", () => {
     expect(currentRevision(db, "overview")).toBe(overview + 1);
     expect(currentRevision(db, "task:t1")).toBe(task + 1);
 
-    db.prepare("UPDATE capability SET status = 'issuing' WHERE id = 'c1'").run();
+    await db.run("UPDATE capability SET status = 'issuing' WHERE id = 'c1'");
     expect(currentRevision(db, "overview")).toBe(overview + 2);
     expect(currentRevision(db, "task:t1")).toBe(task + 2);
   });
@@ -212,7 +212,7 @@ describe("scope_revision", () => {
     expect(bindRunTaskIfEmpty(db, "r1", "t1")).toBe(true);
     expect(currentRevision(db, "overview")).toBe(overview + 2);
 
-    db.prepare("UPDATE machine SET last_seen_at = ? WHERE id = 'm1'").run(AT + 1);
+    await db.run("UPDATE machine SET last_seen_at = ? WHERE id = 'm1'", AT + 1);
     expect(currentRevision(db, "overview")).toBe(overview + 3);
   });
 });

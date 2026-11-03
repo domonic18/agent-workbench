@@ -186,18 +186,14 @@ describe("task 路由", () => {
   });
 
   it("下游完成入队完成播报,根任务自动收口并入队验收播报(响应不带 notify)", async () => {
-    fixture.db
-      .prepare(
+    await fixture.db.run(
         `INSERT INTO task (id, title, assigner, assignee, project, parent_task_id, stage, status, origin, created_at, updated_at)
          VALUES ('tsk_parent', '上游任务', 'console', 'agt_a', 'aw', NULL, 'exec', 'running', 'a2a', 0, 0)`,
-      )
-      .run();
-    fixture.db
-      .prepare(
+      );
+    await fixture.db.run(
         `INSERT INTO task (id, title, assigner, assignee, project, parent_task_id, stage, status, origin, created_at, updated_at)
          VALUES ('tsk_child', '下游任务', 'console', 'agt_b', 'aw', 'tsk_parent', 'exec', 'running', 'a2a', 0, 0)`,
-      )
-      .run();
+      );
 
     const response = await app.inject({
       method: "PATCH",
@@ -223,7 +219,7 @@ describe("task 路由", () => {
       uuid: "task_closed:tsk_parent",
     });
     expect(
-      fixture.db.prepare("SELECT status FROM task WHERE id = 'tsk_parent'").get(),
+      await fixture.db.get("SELECT status FROM task WHERE id = 'tsk_parent'"),
     ).toEqual({ status: "done" });
   });
 

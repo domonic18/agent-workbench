@@ -7,9 +7,9 @@ import { startIngestReceiptCleaner } from "./ingest-receipt.js";
 function prepare(): Db {
   const db = openDatabase(":memory:");
   runMigrations(db);
-  db.prepare(
+  await db.run(
     "INSERT INTO machine (id, hostname, os, collector_version, collector_secret_hash, status, created_at) VALUES ('m1', 'h', 'linux', '1', 'hash', 'active', 0)",
-  ).run();
+  );
   return db;
 }
 

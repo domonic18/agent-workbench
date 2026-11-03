@@ -7,9 +7,7 @@ import { openDatabase } from "./database.js";
 import { defaultMigrationsDir, runMigrations } from "./migrator.js";
 
 function tableNames(db: Database.Database): string[] {
-  const rows = db
-    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
-    .all() as { name: string }[];
+  const rows = await db.all("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name") as { name: string }[];
   return rows.map((row) => row.name);
 }
 
@@ -50,7 +48,7 @@ describe("runMigrations", () => {
       ]),
     );
 
-    const applied = db.prepare("SELECT version, name FROM schema_migration").all();
+    const applied = await db.all("SELECT version, name FROM schema_migration");
     expect(applied).toEqual([
       { version: 1, name: "task" },
       { version: 2, name: "console_credential" },
@@ -106,7 +104,7 @@ describe("runMigrations", () => {
     const db = openDatabase(":memory:");
     expect(() => runMigrations(db, dir)).toThrow();
     expect(tableNames(db)).not.toContain("ok_table");
-    expect(db.prepare("SELECT COUNT(*) AS n FROM schema_migration").get()).toEqual({ n: 0 });
+    expect(await db.get("SELECT COUNT(*) AS n FROM schema_migration")).toEqual({ n: 0 });
     db.close();
   });
 });

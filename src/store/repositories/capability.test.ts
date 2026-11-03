@@ -14,11 +14,11 @@ import {
 function prepare() {
   const db = openDatabase(":memory:");
   runMigrations(db);
-  db.prepare(
+  await db.run(
     `INSERT INTO task
        (id, title, assigner, assignee, project, stage, status, origin, created_at, updated_at)
      VALUES ('T-1', '任务', 'a', 'b', 'aw', 'exec', 'running', 'a2a', 0, 0)`,
-  ).run();
+  );
   return db;
 }
 
@@ -113,13 +113,13 @@ describe("capability 仓储", () => {
       occurredAt: 1_000,
     });
 
-    expect(db.prepare("SELECT action, actor FROM capability_audit").all()).toEqual([
+    expect(await db.all("SELECT action, actor FROM capability_audit")).toEqual([
       { action: "requested", actor: "console" },
     ]);
-    expect(() => db.prepare("UPDATE capability_audit SET actor = 'x'").run()).toThrow(
+    expect(() => await db.run("UPDATE capability_audit SET actor = 'x'")).toThrow(
       /append-only/,
     );
-    expect(() => db.prepare("DELETE FROM capability_audit").run()).toThrow(/append-only/);
+    expect(() => await db.run("DELETE FROM capability_audit")).toThrow(/append-only/);
     db.close();
   });
 

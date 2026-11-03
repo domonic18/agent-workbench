@@ -60,14 +60,12 @@ function fakeEmbedding(): EmbeddingClient {
 
 function ftsHits(db: Db, term: string): number {
   return (
-    db
-      .prepare("SELECT COUNT(*) AS n FROM knowledge_fts WHERE knowledge_fts MATCH ?")
-      .get(`"${term}"`) as { n: number }
+    await db.get("SELECT COUNT(*) AS n FROM knowledge_fts WHERE knowledge_fts MATCH ?", `"${term}"`) as { n: number }
   ).n;
 }
 
 function vectorCount(db: Db): number {
-  return (db.prepare("SELECT COUNT(*) AS n FROM knowledge_vec").get() as { n: number }).n;
+  return (await db.get("SELECT COUNT(*) AS n FROM knowledge_vec") as { n: number }).n;
 }
 
 function options(fixture: Fixture, embedding?: EmbeddingClient) {
@@ -167,7 +165,7 @@ describe("indexKnowledgeEntry", () => {
     expect(findKnowledgeEntry(fixture.db, "kb_1")?.embeddingStatus).toBe("failed");
     expect(ftsHits(fixture.db, "部署手册")).toBe(1);
     expect(
-      fixture.db.prepare("SELECT name FROM sqlite_master WHERE name = 'knowledge_vec'").get(),
+      await fixture.db.get("SELECT name FROM sqlite_master WHERE name = 'knowledge_vec'"),
     ).toBeUndefined();
     fixture.db.close();
   });

@@ -50,7 +50,7 @@ describe("KnowledgeIndexService.reindexEntry", () => {
       KnowledgeEntryNotFoundError,
     );
 
-    db.prepare("UPDATE knowledge_entry SET deleted_at = ? WHERE id = 'kb_1'").run(NOW);
+    await db.run("UPDATE knowledge_entry SET deleted_at = ? WHERE id = 'kb_1'", NOW);
     await expect(service.reindexEntry("kb_1")).rejects.toBeInstanceOf(
       KnowledgeEntryNotFoundError,
     );

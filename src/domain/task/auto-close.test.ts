@@ -21,30 +21,27 @@ function insertTaskRow(
   status = "pending",
   stage = "intake",
 ): void {
-  db.prepare(
+  await db.run(
     `INSERT INTO task (id, title, assigner, assignee, project, parent_task_id, stage, status, origin, created_at, updated_at)
-     VALUES (?, '协作任务', 'console', ?, 'aw', ?, ?, ?, 'a2a', 0, 0)`,
-  ).run(id, assignee, parentTaskId, stage, status);
+     VALUES (?, '协作任务', 'console', ?, 'aw', ?, ?, ?, 'a2a', 0, 0)`,  id, assignee, parentTaskId, stage, status);
 }
 
 function insertReply(db: Db, msgId: string, taskId: string, ackAt: number | null): void {
-  db.prepare(
+  await db.run(
     `INSERT INTO machine (id, hostname, os, collector_version, collector_secret_hash, status, created_at)
      VALUES ('m1', 'h', 'linux', '1', 'hash', 'active', 0)`
-  ).run();
-  db.prepare(
+  );
+  await db.run(
     `INSERT INTO agent (id, machine_id, project, display_name, secret_hash, allowed_targets_json, status, created_at, updated_at)
      VALUES ('agt_a', 'm1', 'pa', 'A', 'hash', '[]', 'active', 0, 0),
             ('agt_b', 'm1', 'pb', 'B', 'hash', '[]', 'active', 0, 0)`
-  ).run();
-  db.prepare(
+  );
+  await db.run(
     `INSERT INTO a2a_thread (id, initiator_task_id, initiator_agent, responder_agent, created_at)
-     VALUES ('thr_1', ?, 'agt_a', 'agt_b', 0)`,
-  ).run(taskId);
-  db.prepare(
+     VALUES ('thr_1', ?, 'agt_a', 'agt_b', 0)`,  taskId);
+  await db.run(
     `INSERT INTO a2a_message (id, thread_id, task_id, round, from_agent, to_agent, intent, summary, expect, ack_at, created_at)
-     VALUES (?, 'thr_1', ?, 1, 'agt_b', 'agt_a', 'reply', '回执', '', ?, 0)`,
-  ).run(msgId, taskId, ackAt);
+     VALUES (?, 'thr_1', ?, 1, 'agt_b', 'agt_a', 'reply', '回执', '', ?, 0)`,  msgId, taskId, ackAt);
 }
 
 describe("closeAncestorsIfComplete(经 task service.update 触发)", () => {

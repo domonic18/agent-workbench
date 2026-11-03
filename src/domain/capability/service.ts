@@ -86,7 +86,7 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
         detail: { target: input.target.trim(), action: input.action, ttlSeconds },
         occurredAt: createdAt,
       });
-    })();
+    });
     return requireCapability(db, id);
   }
 
@@ -117,7 +117,7 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
         occurredAt: approvedAt,
       });
       return true;
-    })();
+    });
     if (!moved) {
       return { applied: false, capability: requireCapability(db, id) };
     }
@@ -148,7 +148,7 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
             occurredAt: failedAt,
           });
         }
-      })();
+      });
       throw new CapabilityError(
         "UPSTREAM_UNAVAILABLE",
         "Teleport 签发失败,授权已转「签发失败」,可重新提交申请",
@@ -175,7 +175,7 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
         });
       }
       return applied;
-    })();
+    });
     // 对账可能在签发途中把 issuing 收敛为 rejected;此时不能再宣称已生效
     return { applied: activated, capability: requireCapability(db, id) };
   }
@@ -204,7 +204,7 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
         occurredAt: decidedAt,
       });
       return true;
-    })();
+    });
     return { applied, capability: requireCapability(db, id) };
   }
 
@@ -233,7 +233,7 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
         occurredAt: revokedAt,
       });
       return true;
-    })();
+    });
     return { applied, capability: requireCapability(db, id) };
   }
 
@@ -261,7 +261,7 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
           occurredAt: at,
         });
         return true;
-      })();
+      });
       if (applied) {
         expired += 1;
       }
@@ -293,7 +293,7 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
           occurredAt: at,
         });
         return true;
-      })();
+      });
       if (applied) {
         reconciled += 1;
       }

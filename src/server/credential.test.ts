@@ -14,9 +14,7 @@ describe("console credential", () => {
     const db = freshDb();
     expect(ensureConsoleCredential(db, "simple-123")).toEqual({ created: true });
 
-    const row = db
-      .prepare("SELECT password_hash FROM console_credential WHERE id = 1")
-      .get() as { password_hash: string };
+    const row = await db.get("SELECT password_hash FROM console_credential WHERE id = 1") as { password_hash: string };
     expect(row.password_hash.startsWith("scrypt$")).toBe(true);
     expect(row.password_hash).not.toContain("simple-123");
 
@@ -33,7 +31,7 @@ describe("console credential", () => {
     expect(verifyConsolePassword(db, "simple-123")).toBe(true);
     expect(verifyConsolePassword(db, "another-456")).toBe(false);
     expect(
-      db.prepare("SELECT COUNT(*) AS n FROM console_credential").get(),
+      await db.get("SELECT COUNT(*) AS n FROM console_credential"),
     ).toEqual({ n: 1 });
     db.close();
   });
@@ -48,7 +46,7 @@ describe("console credential", () => {
   it("损坏的哈希一律校验失败,不抛异常", () => {
     const db = freshDb();
     ensureConsoleCredential(db, "simple-123");
-    db.prepare("UPDATE console_credential SET password_hash = ? WHERE id = 1").run("broken");
+    await db.run("UPDATE console_credential SET password_hash = ? WHERE id = 1", "broken");
 
     expect(verifyConsolePassword(db, "simple-123")).toBe(false);
     db.close();

@@ -42,7 +42,7 @@ describe("task summaries", () => {
 
   it("按 id 查单条,不存在返回 undefined", () => {
     const db = prepare();
-    db.prepare(insert).run("T-1", "任务", null, 0, 1_000, 1_000);
+    await db.run(insert, "T-1", "任务", null, 0, 1_000, 1_000);
 
     expect(findTaskSummary(db, "T-1")).toMatchObject({ id: "T-1", title: "任务" });
     expect(findTaskSummary(db, "T-9")).toBeUndefined();

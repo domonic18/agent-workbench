@@ -56,10 +56,9 @@ function prepare(): Fixture {
     ["tsk_a", agentA.agent.id],
     ["tsk_b", agentB.agent.id],
   ] as const) {
-    db.prepare(
+    await db.run(
       `INSERT INTO task (id, title, assigner, assignee, project, stage, status, origin, created_at, updated_at)
-       VALUES (?, ?, 'console', ?, 'aw', 'exec', 'running', 'a2a', 0, 0)`,
-    ).run(id, id, assignee);
+       VALUES (?, ?, 'console', ?, 'aw', 'exec', 'running', 'a2a', 0, 0)`,  id, id, assignee);
   }
   return {
     db,
@@ -285,7 +284,7 @@ describe("a2a 路由", () => {
     });
     expect(acked.statusCode).toBe(200);
     expect(
-      fixture.db.prepare("SELECT parent_task_id AS p FROM task WHERE id = 'tsk_b'").get(),
+      await fixture.db.get("SELECT parent_task_id AS p FROM task WHERE id = 'tsk_b'"),
     ).toEqual({ p: "tsk_a" });
 
     const empty = await app.inject({

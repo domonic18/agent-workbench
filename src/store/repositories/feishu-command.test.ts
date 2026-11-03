@@ -23,9 +23,7 @@ describe("recordFeishuCommand", () => {
       createdAt: 1_700_000_000_000,
     });
 
-    const row = db
-      .prepare("SELECT event_id, command, outcome, length(raw_text) AS len FROM feishu_command")
-      .get();
+    const row = await db.get("SELECT event_id, command, outcome, length(raw_text) AS len FROM feishu_command");
     expect(row).toEqual({ event_id: "evt_1", command: null, outcome: "unsupported", len: 4000 });
     db.close();
   });

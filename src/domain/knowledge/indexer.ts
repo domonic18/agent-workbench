@@ -112,7 +112,7 @@ export async function indexKnowledgeEntry(
       });
     }
     updateKnowledgeIndex(db, { id: entry.id, contentHash, embeddingStatus: status, now });
-  })();
+  });
 
   return status;
 }

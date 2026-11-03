@@ -173,7 +173,7 @@ export function createKnowledgeEntryService(
           throw new KnowledgeError("NOT_FOUND", `知识条目不存在: ${id}`);
         }
         invalidateKnowledgeIndex(db, id, timestamp);
-      })();
+      });
 
       await reindex(id);
       return requireEntry(id);

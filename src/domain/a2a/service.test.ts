@@ -14,19 +14,18 @@ const LEASE_MS = 30_000;
 function prepare(): { db: Db; service: A2aService; setNow: (value: number) => void } {
   const db = openDatabase(":memory:");
   runMigrations(db);
-  db.prepare(
+  await db.run(
     "INSERT INTO machine (id, hostname, os, collector_version, collector_secret_hash, status, created_at) VALUES ('m1', 'h', 'linux', '1', 'hash', 'active', 0)",
-  ).run();
+  );
   const agents: [string, string[]][] = [
     ["agt_a", ["agt_b", "agt_c"]],
     ["agt_b", ["agt_a"]],
     ["agt_c", []],
   ];
   for (const [id, targets] of agents) {
-    db.prepare(
+    await db.run(
       `INSERT INTO agent (id, machine_id, project, display_name, secret_hash, status, allowed_targets_json, created_at, updated_at)
-       VALUES (?, 'm1', ?, ?, 'hash', 'active', ?, 0, 0)`,
-    ).run(id, id, id, JSON.stringify(targets));
+       VALUES (?, 'm1', ?, ?, 'hash', 'active', ?, 0, 0)`,  id, id, id, JSON.stringify(targets));
   }
   const tasks: [string, string][] = [
     ["tsk_a", "agt_a"],
@@ -35,10 +34,9 @@ function prepare(): { db: Db; service: A2aService; setNow: (value: number) => vo
     ["tsk_c", "agt_c"],
   ];
   for (const [id, assignee] of tasks) {
-    db.prepare(
+    await db.run(
       `INSERT INTO task (id, title, assigner, assignee, project, stage, status, origin, created_at, updated_at)
-       VALUES (?, ?, 'console', ?, 'aw', 'exec', 'running', 'a2a', 0, 0)`,
-    ).run(id, id, assignee);
+       VALUES (?, ?, 'console', ?, 'aw', 'exec', 'running', 'a2a', 0, 0)`,  id, id, assignee);
   }
   let msgSeq = 0;
   let threadSeq = 0;
@@ -112,7 +110,7 @@ describe("a2a send", () => {
 
     expect(second.threadId).toBe("thr_1");
     expect(second.round).toBe(2);
-    expect(db.prepare("SELECT COUNT(*) AS n FROM a2a_message").get()).toEqual({ n: 2 });
+    expect(await db.get("SELECT COUNT(*) AS n FROM a2a_message")).toEqual({ n: 2 });
     db.close();
   });
 
@@ -154,7 +152,7 @@ describe("a2a send", () => {
     const again = service.send(sendInput({ summary: "换个说法也是同一条" }));
 
     expect(again).toEqual(first);
-    expect(db.prepare("SELECT COUNT(*) AS n FROM a2a_message").get()).toEqual({ n: 1 });
+    expect(await db.get("SELECT COUNT(*) AS n FROM a2a_message")).toEqual({ n: 1 });
     db.close();
   });
 
@@ -198,7 +196,7 @@ describe("a2a send", () => {
       availableAt: 0,
       createdAt: 0,
     });
-    db.prepare("UPDATE outbox SET status = 'uncertain' WHERE id = 'ob_fence'").run();
+    await db.run("UPDATE outbox SET status = 'uncertain' WHERE id = 'ob_fence'");
 
     expectCode(() => service.send(sendInput()), "CONFLICT");
     db.close();
@@ -263,16 +261,12 @@ describe("a2a ack", () => {
 
     service.ack("agt_b", "msg_1", { taskId: "tsk_b2" });
 
-    const task = db
-      .prepare("SELECT parent_task_id AS parentTaskId FROM task WHERE id = 'tsk_b2'")
-      .get() as { parentTaskId: string | null };
+    const task = await db.get("SELECT parent_task_id AS parentTaskId FROM task WHERE id = 'tsk_b2'") as { parentTaskId: string | null };
     expect(task.parentTaskId).toBe("tsk_a");
     expect(findMessageById(db, "msg_1")?.ackAt).toBe(NOW);
     expect(findOutboxByKey(db, "idem-1")?.status).toBe("delivered");
 
-    const event = db
-      .prepare("SELECT kind, payload_json AS payload FROM task_event WHERE task_id = 'tsk_b2'")
-      .get() as { kind: string; payload: string };
+    const event = await db.get("SELECT kind, payload_json AS payload FROM task_event WHERE task_id = 'tsk_b2'") as { kind: string; payload: string };
     expect(event.kind).toBe("handoff");
     expect(JSON.parse(event.payload)).toMatchObject({
       relation: "a2a",
@@ -281,7 +275,7 @@ describe("a2a ack", () => {
     });
 
     service.ack("agt_b", "msg_1", { taskId: "tsk_b2" });
-    expect(db.prepare("SELECT COUNT(*) AS n FROM task_event").get()).toEqual({ n: 1 });
+    expect(await db.get("SELECT COUNT(*) AS n FROM task_event")).toEqual({ n: 1 });
     db.close();
   });
 
@@ -312,9 +306,9 @@ describe("a2a ack", () => {
 
     service.ack("agt_a", "msg_2");
     expect(findMessageById(db, "msg_2")?.ackAt).toBe(NOW);
-    expect(db.prepare("SELECT COUNT(*) AS n FROM task_event").get()).toEqual({ n: 0 });
+    expect(await db.get("SELECT COUNT(*) AS n FROM task_event")).toEqual({ n: 0 });
     expect(
-      db.prepare("SELECT parent_task_id AS p FROM task WHERE id = 'tsk_b'").get(),
+      await db.get("SELECT parent_task_id AS p FROM task WHERE id = 'tsk_b'"),
     ).toEqual({ p: null });
     db.close();
   });

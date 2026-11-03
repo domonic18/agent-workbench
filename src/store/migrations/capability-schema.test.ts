@@ -8,9 +8,8 @@ const NOW = 1_700_000_000_000;
 function prepare(): Database.Database {
   const db = openDatabase(":memory:");
   runMigrations(db);
-  db.prepare(
-    "INSERT INTO task (id, title, assigner, assignee, project, stage, status, origin, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-  ).run("tsk_1", "补接口契约", "ou_1", "agent:codex", "aw", "exec", "running", "a2a", NOW, NOW);
+  await db.run(
+    "INSERT INTO task (id, title, assigner, assignee, project, stage, status, origin, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",  "tsk_1", "补接口契约", "ou_1", "agent:codex", "aw", "exec", "running", "a2a", NOW, NOW);
   return db;
 }
 
@@ -30,20 +29,18 @@ function insertCapability(
     updated_at: NOW,
     ...overrides,
   };
-  db.prepare(
+  await db.run(
     `INSERT INTO capability (id, subject, target, action, status, ttl_seconds, task_id, created_at, updated_at)
-     VALUES (@id, @subject, @target, @action, @status, @ttl_seconds, @task_id, @created_at, @updated_at)`,
-  ).run(row);
+     VALUES (@id, @subject, @target, @action, @status, @ttl_seconds, @task_id, @created_at, @updated_at)`,  row);
 }
 
 describe("capability 表约束", () => {
   it("未给 TTL 时落库为 15 分钟", () => {
     const db = prepare();
-    db.prepare(
+    await db.run(
       `INSERT INTO capability (id, subject, target, action, status, task_id, created_at, updated_at)
-       VALUES ('cap_default', 'agent:codex', 'db:aw-prod', 'read', 'pending', 'tsk_1', ?, ?)`,
-    ).run(NOW, NOW);
-    expect(db.prepare("SELECT ttl_seconds FROM capability").get()).toEqual({ ttl_seconds: 900 });
+       VALUES ('cap_default', 'agent:codex', 'db:aw-prod', 'read', 'pending', 'tsk_1', ?, ?)`,  NOW, NOW);
+    expect(await db.get("SELECT ttl_seconds FROM capability")).toEqual({ ttl_seconds: 900 });
     db.close();
   });
 
@@ -71,16 +68,14 @@ describe("capability 表约束", () => {
 
 describe("审计表 append-only", () => {
   function insertAudit(db: Database.Database): void {
-    db.prepare(
-      "INSERT INTO capability_audit (capability_id, action, actor, occurred_at) VALUES (?, ?, ?, ?)",
-    ).run("cap_1", "requested", "agent:codex", NOW);
+    await db.run(
+      "INSERT INTO capability_audit (capability_id, action, actor, occurred_at) VALUES (?, ?, ?, ?)",  "cap_1", "requested", "agent:codex", NOW);
   }
 
   function insertToolCall(db: Database.Database): void {
-    db.prepare(
+    await db.run(
       `INSERT INTO tool_call_log (run_id, agent_id, task_id, tool, args_hash, level, verdict, occurred_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run("run_1", "agent:codex", "tsk_1", "db.query", "sha256:abc", "L0", "allow", NOW);
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,  "run_1", "agent:codex", "tsk_1", "db.query", "sha256:abc", "L0", "allow", NOW);
   }
 
   it("capability_audit 拒绝 UPDATE / DELETE", () => {
@@ -88,11 +83,11 @@ describe("审计表 append-only", () => {
     insertCapability(db);
     insertAudit(db);
 
-    expect(() => db.prepare("UPDATE capability_audit SET actor = 'agent:writer'").run()).toThrow(
+    expect(() => await db.run("UPDATE capability_audit SET actor = 'agent:writer'")).toThrow(
       /append-only/,
     );
-    expect(() => db.prepare("DELETE FROM capability_audit").run()).toThrow(/append-only/);
-    expect(db.prepare("SELECT actor FROM capability_audit").get()).toEqual({ actor: "agent:codex" });
+    expect(() => await db.run("DELETE FROM capability_audit")).toThrow(/append-only/);
+    expect(await db.get("SELECT actor FROM capability_audit")).toEqual({ actor: "agent:codex" });
     db.close();
   });
 
@@ -101,19 +96,15 @@ describe("审计表 append-only", () => {
     insertCapability(db);
     insertToolCall(db);
 
-    expect(() => db.prepare("UPDATE tool_call_log SET verdict = 'allow'").run()).toThrow(
+    expect(() => await db.run("UPDATE tool_call_log SET verdict = 'allow'")).toThrow(
       /append-only/,
     );
-    expect(() => db.prepare("DELETE FROM tool_call_log").run()).toThrow(/append-only/);
+    expect(() => await db.run("DELETE FROM tool_call_log")).toThrow(/append-only/);
 
     expect(() =>
-      db
-        .prepare(
+      await db.run(
           `INSERT INTO tool_call_log (run_id, agent_id, task_id, tool, args_hash, level, verdict, occurred_at)
-           VALUES ('run_2', 'agent:codex', 'tsk_1', 'fs.write', 'sha256:def', 'L3', 'allow', ?)`,
-        )
-        .run(NOW),
-    ).toThrow(/CHECK constraint failed/);
+           VALUES ('run_2', 'agent:codex', 'tsk_1', 'fs.write', 'sha256:def', 'L3', 'allow', ?)`,  NOW)).toThrow(/CHECK constraint failed/);
     db.close();
   });
 });

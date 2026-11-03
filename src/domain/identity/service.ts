@@ -120,7 +120,7 @@ export function createIdentityService(deps: IdentityServiceDeps): IdentityServic
         collectorSecretHash: hashSecret(secret),
         createdAt: now(),
       });
-    })();
+    });
     const machine = findMachineById(db, id);
     if (machine === undefined) {
       throw new Error(`机器注册后读不到记录: ${id}`);
@@ -156,7 +156,7 @@ export function createIdentityService(deps: IdentityServiceDeps): IdentityServic
         allowedTargetsJson,
         createdAt: now(),
       });
-    })();
+    });
     const agent = findAgentById(db, id);
     if (agent === undefined) {
       throw new Error(`Agent 注册后读不到记录: ${id}`);

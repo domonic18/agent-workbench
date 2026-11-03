@@ -77,7 +77,7 @@ describe("overview 路由", () => {
       collectorSecretHash: "h",
       createdAt: AT,
     });
-    db.prepare("UPDATE machine SET last_seen_at = ? WHERE id = 'm1'").run(AT - 60_000);
+    await db.run("UPDATE machine SET last_seen_at = ? WHERE id = 'm1'", AT - 60_000);
     insertAgent(db, {
       id: "a1",
       machineId: "m1",

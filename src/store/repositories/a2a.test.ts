@@ -20,26 +20,24 @@ import {
 function prepare(): Db {
   const db = openDatabase(":memory:");
   runMigrations(db);
-  db.prepare(
+  await db.run(
     "INSERT INTO machine (id, hostname, os, collector_version, collector_secret_hash, status, created_at) VALUES ('m1', 'h', 'linux', '1', 'hash', 'active', 0)",
-  ).run();
+  );
   for (const [id, project] of [
     ["agt_a", "pa"],
     ["agt_b", "pb"],
   ] as const) {
-    db.prepare(
+    await db.run(
       `INSERT INTO agent (id, machine_id, project, display_name, secret_hash, status, allowed_targets_json, created_at, updated_at)
-       VALUES (?, 'm1', ?, ?, 'hash', 'active', '[]', 0, 0)`,
-    ).run(id, project, id);
+       VALUES (?, 'm1', ?, ?, 'hash', 'active', '[]', 0, 0)`,  id, project, id);
   }
   for (const [id, assignee] of [
     ["tsk_a", "agt_a"],
     ["tsk_b", "agt_b"],
   ] as const) {
-    db.prepare(
+    await db.run(
       `INSERT INTO task (id, title, assigner, assignee, project, stage, status, origin, created_at, updated_at)
-       VALUES (?, ?, 'console', ?, 'aw', 'exec', 'running', 'a2a', 0, 0)`,
-    ).run(id, id, assignee);
+       VALUES (?, ?, 'console', ?, 'aw', 'exec', 'running', 'a2a', 0, 0)`,  id, id, assignee);
   }
   return db;
 }
@@ -192,9 +190,9 @@ describe("按任务读取线程", () => {
     insertMessage(db, message({ id: "msg_1", round: 2 }));
     insertMessage(db, message({ id: "msg_2", round: 1 }));
     insertOutbox(db, outbox("msg_1", { id: "ob_old", idempotencyKey: "key_old", createdAt: 1_000 }));
-    db.prepare("UPDATE outbox SET status = 'retry_wait' WHERE id = 'ob_old'").run();
+    await db.run("UPDATE outbox SET status = 'retry_wait' WHERE id = 'ob_old'");
     insertOutbox(db, outbox("msg_1", { id: "ob_new", idempotencyKey: "key_new", createdAt: 2_000 }));
-    db.prepare("UPDATE outbox SET status = 'failed', last_error = 'boom' WHERE id = 'ob_new'").run();
+    await db.run("UPDATE outbox SET status = 'failed', last_error = 'boom' WHERE id = 'ob_new'");
 
     const rows = listMessagesByThreadIds(db, ["thr_1"]);
     expect(rows.map((row) => row.id)).toEqual(["msg_2", "msg_1"]);

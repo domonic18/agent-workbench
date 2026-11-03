@@ -203,7 +203,7 @@ export function createIngestService(deps: IngestServiceDeps): IngestService {
           }
 
           insertIngestReceipt(db, { ...key, receivedAt: now() });
-        })();
+        });
       } catch (error) {
         return {
           ackedSeq,

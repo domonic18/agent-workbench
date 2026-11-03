@@ -10,11 +10,11 @@ import { createCapabilityService } from "./service.js";
 function prepare() {
   const db = openDatabase(":memory:");
   runMigrations(db);
-  db.prepare(
+  await db.run(
     `INSERT INTO task
        (id, title, assigner, assignee, project, stage, status, origin, created_at, updated_at)
      VALUES ('T-1', '任务', 'a', 'b', 'aw', 'exec', 'running', 'a2a', 0, 0)`,
-  ).run();
+  );
   return db;
 }
 
@@ -44,9 +44,7 @@ const input = {
 };
 
 function audits(db: ReturnType<typeof prepare>) {
-  return db
-    .prepare("SELECT action, actor, detail_json AS detail FROM capability_audit ORDER BY id")
-    .all() as { action: string; actor: string; detail: string }[];
+  return await db.all("SELECT action, actor, detail_json AS detail FROM capability_audit ORDER BY id") as { action: string; actor: string; detail: string }[];
 }
 
 describe("deriveBotName", () => {

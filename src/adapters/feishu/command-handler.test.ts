@@ -44,7 +44,7 @@ describe("createCommandHandler", () => {
 
     expect(replies).toEqual(["当前没有任务。"]);
     expect(
-      db.prepare("SELECT command, outcome, open_id, reply_text FROM feishu_command").get(),
+      await db.get("SELECT command, outcome, open_id, reply_text FROM feishu_command"),
     ).toEqual({
       command: "task.list",
       outcome: "handled",
@@ -63,7 +63,7 @@ describe("createCommandHandler", () => {
     expect(replies[0]).toContain("不支持");
     expect(replies[1]).toContain("不支持该指令");
     expect(
-      db.prepare("SELECT command, outcome FROM feishu_command ORDER BY id").all(),
+      await db.all("SELECT command, outcome FROM feishu_command ORDER BY id"),
     ).toEqual([
       { command: null, outcome: "unsupported" },
       { command: null, outcome: "unsupported" },
@@ -77,7 +77,7 @@ describe("createCommandHandler", () => {
     });
 
     await expect(handler(event())).resolves.toBeUndefined();
-    expect(db.prepare("SELECT COUNT(*) AS n FROM feishu_command").get()).toEqual({ n: 1 });
+    expect(await db.get("SELECT COUNT(*) AS n FROM feishu_command")).toEqual({ n: 1 });
     db.close();
   });
 });

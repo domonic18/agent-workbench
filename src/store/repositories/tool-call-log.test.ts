@@ -6,10 +6,10 @@ import { insertToolCallLog } from "./tool-call-log.js";
 function prepare(): Db {
   const db = openDatabase(":memory:");
   runMigrations(db);
-  db.prepare(
+  await db.run(
     `INSERT INTO task (id, title, assigner, assignee, project, stage, status, origin, created_at, updated_at)
      VALUES ('T-1', '测试任务', 'human', 'agt_1', 'proj', 'exec', 'running', 'a2a', 1000, 1000)`,
-  ).run();
+  );
   return db;
 }
 
@@ -31,12 +31,10 @@ describe("tool_call_log 仓储", () => {
     });
 
     expect(
-      db
-        .prepare(
+      await db.get(
           `SELECT run_id AS runId, tool, level, verdict, reason, occurred_at AS occurredAt
            FROM tool_call_log`,
-        )
-        .get(),
+        ),
     ).toEqual({
       runId: "run_1",
       tool: "task.create",
@@ -64,10 +62,10 @@ describe("tool_call_log 仓储", () => {
       occurredAt: 2000,
     });
 
-    expect(() => db.prepare("UPDATE tool_call_log SET reason = 'x'").run()).toThrow(
+    expect(() => await db.run("UPDATE tool_call_log SET reason = 'x'")).toThrow(
       /append-only/,
     );
-    expect(() => db.prepare("DELETE FROM tool_call_log").run()).toThrow(/append-only/);
+    expect(() => await db.run("DELETE FROM tool_call_log")).toThrow(/append-only/);
     db.close();
   });
 

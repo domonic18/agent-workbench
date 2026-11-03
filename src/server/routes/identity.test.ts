@@ -159,9 +159,9 @@ describe("identity 路由", () => {
     });
     expect(created.statusCode).toBe(404);
 
-    db.prepare(
+    await db.run(
       "INSERT INTO machine (id, hostname, os, collector_version, collector_secret_hash, status, created_at) VALUES ('m1','h','linux','1','hash','active',0)",
-    ).run();
+    );
     const agent = await app.inject({
       method: "POST",
       url: "/api/agents",

@@ -191,7 +191,7 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
         });
       }
       bindActiveRun(assignee, id, at);
-    })();
+    });
 
     const created = findTaskById(db, id);
     if (created === undefined) {
@@ -303,7 +303,7 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
       return nextStatus === "done" || nextStatus === "cancelled"
         ? closeAncestorsIfComplete(db, task.id, at)
         : [];
-    })();
+    });
 
     const updated = findTaskById(db, task.id);
     if (updated === undefined) {

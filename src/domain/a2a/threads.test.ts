@@ -16,23 +16,21 @@ const AT = 10_000;
 function prepare(): Db {
   const db = openDatabase(":memory:");
   runMigrations(db);
-  db.prepare(
+  await db.run(
     "INSERT INTO machine (id, hostname, os, collector_version, collector_secret_hash, status, created_at) VALUES ('m1', 'h', 'linux', '1', 'hash', 'active', 0)",
-  ).run();
+  );
   for (const id of ["agt_a", "agt_b"]) {
-    db.prepare(
+    await db.run(
       `INSERT INTO agent (id, machine_id, project, display_name, secret_hash, status, allowed_targets_json, created_at, updated_at)
-       VALUES (?, 'm1', ?, ?, 'hash', 'active', '[]', 0, 0)`,
-    ).run(id, id, id);
+       VALUES (?, 'm1', ?, ?, 'hash', 'active', '[]', 0, 0)`,  id, id, id);
   }
   for (const [id, assignee] of [
     ["tsk_a", "agt_a"],
     ["tsk_b", "agt_b"],
   ] as const) {
-    db.prepare(
+    await db.run(
       `INSERT INTO task (id, title, assigner, assignee, project, stage, status, origin, created_at, updated_at)
-       VALUES (?, ?, 'console', ?, 'aw', 'exec', 'running', 'a2a', 0, 0)`,
-    ).run(id, id, assignee);
+       VALUES (?, ?, 'console', ?, 'aw', 'exec', 'running', 'a2a', 0, 0)`,  id, id, assignee);
   }
   insertThread(db, {
     id: "thr_1",
@@ -112,12 +110,12 @@ describe("A2A 线程读取", () => {
   it("ACK 交接出的下游任务能读到上游线程", () => {
     const db = prepare();
     addMessage(db, { round: 1, ackAt: 1_500 });
-    db.prepare("UPDATE task SET parent_task_id = 'tsk_a' WHERE id = 'tsk_b'").run();
-    db.prepare(
+    await db.run("UPDATE task SET parent_task_id = 'tsk_a' WHERE id = 'tsk_b'");
+    await db.run(
       `INSERT INTO task_event (id, task_id, seq, kind, payload_json, occurred_at)
        VALUES ('tev_1', 'tsk_b', 1, 'handoff',
          '{"relation":"a2a","upstream_msg_id":"msg_1","upstream_task_id":"tsk_a"}', 1_500)`,
-    ).run();
+    );
     const service = createA2aThreadReadService({ db, now: () => AT });
 
     expect(service.byTask("tsk_b").map((row) => row.id)).toEqual(["thr_1"]);

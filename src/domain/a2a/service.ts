@@ -206,7 +206,7 @@ export function createA2aService(deps: A2aServiceDeps): A2aService {
         throw new A2aError("CONFLICT", "幂等键已被另一条 A2A 消息占用");
       }
       return { msgId, threadId: thread.id, round };
-    })();
+    });
 
     wake(input.to);
     return result;
@@ -316,7 +316,7 @@ export function createA2aService(deps: A2aServiceDeps): A2aService {
       // 回执确认可能补齐收口条件(下游全部终态+回执已确认),沿 parent 链收口(2026-11-02 裁决);
       // request/escalate 的 ack 走到这也是空操作(根任务无 parent 或子任务未终态)
       return closeAncestorsIfComplete(db, message.taskId, at);
-    })();
+    });
   }
 
   function agentRef(agent: AgentRecord): CollabAgentRef {

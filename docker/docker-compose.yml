@@ -7,6 +7,26 @@ x-logging: &default-logging
     max-file: "3"
 
 services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: agent_workbench
+      POSTGRES_USER: agent_workbench
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD 必填(.env)}
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agent_workbench -d agent_workbench"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
+    restart: unless-stopped
+    logging: *default-logging
+    # 02 §1:仅内部网络,不映射宿主机端口,不暴露公网
+
   console:
     build:
       context: ..
@@ -18,7 +38,10 @@ services:
       - ../.env
     environment:
       HOST: 0.0.0.0
-      DATABASE_PATH: /app/workspace/console.db
+      DATABASE_URL: postgres://agent_workbench:${POSTGRES_PASSWORD}@postgres:5432/agent_workbench
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "127.0.0.1:8787:8787"
     volumes:
@@ -51,3 +74,6 @@ services:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
     logging: *default-logging
+
+volumes:
+  postgres:

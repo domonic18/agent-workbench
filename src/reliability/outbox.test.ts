@@ -52,7 +52,7 @@ describe("enqueuePush", () => {
     const second = enqueuePush(db, input);
 
     expect(second.id).toBe(first.id);
-    expect(db.prepare("SELECT COUNT(*) AS n FROM outbox").get()).toEqual({ n: 1 });
+    expect(await db.get("SELECT COUNT(*) AS n FROM outbox")).toEqual({ n: 1 });
     db.close();
   });
 

@@ -115,7 +115,7 @@ export function createTokenUsageService(deps: TokenUsageServiceDeps): TokenUsage
         setTaskTotalTokens(db, run.taskId, sumTaskTokens(db, run.taskId));
       }
       return { status: "recorded", id, taskId: run.taskId };
-    })();
+    });
   }
 
   function recomputeTaskTotal(taskId: string): number {
@@ -128,7 +128,7 @@ export function createTokenUsageService(deps: TokenUsageServiceDeps): TokenUsage
       const total = sumTaskTokens(db, id);
       setTaskTotalTokens(db, id, total);
       return total;
-    })();
+    });
   }
 
   return { record, recomputeTaskTotal };

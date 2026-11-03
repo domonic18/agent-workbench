@@ -21,17 +21,17 @@ import {
 function prepare(): { db: Db; service: TokenUsageService } {
   const db = openDatabase(":memory:");
   runMigrations(db);
-  db.prepare(
+  await db.run(
     "INSERT INTO machine (id, hostname, os, collector_version, collector_secret_hash, status, created_at) VALUES ('m1', 'h', 'linux', '1', 'hash', 'active', 0)",
-  ).run();
-  db.prepare(
+  );
+  await db.run(
     `INSERT INTO agent (id, machine_id, project, display_name, secret_hash, status, allowed_targets_json, created_at, updated_at)
      VALUES ('agt_a', 'm1', 'pa', 'agt_a', 'hash', 'active', '[]', 0, 0)`,
-  ).run();
-  db.prepare(
+  );
+  await db.run(
     `INSERT INTO task (id, title, assigner, assignee, project, stage, status, origin, created_at, updated_at)
      VALUES ('tsk_a', 'tsk_a', 'console', 'agt_a', 'aw', 'exec', 'running', 'a2a', 0, 0)`,
-  ).run();
+  );
   insertRun(db, {
     id: "run_1",
     agentId: "agt_a",

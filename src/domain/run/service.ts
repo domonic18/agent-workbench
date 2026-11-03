@@ -146,7 +146,7 @@ export function createRunService(deps: RunServiceDeps): RunService {
         occurredAt,
       });
       return { runId: run.id, eventId, startedRun, staleRev: false };
-    })();
+    });
   }
 
   function endStream(agentId: string, streamId: string, endedAt?: number): string | null {

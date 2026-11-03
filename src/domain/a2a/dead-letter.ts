@@ -94,7 +94,7 @@ export function sweepDeadLetters(deps: DeadLetterSweepDeps): DeadLetterSweepResu
         now: at,
       });
       return true;
-    })();
+    });
     if (handled) {
       deadLettered += 1;
       senders.add(message.fromAgent);

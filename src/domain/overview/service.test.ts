@@ -30,7 +30,7 @@ function addMachine(db: Db, id: string, lastSeenAt: number | null): void {
     createdAt: AT,
   });
   if (lastSeenAt !== null) {
-    db.prepare("UPDATE machine SET last_seen_at = ? WHERE id = ?").run(lastSeenAt, id);
+    await db.run("UPDATE machine SET last_seen_at = ? WHERE id = ?", lastSeenAt, id);
   }
 }
 
@@ -46,7 +46,7 @@ function addAgent(db: Db, id: string, machineId: string, disabled = false): void
     createdAt: AT,
   });
   if (disabled) {
-    db.prepare("UPDATE agent SET status = 'disabled' WHERE id = ?").run(id);
+    await db.run("UPDATE agent SET status = 'disabled' WHERE id = ?", id);
   }
 }
 
@@ -95,7 +95,7 @@ function addRun(
     streamId: `s-${id}`,
     startedAt: lastSeenAt,
   });
-  db.prepare("UPDATE agent_run SET last_seen_at = ? WHERE id = ?").run(lastSeenAt, id);
+  await db.run("UPDATE agent_run SET last_seen_at = ? WHERE id = ?", lastSeenAt, id);
   if (taskId !== undefined) {
     expect(bindRunTaskIfEmpty(db, id, taskId)).toBe(true);
   }
@@ -197,7 +197,7 @@ describe("overview 服务", () => {
       taskId: "t1",
       createdAt: AT,
     });
-    db.prepare("UPDATE capability SET status = 'active' WHERE id = 'c3'").run();
+    await db.run("UPDATE capability SET status = 'active' WHERE id = 'c3'");
   });
 
   afterEach(() => {

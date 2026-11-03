@@ -47,7 +47,7 @@ describe("outbox 仓储", () => {
     const again = insertOutbox(db, newRow({ id: "ob_2" }));
 
     expect(again.id).toBe(first.id);
-    expect(db.prepare("SELECT COUNT(*) AS n FROM outbox").get()).toEqual({ n: 1 });
+    expect(await db.get("SELECT COUNT(*) AS n FROM outbox")).toEqual({ n: 1 });
     db.close();
   });
 
@@ -209,7 +209,7 @@ describe("outbox 仓储", () => {
         taskId: "T-1",
       }),
     );
-    db.prepare("UPDATE outbox SET status = 'uncertain' WHERE id = 'ob_fence'").run();
+    await db.run("UPDATE outbox SET status = 'uncertain' WHERE id = 'ob_fence'");
 
     expect(findUncertainFence(db, "T-1")).toBe(true);
     expect(findUncertainFence(db, "T-2")).toBe(false);

@@ -35,7 +35,7 @@ export function createIdempotencyService(deps: IdempotencyDeps): IdempotencyServ
           createdAt: now(),
         });
         return created;
-      })();
+      });
     },
   };
 }

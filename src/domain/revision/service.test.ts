@@ -31,7 +31,7 @@ describe("revision 服务", () => {
       collectorSecretHash: "h",
       createdAt: AT,
     });
-    db.prepare("UPDATE machine SET last_seen_at = ? WHERE id = 'm1'").run(AT);
+    await db.run("UPDATE machine SET last_seen_at = ? WHERE id = 'm1'", AT);
 
     const service = createRevisionService({ db });
     expect(service.snapshot(["overview"])).toEqual([{ scope: "overview", revision: 1 }]);

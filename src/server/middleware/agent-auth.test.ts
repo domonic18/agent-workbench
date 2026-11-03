@@ -75,7 +75,7 @@ describe("requireAgentAuth", () => {
       });
     }
 
-    db.prepare("UPDATE agent SET status = 'disabled' WHERE id = ?").run(agentId);
+    await db.run("UPDATE agent SET status = 'disabled' WHERE id = ?", agentId);
     const disabled = await app.inject({
       method: "GET",
       url: "/who",

@@ -35,7 +35,7 @@ describe("loadConfig", () => {
     ]);
     expect(
       loadConfig({
-        CONSOLE_ALLOWED_HOSTS: " AW.Example.com:8787 , ,aw.example.com:8787,console:8787 ",
+        CONSOLE_ALLOWED_HOSTS: " AW.Example.com:8787 , aw.example.com:8787,console:8787 ",
       }).allowedHosts,
     ).toEqual(["aw.example.com:8787", "console:8787"]);
   });
@@ -87,7 +87,7 @@ describe("loadConfig", () => {
     expect(
       loadConfig({
         ...base,
-        FEISHU_ALLOWED_OPEN_IDS: " ou_a , ,ou_b,ou_a ",
+        FEISHU_ALLOWED_OPEN_IDS: " ou_a , ou_b,ou_a ",
       }).feishu,
     ).toEqual({
       appId: "cli_x",

@@ -119,9 +119,7 @@ describe("POST /api/audit/tool-calls", () => {
     });
 
     expect(response.statusCode).toBe(201);
-    const row = fixture.db
-      .prepare("SELECT run_id AS runId, agent_id AS agentId, task_id AS taskId, tool FROM tool_call_log")
-      .get();
+    const row = await fixture.db.get("SELECT run_id AS runId, agent_id AS agentId, task_id AS taskId, tool FROM tool_call_log");
     expect(row).toEqual({
       runId: "run_1",
       agentId: "agt_a",
@@ -187,9 +185,7 @@ describe("POST /api/audit/tool-calls", () => {
       payload: auditPayload({ tool: "db.read", level: "L2", capabilityId: "cap_a" }),
     });
     expect(response.statusCode).toBe(201);
-    const row = fixture.db
-      .prepare("SELECT capability_id AS capabilityId, verdict FROM tool_call_log")
-      .get();
+    const row = await fixture.db.get("SELECT capability_id AS capabilityId, verdict FROM tool_call_log");
     expect(row).toEqual({ capabilityId: "cap_a", verdict: "allow" });
   });
 });

@@ -11,21 +11,20 @@ const NOW = 1_000_000;
 function prepare(): Db {
   const db = openDatabase(":memory:");
   runMigrations(db);
-  db.prepare(
+  await db.run(
     `INSERT INTO task
        (id, title, assigner, assignee, project, stage, status, origin, created_at, updated_at)
      VALUES ('T-1', '任务', 'a', 'b', 'aw', 'exec', 'running', 'a2a', 0, 0)`,
-  ).run();
+  );
   return db;
 }
 
 function seedCapability(db: Db, id: string, ticketId: string, taskId = "T-1"): void {
-  db.prepare(
+  await db.run(
     `INSERT INTO capability
        (id, subject, target, action, scope_json, ttl_seconds, status, ticket_id, task_id,
         issued_at, expires_at, created_at, updated_at)
-     VALUES (?, 'agent:x', 'db:prod', 'read', '{}', 900, 'active', ?, ?, 0, 0, 0, 0)`,
-  ).run(id, ticketId, taskId);
+     VALUES (?, 'agent:x', 'db:prod', 'read', '{}', 900, 'active', ?, ?, 0, 0, 0, 0)`,  id, ticketId, taskId);
 }
 
 function seedCall(db: Db, capabilityId: string, taskId = "T-1"): void {

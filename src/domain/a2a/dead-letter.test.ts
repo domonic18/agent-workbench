@@ -13,23 +13,21 @@ const NOW = 1_000;
 function prepare(): { db: Db; service: A2aService; setNow: (value: number) => void } {
   const db = openDatabase(":memory:");
   runMigrations(db);
-  db.prepare(
+  await db.run(
     "INSERT INTO machine (id, hostname, os, collector_version, collector_secret_hash, status, created_at) VALUES ('m1', 'h', 'linux', '1', 'hash', 'active', 0)",
-  ).run();
+  );
   for (const id of ["agt_a", "agt_b"]) {
-    db.prepare(
+    await db.run(
       `INSERT INTO agent (id, machine_id, project, display_name, secret_hash, status, allowed_targets_json, created_at, updated_at)
-       VALUES (?, 'm1', ?, ?, 'hash', 'active', ?, 0, 0)`,
-    ).run(id, id, id, JSON.stringify(["agt_a", "agt_b"]));
+       VALUES (?, 'm1', ?, ?, 'hash', 'active', ?, 0, 0)`,  id, id, id, JSON.stringify(["agt_a", "agt_b"]));
   }
   for (const [id, assignee] of [
     ["tsk_a", "agt_a"],
     ["tsk_b", "agt_b"],
   ] as const) {
-    db.prepare(
+    await db.run(
       `INSERT INTO task (id, title, assigner, assignee, project, stage, status, origin, created_at, updated_at)
-       VALUES (?, ?, 'console', ?, 'aw', 'exec', 'running', 'a2a', 0, 0)`,
-    ).run(id, id, assignee);
+       VALUES (?, ?, 'console', ?, 'aw', 'exec', 'running', 'a2a', 0, 0)`,  id, id, assignee);
   }
   let msgSeq = 0;
   let threadSeq = 0;
@@ -124,7 +122,7 @@ describe("a2a 死信巡检", () => {
     expect(result).toEqual({ deadLettered: 0, senders: [] });
     expect(findDeadLetterByMsgId(db, "msg_1")).toBeUndefined();
     expect(findOutboxByKey(db, "idem-acked")?.status).toBe("delivered");
-    expect(db.prepare("SELECT COUNT(*) AS n FROM a2a_dead_letter").get()).toEqual({ n: 0 });
+    expect(await db.get("SELECT COUNT(*) AS n FROM a2a_dead_letter")).toEqual({ n: 0 });
     db.close();
   });
 
@@ -141,8 +139,8 @@ describe("a2a 死信巡检", () => {
 
     expect(sweepDeadLetters(deps).deadLettered).toBe(1);
     expect(sweepDeadLetters(deps)).toEqual({ deadLettered: 0, senders: [] });
-    expect(db.prepare("SELECT COUNT(*) AS n FROM a2a_dead_letter").get()).toEqual({ n: 1 });
-    expect(db.prepare("SELECT COUNT(*) AS n FROM a2a_message").get()).toEqual({ n: 2 });
+    expect(await db.get("SELECT COUNT(*) AS n FROM a2a_dead_letter")).toEqual({ n: 1 });
+    expect(await db.get("SELECT COUNT(*) AS n FROM a2a_message")).toEqual({ n: 2 });
     db.close();
   });
 

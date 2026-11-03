@@ -13,11 +13,11 @@ function prepare() {
   const db = openDatabase(":memory:");
   runMigrations(db);
   ensureConsoleCredential(db, PASSWORD);
-  db.prepare(
+  await db.run(
     `INSERT INTO task
        (id, title, assigner, assignee, project, stage, status, origin, created_at, updated_at)
      VALUES ('T-1', '任务', 'a', 'b', 'aw', 'exec', 'running', 'a2a', 0, 0)`,
-  ).run();
+  );
   return db;
 }
 
@@ -265,7 +265,7 @@ describe("capabilities 路由", () => {
     await write(`/api/capabilities/${rejectedId}/reject`, "v8");
 
     const issuingId = await createId("v9");
-    db.prepare("UPDATE capability SET status = 'issuing' WHERE id = ?").run(issuingId);
+    await db.run("UPDATE capability SET status = 'issuing' WHERE id = ?", issuingId);
 
     expect(await viewIds("pending")).toEqual([pendingId, issuingId].sort());
     expect(await viewIds("active")).toEqual([activeId]);

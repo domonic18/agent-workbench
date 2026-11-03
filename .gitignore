@@ -48,3 +48,6 @@ docs/plan/*.local.md
 
 # 里程碑任务清单必须可入库(覆盖本机全局 *.md 忽略)
 !docs/plan/tasks/*.md
+
+# compose 插值密钥(2026-11-03 重基线)
+docker/.env

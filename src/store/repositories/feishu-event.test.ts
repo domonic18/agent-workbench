@@ -18,21 +18,19 @@ describe("claimFeishuEvent", () => {
 
     expect(claimFeishuEvent(db, "evt_1", "im.message.receive_v1", now)).toBe(true);
     expect(claimFeishuEvent(db, "evt_1", "im.message.receive_v1", now + 1000)).toBe(false);
-    expect(db.prepare("SELECT COUNT(*) AS n FROM feishu_event").get()).toEqual({ n: 1 });
+    expect(await db.get("SELECT COUNT(*) AS n FROM feishu_event")).toEqual({ n: 1 });
     db.close();
   });
 
   it("只保留 7 天窗口,过期事件被清理", () => {
     const db = prepare();
     const now = 1_700_000_000_000;
-    db.prepare("INSERT INTO feishu_event (event_id, event_type, received_at) VALUES (?, ?, ?)").run(
-      "evt_old",
+    await db.run("INSERT INTO feishu_event (event_id, event_type, received_at) VALUES (?, ?, ?)", "evt_old",
       "im.message.receive_v1",
-      now - 8 * DAY_MS,
-    );
+      now - 8 * DAY_MS);
 
     expect(claimFeishuEvent(db, "evt_new", "im.message.receive_v1", now)).toBe(true);
-    expect(db.prepare("SELECT event_id FROM feishu_event ORDER BY event_id").all()).toEqual([
+    expect(await db.all("SELECT event_id FROM feishu_event ORDER BY event_id")).toEqual([
       { event_id: "evt_new" },
     ]);
     db.close();

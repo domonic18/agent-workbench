@@ -31,13 +31,13 @@ function prepare(options: { now?: () => number } = {}): {
 }
 
 function addRun(db: Db, id: string, lastSeenAt: number): void {
-  db.prepare(
+  await db.run(
     "INSERT OR IGNORE INTO machine (id, hostname, os, collector_version, collector_secret_hash, status, created_at) VALUES ('m1', 'h', 'linux', '1', 'h', 'active', 0)",
-  ).run();
-  db.prepare(
+  );
+  await db.run(
     `INSERT OR IGNORE INTO agent (id, machine_id, project, display_name, secret_hash, status, allowed_targets_json, created_at, updated_at)
      VALUES ('agt_a', 'm1', 'aw', 'agt_a', 'h', 'active', '[]', 0, 0)`,
-  ).run();
+  );
   insertRun(db, {
     id,
     agentId: "agt_a",
@@ -46,7 +46,7 @@ function addRun(db: Db, id: string, lastSeenAt: number): void {
     streamId: `s-${id}`,
     startedAt: lastSeenAt,
   });
-  db.prepare("UPDATE agent_run SET last_seen_at = ? WHERE id = ?").run(lastSeenAt, id);
+  await db.run("UPDATE agent_run SET last_seen_at = ? WHERE id = ?", lastSeenAt, id);
 }
 
 function createInput(overrides: Partial<TaskCreateInput> = {}): TaskCreateInput {
@@ -60,9 +60,7 @@ function createInput(overrides: Partial<TaskCreateInput> = {}): TaskCreateInput 
 }
 
 function events(db: Db, taskId: string): { kind: TaskEventKind; payload: unknown }[] {
-  return db
-    .prepare("SELECT kind, payload_json AS payload FROM task_event WHERE task_id = ? ORDER BY seq")
-    .all(taskId) as { kind: TaskEventKind; payload: string }[];
+  return await db.all("SELECT kind, payload_json AS payload FROM task_event WHERE task_id = ? ORDER BY seq", taskId) as { kind: TaskEventKind; payload: string }[];
 }
 
 function expectCode(fn: () => unknown, code: TaskError["code"]): void {
@@ -134,7 +132,7 @@ describe("createTaskService.create", () => {
   it("output 非法 422 且不落库", () => {
     const { db, service } = prepare();
     expectCode(() => service.create(createInput({ output: "自由文本" })), "VALIDATION_FAILED");
-    expect(db.prepare("SELECT COUNT(*) AS n FROM task").get()).toEqual({ n: 0 });
+    expect(await db.get("SELECT COUNT(*) AS n FROM task")).toEqual({ n: 0 });
     db.close();
   });
 
@@ -153,17 +151,17 @@ describe("createTaskService.create", () => {
   it("已归属任务的 run 不被抢占,空闲超窗的 run 不参与绑定", () => {
     const at = NOW + RUN_IDLE_GAP_MS + 1;
     const { db, service } = prepare({ now: () => at });
-    db.prepare(
+    await db.run(
       "INSERT INTO machine (id, hostname, os, collector_version, collector_secret_hash, status, created_at) VALUES ('m1', 'h', 'linux', '1', 'h', 'active', 0)",
-    ).run();
-    db.prepare(
+    );
+    await db.run(
       `INSERT INTO agent (id, machine_id, project, display_name, secret_hash, status, allowed_targets_json, created_at, updated_at)
        VALUES ('agt_a', 'm1', 'aw', 'agt_a', 'h', 'active', '[]', 0, 0)`,
-    ).run();
-    db.prepare(
+    );
+    await db.run(
       `INSERT INTO task (id, title, assigner, assignee, project, stage, status, origin, created_at, updated_at)
        VALUES ('tsk_other', 'tsk_other', 'console', 'agt_a', 'aw', 'intake', 'pending', 'a2a', 0, 0)`,
-    ).run();
+    );
     addRun(db, "run_bound", at - 50);
     expect(bindRunTaskIfEmpty(db, "run_bound", "tsk_other")).toBe(true);
     addRun(db, "run_stale", NOW);
@@ -256,7 +254,7 @@ describe("createTaskService.update", () => {
       now: () => {
         if (interfere) {
           interfere = false;
-          db.prepare("UPDATE task SET status = 'blocked' WHERE id = 'tsk_1'").run();
+          await db.run("UPDATE task SET status = 'blocked' WHERE id = 'tsk_1'");
         }
         return NOW;
       },
@@ -308,19 +306,18 @@ describe("createTaskService.update", () => {
 
 describe("completionNotice", () => {
   function seed(db: Db): void {
-    db.prepare(
+    await db.run(
       "INSERT INTO machine (id, hostname, os, collector_version, collector_secret_hash, status, created_at) VALUES ('m1', 'h', 'linux', '1', 'h', 'active', 0)",
-    ).run();
+    );
     const agents: [string, string, string, string | null][] = [
       ["agt_a", "pa", "Agent A", "ou_a"],
       ["agt_b", "pb", "Agent B", null],
     ];
     for (const [id, project, name, openId] of agents) {
-      db.prepare(
+      await db.run(
         `INSERT INTO agent (id, machine_id, project, display_name, secret_hash, status,
            allowed_targets_json, feishu_bot_open_id, created_at, updated_at)
-         VALUES (?, 'm1', ?, ?, 'h', 'active', '[]', ?, 0, 0)`,
-      ).run(id, project, name, openId);
+         VALUES (?, 'm1', ?, ?, 'h', 'active', '[]', ?, 0, 0)`,  id, project, name, openId);
     }
     const tasks: [string, string, string, string | null][] = [
       ["tsk_parent", "上游任务", "agt_a", null],
@@ -329,11 +326,10 @@ describe("completionNotice", () => {
       ["tsk_orphan", "无父任务", "agt_b", null],
     ];
     for (const [id, title, assignee, parent] of tasks) {
-      db.prepare(
+      await db.run(
         `INSERT INTO task (id, title, assigner, assignee, project, parent_task_id,
            stage, status, origin, created_at, updated_at)
-         VALUES (?, ?, 'console', ?, 'aw', ?, 'exec', 'running', 'a2a', 0, 0)`,
-      ).run(id, title, assignee, parent);
+         VALUES (?, ?, 'console', ?, 'aw', ?, 'exec', 'running', 'a2a', 0, 0)`,  id, title, assignee, parent);
     }
   }
 
@@ -358,7 +354,7 @@ describe("completionNotice", () => {
     expect(service.completionNotice("tsk_child")).toBeNull();
     service.update({ taskId: "tsk_same", assignee: "agt_a", status: "done" });
     expect(service.completionNotice("tsk_same")).toBeNull();
-    db.prepare("UPDATE task SET status = 'done' WHERE id = 'tsk_orphan'").run();
+    await db.run("UPDATE task SET status = 'done' WHERE id = 'tsk_orphan'");
     expect(service.completionNotice("tsk_orphan")).toBeNull();
     db.close();
   });

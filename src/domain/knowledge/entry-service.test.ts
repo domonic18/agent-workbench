@@ -138,7 +138,7 @@ describe("KnowledgeEntryService", () => {
   });
 
   it("已删除条目不进列表与计数", () => {
-    db.prepare("UPDATE knowledge_entry SET deleted_at = ? WHERE id = 'kb_active'").run(NOW);
+    await db.run("UPDATE knowledge_entry SET deleted_at = ? WHERE id = 'kb_active'", NOW);
     expect(service.list({ status: "active", limit: 10 }).items).toEqual([]);
     expect(countKnowledgeEntriesByStatus(db).active).toBe(0);
   });
