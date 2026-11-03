@@ -41,14 +41,15 @@ export interface NewTokenUsage {
   occurredAt: number;
 }
 
-export function insertTokenUsage(db: Db, row: NewTokenUsage): Promise<void>{
-  await db.run(
+export function insertTokenUsage(db: Db, row: NewTokenUsage): void {
+  db.prepare(
     `INSERT INTO token_usage
        (id, agent_id, task_id, run_id, provider, model, input_tokens, output_tokens,
         cache_read_tokens, cache_creation_tokens, source, sequence, receipt_hash, occurred_at)
      VALUES (@id, @agentId, @taskId, @runId, @provider, @model, @inputTokens, @outputTokens,
-             @cacheReadTokens, @cacheCreationTokens, @source, @sequence, @receiptHash, @occurredAt)`,
-  , row);
+             @cacheReadTokens, @cacheCreationTokens, @source, @sequence, @receiptHash, @occurredAt
+  ON CONFLICT DO NOTHING)`,
+  ).run(row);
 }
 
 /** 幂等键 (agent_id, run_id, source, sequence);回执哈希由服务层比较 */
@@ -58,24 +59,28 @@ export function findTokenUsageByKey(
   runId: string,
   source: string,
   sequence: number,
-): Promise<TokenUsageRecord | undefined>{
-  return await db.get(
+): TokenUsageRecord | undefined {
+  return db
+    .prepare(
       `SELECT ${COLUMNS} FROM token_usage
        WHERE agent_id = ? AND run_id = ? AND source = ? AND sequence = ?`,
-    , agentId, runId, source, sequence) as TokenUsageRecord | undefined;
+    )
+    .get(agentId, runId, source, sequence) as TokenUsageRecord | undefined;
 }
 
-export function listTokenUsageByRun(db: Db, runId: string): Promise<TokenUsageRecord[]>{
+export async function listTokenUsageByRun(db: Db, runId: string): Promise<TokenUsageRecord[]>{
   return await db.all(`SELECT ${COLUMNS} FROM token_usage WHERE run_id = ? ORDER BY sequence ASC, id ASC`, runId) as TokenUsageRecord[];
 }
 
 /** 四维之和:总 token 不单独落列,读时按口径计算(02 §3.6) */
-export function sumTaskTokens(db: Db, taskId: string): Promise<number>{
-  const row = await db.get(
+export function sumTaskTokens(db: Db, taskId: string): number {
+  const row = db
+    .prepare(
       `SELECT COALESCE(SUM(
          input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens
        ), 0) AS total FROM token_usage WHERE task_id = ?`,
-    , taskId) as { total: number };
+    )
+    .get(taskId) as { total: number };
   return row.total;
 }
 
@@ -85,17 +90,19 @@ export interface TaskTokenSummary {
 }
 
 /** 任务详情的用量汇总:四维之和与明细条数,与 token_usage 可对账 */
-export function summarizeTaskTokens(db: Db, taskId: string): Promise<TaskTokenSummary>{
-  return await db.get(
+export function summarizeTaskTokens(db: Db, taskId: string): TaskTokenSummary {
+  return db
+    .prepare(
       `SELECT COALESCE(SUM(
          input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens
        ), 0) AS total, COUNT(*) AS entries
          FROM token_usage WHERE task_id = ?`,
-    , taskId) as TaskTokenSummary;
+    )
+    .get(taskId) as TaskTokenSummary;
 }
 
-export function setTaskTotalTokens(db: Db, taskId: string, total: number): Promise<boolean>{
+export function setTaskTotalTokens(db: Db, taskId: string, total: number): boolean {
   return (
-    (await db.run("UPDATE task SET total_tokens = ? WHERE id = ?", total, taskId)).changes === 1
+    db.prepare("UPDATE task SET total_tokens = ? WHERE id = ?").run(total, taskId).changes === 1
   );
 }

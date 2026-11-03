@@ -18,8 +18,9 @@ export interface OverviewWindow {
 }
 
 /** 五项指标一次取回,避免前端为同一屏打多次接口 */
-export function getOverviewMetrics(db: Db, window: OverviewWindow): Promise<OverviewMetrics>{
-  return await db.get(
+export function getOverviewMetrics(db: Db, window: OverviewWindow): OverviewMetrics {
+  return db
+    .prepare(
       `SELECT
          (SELECT COUNT(DISTINCT r.agent_id)
             FROM agent_run r JOIN agent a ON a.id = r.agent_id
@@ -33,7 +34,8 @@ export function getOverviewMetrics(db: Db, window: OverviewWindow): Promise<Over
          (SELECT COUNT(*) FROM machine
            WHERE status = 'active' AND last_seen_at IS NOT NULL
              AND last_seen_at < @heartbeatSince) AS heartbeatTimeouts`,
-    , window) as OverviewMetrics;
+    )
+    .get(window) as OverviewMetrics;
 }
 
 export interface AgentOverviewRow {
@@ -66,8 +68,9 @@ export interface AgentOverviewWindow {
 export function listAgentOverviewRows(
   db: Db,
   window: AgentOverviewWindow,
-): Promise<AgentOverviewRow[]>{
-  return await db.all(
+): AgentOverviewRow[] {
+  return db
+    .prepare(
       `SELECT
          a.id,
          a.display_name AS displayName,
@@ -111,5 +114,6 @@ export function listAgentOverviewRows(
        ) tok ON tok.agent_id = a.id
        WHERE a.status = 'active'
        ORDER BY (r.id IS NULL), r.last_seen_at DESC, a.id`,
-    , window) as AgentOverviewRow[];
+    )
+    .all(window) as AgentOverviewRow[];
 }
