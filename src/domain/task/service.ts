@@ -55,11 +55,11 @@ export interface TaskUpdateInput {
 }
 
 export interface TaskService {
-  create(input: TaskCreateInput): TaskRecord;
+  create(input: TaskCreateInput): Promise<TaskRecord>;
   /** 返回更新后的任务;autoClosed 是本轮沿 parent 链被系统收口的根任务(调用方据此发播报) */
-  update(input: TaskUpdateInput): { task: TaskRecord; autoClosed: TaskRecord[] };
+  update(input: TaskUpdateInput): Promise<{ task: TaskRecord; autoClosed: TaskRecord[] }>;
   /** 下游任务完成时通知上游发起方;非 done、无父任务或同一 Agent 时返回 null */
-  completionNotice(taskId: string): CompletionNotice | null;
+  completionNotice(taskId: string): Promise<CompletionNotice | null>;
 }
 
 export interface TaskServiceDeps {
@@ -137,7 +137,7 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
     }
   }
 
-  function create(input: TaskCreateInput): TaskRecord {
+  async function create(input: TaskCreateInput): Promise<TaskRecord> {
     const title = requireText(input.title, "title", TASK_LIMITS.title);
     const assigner = requireText(input.assigner, "assigner", TASK_LIMITS.assigner);
     const project = requireText(input.project, "project", TASK_LIMITS.project);
@@ -150,7 +150,7 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
         ? null
         : requireText(input.parentTaskId, "parentTaskId", TASK_LIMITS.assigner);
     if (parentTaskId !== null) {
-      const parent = findTaskById(db, parentTaskId);
+      const parent = await findTaskById(db, parentTaskId);
       if (parent === undefined) {
         throw new TaskError("NOT_FOUND", `父任务 ${parentTaskId} 不存在`);
       }
@@ -161,8 +161,8 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
 
     const id = newTaskId();
     const at = now();
-    db.transaction(async () => {
-      insertTask(db, {
+    await db.transaction(async () => {
+      await insertTask(db, {
         id,
         title,
         assigner,
@@ -174,7 +174,7 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
         output,
         createdAt: at,
       });
-      appendTaskEvent(db, {
+      await appendTaskEvent(db, {
         id: newEventId(),
         taskId: id,
         kind: "created",
@@ -182,7 +182,7 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
         occurredAt: at,
       });
       if (parentTaskId !== null) {
-        appendTaskEvent(db, {
+        await appendTaskEvent(db, {
           id: newEventId(),
           taskId: id,
           kind: "handoff",
@@ -190,18 +190,18 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
           occurredAt: at,
         });
       }
-      bindActiveRun(assignee, id, at);
+      await bindActiveRun(assignee, id, at);
     });
 
-    const created = findTaskById(db, id);
+    const created = await findTaskById(db, id);
     if (created === undefined) {
       throw new Error(`任务创建后读不到记录: ${id}`);
     }
     return created;
   }
 
-  function update(input: TaskUpdateInput): { task: TaskRecord; autoClosed: TaskRecord[] } {
-    const task = findTaskById(db, input.taskId);
+  async function update(input: TaskUpdateInput): Promise<{ task: TaskRecord; autoClosed: TaskRecord[] }> {
+    const task = await findTaskById(db, input.taskId);
     if (task === undefined) {
       throw new TaskError("NOT_FOUND", `任务 ${input.taskId} 不存在`);
     }
@@ -244,8 +244,8 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
     const endedAt =
       nextStatus === "done" || nextStatus === "cancelled" ? (task.endedAt ?? at) : task.endedAt;
 
-    const autoClosed: TaskRecord[] = db.transaction(async () => {
-      const applied = updateTask(db, {
+    const autoClosed: TaskRecord[] = await db.transaction(async () => {
+      const applied = await updateTask(db, {
         id: task.id,
         fromStage: task.stage,
         fromStatus: task.status,
@@ -262,7 +262,7 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
         throw new TaskError("CONFLICT", "任务已被并发修改,请重读后再试");
       }
       if (stageChanged) {
-        appendTaskEvent(db, {
+        await appendTaskEvent(db, {
           id: newEventId(),
           taskId: task.id,
           kind: "stage_changed",
@@ -271,7 +271,7 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
         });
       }
       if (rework) {
-        appendTaskEvent(db, {
+        await appendTaskEvent(db, {
           id: newEventId(),
           taskId: task.id,
           kind: "rework",
@@ -305,7 +305,7 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
         : [];
     });
 
-    const updated = findTaskById(db, task.id);
+    const updated = await findTaskById(db, task.id);
     if (updated === undefined) {
       throw new Error(`任务更新后读不到记录: ${task.id}`);
     }
@@ -316,17 +316,17 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
     return { id: agent.id, displayName: agent.displayName };
   }
 
-  function completionNotice(taskId: string): CompletionNotice | null {
-    const task = findTaskById(db, taskId);
+  async function completionNotice(taskId: string): Promise<CompletionNotice | null> {
+    const task = await findTaskById(db, taskId);
     if (task === undefined || task.status !== "done" || task.parentTaskId === null) {
       return null;
     }
-    const parent = findTaskById(db, task.parentTaskId);
+    const parent = await findTaskById(db, task.parentTaskId);
     if (parent === undefined || parent.assignee === task.assignee) {
       return null;
     }
-    const from = findAgentById(db, task.assignee);
-    const to = findAgentById(db, parent.assignee);
+    const from = await findAgentById(db, task.assignee);
+    const to = await findAgentById(db, parent.assignee);
     if (from === undefined || to === undefined) {
       return null;
     }

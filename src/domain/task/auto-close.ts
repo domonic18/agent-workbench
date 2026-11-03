@@ -19,26 +19,23 @@ interface ChildStatus {
   status: string;
 }
 
-function findChildren(db: Db, parentId: string): ChildStatus[] {
-  return db
-    .prepare(`SELECT id, status FROM task WHERE parent_task_id = ?`)
-    .all(parentId) as ChildStatus[];
+async function findChildren(db: Db, parentId: string): Promise<ChildStatus[]> {
+  return db.all(`SELECT id, status FROM task WHERE parent_task_id = ?`, parentId) as Promise<ChildStatus[]>;
 }
 
-function hasUnackedReplies(db: Db, childIds: string[]): boolean {
+async function hasUnackedReplies(db: Db, childIds: string[]): Promise<boolean> {
   const placeholders = childIds.map(() => "?").join(", ");
-  const row = db
-    .prepare(
-      `SELECT 1 FROM a2a_message
+  const row = await db.get(
+    `SELECT 1 FROM a2a_message
         WHERE intent = 'reply' AND ack_at IS NULL AND task_id IN (${placeholders})
         LIMIT 1`,
-    )
-    .get(...childIds);
+    ...childIds,
+  );
   return row !== undefined;
 }
 
 /** pending 根任务先补 running(系统代推进),再落 done;两级都走 CAS,事件记 system actor */
-function closeOne(db: Db, parent: TaskRecord, at: number): TaskRecord {
+async function closeOne(db: Db, parent: TaskRecord, at: number): Promise<TaskRecord> {
   const patch = (fromStatus: TaskRecord["status"], toStatus: TaskRecord["status"]) => {
     const applied = updateTask(db, {
       id: parent.id,
@@ -83,7 +80,7 @@ function closeOne(db: Db, parent: TaskRecord, at: number): TaskRecord {
 }
 
 /** 从 taskId 沿 parent 链向上收口;返回本轮被系统关单的任务(调用方据此发〔验收〕播报) */
-export function closeAncestorsIfComplete(db: Db, taskId: string, at: number): TaskRecord[] {
+export async function closeAncestorsIfComplete(db: Db, taskId: string, at: number): Promise<TaskRecord[]> {
   const closed: TaskRecord[] = [];
   let parentId = findTaskParent(db, taskId);
   while (typeof parentId === "string") {
@@ -91,14 +88,14 @@ export function closeAncestorsIfComplete(db: Db, taskId: string, at: number): Ta
     if (parent === undefined || parent.status === "done" || parent.status === "cancelled") {
       break;
     }
-    const children = findChildren(db, parent.id);
+    const children = await findChildren(db, parent.id);
     const allTerminal =
       children.length > 0 &&
       children.every((child) => child.status === "done" || child.status === "cancelled");
-    if (!allTerminal || hasUnackedReplies(db, children.map((child) => child.id))) {
+    if (!allTerminal || (await hasUnackedReplies(db, children.map((child) => child.id)))) {
       break;
     }
-    closed.push(closeOne(db, parent, at));
+    closed.push(await closeOne(db, parent, at));
     parentId = findTaskParent(db, parent.id);
   }
   return closed;

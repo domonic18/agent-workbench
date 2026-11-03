@@ -51,7 +51,7 @@ export interface A2aAckInput {
 }
 
 export interface A2aService {
-  send(input: A2aSendInput): A2aSendResult;
+  send(input: A2aSendInput): Promise<A2aSendResult>;
   inbox(agentId: string, opts?: { cursor?: string; waitMs?: number }): Promise<A2aInboxResult>;
   /** 返回本轮沿 parent 链被系统收口的根任务(调用方据此发〔验收〕播报) */
   ack(agentId: string, msgId: string, input?: A2aAckInput): TaskRecord[];

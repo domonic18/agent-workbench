@@ -119,7 +119,7 @@ export function createA2aService(deps: A2aServiceDeps): A2aService {
     return thread;
   }
 
-  function send(input: A2aSendInput): A2aSendResult {
+  async function send(input: A2aSendInput): Promise<A2aSendResult> {
     const existing = findOutboxByKey(db, input.idempotencyKey);
     if (existing !== undefined) {
       if (existing.msgId === null) {
@@ -164,16 +164,16 @@ export function createA2aService(deps: A2aServiceDeps): A2aService {
     const at = now();
     const msgId = newMsgId();
 
-    const result = db.transaction((): A2aSendResult => {
-      const thread = resolveThread(input, sender, at);
+    const result = await db.transaction(async (): Promise<A2aSendResult> => {
+      const thread = await resolveThread(input, sender, at);
       if (input.replyToMsgId !== undefined) {
-        const referenced = findMessageById(db, input.replyToMsgId);
+        const referenced = await findMessageById(db, input.replyToMsgId);
         if (referenced === undefined || referenced.threadId !== thread.id) {
           throw new A2aError("VALIDATION_FAILED", "reply_to 必须是同一线程内的消息");
         }
       }
-      const round = maxRound(db, thread.id) + 1;
-      insertMessage(db, {
+      const round = (await maxRound(db, thread.id)) + 1;
+      await insertMessage(db, {
         id: msgId,
         threadId: thread.id,
         taskId: input.taskId,
@@ -189,7 +189,7 @@ export function createA2aService(deps: A2aServiceDeps): A2aService {
         authTicket: input.authTicketId,
         createdAt: at,
       });
-      const row = findMessageById(db, msgId);
+      const row = await findMessageById(db, msgId);
       if (row === undefined) {
         throw new Error(`A2A 消息落库后读不到: ${msgId}`);
       }
@@ -285,7 +285,7 @@ export function createA2aService(deps: A2aServiceDeps): A2aService {
             "ACK request/escalate 必须携带自己承接的 task_id",
           );
         }
-        const downstream = findTaskSummary(db, taskId);
+        const downstream = await findTaskSummary(db, taskId);
         if (downstream === undefined) {
           throw new A2aError("NOT_FOUND", `下游任务 ${taskId} 不存在`);
         }
