@@ -28,9 +28,11 @@ export interface NewMachine {
 }
 
 export function insertMachine(db: Db, row: NewMachine): Promise<void>{
-  await db.run(``INSERT INTO machine
+  await db.run(
+    `INSERT INTO machine
        (id, hostname, os, collector_version, collector_secret_hash, status, created_at)
-     VALUES (?, ?, ?, ?, ?, 'active', ?)`,`, row.id, row.hostname, row.os, row.collectorVersion, row.collectorSecretHash, row.createdAt);
+     VALUES (@id, @hostname, @os, @collectorVersion, @collectorSecretHash, 'active', @createdAt)`,
+  , row);
 }
 
 export function findMachineById(db: Db, id: string): Promise<MachineRecord | undefined>{
@@ -51,7 +53,9 @@ export function touchMachineLastSeen(db: Db, id: string, now: number): Promise<b
 
 /** 采集器据此判断哪些项目已登记,未登记项目不推送 */
 export function listActiveAgentProjects(db: Db, machineId: string): Promise<string[]>{
-  const rows = await db.all("SELECT project FROM agent WHERE machine_id = ? AND status = 'active' ORDER BY project",, machineId) as Array<{ project: string }>;
+  const rows = await db.all(
+      "SELECT project FROM agent WHERE machine_id = ? AND status = 'active' ORDER BY project",
+    , machineId) as Array<{ project: string }>;
   return rows.map((row) => row.project);
 }
 
@@ -70,7 +74,9 @@ export function listMachines(db: Db, query: MachineListQuery): Promise<MachineRe
     params.beforeCreatedAt = query.before.createdAt;
     params.beforeId = query.before.id;
   }
-  return await db.all(``SELECT ${MACHINE_COLUMNS} FROM machine ${where} ORDER BY created_at DESC, id DESC LIMIT ?`,`, params.limit) as MachineRecord[];
+  return await db.all(
+      `SELECT ${MACHINE_COLUMNS} FROM machine ${where} ORDER BY created_at DESC, id DESC LIMIT @limit`,
+    , params) as MachineRecord[];
 }
 
 export interface AgentRecord {
@@ -107,11 +113,13 @@ export interface NewAgent {
 }
 
 export function insertAgent(db: Db, row: NewAgent): Promise<void>{
-  await db.run(``INSERT INTO agent
+  await db.run(
+    `INSERT INTO agent
        (id, machine_id, project, display_name, secret_hash, feishu_app_id, status,
         allowed_targets_json, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, 'active',
-        ?, ?, ?)`,`, row.id, row.machineId, row.project, row.displayName, row.secretHash, row.feishuAppId, row.allowedTargetsJson, row.createdAt, row.createdAt);
+     VALUES (@id, @machineId, @project, @displayName, @secretHash, @feishuAppId, 'active',
+        @allowedTargetsJson, @createdAt, @createdAt)`,
+  , row);
 }
 
 export function findAgentById(db: Db, id: string): Promise<AgentRecord | undefined>{
@@ -141,10 +149,12 @@ export function updateAgentFeishuBot(
   appId: string | null,
   now: number,
 ): Promise<boolean>{
-  return (await db.run(`UPDATE agent
+  return (await db.run(
+      `UPDATE agent
          SET feishu_bot_open_id = ?, feishu_bot_name = ?,
              feishu_app_id = COALESCE(?, feishu_app_id), updated_at = ?
-       WHERE id = ?`,, openId, name, appId, now, id)).changes === 1;
+       WHERE id = ?`,
+    , openId, name, appId, now, id)).changes === 1;
 }
 
 /** 委派白名单只由控制台会话写;保存即对下一次 a2a.send 判定生效 */
@@ -171,5 +181,7 @@ export function listAgents(db: Db, query: AgentListQuery): Promise<AgentRecord[]
     params.beforeCreatedAt = query.before.createdAt;
     params.beforeId = query.before.id;
   }
-  return await db.all(``SELECT ${AGENT_COLUMNS} FROM agent ${where} ORDER BY created_at DESC, id DESC LIMIT ?`,`, params.limit) as AgentRecord[];
+  return await db.all(
+      `SELECT ${AGENT_COLUMNS} FROM agent ${where} ORDER BY created_at DESC, id DESC LIMIT @limit`,
+    , params) as AgentRecord[];
 }

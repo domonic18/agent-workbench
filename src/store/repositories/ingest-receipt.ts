@@ -12,16 +12,20 @@ export interface NewIngestReceipt extends IngestReceiptKey {
 
 export function hasIngestReceipt(db: Db, key: IngestReceiptKey): Promise<boolean>{
   return (
-    await db.get("SELECT 1 FROM ingest_receipt WHERE collector_id = ? AND stream_id = ? AND seq = ?",, key.collectorId, key.streamId, key.seq) !== undefined
+    await db.get(
+        "SELECT 1 FROM ingest_receipt WHERE collector_id = ? AND stream_id = ? AND seq = ?",
+      , key.collectorId, key.streamId, key.seq) !== undefined
   );
 }
 
 /** 返回 false 表示该 (collector, stream, seq) 已被其他请求先写入 */
 export function insertIngestReceipt(db: Db, row: NewIngestReceipt): Promise<boolean>{
   return (
-    (await db.run(``INSERT INTO ingest_receipt (collector_id, stream_id, seq, received_at)
-         VALUES (?, ?, ?, ?)
-         ON CONFLICT DO NOTHING`,`, row.collectorId, row.streamId, row.seq, row.receivedAt)).changes === 1
+    (await db.run(
+        `INSERT INTO ingest_receipt (collector_id, stream_id, seq, received_at)
+         VALUES (@collectorId, @streamId, @seq, @receivedAt)
+         ON CONFLICT DO NOTHING`,
+      , row)).changes === 1
   );
 }
 

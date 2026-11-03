@@ -40,9 +40,11 @@ export interface NewCapability {
 }
 
 export function insertCapability(db: Db, row: NewCapability): Promise<void>{
-  await db.run(``INSERT INTO capability
+  await db.run(
+    `INSERT INTO capability
        (id, subject, target, action, scope_json, ttl_seconds, status, task_id, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,`, row.id, row.subject, row.target, row.action, row.scopeJson, row.ttlSeconds, row.taskId, row.createdAt, row.createdAt);
+     VALUES (@id, @subject, @target, @action, @scopeJson, @ttlSeconds, 'pending', @taskId, @createdAt, @createdAt)`,
+  , row);
 }
 
 export function findCapability(db: Db, id: string): Promise<CapabilityRecord | undefined>{
@@ -80,7 +82,9 @@ export function listCapabilities(db: Db, query: CapabilityListQuery): Promise<Ca
     params.beforeId = query.before.id;
   }
   const where = conditions.length === 0 ? "" : `WHERE ${conditions.join(" AND ")}`;
-  return await db.all(``SELECT ${COLUMNS} FROM capability ${where} ORDER BY created_at DESC, id DESC LIMIT ?`,`, params.limit) as CapabilityRecord[];
+  return await db.all(
+      `SELECT ${COLUMNS} FROM capability ${where} ORDER BY created_at DESC, id DESC LIMIT @limit`,
+    , params) as CapabilityRecord[];
 }
 
 export interface CapabilitySummary {
@@ -95,9 +99,11 @@ export interface CapabilitySummary {
 
 /** 任务详情附带的授权摘要:不含 ticket 标识与证书内容 */
 export function listCapabilitySummariesByTask(db: Db, taskId: string): Promise<CapabilitySummary[]>{
-  return await db.all(`SELECT id, target, action, scope_json AS scopeJson, status,
+  return await db.all(
+      `SELECT id, target, action, scope_json AS scopeJson, status,
               expires_at AS expiresAt, created_at AS createdAt
-         FROM capability WHERE task_id = ? ORDER BY created_at DESC, id DESC`,, taskId) as CapabilitySummary[];
+         FROM capability WHERE task_id = ? ORDER BY created_at DESC, id DESC`,
+    , taskId) as CapabilitySummary[];
 }
 
 export interface CapabilityTransition {
@@ -136,7 +142,7 @@ export function transitionCapability(db: Db, input: CapabilityTransition): Promi
     sets.push("revoked_at = @revokedAt");
     params.revokedAt = input.revokedAt;
   }
-  const result = await db.run(`UPDATE capability SET ${sets.join(", ")} WHERE id = ? AND status = ?`, params.id, params.from);
+  const result = await await db.run(`UPDATE capability SET ${sets.join(", ")} WHERE id = ? AND status = ?`, params.id, params.from);
   return result.changes === 1;
 }
 
@@ -149,8 +155,10 @@ export interface NewAuditEntry {
 }
 
 export function appendCapabilityAudit(db: Db, entry: NewAuditEntry): Promise<void>{
-  await db.run(`INSERT INTO capability_audit (capability_id, action, actor, detail_json, occurred_at)
-     VALUES (?, ?, ?, ?, ?)`,, entry.capabilityId,
+  await db.run(
+    `INSERT INTO capability_audit (capability_id, action, actor, detail_json, occurred_at)
+     VALUES (?, ?, ?, ?, ?)`,
+  , entry.capabilityId,
     entry.action,
     entry.actor,
     JSON.stringify(entry.detail ?? {}),
@@ -158,13 +166,17 @@ export function appendCapabilityAudit(db: Db, entry: NewAuditEntry): Promise<voi
 }
 
 export function findStalePending(db: Db, cutoff: number, limit = 100): Promise<CapabilityRecord[]>{
-  return await db.all(`SELECT ${COLUMNS} FROM capability
+  return await db.all(
+      `SELECT ${COLUMNS} FROM capability
        WHERE status = 'pending' AND created_at < ?
-       ORDER BY created_at ASC LIMIT ?`,, cutoff, limit) as CapabilityRecord[];
+       ORDER BY created_at ASC LIMIT ?`,
+    , cutoff, limit) as CapabilityRecord[];
 }
 
 export function findStaleIssuing(db: Db, cutoff: number, limit = 100): Promise<CapabilityRecord[]>{
-  return await db.all(`SELECT ${COLUMNS} FROM capability
+  return await db.all(
+      `SELECT ${COLUMNS} FROM capability
        WHERE status = 'issuing' AND updated_at < ?
-       ORDER BY updated_at ASC LIMIT ?`,, cutoff, limit) as CapabilityRecord[];
+       ORDER BY updated_at ASC LIMIT ?`,
+    , cutoff, limit) as CapabilityRecord[];
 }

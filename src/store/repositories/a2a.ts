@@ -22,26 +22,27 @@ export interface NewA2aThread {
   createdAt: number;
 }
 
-export function insertThread(db: Db, row: NewA2aThread): Promise<void>{
-  await db.run(``INSERT INTO a2a_thread
+export async function insertThread(db: Db, row: NewA2aThread): Promise<void> {
+  await db.run(
+    `INSERT INTO a2a_thread
        (id, initiator_task_id, initiator_agent, responder_agent, created_at)
-     VALUES (?, ?, ?, ?, ?
-  ON CONFLICT DO NOTHING)`,`, row.id, row.initiatorTaskId, row.initiatorAgent, row.responderAgent, row.createdAt);
+     VALUES (?, ?, ?, ?, ?)`,
+    row.id, row.initiatorTaskId, row.initiatorAgent, row.responderAgent, row.createdAt);
 }
 
-export async function findThreadById(db: Db, id: string): Promise<A2aThreadRecord | undefined>{
+export async function findThreadById(db: Db, id: string): Promise<A2aThreadRecord | undefined> {
   return await db.get(`SELECT ${THREAD_COLUMNS} FROM a2a_thread WHERE id = ?`, id) as
     | A2aThreadRecord
     | undefined;
 }
 
-export function findThreadByInitiator(
+export async function findThreadByInitiator(
   db: Db,
   initiatorTaskId: string,
-  responderAgent: string,
-): Promise<A2aThreadRecord | undefined>{
-  return await db.get(`SELECT ${THREAD_COLUMNS} FROM a2a_thread
-       WHERE initiator_task_id = ? AND responder_agent = ?`,, initiatorTaskId, responderAgent) as A2aThreadRecord | undefined;
+  responderAgent: string): Promise<A2aThreadRecord | undefined> {
+  return await db.get(
+      `SELECT ${THREAD_COLUMNS} FROM a2a_thread
+       WHERE initiator_task_id = ? AND responder_agent = ?`,  initiatorTaskId, responderAgent) as A2aThreadRecord | undefined;
 }
 
 export interface A2aMessageRecord {
@@ -92,15 +93,14 @@ export interface NewA2aMessage {
 }
 
 export function insertMessage(db: Db, row: NewA2aMessage): Promise<void>{
-  await db.run(``INSERT INTO a2a_message
+  await await db.run(`INSERT INTO a2a_message
        (id, thread_id, task_id, round, reply_to_msg_id, from_agent, to_agent, intent,
         summary, expect, deadline_at, refs_json, auth_ticket, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?
-  ON CONFLICT DO NOTHING)`,`, row.id, row.threadId, row.taskId, row.round, row.replyToMsgId, row.fromAgent, row.toAgent, row.intent, row.summary, row.expect, row.deadlineAt, row.refsJson, row.authTicket, row.createdAt);
+        ?, ?, ?, ?, ?, ?)`, row.id, row.threadId, row.taskId, row.round, row.replyToMsgId, row.fromAgent, row.toAgent, row.intent, row.summary, row.expect, row.deadlineAt, row.refsJson, row.authTicket, row.createdAt);
 }
 
-export async function findMessageById(db: Db, id: string): Promise<A2aMessageRecord | undefined>{
+export function findMessageById(db: Db, id: string): Promise<A2aMessageRecord | undefined>{
   return await db.get(`SELECT ${MESSAGE_COLUMNS} FROM a2a_message WHERE id = ?`, id) as
     | A2aMessageRecord
     | undefined;
@@ -113,7 +113,7 @@ export function maxRound(db: Db, threadId: string): Promise<number>{
 
 export function markAck(db: Db, id: string, now: number): Promise<boolean>{
   return (
-    (await db.run(`"UPDATE a2a_message SET ack_at = ? WHERE id = ? AND ack_at IS NULL"`, { id, now })).changes === 1
+    (await db.run("UPDATE a2a_message SET ack_at = @now WHERE id = @id AND ack_at IS NULL", { id, now })).changes === 1
   );
 }
 
@@ -145,13 +145,12 @@ const DEAD_LETTER_COLUMNS = `
 `;
 
 export function insertDeadLetter(db: Db, row: NewA2aDeadLetter): Promise<void>{
-  await db.run(``INSERT INTO a2a_dead_letter
+  await await db.run(`INSERT INTO a2a_dead_letter
        (id, msg_id, from_agent, to_agent, task_id, reason, payload_json, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?
-  ON CONFLICT DO NOTHING)`,`, row.id, row.msgId, row.fromAgent, row.toAgent, row.taskId, row.reason, row.payloadJson, row.createdAt);
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, row.id, row.msgId, row.fromAgent, row.toAgent, row.taskId, row.reason, row.payloadJson, row.createdAt);
 }
 
-export async function findDeadLetterByMsgId(db: Db, msgId: string): Promise<A2aDeadLetterRecord | undefined>{
+export function findDeadLetterByMsgId(db: Db, msgId: string): Promise<A2aDeadLetterRecord | undefined>{
   return await db.get(`SELECT ${DEAD_LETTER_COLUMNS} FROM a2a_dead_letter WHERE msg_id = ? LIMIT 1`, msgId) as A2aDeadLetterRecord | undefined;
 }
 
@@ -160,14 +159,15 @@ export async function findDeadLetterByMsgId(db: Db, msgId: string): Promise<A2aD
  * notify 无 deadline,天然不在结果内。
  */
 export function listExpiredUnacked(db: Db, now: number, limit: number): Promise<A2aMessageRecord[]>{
-  return await db.all(``SELECT ${MESSAGE_COLUMNS} FROM a2a_message
-       WHERE deadline_at IS NOT NULL AND deadline_at <= ? AND ack_at IS NULL
+  return await db.all(
+      `SELECT ${MESSAGE_COLUMNS} FROM a2a_message
+       WHERE deadline_at IS NOT NULL AND deadline_at <= @now AND ack_at IS NULL
          AND EXISTS (
            SELECT 1 FROM outbox o
            WHERE o.msg_id = a2a_message.id AND o.channel = 'pull'
              AND o.status IN ('pending', 'claimed', 'sending', 'retry_wait')
          )
-       ORDER BY deadline_at ASC, id ASC LIMIT ?`,`, { now, limit }) as A2aMessageRecord[];
+       ORDER BY deadline_at ASC, id ASC LIMIT @limit`,  { now, limit }) as A2aMessageRecord[];
 }
 
 export interface InboxQuery {
@@ -191,15 +191,16 @@ export function listInbox(db: Db, agentId: string, query: InboxQuery): Promise<A
     params.afterCreatedAt = query.after.createdAt;
     params.afterId = query.after.id;
   }
-  return await db.all(``SELECT ${MESSAGE_COLUMNS} FROM a2a_message
+  return await db.all(
+      `SELECT ${MESSAGE_COLUMNS} FROM a2a_message
        WHERE id IN (
          SELECT m.id FROM a2a_message m
          JOIN outbox o ON o.msg_id = m.id AND o.channel = 'pull'
-         WHERE m.to_agent = ? AND m.ack_at IS NULL
-           AND o.status IN ('pending', 'retry_wait') AND o.available_at <= ?
+         WHERE m.to_agent = @agentId AND m.ack_at IS NULL
+           AND o.status IN ('pending', 'retry_wait') AND o.available_at <= @now
            ${cursor}
        )
-       ORDER BY created_at ASC, id ASC LIMIT ?`,`, params.agentId, params.now, params.limit) as A2aMessageRecord[];
+       ORDER BY created_at ASC, id ASC LIMIT @limit`,  params) as A2aMessageRecord[];
 }
 
 /**
@@ -207,20 +208,21 @@ export function listInbox(db: Db, agentId: string, query: InboxQuery): Promise<A
  * 或它是某条 ACK 交接出的下游任务(handoff 事件记 upstream_msg_id)。
  */
 export function listThreadsForTask(db: Db, taskId: string): Promise<A2aThreadRecord[]>{
-  return await db.all(``SELECT ${THREAD_COLUMNS} FROM a2a_thread t
-       WHERE t.initiator_task_id = ?
+  return await db.all(
+      `SELECT ${THREAD_COLUMNS} FROM a2a_thread t
+       WHERE t.initiator_task_id = @taskId
          OR EXISTS (
-           SELECT 1 FROM a2a_message m WHERE m.thread_id = t.id AND m.task_id = ?
+           SELECT 1 FROM a2a_message m WHERE m.thread_id = t.id AND m.task_id = @taskId
          )
          OR EXISTS (
            SELECT 1 FROM task_event e
            JOIN a2a_message hm ON hm.id = json_extract(e.payload_json, '$.upstream_msg_id')
-           WHERE e.task_id = ?
+           WHERE e.task_id = @taskId
              AND e.kind = 'handoff'
              AND json_extract(e.payload_json, '$.relation') = 'a2a'
              AND hm.thread_id = t.id
          )
-       ORDER BY t.created_at ASC, t.id ASC`,`, { taskId }) as A2aThreadRecord[];
+       ORDER BY t.created_at ASC, t.id ASC`,  { taskId }) as A2aThreadRecord[];
 }
 
 export interface A2aThreadMessageRecord extends A2aMessageRecord {
@@ -232,13 +234,13 @@ export interface A2aThreadMessageRecord extends A2aMessageRecord {
 
 export function listMessagesByThreadIds(
   db: Db,
-  threadIds: readonly string[],
-): Promise<A2aThreadMessageRecord[]>{
+  threadIds: readonly string[]): Promise<A2aThreadMessageRecord[]>{
   if (threadIds.length === 0) {
     return [];
   }
   const placeholders = threadIds.map(() => "?").join(", ");
-  return await db.all(`SELECT ${messageColumns("m")},
+  return await db.all(
+      `SELECT ${messageColumns("m")},
               o.status AS deliveryStatus, o.attempts AS deliveryAttempts,
               o.last_error AS deliveryError
        FROM a2a_message m
@@ -247,5 +249,5 @@ export function listMessagesByThreadIds(
          ORDER BY o2.created_at DESC, o2.id DESC LIMIT 1
        )
        WHERE m.thread_id IN (${placeholders})
-       ORDER BY m.thread_id ASC, m.round ASC`,, ...threadIds) as A2aThreadMessageRecord[];
+       ORDER BY m.thread_id ASC, m.round ASC`,  ...threadIds) as A2aThreadMessageRecord[];
 }

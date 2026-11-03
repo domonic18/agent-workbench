@@ -19,6 +19,8 @@ export function findIdempotencyResource(
 }
 
 export function saveIdempotencyResource(db: Db, row: NewIdempotencyRecord): Promise<void>{
-  await db.run(``INSERT INTO idempotency_record (scope, key, resource_id, created_at)
-     VALUES (?, ?, ?, ?)`,`, row.scope, row.key, row.resourceId, row.createdAt);
+  await db.run(
+    `INSERT INTO idempotency_record (scope, key, resource_id, created_at)
+     VALUES (@scope, @key, @resourceId, @createdAt)`,
+  , row);
 }

@@ -12,7 +12,9 @@ export function claimFeishuEvent(
   eventType: string,
   now: number = Date.now(),
 ): Promise<boolean>{
-  const inserted = await db.run("INSERT OR IGNORE INTO feishu_event (event_id, event_type, received_at) VALUES (?, ?, ?)",, eventId, eventType, now);
+  const inserted = await db.run(
+      "INSERT OR IGNORE INTO feishu_event (event_id, event_type, received_at) VALUES (?, ?, ?)",
+    , eventId, eventType, now);
   if (inserted.changes === 0) {
     return false;
   }

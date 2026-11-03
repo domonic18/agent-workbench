@@ -15,7 +15,9 @@ export function createSession(
   db: Db,
   input: { id: string; createdAt: number; expiresAt: number },
 ): Promise<void>{
-  await db.run("INSERT INTO session (id, created_at, last_seen_at, expires_at) VALUES (?, ?, ?, ?)",, input.id, input.createdAt, input.createdAt, input.expiresAt);
+  await db.run(
+    "INSERT INTO session (id, created_at, last_seen_at, expires_at) VALUES (?, ?, ?, ?)",
+  , input.id, input.createdAt, input.createdAt, input.expiresAt);
 }
 
 /** 只返回未过期会话;过期判定以库中 expires_at 为准 */

@@ -16,9 +16,11 @@ export interface FeishuCommandRecord {
 const MAX_RAW_TEXT = 4000;
 
 export function recordFeishuCommand(db: Db, record: FeishuCommandRecord): Promise<void>{
-  await db.run(`INSERT INTO feishu_command
+  await db.run(
+    `INSERT INTO feishu_command
        (event_id, open_id, chat_id, raw_text, command, outcome, reply_text, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,, record.eventId,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  , record.eventId,
     record.openId,
     record.chatId,
     record.rawText.slice(0, MAX_RAW_TEXT),

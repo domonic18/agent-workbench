@@ -5,7 +5,7 @@ import type { Db } from "../database.js";
 /** 同一个连接只加载一次扩展;失败直接抛,由调用方决定降级 */
 const loaded = new WeakSet<Db>();
 
-export async function ensureKnowledgeVectorTable(db: Db): Promise<void>{
+export function ensureKnowledgeVectorTable(db: Db): Promise<void>{
   if (!loaded.has(db)) {
     db.loadExtension(getLoadablePath());
     loaded.add(db);
@@ -19,10 +19,10 @@ export async function ensureKnowledgeVectorTable(db: Db): Promise<void>{
  * vec0 的主键只收整数,而 better-sqlite3 默认把 JS number 绑成 REAL,
  * 必须显式 CAST,否则报「Only integers are allows for primary key values」。
  */
-export async function insertKnowledgeVector(db: Db, chunkId: number, embedding: Float32Array): Promise<void> {
+export function insertKnowledgeVector(db: Db, chunkId: number, embedding: Float32Array): Promise<void>{
   await db.run(
-    "INSERT INTO knowledge_vec (chunk_id, embedding) VALUES (?, ?)",
-    chunkId, embedding);
+    "INSERT INTO knowledge_vec (rowid, embedding) VALUES (CAST(? AS INTEGER), ?)",
+  , chunkId, embedding);
 }
 
 export function deleteKnowledgeVectors(db: Db, chunkIds: readonly number[]): void {
