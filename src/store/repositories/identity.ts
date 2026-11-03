@@ -31,13 +31,12 @@ export function insertMachine(db: Db, row: NewMachine): void {
   db.prepare(
     `INSERT INTO machine
        (id, hostname, os, collector_version, collector_secret_hash, status, created_at)
-     VALUES (@id, @hostname, @os, @collectorVersion, @collectorSecretHash, 'active', @createdAt
-  ON CONFLICT DO NOTHING)`,
+     VALUES (@id, @hostname, @os, @collectorVersion, @collectorSecretHash, 'active', @createdAt)`,
   ).run(row);
 }
 
-export async function findMachineById(db: Db, id: string): Promise<MachineRecord | undefined>{
-  return await db.get(`SELECT ${MACHINE_COLUMNS} FROM machine WHERE id = ?`, id) as
+export function findMachineById(db: Db, id: string): MachineRecord | undefined {
+  return db.prepare(`SELECT ${MACHINE_COLUMNS} FROM machine WHERE id = ?`).get(id) as
     | MachineRecord
     | undefined;
 }
@@ -125,23 +124,24 @@ export function insertAgent(db: Db, row: NewAgent): void {
        (id, machine_id, project, display_name, secret_hash, feishu_app_id, status,
         allowed_targets_json, created_at, updated_at)
      VALUES (@id, @machineId, @project, @displayName, @secretHash, @feishuAppId, 'active',
-        @allowedTargetsJson, @createdAt, @createdAt
-  ON CONFLICT DO NOTHING)`,
+        @allowedTargetsJson, @createdAt, @createdAt)`,
   ).run(row);
 }
 
-export async function findAgentById(db: Db, id: string): Promise<AgentRecord | undefined>{
-  return await db.get(`SELECT ${AGENT_COLUMNS} FROM agent WHERE id = ?`, id) as
+export function findAgentById(db: Db, id: string): AgentRecord | undefined {
+  return db.prepare(`SELECT ${AGENT_COLUMNS} FROM agent WHERE id = ?`).get(id) as
     | AgentRecord
     | undefined;
 }
 
-export async function findAgentByMachineProject(
+export function findAgentByMachineProject(
   db: Db,
   machineId: string,
   project: string,
-): Promise<AgentRecord | undefined>{
-  return await db.get(`SELECT ${AGENT_COLUMNS} FROM agent WHERE machine_id = ? AND project = ?`, machineId, project) as AgentRecord | undefined;
+): AgentRecord | undefined {
+  return db
+    .prepare(`SELECT ${AGENT_COLUMNS} FROM agent WHERE machine_id = ? AND project = ?`)
+    .get(machineId, project) as AgentRecord | undefined;
 }
 
 export function updateAgentSecretHash(db: Db, id: string, hash: string, now: number): boolean {

@@ -47,8 +47,7 @@ export function insertTokenUsage(db: Db, row: NewTokenUsage): void {
        (id, agent_id, task_id, run_id, provider, model, input_tokens, output_tokens,
         cache_read_tokens, cache_creation_tokens, source, sequence, receipt_hash, occurred_at)
      VALUES (@id, @agentId, @taskId, @runId, @provider, @model, @inputTokens, @outputTokens,
-             @cacheReadTokens, @cacheCreationTokens, @source, @sequence, @receiptHash, @occurredAt
-  ON CONFLICT DO NOTHING)`,
+             @cacheReadTokens, @cacheCreationTokens, @source, @sequence, @receiptHash, @occurredAt)`,
   ).run(row);
 }
 
@@ -68,8 +67,10 @@ export function findTokenUsageByKey(
     .get(agentId, runId, source, sequence) as TokenUsageRecord | undefined;
 }
 
-export async function listTokenUsageByRun(db: Db, runId: string): Promise<TokenUsageRecord[]>{
-  return await db.all(`SELECT ${COLUMNS} FROM token_usage WHERE run_id = ? ORDER BY sequence ASC, id ASC`, runId) as TokenUsageRecord[];
+export function listTokenUsageByRun(db: Db, runId: string): TokenUsageRecord[] {
+  return db
+    .prepare(`SELECT ${COLUMNS} FROM token_usage WHERE run_id = ? ORDER BY sequence ASC, id ASC`)
+    .all(runId) as TokenUsageRecord[];
 }
 
 /** 四维之和:总 token 不单独落列,读时按口径计算(02 §3.6) */

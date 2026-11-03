@@ -53,7 +53,7 @@ function requireCapability(db: Db, id: string): CapabilityRecord {
   return row;
 }
 
-export function createCapabilityService(deps: CapabilityServiceDeps): CapabilityService {
+export function createCapabilityService(deps: CapabilityServiceDeps): Promise<CapabilityService>{
   const { db, teleport } = deps;
   const now = deps.now ?? Date.now;
   const newId = deps.newId ?? (() => defaultId("cap"));

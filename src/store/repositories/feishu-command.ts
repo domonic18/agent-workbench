@@ -19,8 +19,7 @@ export function recordFeishuCommand(db: Db, record: FeishuCommandRecord): void {
   db.prepare(
     `INSERT INTO feishu_command
        (event_id, open_id, chat_id, raw_text, command, outcome, reply_text, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?
-  ON CONFLICT DO NOTHING)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     record.eventId,
     record.openId,

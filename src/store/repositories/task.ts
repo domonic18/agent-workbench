@@ -180,7 +180,8 @@ export async function insertTask(db: Db, task: NewTask): Promise<void>{
        (id, title, assigner, assignee, project, parent_task_id, round, rework_count,
         stage, status, origin, deadline_at, output, started_at, ended_at, total_tokens,
         created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, 1, 0, 'intake', 'pending', ?, ?, ?, NULL, NULL, 0, ?, ?)`,  task.id,
+     VALUES (?, ?, ?, ?, ?, ?, 1, 0, 'intake', 'pending', ?, ?, ?, NULL, NULL, 0, ?, ?
+  ON CONFLICT DO NOTHING)`,  task.id,
     task.title,
     task.assigner,
     task.assignee,
@@ -242,5 +243,6 @@ export async function appendTaskEvent(db: Db, entry: NewTaskEvent): Promise<void
   const { seq } = await db.get("SELECT COALESCE(MAX(seq), 0) + 1 AS seq FROM task_event WHERE task_id = ?", entry.taskId) as { seq: number };
   await db.run(
     `INSERT INTO task_event (id, task_id, seq, kind, payload_json, occurred_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,  entry.id, entry.taskId, seq, entry.kind, JSON.stringify(entry.payload ?? {}), entry.occurredAt);
+     VALUES (?, ?, ?, ?, ?, ?
+  ON CONFLICT DO NOTHING)`,  entry.id, entry.taskId, seq, entry.kind, JSON.stringify(entry.payload ?? {}), entry.occurredAt);
 }

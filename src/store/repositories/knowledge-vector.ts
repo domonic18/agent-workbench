@@ -5,7 +5,7 @@ import type { Db } from "../database.js";
 /** 同一个连接只加载一次扩展;失败直接抛,由调用方决定降级 */
 const loaded = new WeakSet<Db>();
 
-export function ensureKnowledgeVectorTable(db: Db): Promise<void>{
+export async function ensureKnowledgeVectorTable(db: Db): Promise<void>{
   if (!loaded.has(db)) {
     db.loadExtension(getLoadablePath());
     loaded.add(db);

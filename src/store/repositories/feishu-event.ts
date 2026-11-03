@@ -14,7 +14,7 @@ export function claimFeishuEvent(
 ): boolean {
   const inserted = db
     .prepare(
-      "INSERT INTO feishu_event (event_id, event_type, received_at) VALUES (?, ?, ?)",
+      "INSERT OR IGNORE INTO feishu_event (event_id, event_type, received_at) VALUES (?, ?, ?)",
     )
     .run(eventId, eventType, now);
   if (inserted.changes === 0) {

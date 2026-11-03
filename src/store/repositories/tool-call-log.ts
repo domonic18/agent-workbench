@@ -14,7 +14,6 @@ export function insertToolCallLog(db: Db, entry: NewToolCallLog): void {
         capability_id, duration_ms, occurred_at)
      VALUES
        (@runId, @agentId, @taskId, @tool, @argsHash, @level, @verdict, @reason,
-        @capabilityId, @durationMs, @occurredAt
-  ON CONFLICT DO NOTHING)`,
+        @capabilityId, @durationMs, @occurredAt)`,
   ).run(entry);
 }

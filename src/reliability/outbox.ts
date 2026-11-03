@@ -63,7 +63,7 @@ export function enqueuePush(db: Db, input: EnqueuePushInput): Promise<OutboxReco
  * 入队一条 A2A 信箱消息(business 类,pull 通道):只有对端 ACK 才算 delivered,
  * 失败不重试、不推进 round;拉取不产生 uncertain。
  */
-export async function enqueuePull(db: Db, input: EnqueuePullInput): OutboxRecord {
+export async function enqueuePull(db: Db, input: EnqueuePullInput): Promise<OutboxRecord>{
   const now = input.now ?? Date.now();
   return await insertOutbox(db, {
     id: newPrefixedId("ob"),

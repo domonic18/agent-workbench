@@ -43,13 +43,12 @@ export function insertCapability(db: Db, row: NewCapability): void {
   db.prepare(
     `INSERT INTO capability
        (id, subject, target, action, scope_json, ttl_seconds, status, task_id, created_at, updated_at)
-     VALUES (@id, @subject, @target, @action, @scopeJson, @ttlSeconds, 'pending', @taskId, @createdAt, @createdAt
-  ON CONFLICT DO NOTHING)`,
+     VALUES (@id, @subject, @target, @action, @scopeJson, @ttlSeconds, 'pending', @taskId, @createdAt, @createdAt)`,
   ).run(row);
 }
 
-export async function findCapability(db: Db, id: string): Promise<CapabilityRecord | undefined>{
-  return await db.get(`SELECT ${COLUMNS} FROM capability WHERE id = ?`, id) as
+export function findCapability(db: Db, id: string): CapabilityRecord | undefined {
+  return db.prepare(`SELECT ${COLUMNS} FROM capability WHERE id = ?`).get(id) as
     | CapabilityRecord
     | undefined;
 }
@@ -123,7 +122,7 @@ export interface CapabilityTransition {
 }
 
 /** 条件更新(CAS):只有当前状态仍是 `from` 才迁移,返回是否真正发生跃迁 */
-export async function transitionCapability(db: Db, input: CapabilityTransition): Promise<boolean>{
+export function transitionCapability(db: Db, input: CapabilityTransition): boolean {
   const sets = ["status = @to", "updated_at = @now"];
   const params: Record<string, unknown> = {
     id: input.id,
@@ -147,7 +146,9 @@ export async function transitionCapability(db: Db, input: CapabilityTransition):
     sets.push("revoked_at = @revokedAt");
     params.revokedAt = input.revokedAt;
   }
-  const result = (await db.run(`UPDATE capability SET ${sets.join(", ")} WHERE id = ? AND status = ?`, params.id, params.from)).changes;
+  const result = db
+    .prepare(`UPDATE capability SET ${sets.join(", ")} WHERE id = @id AND status = @from`)
+    .run(params);
   return result.changes === 1;
 }
 
@@ -162,8 +163,7 @@ export interface NewAuditEntry {
 export function appendCapabilityAudit(db: Db, entry: NewAuditEntry): void {
   db.prepare(
     `INSERT INTO capability_audit (capability_id, action, actor, detail_json, occurred_at)
-     VALUES (?, ?, ?, ?, ?
-  ON CONFLICT DO NOTHING)`,
+     VALUES (?, ?, ?, ?, ?)`,
   ).run(
     entry.capabilityId,
     entry.action,

@@ -35,13 +35,12 @@ export function insertRun(db: Db, run: NewAgentRun): void {
        (id, agent_id, machine, project, stream_id, task_id, status,
         started_at, last_seen_at, ended_at)
      VALUES (@id, @agentId, @machine, @project, @streamId, NULL, 'running',
-             @startedAt, @startedAt, NULL
-  ON CONFLICT DO NOTHING)`,
+             @startedAt, @startedAt, NULL)`,
   ).run(run);
 }
 
-export async function findRunById(db: Db, id: string): Promise<AgentRunRecord | undefined>{
-  return await db.get(`SELECT ${RUN_COLUMNS} FROM agent_run WHERE id = ?`, id) as
+export function findRunById(db: Db, id: string): AgentRunRecord | undefined {
+  return db.prepare(`SELECT ${RUN_COLUMNS} FROM agent_run WHERE id = ?`).get(id) as
     | AgentRunRecord
     | undefined;
 }
@@ -146,8 +145,7 @@ export function insertTimelineEvent(db: Db, event: NewTimelineEvent): void {
     `INSERT INTO timeline_event
        (id, run_id, turn_id, block_id, ord, block_rev, "offset", kind, payload_json, occurred_at)
      VALUES (@id, @runId, @turnId, @blockId, @ord, @blockRev, @offset, @kind, @payloadJson,
-             @occurredAt
-  ON CONFLICT DO NOTHING)`,
+             @occurredAt)`,
   ).run({
     id: event.id,
     runId: event.runId,

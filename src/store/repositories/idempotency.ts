@@ -23,7 +23,6 @@ export function findIdempotencyResource(
 export function saveIdempotencyResource(db: Db, row: NewIdempotencyRecord): void {
   db.prepare(
     `INSERT INTO idempotency_record (scope, key, resource_id, created_at)
-     VALUES (@scope, @key, @resourceId, @createdAt
-  ON CONFLICT DO NOTHING)`,
+     VALUES (@scope, @key, @resourceId, @createdAt)`,
   ).run(row);
 }
