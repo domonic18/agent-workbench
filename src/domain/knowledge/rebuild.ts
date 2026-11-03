@@ -13,7 +13,7 @@ function resolveWorkerEntry(): URL {
 }
 
 export interface KnowledgeRebuilderOptions {
-  databasePath: string;
+  databaseUrl: string;
   knowledgeDir: string;
   embedding?: EmbeddingConfig;
 }

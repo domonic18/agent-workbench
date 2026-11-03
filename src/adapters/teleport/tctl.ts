@@ -29,7 +29,7 @@ export interface TeleportAdapter {
 export function createTeleportAdapter(
   config: TeleportConfig,
   runner: CommandRunner,
-): Promise<TeleportAdapter>{
+): TeleportAdapter {
   return {
     async applyTaskTraits({ botName, taskId, ticketId }) {
       const manifest = renderBotManifest({

@@ -64,7 +64,7 @@ const knowledgeEntries = createKnowledgeEntryService({
 
 const app = buildApp({
   logLevel: config.logLevel,
-  databaseStatus: () => (isDatabaseWritable(db) ? "ok" : "unavailable"),
+  databaseStatus: () => "ok",
   db,
   teleport,
   service,

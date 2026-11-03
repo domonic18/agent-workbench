@@ -83,7 +83,7 @@ export interface KnowledgeEntryService {
 
 export function createKnowledgeEntryService(
   options: KnowledgeEntryServiceOptions,
-): Promise<KnowledgeEntryService>{
+): KnowledgeEntryService {
   const db = options.db;
   const now = options.now ?? Date.now;
 
