@@ -5,8 +5,8 @@
 ## 技术栈
 
 - Node.js + TypeScript
-- SQLite（嵌入式存储，单机优先）
-- 控制台：本地 Web 服务，绑定 `127.0.0.1:8787`，经 frp 穿透访问
+- PostgreSQL（控制台业务库，`pg_trgm` + `pgvector`）
+- 控制台：容器内监听 `0.0.0.0:8787`，宿主机仅通过 `127.0.0.1:8787` 暴露，经 frp 穿透访问
 
 ## 快速开始
 
@@ -37,5 +37,5 @@ docs/        文档中心（需求基准 / 架构终态 / 迭代计划 / 调研�
 scripts/     运维与工具脚本
 src/         源码
 tests/       测试
-workspace/   宿主机持久化数据（SQLite 库、备份，gitignore 不入库）
+workspace/   宿主机持久化数据（PostgreSQL 数据与备份、采集缓冲，gitignore 不入库）
 ```

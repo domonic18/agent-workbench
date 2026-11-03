@@ -45,3 +45,6 @@ docker/spike/out/
 
 # 真实基础设施信息只在本机(公开仓库内一律用占位符)
 docs/plan/*.local.md
+
+# 里程碑任务清单必须可入库(覆盖本机全局 *.md 忽略)
+!docs/plan/tasks/*.md

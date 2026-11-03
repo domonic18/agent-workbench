@@ -21,7 +21,7 @@
 2 vCPU / 2GB 内存决定了它的上限:
 
 - **适合**:验收对端(A2A 跨机往返的第二端)、控制台冒烟(只绑 `127.0.0.1`,经 `ssh -L` 隧道访问)、采集器临时测试。
-- **不适合**:同时跑 Teleport CE + 多个 Agent 运行时(Teleport auth + proxy 常驻约 300~500MB,叠加 Node 与 SQLite 后余量很小);也**不作为** Agent 运行机的长期载体。
+- **不适合**:同时跑 Teleport CE + PostgreSQL + 多个 Agent 运行时(Teleport auth + proxy 常驻约 300~500MB，再叠加数据库与 Node 后余量很小);也**不作为** Agent 运行机的长期载体。
 
 ## 3. 穿透与域名
 
