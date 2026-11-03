@@ -21,11 +21,11 @@ export function ensureConsoleCredential(db: Db, initialPassword?: string): Promi
   const now = Date.now();
   await db.run(
     "INSERT INTO console_credential (id, password_hash, created_at, updated_at) VALUES (1, ?, ?, ?)",
-  , hashSecret(initialPassword), now, now);
+    hashSecret(initialPassword), now, now);
   return { created: true };
 }
 
-export function verifyConsolePassword(db: Db, password: string): Promise<boolean>{
+export async function verifyConsolePassword(db: Db, password: string): Promise<boolean> {
   const row = await db.get("SELECT password_hash FROM console_credential WHERE id = 1") as { password_hash: string } | undefined;
   if (row === undefined) {
     return false;
