@@ -14,6 +14,7 @@
   - **三平面**：展示面（浏览器 B/S，不做任何约束判定）/ 控制面（策略、判定、审计、确定性 Router）/ 执行面（每台机一个 `aw-node`）。控制台经同一 HTTP 服务提供远程 Streamable HTTP MCP，只含 `task / a2a / kb / work` 控制工具，以 Agent Bearer 鉴权并由服务端校验归属，**不引入 run_token**；**本机第三方 MCP、Claude Code 原生工具与终端直跑均不在项目管控边界内**（2026-11-03 裁决）；一期不做 OS 级沙箱、托盘与进程急停
   - 不重写 Agent 运行时（Claude Code / cc-connect 是资产）；Source Agent 只整理事实，业务路由只查 Thread owner 与 Git 版本化 RouteRule，未知或冲突交人，**一期不做在线 Slow Router**
   - 首个业务闭环使用真实 Bug：PR 关联且当前提交 CI 通过后进入待验收，**只有原 Bug 机器人的人工接受才完成**；退回到同一 WorkItem 返工，A2A ACK 只代表上游 Task 验收，生产发布始终单独确认
+  - **首次使用必须自动装配**：无凭据仅开放 bootstrap mode，以一次性 bootstrap token 设置管理员口令；`/setup` 四步引导 + enroll token + aw-node 上报 cc-connect 发现 + `POST /api/aw-node/config` 轮换签发 secret（ACK 前重试可轮换，ACK 后不明文返回）+ 默认 `bug_fix` + 分项预检。用户只做必要授权、一次安装执行和一次确认，不要求手工编辑 RouteRule、Mandate、plist 或数据库配置；预检失败不就绪且不创建空 Assignment
 
 ## 2. 项目结构
 

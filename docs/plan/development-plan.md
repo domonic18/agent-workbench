@@ -59,10 +59,10 @@
 
 ### M3.8: 地基迁移（PostgreSQL + 远程控制 MCP + 单 aw-node）
 
-- 目标: 控制台以 PostgreSQL 为唯一业务库并提供自有控制类远程 MCP；执行机每机仅一个 aw-node；旧业务数据、旧知识与旧 proxy 不进入新基线
-- 验收标准: 同机 compose PostgreSQL + pg_trgm/pgvector 通过行为契约；空库空知识启动且无导入/双写；控制台远程 `/mcp` 直接替换 stdio；同机单 aw-node 无重复副作用；WorkBuddy 官方 automations 可处理 A2A 且三项过程数据留空，Assignment/Input 的 automation 验收归 M3.9
+- 目标: 控制台以 PostgreSQL 为唯一业务库并提供自有控制类远程 MCP；执行机每机仅一个 aw-node；旧业务数据、旧知识与旧 proxy 不进入新基线；首次使用通过 `/setup` 自动装配完成，不要求用户手工编辑内部配置
+- 验收标准: 同机 compose PostgreSQL + pg_trgm/pgvector 通过行为契约；空库空知识启动且无导入/双写；无 `CONSOLE_INIT_PASSWORD` 时仅开放 bootstrap mode，管理员初始化后解锁；控制台远程 `/mcp` 直接替换 stdio；同机单 aw-node 无重复副作用；一次性 enroll token 可完成机器加入且过期/重放拒绝，aw-node discovery 自动预填，项目确认只创建身份与非敏感配置，`POST /api/aw-node/config` 在 ACK 前轮换并返回最新 secret、旧值立即失效以支持响应丢失重试，ACK 后不再返回明文且无需第二次安装，令牌与长期密钥不入日志；预检失败不就绪且不创建空 Assignment；WorkBuddy 官方 automations 可处理 A2A 且三项过程数据留空，Assignment/Input 的 automation 验收归 M3.9
 - 状态: **进行中**。M3.8-1 新裁决与文档收口已闭，M3.8-2 PostgreSQL 迁移与 M3.8-3 远程 MCP/aw-node 未开始；历史 SQLite/stdio 验收只作旧基线证据
-- 阻塞项: 需在 M3.8-2 前冻结现有行为测试基线并锁定 PostgreSQL 驱动与 compose 镜像；远程客户端与 WorkBuddy automations 真实验收在 M3.8-3 执行
+- 阻塞项: 需在 M3.8-2 前冻结现有行为测试基线并锁定 PostgreSQL 驱动与 compose 镜像；远程客户端、enroll token、cc-connect 自动发现、初始化预检与 WorkBuddy automations 真实验收在 M3.8-3 执行
 
 ### M3.9: 确定性协调内核与真实 Bug 闭环
 
@@ -90,7 +90,7 @@
 | M2.5 | [tasks/M2.5.md](tasks/M2.5.md) | 10 | MCP 工具面、身份域、发件箱状态机、信箱拉取、死信、飞书播报与执行面唤醒 |
 | M3 | [tasks/M3.md](tasks/M3.md) | 11 | token 记账、采集入库、投影与 SSE、总览与任务两屏 |
 | M3.5 | [tasks/M3.5.md](tasks/M3.5.md) | 9 | 授权屏与委派矩阵、知识状态机与索引链、知识写入与检索验收 |
-| M3.8 | [tasks/M3.8.md](tasks/M3.8.md) | 3 | 文档收口、PostgreSQL 全新基线、控制台远程控制 MCP、每机单 aw-node |
+| M3.8 | [tasks/M3.8.md](tasks/M3.8.md) | 3 | 文档收口、PostgreSQL 全新基线、控制台远程控制 MCP、每机单 aw-node、首次使用自动装配 |
 | M3.9 | [tasks/M3.9.md](tasks/M3.9.md) | 2 | 确定性 Git Router、WorkItem/worker_inbox、真实 Bug 接受/退回 E2E |
 | M4 | [tasks/M4.md](tasks/M4.md) | 4 | 用量上限与硬停、下钻、周报、飞书免登 |
 
@@ -110,6 +110,7 @@
 | S6 | PostgreSQL 与检索基线 | 同机 compose 的 pg_trgm/pgvector、空库迁移、pg_dump/pg_restore 是否满足现有行为 | M3.8-2 | 未开始 |
 | S7 | 控制台远程 MCP 客户端 | Claude Code / WorkBuddy 的 Streamable HTTP、Bearer、断线与重复请求是否可靠 | M3.8-3 | 未开始 |
 | S8 | 单 aw-node 与 WorkBuddy automations | 同机单实例是否避免重复采集/唤醒，automation 是否真实查件且过程字段正确留空 | M3.8-3 | 未开始 |
+| S9 | 首次使用端到端自动装配 | 新用户是否能不编辑 RouteRule/plist/数据库配置，完成 `/setup`、机器加入、项目装配、预检并提交首个 Bug；同时验证过期/重放 token 不签发密钥、配置响应丢失后重试会轮换并返回最新 secret、旧值立即失效且 ACK 后不再返回明文、令牌与长期密钥不入日志、预检失败不就绪且不创建空 Assignment | M3.8-3、M3.9-2 | 未开始 |
 
 **结论(2026-10-31)**
 
@@ -128,7 +129,7 @@ P1 项(飞书长连接与回调穿 frp、SSE 穿 frp、launchd 用户域、长�
 - 任务级 token 上限与超支降级（一期只做按 Agent 的日 token 上限 + 硬停）
 - 树形 handoff 可视化（一期为面包屑）
 - ~~proxy 远程化（stdio 改双模、执行机常驻）~~ **已由 M3.8-3 取代并移出待做池**：控制台同一 HTTP 服务直接提供 Streamable HTTP `/mcp`，不保留双模；执行机不再有 proxy。WorkBuddy automations 同项落地，过程数据按新裁决留空。
-- **执行面部署包行业对标补强（2026-11-02 评估，待实施）**：当前实现适合自托管场景（two-step 下载校验安装、用户态 launchd、幂等升级、SHA256 校验），对标 Teleport/Tailscale/Sigstore 实践有六项差距——① P1 版本化与回滚：artifacts 为 always-latest 单版本覆盖，改版本戳文件名 + manifest(版本/git SHA/构建时间) + 保留 N 版 + `install.sh --version`；② P1 独立信任锚：SHASUMS 与 tarball 同源（只防传输损坏不防源头被攻破），最低成本=哈希发布到第二通道（git tag/repo commit），进阶=cosign keyless 签名或 SLSA provenance；③ P2 `install.sh --uninstall` 卸载路径；④ P2 macOS LaunchAgent 依赖用户登录会话（重启后需自动登录），部署注意事项需明示，或评估 LaunchDaemon；⑤ P2 enroll-token 一次性加入令牌（对齐 Teleport join token，让「Agent 密钥只出现一次」体验闭环）；⑥ P3 Linux systemd 模板 + 安装后自检（healthz 断言）与 plist XML 值转义。评估对标来源：teleport managed updates v2 / tailscale installer.sh / curl|sh 供应链争议（rust-lang#1572）/ SLSA provenance
+- **执行面部署包行业对标补强（2026-11-02 评估，待实施）**：当前实现适合自托管场景（two-step 下载校验安装、用户态 launchd、幂等升级、SHA256 校验），对标 Teleport/Tailscale/Sigstore 实践有六项差距——① P1 版本化与回滚：artifacts 为 always-latest 单版本覆盖，改版本戳文件名 + manifest(版本/git SHA/构建时间) + 保留 N 版 + `install.sh --version`；② P1 独立信任锚：SHASUMS 与 tarball 同源（只防传输损坏不防源头被攻破），最低成本=哈希发布到第二通道（git tag/repo commit），进阶=cosign keyless 签名或 SLSA provenance；③ P2 `install.sh --uninstall` 卸载路径；④ P2 macOS LaunchAgent 依赖用户登录会话（重启后需自动登录），部署注意事项需明示，或评估 LaunchDaemon；⑤ ~~P2 enroll-token 一次性加入令牌~~ 已提前纳入 M3.8-3；⑥ P3 Linux systemd 模板 + plist XML 值转义（安装后自检已纳入 M3.8-3，不再单列）。评估对标来源：teleport managed updates v2 / tailscale installer.sh / curl|sh 供应链争议（rust-lang#1572）/ SLSA provenance
 
 ## 状态图例
 
@@ -214,3 +215,5 @@ P1 项(飞书长连接与回调穿 frp、SSE 穿 frp、launchd 用户域、长�
 | 2026-11-03 | **M2.5-7 双机验收关闭**:MacBook 经执行面一体部署包装机,cc-arch Agent 真实 headless 会话完成六步(真实读仓库回执,parent 挂链,根任务系统收口),双机采集流活,死信恢复回路自主三轮;部署包真机迭代修复七处(密钥兜底/bootstrap 回退/裸名 node/断链 claude/nvm PATH/cwd 校验/--model 透传) | 跨设备 A2A 从通道语义到真实会话执行全量闭环;安装器经真机淬炼后已可复制到第三台机器 |
 | 2026-11-03 | **跨 Agent 类型验证关闭(WorkBuddy 接入)**:小W秘书经官方 stdio MCP Connector 挂载 aw proxy,协议注入后真实完成 Claude Code→WorkBuddy 跨类型六步协作(回执经 spec 文件核验为真实),A 侧验收后根任务系统收口 | A2A 协议边界证实运行时无关:控制面判定(白名单/状态机/审计/自动收口)与运行时解耦,新运行时接入=注册身份+挂 MCP+注入协议三步;遗留 automations 自动唤醒与采集归因待补 |
 | 2026-11-03 | **数据与协同架构重基线，新增 M3.8/M3.9**：确定 PostgreSQL 同机 compose + pg_trgm/pgvector，旧业务数据与知识全部不导入；控制台远程控制类 MCP 直接替换 stdio，第三方 MCP 出界；每机单 aw-node，WorkBuddy 用官方 automations 且三项过程数据留空；Source 只整理事实，确定性 Git RouteRule 派工；真实 Bug 以 PR+当前提交 CI 待验收并由原 Bug 机器人人工接受/退回。M3.8-1 文档收口完成，后续按 PostgreSQL→远程 MCP/aw-node→协调内核→真实 Bug E2E 实施 | 单控制台小幅扩展下保留数据余量并简化执行机；避免 Source Memory、在线 Slow 与 Rules 共同路由难以排障；把上游 Task ACK 与 WorkItem 人工验收分开，形成可验证的真实业务闭环 |
+| 2026-11-03 | **确认端到端首次使用需求并纳入 M3.8**：新增 `/setup` 四步引导、一次性 enroll token、cc-connect 自动发现与预填、默认 bug_fix 装配和分项预检；M3.8-2 负责控制台初始化，M3.8-3 负责执行机加入、项目装配、远程 MCP 与自动化验收 | 首次使用从「照文档手工配置」改为「必要授权 + 一次安装 + 一次确认」，避免初始化成为真实 Bug 闭环前的认知障碍 |
+| 2026-11-03 | **补齐首次初始化安全闭环**：无凭据仅开放 bootstrap mode，一次性 bootstrap token 初始化管理员；enroll 独立鉴权；aw-node 上报 cc-connect 发现并自动下载配置与 ACK；`one_time_token` 记录哈希/TTL/消费状态；过期/重放不签发密钥，预检失败不就绪且不创建空 Assignment；enroll-token 与安装自检从后置池归入 M3.8-3 | 修复首次启动、跨机发现与配置落地、token 安全及验收反例缺口，确保 S9 不只是 happy path |

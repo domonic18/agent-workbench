@@ -10,7 +10,7 @@
 
 | 文档 | 说明 |
 |------|------|
-| [01-requirement.md](requirement/01-requirement.md) | **唯一需求文档**：一人公司愿景与终态、介入边界、12 个用户场景与去重关系、用户价值优先级、首个业务闭环、协作形态与横切走查、分期范围、验收、裁决与开放问题 |
+| [01-requirement.md](requirement/01-requirement.md) | **唯一需求文档**：一人公司愿景与终态、介入边界、12 个用户场景与去重关系、用户价值优先级、首次使用自动装配、真实 Bug 闭环、协作形态与横切走查、分期范围、验收、裁决与开放问题 |
 
 **控制台原型**（不在仓库内）：Ardot <https://ardot.tencent.com/file/741613178974645?node_id=0%3A1> —— 四屏桌面 + 任务详情抽屉 + 手机 390，共 6 屏；界面上的问号标注对应原文 §12 待确认项。
 
@@ -21,7 +21,7 @@
 | [00-总体架构设计.md](arch/00-总体架构设计.md) | 项目定位与 G1～G8、三平面、WorkItem/Mandate、确定性 Router、PostgreSQL、远程控制类 MCP、单 aw-node、目录与数据流 | 首次进入项目必读 |
 | [01-后端服务设计.md](arch/01-后端服务设计.md) | 进程模型、认证、远程 Streamable HTTP MCP、A2A、发件箱、SSE、飞书、Trigger、RouteRule、worker_inbox 与真实 Bug 闭环 | 做后端/接口/事件协调时 |
 | [02-数据服务设计.md](arch/02-数据服务设计.md) | PostgreSQL 表结构、WorkItem/Mandate/Assignment/Input/Handback、pg_trgm/pgvector、事件投影、一致性、greenfield 迁移与备份 | 改库、加字段或改协调模型时 |
-| [03-前端设计.md](arch/03-前端设计.md) | 四屏主导航、工作事项与 worker_inbox 下钻、注意力队列、只读详情、WorkBuddy 空态、实时订阅与移动适配 | 做界面时 |
+| [03-前端设计.md](arch/03-前端设计.md) | `/setup` 首次使用引导、四屏主导航、工作事项与 worker_inbox 下钻、注意力队列、只读详情、WorkBuddy 空态、实时订阅与移动适配 | 做界面或首次使用流程时 |
 | [04-采集器设计.md](arch/04-采集器设计.md) | 每机单 aw-node、采集断点续读、推送协议、缓冲重试、Claude Code 调度、WorkBuddy automations 与 launchd 部署 | 跨机采集或执行面部署时 |
 | [05-授权与闸门设计.md](arch/05-授权与闸门设计.md) | 能力模型、Teleport、审批流、控制台自有控制工具判定、确定性路由授权与审计 | 做授权或路由权限时 |
 | [06-架构评审记录.md](arch/06-架构评审记录.md) | 历史评审与历轮裁决，含被 2026-11-03 新基线 supersede 的旧方案；仅供核对当时证据，不直接作为现行架构 | 进入编码前、核对设计依据或拆分任务时 |
@@ -52,5 +52,5 @@
 ## 背景速览(新会话先看这里)
 
 - 项目来源:飞书《【项目】智能体工作台 · 立项书 · v0.2》(2026-10-29 立项,提出:诸葛东明,承办:随行-小W)
-- 核心决策:控制台 + 飞书双面并存;PostgreSQL 为业务事实源;控制台同一 HTTP 服务提供自有控制类 MCP，执行机每机仅一个 aw-node;本机第三方 MCP 与原生工具出界;Source 只整理事实，新工作按 `Thread owner → Git RouteRule → needs_person` 确定性分配;真实 Bug 以 PR+CI 待验收并由原 Bug 机器人人工接受/退回
+- 核心决策:控制台 + 飞书双面并存;PostgreSQL 为业务事实源;控制台同一 HTTP 服务提供自有控制类 MCP，执行机每机仅一个 aw-node;本机第三方 MCP 与原生工具出界;Source 只整理事实，新工作按 `Thread owner → Git RouteRule → needs_person` 确定性分配;首次使用以无凭据 bootstrap mode、`/setup` 四步、一次性 enroll token、aw-node 上报发现和配置轮换签发与 ACK 完成自动装配，预检失败不就绪;真实 Bug 以 PR+CI 待验收并由原 Bug 机器人人工接受/退回
 - 当前阶段:以 [plan/development-plan.md](plan/development-plan.md) 为准（本文件不维护进度,避免出现第二份状态）
