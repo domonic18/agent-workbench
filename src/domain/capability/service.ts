@@ -53,7 +53,7 @@ function requireCapability(db: Db, id: string): CapabilityRecord {
   return row;
 }
 
-export function createCapabilityService(deps: CapabilityServiceDeps): CapabilityService {
+export function createCapabilityService(deps: CapabilityServiceDeps): Promise<CapabilityService>{
   const { db, teleport } = deps;
   const now = deps.now ?? Date.now;
   const newId = deps.newId ?? (() => defaultId("cap"));
@@ -69,7 +69,7 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
     const id = newId();
     const createdAt = now();
     db.transaction(async () => {
-      insertCapability(db, {
+      await insertCapability(db, {
         id,
         subject: input.subject,
         target: input.target.trim(),

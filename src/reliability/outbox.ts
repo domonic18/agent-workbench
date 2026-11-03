@@ -35,7 +35,7 @@ export interface EnqueuePullInput {
 }
 
 /** 入队一条飞书推送(notification 类,失败只重试);同幂等键只保留首条 */
-export function enqueuePush(db: Db, input: EnqueuePushInput): OutboxRecord {
+export function enqueuePush(db: Db, input: EnqueuePushInput): Promise<OutboxRecord>{
   const payload: OutboxPushPayload = {
     chatId: input.chatId,
     ...(input.card === undefined ? {} : { card: input.card }),
@@ -44,7 +44,7 @@ export function enqueuePush(db: Db, input: EnqueuePushInput): OutboxRecord {
   };
   const payloadJson = JSON.stringify(payload);
   const now = input.now ?? Date.now();
-  return insertOutbox(db, {
+  return await insertOutbox(db, {
     id: newPrefixedId("ob"),
     idempotencyKey: input.idempotencyKey,
     channel: "push",
@@ -63,9 +63,9 @@ export function enqueuePush(db: Db, input: EnqueuePushInput): OutboxRecord {
  * 入队一条 A2A 信箱消息(business 类,pull 通道):只有对端 ACK 才算 delivered,
  * 失败不重试、不推进 round;拉取不产生 uncertain。
  */
-export function enqueuePull(db: Db, input: EnqueuePullInput): OutboxRecord {
+export async function enqueuePull(db: Db, input: EnqueuePullInput): OutboxRecord {
   const now = input.now ?? Date.now();
-  return insertOutbox(db, {
+  return await insertOutbox(db, {
     id: newPrefixedId("ob"),
     idempotencyKey: input.idempotencyKey,
     channel: "pull",

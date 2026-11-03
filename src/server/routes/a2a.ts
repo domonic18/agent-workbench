@@ -58,7 +58,7 @@ function optionalText(body: Record<string, unknown>, field: string): string | un
   return typeof value === "string" ? value : undefined;
 }
 
-export function registerA2aRoutes(app: FastifyInstance, options: A2aRoutesOptions): void {
+export function registerA2aRoutes(app: FastifyInstance, options: A2aRoutesOptions): Promise<void>{
   const db = options.db;
   const now = options.now ?? Date.now;
   const service = options.service ?? createA2aService({ db, now });

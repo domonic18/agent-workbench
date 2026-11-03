@@ -124,7 +124,7 @@ const outbox: OutboxSender | undefined =
 let inbound: FeishuInbound | undefined;
 let shuttingDown = false;
 
-function shutdown(): void {
+function shutdown(): Promise<void>{
   if (shuttingDown) {
     return;
   }

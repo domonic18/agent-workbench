@@ -54,11 +54,11 @@ export interface A2aService {
   send(input: A2aSendInput): Promise<A2aSendResult>;
   inbox(agentId: string, opts?: { cursor?: string; waitMs?: number }): Promise<A2aInboxResult>;
   /** 返回本轮沿 parent 链被系统收口的根任务(调用方据此发〔验收〕播报) */
-  ack(agentId: string, msgId: string, input?: A2aAckInput): TaskRecord[];
+  ack(agentId: string, msgId: string, input?: A2aAckInput): Promise<TaskRecord[]>;
   /** 交接通知的渲染元数据;非 request/escalate 或消息/参与方缺失时返回 null */
-  handoffNotice(msgId: string): HandoffNotice | null;
+  handoffNotice(msgId: string): Promise<HandoffNotice | null>;
   /** 接单播报的渲染元数据;非 request/escalate、未 ack 或参与方缺失时返回 null */
-  acceptNotice(msgId: string, childTaskId?: string): AcceptNotice | null;
+  acceptNotice(msgId: string, childTaskId?: string): Promise<AcceptNotice | null>;
   /** 发送落库后唤醒该收件方的长轮询 */
   wake(agentId: string): void;
 }

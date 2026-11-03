@@ -25,12 +25,12 @@ export interface LoginLockoutDeps {
  * 登录失败锁定(01 §3):按来源连续失败计数,达到上限锁 10 分钟。
  * 只作用于登录接口;已登录会话不受影响。计数落库,重启不绕锁。
  */
-export function createLoginLockoutGuard(deps: LoginLockoutDeps): LoginLockoutGuard {
+export function createLoginLockoutGuard(deps: LoginLockoutDeps): Promise<LoginLockoutGuard>{
   const { db } = deps;
   const now = deps.now ?? Date.now;
 
   function isLocked(source: string): boolean {
-    const row = findLoginFailure(db, source);
+    const row = await findLoginFailure(db, source);
     if (row === undefined) {
       return false;
     }
@@ -50,7 +50,7 @@ export function createLoginLockoutGuard(deps: LoginLockoutDeps): LoginLockoutGua
 
   function fail(source: string): void {
     const at = now();
-    const current = findLoginFailure(db, source);
+    const current = await findLoginFailure(db, source);
     const failures = (current?.failures ?? 0) + 1;
     const lockedUntil =
       failures >= LOGIN_LOCKOUT.maxFailures ? at + LOGIN_LOCKOUT.lockMs : null;

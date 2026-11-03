@@ -225,7 +225,7 @@ export interface CardSender {
 }
 
 /** 把发件箱载荷投递为卡片或文本播报;业务状态由调用方的发件箱状态机维护 */
-export function createCardSender(client: Lark.Client): CardSender {
+export function createCardSender(client: Lark.Client): Promise<CardSender>{
   return {
     async send(target) {
       const isText = target.text !== undefined;
