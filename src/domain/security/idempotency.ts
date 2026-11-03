@@ -26,7 +26,7 @@ export function createIdempotencyService(deps: IdempotencyDeps): IdempotencyServ
   return {
     find: (scope, key) => findIdempotencyResource(db, scope, key),
     run(scope, key, work) {
-      return db.transaction(() => {
+      return db.transaction(async () => {
         const created = work();
         saveIdempotencyResource(db, {
           scope,

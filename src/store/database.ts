@@ -13,11 +13,11 @@ import { Pool, type PoolClient, types, type QueryResult } from "pg";
  */
 export interface Db {
   query(sql: string, params?: unknown[]): Promise<QueryResult>;
-  /** 取第一行;无行返回 undefined。等价旧 better-sqlite3 的 `get` */
-  get<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<T | undefined>;
-  all<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<T[]>;
+  /** 取第一行;无行返回 undefined。等价旧 better-sqlite3 的 `get`(变参绑定) */
+  get<T = Record<string, unknown>>(sql: string, ...params: unknown[]): Promise<T | undefined>;
+  all<T = Record<string, unknown>>(sql: string, ...params: unknown[]): Promise<T[]>;
   /** 写语句;`changes` 取 affected rows,供 CAS(`changes === 1`)判定 */
-  run(sql: string, params?: unknown[]): Promise<{ changes: number }>;
+  run(sql: string, ...params: unknown[]): Promise<{ changes: number }>;
   /** 多语句脚本(迁移用),不带参数,走 simple query 协议 */
   exec(sql: string): Promise<void>;
   /** 事务:专用连接 BEGIN/COMMIT,异常 ROLLBACK 并向上抛 */
@@ -52,17 +52,17 @@ class PgHandle implements Db {
     return this.source.query(toPgPlaceholders(sql), params);
   }
 
-  async get<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T | undefined> {
+  async get<T = Record<string, unknown>>(sql: string, ...params: unknown[]): Promise<T | undefined> {
     const result = await this.query(sql, params);
     return result.rows[0] as T | undefined;
   }
 
-  async all<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
+  async all<T = Record<string, unknown>>(sql: string, ...params: unknown[]): Promise<T[]> {
     const result = await this.query(sql, params);
     return result.rows as T[];
   }
 
-  async run(sql: string, params: unknown[] = []): Promise<{ changes: number }> {
+  async run(sql: string, ...params: unknown[]): Promise<{ changes: number }> {
     const result = await this.query(sql, params);
     return { changes: rowCountOf(result) };
   }

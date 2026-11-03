@@ -111,7 +111,7 @@ export function createIdentityService(deps: IdentityServiceDeps): IdentityServic
       throw new IdentityError("CONFLICT", `机器 ${id} 已注册;重置密钥请走轮换接口`);
     }
     const secret = generateSecret();
-    db.transaction(() => {
+    db.transaction(async () => {
       insertMachine(db, {
         id,
         hostname,
@@ -145,7 +145,7 @@ export function createIdentityService(deps: IdentityServiceDeps): IdentityServic
     const allowedTargetsJson = JSON.stringify(normalizeTargets(input.allowedTargets));
     const id = newAgentId();
     const secret = generateSecret();
-    db.transaction(() => {
+    db.transaction(async () => {
       insertAgent(db, {
         id,
         machineId,

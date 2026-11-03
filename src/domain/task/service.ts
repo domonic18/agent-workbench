@@ -161,7 +161,7 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
 
     const id = newTaskId();
     const at = now();
-    db.transaction(() => {
+    db.transaction(async () => {
       insertTask(db, {
         id,
         title,
@@ -244,7 +244,7 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
     const endedAt =
       nextStatus === "done" || nextStatus === "cancelled" ? (task.endedAt ?? at) : task.endedAt;
 
-    const autoClosed: TaskRecord[] = db.transaction(() => {
+    const autoClosed: TaskRecord[] = db.transaction(async () => {
       const applied = updateTask(db, {
         id: task.id,
         fromStage: task.stage,

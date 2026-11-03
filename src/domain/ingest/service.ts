@@ -167,7 +167,7 @@ export function createIngestService(deps: IngestServiceDeps): IngestService {
       }
 
       try {
-        db.transaction(() => {
+        db.transaction(async () => {
           const payload = asRecord(item.payload);
           const recorded = runService.recordEvent({
             agentId: agent.id,

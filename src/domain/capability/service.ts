@@ -68,7 +68,7 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
     }
     const id = newId();
     const createdAt = now();
-    db.transaction(() => {
+    db.transaction(async () => {
       insertCapability(db, {
         id,
         subject: input.subject,
@@ -98,7 +98,7 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
 
     const ticketId = newTicketId();
     const approvedAt = now();
-    const moved = db.transaction(() => {
+    const moved = db.transaction(async () => {
       const applied = transitionCapability(db, {
         id,
         from: "pending",
@@ -131,7 +131,7 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
       });
     } catch (error) {
       const failedAt = now();
-      db.transaction(() => {
+      db.transaction(async () => {
         const applied = transitionCapability(db, {
           id,
           from: "issuing",
@@ -156,7 +156,7 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
     }
 
     const issuedAt = now();
-    const activated = db.transaction(() => {
+    const activated = db.transaction(async () => {
       const applied = transitionCapability(db, {
         id,
         from: "issuing",
@@ -186,7 +186,7 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
       return { applied: false, capability: row };
     }
     const decidedAt = now();
-    const applied = db.transaction(() => {
+    const applied = db.transaction(async () => {
       const moved = transitionCapability(db, {
         id,
         from: "pending",
@@ -214,7 +214,7 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
       return { applied: false, capability: row };
     }
     const revokedAt = now();
-    const applied = db.transaction(() => {
+    const applied = db.transaction(async () => {
       const moved = transitionCapability(db, {
         id,
         from: "active",
@@ -242,7 +242,7 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
     const at = now();
     let expired = 0;
     for (const row of findStalePending(db, at - CAPABILITY_TIMEOUTS.pendingMs)) {
-      const applied = db.transaction(() => {
+      const applied = db.transaction(async () => {
         if (
           !transitionCapability(db, {
             id: row.id,
@@ -274,7 +274,7 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
     const at = now();
     let reconciled = 0;
     for (const row of findStaleIssuing(db, at - CAPABILITY_TIMEOUTS.issuingMs)) {
-      const applied = db.transaction(() => {
+      const applied = db.transaction(async () => {
         if (
           !transitionCapability(db, {
             id: row.id,

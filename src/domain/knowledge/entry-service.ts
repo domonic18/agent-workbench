@@ -168,7 +168,7 @@ export function createKnowledgeEntryService(
       if (input.category !== undefined) {
         meta.category = input.category;
       }
-      db.transaction(() => {
+      db.transaction(async () => {
         if (!updateKnowledgeEntryMeta(db, meta)) {
           throw new KnowledgeError("NOT_FOUND", `知识条目不存在: ${id}`);
         }

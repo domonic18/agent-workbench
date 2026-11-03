@@ -96,7 +96,7 @@ export async function indexKnowledgeEntry(
       : "ready";
   const now = (options.now ?? Date.now)();
 
-  db.transaction(() => {
+  db.transaction(async () => {
     const oldChunkIds = listKnowledgeChunkIds(db, entry.id);
     deleteKnowledgeChunks(db, entry.id);
     const newChunkIds = chunks.map((chunk, index) =>

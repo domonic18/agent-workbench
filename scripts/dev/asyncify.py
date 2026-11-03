@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""给函数体含 await 的声明补 async(export 语序自动修正,函数间补空行)。"""
+"""给 async 函数的同步返回类型注解包裹 Promise<T>(M3.8-2 存储层迁移工具)。"""
 import sys, re
 
 def match_brace(text, start):
@@ -44,11 +44,15 @@ def match_paren(text, start):
         i += 1
     return -1
 
+FN_RE = re.compile(r'(?:export\s+)?(?:async\s+)?function\s+[A-Za-z_$][\w$]*\s*\(')
+
 def asyncify_text(text):
-    pieces = []
+    result = []
+    cursor = 0
+    changed = False
     last_end = 0
-    for m in re.finditer(r'(?:^|[\n;}])\s*((?:export\s+)?function\s+[A-Za-z_$][\w$]*\s*\()', text):
-        decl_start = m.start(1)
+    for m in FN_RE.finditer(text):
+        decl_start = m.start()
         if decl_start < last_end:
             continue
         open_paren = m.end() - 1
@@ -61,34 +65,22 @@ def asyncify_text(text):
         close_brace = match_brace(text, brace)
         if close_brace == -1:
             continue
-        body = text[brace:close_brace]
-        decl = text[m.start(1):open_paren]
-        already = text[max(0, decl_start - 6):decl_start].rstrip().endswith('async')
-        needs = ('await ' in body) or ('await(' in body)
-        pieces.append((decl_start, close_brace + 1, decl, needs, already, text[last_end:decl_start]))
         last_end = close_brace + 1
-
-    result = []
-    cursor = 0
-    changed = False
-    for decl_start, end, decl, needs, already, gap in pieces:
-        if needs and not already:
-            if decl.startswith('export'):
-                insert_at = decl_start + len('export ')
-                result.append(text[cursor:insert_at])
-                result.append('async ')
-            else:
-                result.append(text[cursor:decl_start])
-                result.append('async ')
-            changed = True
-        else:
-            result.append(text[cursor:decl_start])
-        result.append(text[decl_start:end])
-        cursor = end
+        body = text[brace:close_brace]
+        needs = ('await ' in body) or ('await(' in body)
+        annot = text[close_paren + 1:brace]
+        already_async = 'async ' in text[m.start():open_paren]
+        needs_promise = needs and re.match(r'^\s*:\s*(?!\s*Promise<)(.+)$', annot, re.DOTALL) is not None
+        if not (needs and not already_async and needs_promise):
+            continue
+        result.append(text[cursor:close_paren + 1])
+        m_annot = re.match(r'^\s*:\s*(.+)$', annot, re.DOTALL)
+        result.append(': Promise<' + m_annot.group(1).strip() + '>')
+        result.append(text[brace:close_brace + 1])
+        cursor = close_brace + 1
+        changed = True
     result.append(text[cursor:])
-    new = ''.join(result)
-    new = re.sub(r'\}(?=(?:export\s+)?(?:async\s+)?function\b)', '}\n\n', new)
-    return new, changed
+    return ''.join(result), changed
 
 def process(path):
     s = open(path, encoding='utf-8').read()

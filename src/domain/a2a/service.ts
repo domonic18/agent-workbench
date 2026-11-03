@@ -262,7 +262,7 @@ export function createA2aService(deps: A2aServiceDeps): A2aService {
 
   function ack(agentId: string, msgId: string, input: A2aAckInput = {}): TaskRecord[] {
     const at = now();
-    return db.transaction(() => {
+    return db.transaction(async () => {
       const message = findMessageById(db, msgId);
       if (message === undefined) {
         throw new A2aError("NOT_FOUND", `消息 ${msgId} 不存在`);
