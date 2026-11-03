@@ -146,9 +146,7 @@ export function transitionCapability(db: Db, input: CapabilityTransition): boole
     sets.push("revoked_at = @revokedAt");
     params.revokedAt = input.revokedAt;
   }
-  const result = db
-    .prepare(`UPDATE capability SET ${sets.join(", ")} WHERE id = @id AND status = @from`)
-    .run(params);
+  const result = await db.run(`UPDATE capability SET ${sets.join(", ")} WHERE id = ? AND status = ?`, params.id, params.from);
   return result.changes === 1;
 }
 
