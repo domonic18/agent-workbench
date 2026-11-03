@@ -7,8 +7,8 @@ export interface NewToolCallLog extends ToolCallAudit {
 }
 
 /** append-only:触发器拒绝 UPDATE/DELETE,这里只提供 INSERT */
-export function insertToolCallLog(db: Db, entry: NewToolCallLog): void {
-  db.prepare(
+export function insertToolCallLog(db: Db, entry: NewToolCallLog): Promise<void>{
+  await db.run(
     `INSERT INTO tool_call_log
        (run_id, agent_id, task_id, tool, args_hash, level, verdict, reason,
         capability_id, duration_ms, occurred_at)
@@ -16,5 +16,5 @@ export function insertToolCallLog(db: Db, entry: NewToolCallLog): void {
        (@runId, @agentId, @taskId, @tool, @argsHash, @level, @verdict, @reason,
         @capabilityId, @durationMs, @occurredAt
   ON CONFLICT DO NOTHING)`,
-  ).run(entry);
+  , entry);
 }
