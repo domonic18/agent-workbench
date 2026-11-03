@@ -71,7 +71,7 @@ def asyncify_text(text):
         annot = text[close_paren + 1:brace]
         already_async = 'async ' in text[m.start():open_paren]
         needs_promise = needs and re.match(r'^\s*:\s*(?!\s*Promise<)(.+)$', annot, re.DOTALL) is not None
-        if not (needs and not already_async and needs_promise):
+        if not needs_promise:
             continue
         result.append(text[cursor:close_paren + 1])
         m_annot = re.match(r'^\s*:\s*(.+)$', annot, re.DOTALL)
