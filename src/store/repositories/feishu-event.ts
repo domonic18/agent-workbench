@@ -11,15 +11,11 @@ export function claimFeishuEvent(
   eventId: string,
   eventType: string,
   now: number = Date.now(),
-): boolean {
-  const inserted = db
-    .prepare(
-      "INSERT OR IGNORE INTO feishu_event (event_id, event_type, received_at) VALUES (?, ?, ?)",
-    )
-    .run(eventId, eventType, now);
+): Promise<boolean>{
+  const inserted = await db.run("INSERT OR IGNORE INTO feishu_event (event_id, event_type, received_at) VALUES (?, ?, ?)",, eventId, eventType, now);
   if (inserted.changes === 0) {
     return false;
   }
-  db.prepare("DELETE FROM feishu_event WHERE received_at < ?").run(now - RETENTION_MS);
+  await db.run("DELETE FROM feishu_event WHERE received_at < ?", now - RETENTION_MS);
   return true;
 }

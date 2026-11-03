@@ -29,18 +29,16 @@ export interface NewAgentRun {
   startedAt: number;
 }
 
-export function insertRun(db: Db, run: NewAgentRun): void {
-  db.prepare(
-    `INSERT INTO agent_run
+export function insertRun(db: Db, run: NewAgentRun): Promise<void>{
+  await db.run(``INSERT INTO agent_run
        (id, agent_id, machine, project, stream_id, task_id, status,
         started_at, last_seen_at, ended_at)
-     VALUES (@id, @agentId, @machine, @project, @streamId, NULL, 'running',
-             @startedAt, @startedAt, NULL)`,
-  ).run(run);
+     VALUES (?, ?, ?, ?, ?, NULL, 'running',
+             ?, ?, NULL)`,`, run.id, run.agentId, run.machine, run.project, run.streamId, run.startedAt, run.startedAt);
 }
 
-export function findRunById(db: Db, id: string): AgentRunRecord | undefined {
-  return db.prepare(`SELECT ${RUN_COLUMNS} FROM agent_run WHERE id = ?`).get(id) as
+export function findRunById(db: Db, id: string): Promise<AgentRunRecord | undefined>{
+  return await db.get(`SELECT ${RUN_COLUMNS} FROM agent_run WHERE id = ?`, id) as
     | AgentRunRecord
     | undefined;
 }
@@ -50,34 +48,22 @@ export function findRunningRunForStream(
   db: Db,
   agentId: string,
   streamId: string,
-): AgentRunRecord | undefined {
-  return db
-    .prepare(
-      `SELECT ${RUN_COLUMNS} FROM agent_run
+): Promise<AgentRunRecord | undefined>{
+  return await db.get(`SELECT ${RUN_COLUMNS} FROM agent_run
        WHERE agent_id = ? AND stream_id = ? AND status = 'running'
-       ORDER BY last_seen_at DESC, id DESC LIMIT 1`,
-    )
-    .get(agentId, streamId) as AgentRunRecord | undefined;
+       ORDER BY last_seen_at DESC, id DESC LIMIT 1`,, agentId, streamId) as AgentRunRecord | undefined;
 }
 
 /** 晚到事件不得回拨 last_seen_at:调用方传入 max(当前值, 事件时间) */
-export function touchRunLastSeen(db: Db, id: string, lastSeenAt: number): boolean {
+export function touchRunLastSeen(db: Db, id: string, lastSeenAt: number): Promise<boolean>{
   return (
-    db
-      .prepare(
-        "UPDATE agent_run SET last_seen_at = ? WHERE id = ? AND status = 'running' AND last_seen_at <= ?",
-      )
-      .run(lastSeenAt, id, lastSeenAt).changes === 1
+    (await db.run("UPDATE agent_run SET last_seen_at = ? WHERE id = ? AND status = 'running' AND last_seen_at <= ?",, lastSeenAt, id, lastSeenAt)).changes === 1
   );
 }
 
-export function endRun(db: Db, id: string, endedAt: number): boolean {
+export function endRun(db: Db, id: string, endedAt: number): Promise<boolean>{
   return (
-    db
-      .prepare(
-        "UPDATE agent_run SET status = 'ended', ended_at = ? WHERE id = ? AND status = 'running'",
-      )
-      .run(endedAt, id).changes === 1
+    (await db.run("UPDATE agent_run SET status = 'ended', ended_at = ? WHERE id = ? AND status = 'running'",, endedAt, id)).changes === 1
   );
 }
 
@@ -89,22 +75,16 @@ export function findLatestUnboundRunningRunByAgent(
   db: Db,
   agentId: string,
   activeSince: number,
-): AgentRunRecord | undefined {
-  return db
-    .prepare(
-      `SELECT ${RUN_COLUMNS} FROM agent_run
+): Promise<AgentRunRecord | undefined>{
+  return await db.get(`SELECT ${RUN_COLUMNS} FROM agent_run
        WHERE agent_id = ? AND status = 'running' AND task_id IS NULL AND last_seen_at >= ?
-       ORDER BY last_seen_at DESC, id DESC LIMIT 1`,
-    )
-    .get(agentId, activeSince) as AgentRunRecord | undefined;
+       ORDER BY last_seen_at DESC, id DESC LIMIT 1`,, agentId, activeSince) as AgentRunRecord | undefined;
 }
 
 /** 一个 run 至多归属一条任务:首次绑定后不可覆盖(02 §3.1) */
-export function bindRunTaskIfEmpty(db: Db, id: string, taskId: string): boolean {
+export function bindRunTaskIfEmpty(db: Db, id: string, taskId: string): Promise<boolean>{
   return (
-    db
-      .prepare("UPDATE agent_run SET task_id = ? WHERE id = ? AND task_id IS NULL")
-      .run(taskId, id).changes === 1
+    (await db.run("UPDATE agent_run SET task_id = ? WHERE id = ? AND task_id IS NULL", taskId, id)).changes === 1
   );
 }
 
@@ -140,13 +120,11 @@ export interface NewTimelineEvent {
   occurredAt: number;
 }
 
-export function insertTimelineEvent(db: Db, event: NewTimelineEvent): void {
-  db.prepare(
-    `INSERT INTO timeline_event
+export function insertTimelineEvent(db: Db, event: NewTimelineEvent): Promise<void>{
+  await db.run(``INSERT INTO timeline_event
        (id, run_id, turn_id, block_id, ord, block_rev, "offset", kind, payload_json, occurred_at)
-     VALUES (@id, @runId, @turnId, @blockId, @ord, @blockRev, @offset, @kind, @payloadJson,
-             @occurredAt)`,
-  ).run({
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,
+             ?)`,`, {
     id: event.id,
     runId: event.runId,
     turnId: event.turnId,
@@ -161,20 +139,12 @@ export function insertTimelineEvent(db: Db, event: NewTimelineEvent): void {
 }
 
 /** 块内当前新鲜度;没有该块的旧事件时返回 0,便于统一比较 */
-export function maxBlockRev(db: Db, runId: string, blockId: string): number {
-  const row = db
-    .prepare(
-      "SELECT COALESCE(MAX(block_rev), 0) AS blockRev FROM timeline_event WHERE run_id = ? AND block_id = ?",
-    )
-    .get(runId, blockId) as { blockRev: number };
+export function maxBlockRev(db: Db, runId: string, blockId: string): Promise<number>{
+  const row = await db.get("SELECT COALESCE(MAX(block_rev), 0) AS blockRev FROM timeline_event WHERE run_id = ? AND block_id = ?",, runId, blockId) as { blockRev: number };
   return row.blockRev;
 }
 
-export function listTimelineEventsByRun(db: Db, runId: string): TimelineEventRecord[] {
-  return db
-    .prepare(
-      `SELECT ${TIMELINE_COLUMNS} FROM timeline_event
-       WHERE run_id = ? ORDER BY occurred_at ASC, ord ASC, id ASC`,
-    )
-    .all(runId) as TimelineEventRecord[];
+export function listTimelineEventsByRun(db: Db, runId: string): Promise<TimelineEventRecord[]>{
+  return await db.all(`SELECT ${TIMELINE_COLUMNS} FROM timeline_event
+       WHERE run_id = ? ORDER BY occurred_at ASC, ord ASC, id ASC`,, runId) as TimelineEventRecord[];
 }
