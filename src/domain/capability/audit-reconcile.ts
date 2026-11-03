@@ -36,7 +36,7 @@ export interface AuditReconcilerDeps {
  * 审计对账(05 §7):逐条核对 tool_call_log → capability(ticket_id) → session.start。
  * 只读事实,不做修复;对不上的落缺口表,重跑按 dedup_key 幂等。
  */
-export function createAuditReconciler(deps: AuditReconcilerDeps): Promise<AuditReconciler>{
+export function createAuditReconciler(deps: AuditReconcilerDeps): AuditReconciler {
   const { db, teleportAudit } = deps;
   const now = deps.now ?? Date.now;
 

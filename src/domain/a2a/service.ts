@@ -44,7 +44,7 @@ import type {
   A2aServiceDeps,
 } from "./types.js";
 
-export function createA2aService(deps: A2aServiceDeps): Promise<A2aService>{
+export function createA2aService(deps: A2aServiceDeps): A2aService {
   const { db } = deps;
   const now = deps.now ?? Date.now;
   const newMsgId = deps.newMsgId ?? (() => newPrefixedId("msg"));

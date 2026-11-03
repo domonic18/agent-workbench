@@ -41,9 +41,9 @@ try {
   throw error;
 }
 
-const teleport = await createTeleportAdapter(config.teleport, createProcessRunner());
-const service = createCapabilityService({ db, teleport });
-const a2a = createA2aService({ db });
+const teleport = createTeleportAdapter(config.teleport, createProcessRunner());
+const service = await createCapabilityService({ db, teleport });
+const a2a = await createA2aService({ db });
 const knowledgeRebuilder = createKnowledgeRebuilder({
   databaseUrl: config.databaseUrl,
   knowledgeDir: config.knowledgeDir,
@@ -56,7 +56,7 @@ const knowledgeIndexer = await createKnowledgeIndexService({
   knowledgeDir: config.knowledgeDir,
   ...(knowledgeEmbedding === undefined ? {} : { embedding: knowledgeEmbedding }),
 });
-const knowledgeEntries = createKnowledgeEntryService({
+const knowledgeEntries = await createKnowledgeEntryService({
   db,
   knowledgeDir: config.knowledgeDir,
   indexer: knowledgeIndexer,

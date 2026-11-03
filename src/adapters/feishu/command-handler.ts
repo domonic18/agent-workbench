@@ -17,7 +17,7 @@ export interface CommandHandlerDeps {
 export function createCommandHandler(
   db: Db,
   deps: CommandHandlerDeps,
-): Promise<(event: InboundMessage) => void | Promise<void>>{
+): (event: InboundMessage) => void | Promise<void> {
   return async (event) => {
     const text = event.messageType === "text" ? extractText(event.content) : undefined;
     const result = executeCommand(
