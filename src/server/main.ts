@@ -14,7 +14,7 @@ import { createEmbeddingClient } from "../domain/knowledge/embedding.js";
 import { createKnowledgeEntryService } from "../domain/knowledge/entry-service.js";
 import { createKnowledgeIndexService } from "../domain/knowledge/index-service.js";
 import { createKnowledgeRebuilder } from "../domain/knowledge/rebuild.js";
-import { isDatabaseWritable, openDatabase } from "../store/database.js";
+import { createDb, type Db } from "../store/database.js";
 import { acquireInstanceLock } from "../store/lock.js";
 import { runMigrations } from "../store/migrator.js";
 import { buildApp } from "./app.js";
@@ -29,29 +29,29 @@ import { startOutboxSender, type OutboxSender } from "./jobs/send-worker.js";
 // 启动顺序(01 §2):env → 单实例锁 → 打开库 → 迁移与口令初始化 → 注册路由 → 监听。
 // 锁先于开库:第二个进程不能在第一个进程的库上跑迁移。
 const config = loadConfig();
-const lock = acquireInstanceLock(join(dirname(config.databasePath), "console.lock"));
-const db = openDatabase(config.databasePath);
+const lock = acquireInstanceLock(join(process.cwd(), "console.lock"));
+const db = await createDb(config.databaseUrl);
 
 try {
-  runMigrations(db);
-  ensureConsoleCredential(db, config.consoleInitPassword);
+  await runMigrations(db);
+  await ensureConsoleCredential(db, config.consoleInitPassword);
 } catch (error) {
-  db.close();
+  await db.close();
   lock.release();
   throw error;
 }
 
-const teleport = createTeleportAdapter(config.teleport, createProcessRunner());
+const teleport = await createTeleportAdapter(config.teleport, createProcessRunner());
 const service = createCapabilityService({ db, teleport });
 const a2a = createA2aService({ db });
 const knowledgeRebuilder = createKnowledgeRebuilder({
-  databasePath: config.databasePath,
+  databaseUrl: config.databaseUrl,
   knowledgeDir: config.knowledgeDir,
   ...(config.embedding === undefined ? {} : { embedding: config.embedding }),
 });
 const knowledgeEmbedding =
   config.embedding === undefined ? undefined : createEmbeddingClient(config.embedding);
-const knowledgeIndexer = createKnowledgeIndexService({
+const knowledgeIndexer = await createKnowledgeIndexService({
   db,
   knowledgeDir: config.knowledgeDir,
   ...(knowledgeEmbedding === undefined ? {} : { embedding: knowledgeEmbedding }),
@@ -139,8 +139,8 @@ function shutdown(): void {
   const timer = setTimeout(() => process.exit(1), 10_000);
   timer.unref();
   void app.close().then(
-    () => {
-      db.close();
+    async () => {
+      await db.close();
       lock.release();
       process.exit(0);
     },

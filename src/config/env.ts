@@ -8,7 +8,7 @@ const envSchema = z.object({
     .default("info"),
   HOST: z.string().min(1).default("127.0.0.1"),
   PORT: z.coerce.number().int().min(1).max(65_535).default(8787),
-  DATABASE_PATH: z.string().min(1).default("./workspace/console.db"),
+  DATABASE_URL: z.string().min(1).default("postgres://agent_workbench@127.0.0.1:5433/agent_workbench"),
   // Markdown 知识条目目录(文本真相源);索引与元数据只是可重建的镜像
   KNOWLEDGE_DIR: z.string().min(1).default("./workspace/knowledge"),
   // OpenAI 兼容嵌入接口;未配齐则只建关键词索引,条目保持 pending
@@ -57,7 +57,7 @@ export interface Config {
   logLevel: string;
   host: string;
   port: number;
-  databasePath: string;
+  databaseUrl: string;
   knowledgeDir: string;
   embedding: EmbeddingConfig | undefined;
   consoleInitPassword: string | undefined;
@@ -146,7 +146,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     logLevel: parsed.data.LOG_LEVEL,
     host: parsed.data.HOST,
     port: parsed.data.PORT,
-    databasePath: parsed.data.DATABASE_PATH,
+    databaseUrl: parsed.data.DATABASE_URL,
     knowledgeDir: parsed.data.KNOWLEDGE_DIR,
     embedding: parseEmbedding(parsed.data),
     consoleInitPassword:
