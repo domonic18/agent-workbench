@@ -16,7 +16,7 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   {
     // 运维脚本直接跑 Node,不参与 tsc;补齐 Node 运行时全局
-    files: ["scripts/**/*.mjs"],
+    files: ["scripts/**/*.mjs", "e2e/**/*.mjs"],
     languageOptions: {
       globals: {
         AbortController: "readonly",
