@@ -52,13 +52,13 @@ agent-bundle: build ## 打包执行面一键部署包(collector+proxy bundle+调
 	mkdir -p dist/agent-host workspace/artifacts
 	pnpm run bundle:proxy
 	cp scripts/aw-dispatch.mjs scripts/enroll-agent.mjs scripts/install-agent-host.sh dist/agent-host/
-	@if [ -f collector/dist/bin/aw-collector-macos-$(AW_ARCH) ]; then \
-		cp collector/dist/bin/aw-collector-macos-$(AW_ARCH) dist/agent-host/aw-collector-macos-$(AW_ARCH); \
-	elif [ -f $(HOME)/.local/bin/aw-collector ]; then \
-		cp $(HOME)/.local/bin/aw-collector dist/agent-host/aw-collector-macos-$(AW_ARCH); \
-	else echo "缺采集器二进制:先 bun run package 或确认 ~/.local/bin/aw-collector"; exit 1; fi
+	@if [ -f collector/dist/bin/aw-node-macos-$(AW_ARCH) ]; then \
+		cp collector/dist/bin/aw-node-macos-$(AW_ARCH) dist/agent-host/aw-node-macos-$(AW_ARCH); \
+	elif [ -f $(HOME)/.local/bin/aw-node ]; then \
+		cp $(HOME)/.local/bin/aw-node dist/agent-host/aw-node-macos-$(AW_ARCH); \
+	else echo "缺采集器二进制:先 bun run package 或确认 ~/.local/bin/aw-node"; exit 1; fi
 	tar -czf workspace/artifacts/aw-agent-host-darwin-$(AW_ARCH).tar.gz -C dist/agent-host \
-		aw-collector-macos-$(AW_ARCH) aw-proxy.mjs aw-dispatch.mjs enroll-agent.mjs
+		aw-node-macos-$(AW_ARCH) aw-proxy.mjs aw-dispatch.mjs enroll-agent.mjs
 	cd workspace/artifacts && shasum -a 256 aw-agent-host-darwin-$(AW_ARCH).tar.gz > SHASUMS256.txt
 	cp dist/agent-host/install-agent-host.sh workspace/artifacts/install.sh
 	@echo "部署包: workspace/artifacts/(install.sh + tar.gz + SHASUMS256.txt)"

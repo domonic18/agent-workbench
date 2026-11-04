@@ -43,7 +43,7 @@ jobs:
         run: |
           set -eu
           cd collector/dist/bin
-          shasum -a 256 aw-collector-macos-arm64 aw-collector-macos-x64 > checksums.txt
+          shasum -a 256 aw-node-macos-arm64 aw-node-macos-x64 > checksums.txt
           cat checksums.txt
 
       - name: Publish release
@@ -53,12 +53,12 @@ jobs:
         run: |
           set -eu
           cd collector/dist/bin
-          cp ../../../scripts/install-collector.sh .
+          cp ../../../scripts/install-aw-node.sh .
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" --clobber aw-collector-macos-arm64 aw-collector-macos-x64 checksums.txt install-collector.sh
+            gh release upload "$TAG" --clobber aw-node-macos-arm64 aw-node-macos-x64 checksums.txt install-aw-node.sh
           else
             gh release create "$TAG" \
-              --title "Collector ${TAG#collector-}" \
-              --notes "采集器预编译产物(macOS arm64 / x64)。安装见 install-collector.sh。" \
-              aw-collector-macos-arm64 aw-collector-macos-x64 checksums.txt install-collector.sh
+              --title "aw-node ${TAG#collector-}" \
+              --notes "aw-node 预编译产物(macOS arm64 / x64)。安装见 install-aw-node.sh。" \
+              aw-node-macos-arm64 aw-node-macos-x64 checksums.txt install-aw-node.sh
           fi
