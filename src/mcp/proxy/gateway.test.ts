@@ -2,7 +2,6 @@ import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
 import { describe, expect, it } from "vitest";
 import type { RunContext } from "../../domain/capability/gate.js";
 import { openDatabase } from "../../store/database.js";
-import { runMigrations } from "../../store/migrator.js";
 import { insertToolCallLog } from "../../store/repositories/tool-call-log.js";
 import type { ToolCallAudit } from "../../shared/audit.js";
 import { createGateway, exposeToolName } from "./gateway.js";
@@ -110,8 +109,7 @@ describe("gateway", () => {
   });
 
   it("任务不存在导致审计失败时同样拒绝(真实库外键)", async () => {
-    const db = openDatabase(":memory:");
-    runMigrations(db);
+    const db = await openDatabase();
     const upstream = fakeUpstream("fs", ["read"]);
     const gateway = createGateway({
       ctx: context({ taskId: "T-missing" }),
@@ -123,7 +121,7 @@ describe("gateway", () => {
     const result = await gateway.callTool("fs__read", {});
     expect(result.isError).toBe(true);
     expect(upstream.calls).toHaveLength(0);
-    db.close();
+    await db.close();
   });
 
   it("L2 未接入审批通道时拒绝", async () => {

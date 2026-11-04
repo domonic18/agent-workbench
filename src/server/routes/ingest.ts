@@ -93,10 +93,10 @@ export function registerIngestRoutes(app: FastifyInstance, options: IngestRoutes
       return validationError(reply, parsed.error);
     }
     // 心跳只推进机器存活时间与取回可推送项目;CPU / 内存等指标不入库
-    touchMachineLastSeen(db, machine.id, now());
+    await touchMachineLastSeen(db, machine.id, now());
     return reply.code(200).send({
       ok: true,
-      projects: listActiveAgentProjects(db, machine.id),
+      projects: await listActiveAgentProjects(db, machine.id),
       server_time: now(),
     });
   });
@@ -104,7 +104,7 @@ export function registerIngestRoutes(app: FastifyInstance, options: IngestRoutes
   app.get("/api/ingest/projects", { preHandler: [requireMachineAuth(db)] }, async (request, reply) => {
     const machine = request.machine as MachineRecord;
     return reply.code(200).send({
-      projects: listActiveAgentProjects(db, machine.id),
+      projects: await listActiveAgentProjects(db, machine.id),
     });
   });
 
@@ -124,7 +124,7 @@ export function registerIngestRoutes(app: FastifyInstance, options: IngestRoutes
     }
 
     try {
-      const result = service.ingestBatch({
+      const result = await service.ingestBatch({
         collectorId: machine.id,
         agentProject: body.agent_project,
         streamId: body.stream_id,

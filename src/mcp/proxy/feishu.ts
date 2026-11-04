@@ -39,7 +39,7 @@ function ensureOk(
   }
 }
 
-export function createFeishuNotifier(appId: string, appSecret: string): Promise<FeishuNotifier>{
+export function createFeishuNotifier(appId: string, appSecret: string): FeishuNotifier {
   let cachedToken: { token: string; expiresAt: number } | undefined;
   return {
     identify: async () => {

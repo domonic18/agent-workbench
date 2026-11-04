@@ -58,7 +58,7 @@ function optionalText(body: Record<string, unknown>, field: string): string | un
   return typeof value === "string" ? value : undefined;
 }
 
-export function registerA2aRoutes(app: FastifyInstance, options: A2aRoutesOptions): Promise<void>{
+export function registerA2aRoutes(app: FastifyInstance, options: A2aRoutesOptions): void {
   const db = options.db;
   const now = options.now ?? Date.now;
   const service = options.service ?? createA2aService({ db, now });
@@ -103,7 +103,7 @@ export function registerA2aRoutes(app: FastifyInstance, options: A2aRoutesOption
       const envelope = validation.envelope;
 
       try {
-        const result = service.send({
+        const result = await service.send({
           idempotencyKey: key,
           fromAgentId: agent.id,
           taskId: envelope.task_id,
@@ -119,9 +119,9 @@ export function registerA2aRoutes(app: FastifyInstance, options: A2aRoutesOption
         });
         // ① 交接播报:控制台经发件箱直发协作群,不返回 notify 给 proxy(2026-11-02 裁决)
         if (options.collabChatId !== undefined) {
-          const notice = service.handoffNotice(result.msgId);
+          const notice = await service.handoffNotice(result.msgId);
           if (notice !== null) {
-            enqueueCollabBulletin(
+            await enqueueCollabBulletin(
               db,
               buildHandoffBulletin(notice, options.collabChatId),
               options.now?.(),
@@ -199,19 +199,19 @@ export function registerA2aRoutes(app: FastifyInstance, options: A2aRoutesOption
       return validationFailed(reply, "task_id 必须是非空字符串");
     }
     try {
-      const autoClosed = service.ack(agent.id, msgId, taskId === undefined ? {} : { taskId });
-      // ② 接单播报 + ④ 验收播报:控制台直发,fire-and-forget 不影响 ack 语义
+      const autoClosed = await service.ack(agent.id, msgId, taskId === undefined ? {} : { taskId });
+      // ② 接单播报 + ④ 验收播报:控制台直发,入队与业务同库,不影响 ack 判定语义
       if (options.collabChatId !== undefined) {
-        const accept = service.acceptNotice(msgId, taskId);
+        const accept = await service.acceptNotice(msgId, taskId);
         if (accept !== null) {
-          enqueueCollabBulletin(
+          await enqueueCollabBulletin(
             db,
             buildAcceptBulletin(accept, options.collabChatId),
             options.now?.(),
           );
         }
         for (const closed of autoClosed) {
-          enqueueCollabBulletin(
+          await enqueueCollabBulletin(
             db,
             buildClosureBulletin(
               { taskId: closed.id, title: closed.title },

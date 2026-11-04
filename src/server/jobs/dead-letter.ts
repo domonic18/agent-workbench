@@ -21,18 +21,19 @@ export function startDeadLetterSweeper(
   options: DeadLetterSweeperOptions = {},
 ): DeadLetterSweeper {
   const sweep = (): void => {
-    try {
-      const result = sweepDeadLetters({
-        db,
-        ...(options.now === undefined ? {} : { now: options.now }),
-        ...(options.wake === undefined ? {} : { wake: options.wake }),
+    void sweepDeadLetters({
+      db,
+      ...(options.now === undefined ? {} : { now: options.now }),
+      ...(options.wake === undefined ? {} : { wake: options.wake }),
+    })
+      .then((result) => {
+        if (result.deadLettered > 0) {
+          logger.info(result, "A2A 死信巡检转入死信");
+        }
+      })
+      .catch((error) => {
+        logger.error({ err: error }, "A2A 死信巡检失败");
       });
-      if (result.deadLettered > 0) {
-        logger.info(result, "A2A 死信巡检转入死信");
-      }
-    } catch (error) {
-      logger.error({ err: error }, "A2A 死信巡检失败");
-    }
   };
 
   sweep();

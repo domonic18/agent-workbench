@@ -139,7 +139,7 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
       return validationError(reply, parsed.error);
     }
     try {
-      const { machine, secret } = service.registerMachine(parsed.data);
+      const { machine, secret } = await service.registerMachine(parsed.data);
       return reply.code(201).send({ machine: toMachineDto(machine), secret });
     } catch (error) {
       if (error instanceof IdentityError) {
@@ -152,7 +152,7 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
   app.post("/api/machines/:id/rotate", { preHandler: writeGuards }, async (request, reply) => {
     const { id } = request.params as { id: string };
     try {
-      const { secret } = service.rotateMachineSecret(id);
+      const { secret } = await service.rotateMachineSecret(id);
       return { secret };
     } catch (error) {
       if (error instanceof IdentityError) {
@@ -167,7 +167,7 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
     if (query === undefined) {
       return reply;
     }
-    const rows = service.listMachines(query);
+    const rows = await service.listMachines(query);
     const last = rows.at(-1);
     return {
       items: rows.map(toMachineDto),
@@ -182,7 +182,7 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
       return validationError(reply, parsed.error);
     }
     try {
-      const { agent, secret } = service.registerAgent(parsed.data);
+      const { agent, secret } = await service.registerAgent(parsed.data);
       return reply.code(201).send({ agent: toAgentDto(agent), secret });
     } catch (error) {
       if (error instanceof IdentityError) {
@@ -195,7 +195,7 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
   app.post("/api/agents/:id/rotate", { preHandler: writeGuards }, async (request, reply) => {
     const { id } = request.params as { id: string };
     try {
-      const { secret } = service.rotateAgentSecret(id);
+      const { secret } = await service.rotateAgentSecret(id);
       return { secret };
     } catch (error) {
       if (error instanceof IdentityError) {
@@ -212,7 +212,7 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
       return validationError(reply, parsed.error);
     }
     try {
-      const agent = service.setAllowedTargets(id, parsed.data.targets);
+      const agent = await service.setAllowedTargets(id, parsed.data.targets);
       return { agent: toAgentDto(agent) };
     } catch (error) {
       if (error instanceof IdentityError) {
@@ -227,7 +227,7 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
     if (query === undefined) {
       return reply;
     }
-    const rows = service.listAgents(query);
+    const rows = await service.listAgents(query);
     const last = rows.at(-1);
     return {
       items: rows.map(toAgentDto),

@@ -23,14 +23,15 @@ export function startIngestReceiptCleaner(
   const retentionMs = options.retentionMs ?? INGEST.receiptRetentionMs;
 
   const sweep = (): void => {
-    try {
-      const deleted = deleteIngestReceiptsBefore(db, now() - retentionMs);
-      if (deleted > 0) {
-        logger.info({ deleted }, "清理过期的采集去重回执");
-      }
-    } catch (error) {
-      logger.error({ err: error }, "清理采集去重回执失败");
-    }
+    void deleteIngestReceiptsBefore(db, now() - retentionMs)
+      .then((deleted) => {
+        if (deleted > 0) {
+          logger.info({ deleted }, "清理过期的采集去重回执");
+        }
+      })
+      .catch((error) => {
+        logger.error({ err: error }, "清理采集去重回执失败");
+      });
   };
 
   sweep();

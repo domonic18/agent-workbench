@@ -145,7 +145,7 @@ export function registerTaskReadRoutes(
       }
     }
 
-    const result = read.list({
+    const result = await read.list({
       limit,
       ...(status === undefined ? {} : { status }),
       ...(project === undefined ? {} : { project }),
@@ -163,7 +163,7 @@ export function registerTaskReadRoutes(
   app.get("/api/tasks/:id", { preHandler: session }, async (request, reply) => {
     const { id } = request.params as { id: string };
     try {
-      const result = read.detail(id);
+      const result = await read.detail(id);
       return {
         task: toTaskDto(result.task),
         capabilities: result.capabilities.map(toCapabilityDto),
@@ -192,7 +192,7 @@ export function registerTaskReadRoutes(
     }
 
     try {
-      const result = read.events(id, { afterSeq, limit });
+      const result = await read.events(id, { afterSeq, limit });
       const last = result.items.at(-1);
       return {
         revision: result.revision,

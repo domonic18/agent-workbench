@@ -2,7 +2,6 @@ import type { FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createIdentityService } from "../../domain/identity/service.js";
 import { openDatabase, type Db } from "../../store/database.js";
-import { runMigrations } from "../../store/migrator.js";
 import { hasIngestReceipt } from "../../store/repositories/ingest-receipt.js";
 import { findMachineById } from "../../store/repositories/identity.js";
 import { findRunningRunForStream, listTimelineEventsByRun } from "../../store/repositories/run.js";
@@ -14,17 +13,16 @@ interface Fixture {
   agentId: string;
 }
 
-function prepare(): Fixture {
-  const db = openDatabase(":memory:");
-  runMigrations(db);
+async function prepare(): Promise<Fixture> {
+  const db = await openDatabase();
   const identity = createIdentityService({ db, newSecret: () => "secret-m1" });
-  const machine = identity.registerMachine({
+  const machine = await identity.registerMachine({
     id: "m1",
     hostname: "h",
     os: "linux",
     collectorVersion: "1",
   });
-  const agent = identity.registerAgent({ machineId: "m1", project: "pa", displayName: "A" });
+  const agent = await identity.registerAgent({ machineId: "m1", project: "pa", displayName: "A" });
   return { db, secret: machine.secret, agentId: agent.agent.id };
 }
 
@@ -53,14 +51,14 @@ describe("ingest 路由", () => {
     };
   }
 
-  beforeEach(() => {
-    fixture = prepare();
+  beforeEach(async () => {
+    fixture = await prepare();
     app = buildApp({ logLevel: "silent", db: fixture.db });
   });
 
   afterEach(async () => {
     await app.close();
-    fixture.db.close();
+    await fixture.db.close();
   });
 
   it("采集器 Bearer 推送成功,返回已确认 seq", async () => {
@@ -73,8 +71,8 @@ describe("ingest 路由", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ acked_seq: 2 });
-    const run = findRunningRunForStream(fixture.db, fixture.agentId, "claude-session:s1")!;
-    expect(listTimelineEventsByRun(fixture.db, run.id)).toHaveLength(2);
+    const run = (await findRunningRunForStream(fixture.db, fixture.agentId, "claude-session:s1"))!;
+    expect(await listTimelineEventsByRun(fixture.db, run.id)).toHaveLength(2);
   });
 
   it("无 Bearer 或密钥错误 401", async () => {
@@ -110,7 +108,7 @@ describe("ingest 路由", () => {
     });
     expect(response.statusCode).toBe(400);
     expect(
-      hasIngestReceipt(fixture.db, {
+      await hasIngestReceipt(fixture.db, {
         collectorId: "m1",
         streamId: "claude-session:s1",
         seq: 1,
@@ -162,7 +160,7 @@ describe("ingest 路由", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ acked_seq: 1 });
     expect(
-      hasIngestReceipt(fixture.db, {
+      await hasIngestReceipt(fixture.db, {
         collectorId: "m1",
         streamId: "claude-session:s1",
         seq: 3,
@@ -180,7 +178,7 @@ describe("ingest 路由", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ ok: true, projects: ["pa"] });
-    expect(findMachineById(fixture.db, "m1")?.lastSeenAt).toBeTypeOf("number");
+    expect((await findMachineById(fixture.db, "m1"))?.lastSeenAt).toBeTypeOf("number");
   });
 
   it("心跳与项目列表都要求采集器 Bearer", async () => {

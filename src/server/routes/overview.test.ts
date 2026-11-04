@@ -1,7 +1,6 @@
 import type { FastifyInstance, LightMyRequestResponse } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openDatabase, type Db } from "../../store/database.js";
-import { runMigrations } from "../../store/migrator.js";
 import { insertAgent, insertMachine } from "../../store/repositories/identity.js";
 import { buildApp } from "../app.js";
 import { ensureConsoleCredential } from "../credential.js";
@@ -24,9 +23,8 @@ describe("overview 路由", () => {
   let cookie: string;
 
   beforeEach(async () => {
-    db = openDatabase(":memory:");
-    runMigrations(db);
-    ensureConsoleCredential(db, PASSWORD);
+    db = await openDatabase();
+    await ensureConsoleCredential(db, PASSWORD);
     app = buildApp({ logLevel: "silent", db, now: () => AT });
     const login = await app.inject({
       method: "POST",
@@ -39,7 +37,7 @@ describe("overview 路由", () => {
 
   afterEach(async () => {
     await app.close();
-    db.close();
+    await db.close();
   });
 
   it("未登录返回 401", async () => {

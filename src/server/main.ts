@@ -1,4 +1,4 @@
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as Lark from "@larksuiteoapi/node-sdk";
 import { createCardSender } from "../adapters/feishu/card.js";
@@ -14,7 +14,7 @@ import { createEmbeddingClient } from "../domain/knowledge/embedding.js";
 import { createKnowledgeEntryService } from "../domain/knowledge/entry-service.js";
 import { createKnowledgeIndexService } from "../domain/knowledge/index-service.js";
 import { createKnowledgeRebuilder } from "../domain/knowledge/rebuild.js";
-import { createDb, type Db } from "../store/database.js";
+import { createDb } from "../store/database.js";
 import { acquireInstanceLock } from "../store/lock.js";
 import { runMigrations } from "../store/migrator.js";
 import { buildApp } from "./app.js";
@@ -124,7 +124,7 @@ const outbox: OutboxSender | undefined =
 let inbound: FeishuInbound | undefined;
 let shuttingDown = false;
 
-function shutdown(): Promise<void>{
+function shutdown(): void {
   if (shuttingDown) {
     return;
   }

@@ -17,10 +17,10 @@ export interface CommandHandlerDeps {
 export function createCommandHandler(
   db: Db,
   deps: CommandHandlerDeps,
-): Promise<(event: InboundMessage) => void | Promise<void>>{
+): (event: InboundMessage) => Promise<void> {
   return async (event) => {
     const text = event.messageType === "text" ? extractText(event.content) : undefined;
-    const result = executeCommand(
+    const result = await executeCommand(
       {
         listTasks: (limit) => listTaskSummaries(db, limit),
         findTask: (id) => findTaskSummary(db, id),
@@ -29,7 +29,7 @@ export function createCommandHandler(
     );
 
     try {
-      recordFeishuCommand(db, {
+      await recordFeishuCommand(db, {
         eventId: event.eventId,
         openId: event.senderOpenId ?? "",
         chatId: event.chatId,

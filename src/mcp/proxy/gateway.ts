@@ -40,7 +40,7 @@ function resolveTool(upstreams: readonly Upstream[], exposedName: string): Resol
   return undefined;
 }
 
-export function createGateway(options: GatewayOptions): Promise<Gateway>{
+export function createGateway(options: GatewayOptions): Gateway {
   const { ctx, upstreams, audit } = options;
   const nativeTools = options.nativeTools ?? [];
   const now = options.now ?? Date.now;

@@ -94,17 +94,22 @@ export function registerStreamRoutes(app: FastifyInstance, options: StreamRoutes
     });
 
     // 首帧与基准取自同一次读取,否则两次读之间的变更会多推一条 delta
-    const initial = revisions.snapshot(scopes);
+    const initial = await revisions.snapshot(scopes);
     const seen = new Map(initial.map((entry) => [entry.scope, entry.revision]));
     writeEvent(stream, "snapshot", { scopes: initial, at: now() });
 
     const poll = setInterval(() => {
-      for (const { scope, revision } of revisions.snapshot(scopes)) {
-        if (revision > (seen.get(scope) ?? 0)) {
-          seen.set(scope, revision);
-          writeEvent(stream, "delta", { scope, revision });
-        }
-      }
+      void revisions
+        .snapshot(scopes)
+        .then((entries) => {
+          for (const { scope, revision } of entries) {
+            if (revision > (seen.get(scope) ?? 0)) {
+              seen.set(scope, revision);
+              writeEvent(stream, "delta", { scope, revision });
+            }
+          }
+        })
+        .catch(() => undefined);
     }, pollMs);
     const heartbeat = setInterval(() => {
       writeEvent(stream, "heartbeat", { at: now() });

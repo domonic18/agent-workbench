@@ -60,13 +60,13 @@ export function buildClosureBulletin(notice: ClosureNotice, chatId: string): Col
   };
 }
 
-/** 播报入发件箱;幂等键 = collab:{uuid},同 uuid 只保留首条 */
-export function enqueueCollabBulletin(
+/** 播报入发件箱;幂等键 = collab:{uuid},同 uuid 只保留首条。与业务写同库,await 不会放大失败面 */
+export async function enqueueCollabBulletin(
   db: Db,
   bulletin: CollabBulletin,
   now?: number,
-): void {
-  enqueuePush(db, {
+): Promise<void> {
+  await enqueuePush(db, {
     idempotencyKey: `collab:${bulletin.uuid}`,
     kind: "collab_bulletin",
     taskId: bulletin.taskId,

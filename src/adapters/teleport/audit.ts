@@ -89,7 +89,7 @@ function parseLine(line: string): SessionStartEvent | undefined {
 export function createTeleportAuditAdapter(
   config: TeleportAuditConfig,
   deps: { readFile?: (path: string) => Promise<string> } = {},
-): Promise<TeleportAuditAdapter>{
+): TeleportAuditAdapter {
   const read = deps.readFile ?? ((path: string) => readFile(path, "utf8"));
   return {
     async listSessionStarts() {

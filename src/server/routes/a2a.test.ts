@@ -2,7 +2,6 @@ import type { FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createIdentityService } from "../../domain/identity/service.js";
 import { openDatabase, type Db } from "../../store/database.js";
-import { runMigrations } from "../../store/migrator.js";
 import { findOutboxByKey } from "../../store/repositories/outbox.js";
 import { buildApp } from "../app.js";
 
@@ -21,9 +20,8 @@ interface Fixture {
   agents: Record<string, string>;
 }
 
-function prepare(): Fixture {
-  const db = openDatabase(":memory:");
-  runMigrations(db);
+async function prepare(): Promise<Fixture> {
+  const db = await openDatabase();
   const ids = ["agt_a", "agt_b", "agt_c"];
   const secrets = ["secret-a", "secret-b", "secret-c"];
   let idSeq = 0;
@@ -33,20 +31,20 @@ function prepare(): Fixture {
     newAgentId: () => ids[idSeq++] ?? "agt_x",
     newSecret: () => secrets[secretSeq++] ?? "secret-x",
   });
-  identity.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
-  const agentA = identity.registerAgent({
+  await identity.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
+  const agentA = await identity.registerAgent({
     machineId: "m1",
     project: "pa",
     displayName: "Agent A",
     allowedTargets: ["agt_b"],
   });
-  const agentB = identity.registerAgent({
+  const agentB = await identity.registerAgent({
     machineId: "m1",
     project: "pb",
     displayName: "Agent B",
     allowedTargets: ["agt_a"],
   });
-  const agentC = identity.registerAgent({
+  const agentC = await identity.registerAgent({
     machineId: "m1",
     project: "pc",
     displayName: "Agent C",
@@ -58,7 +56,9 @@ function prepare(): Fixture {
   ] as const) {
     await db.run(
       `INSERT INTO task (id, title, assigner, assignee, project, stage, status, origin, created_at, updated_at)
-       VALUES (?, ?, 'console', ?, 'aw', 'exec', 'running', 'a2a', 0, 0)`,  id, id, assignee);
+       VALUES (?, ?, 'console', ?, 'aw', 'exec', 'running', 'a2a', 0, 0)`,
+      id, id, assignee,
+    );
   }
   return {
     db,
@@ -91,14 +91,14 @@ describe("a2a 路由", () => {
     };
   }
 
-  beforeEach(() => {
-    fixture = prepare();
+  beforeEach(async () => {
+    fixture = await prepare();
     app = buildApp({ logLevel: "silent", db: fixture.db, feishu: FEISHU });
   });
 
   afterEach(async () => {
     await app.close();
-    fixture.db.close();
+    await fixture.db.close();
   });
 
   it("无 Bearer 401;缺 Idempotency-Key 422", async () => {
@@ -154,7 +154,7 @@ describe("a2a 路由", () => {
     expect(response.statusCode).toBe(201);
     const body = response.json() as { msg_id: string; thread_id: string };
     expect(body).not.toHaveProperty("notify");
-    const row = findOutboxByKey(fixture.db, `collab:${body.msg_id}`);
+    const row = await findOutboxByKey(fixture.db, `collab:${body.msg_id}`);
     expect(row?.kind).toBe("collab_bulletin");
     expect(JSON.parse(row?.payloadJson ?? "{}")).toEqual({
       chatId: "oc_group",

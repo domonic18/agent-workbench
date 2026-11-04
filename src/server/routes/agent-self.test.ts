@@ -2,7 +2,6 @@ import type { FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createIdentityService } from "../../domain/identity/service.js";
 import { openDatabase, type Db } from "../../store/database.js";
-import { runMigrations } from "../../store/migrator.js";
 import { findAgentById } from "../../store/repositories/identity.js";
 import { buildApp } from "../app.js";
 
@@ -12,16 +11,15 @@ interface Fixture {
   secret: string;
 }
 
-function prepare(): Fixture {
-  const db = openDatabase(":memory:");
-  runMigrations(db);
+async function prepare(): Promise<Fixture> {
+  const db = await openDatabase();
   const identity = createIdentityService({
     db,
     newAgentId: () => "agt_a",
     newSecret: () => "secret-a",
   });
-  identity.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
-  const { agent, secret } = identity.registerAgent({
+  await identity.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
+  const { agent, secret } = await identity.registerAgent({
     machineId: "m1",
     project: "aw",
     displayName: "Agent A",
@@ -40,14 +38,14 @@ describe("PUT /api/agents/self/feishu-bot", () => {
     };
   }
 
-  beforeEach(() => {
-    fixture = prepare();
+  beforeEach(async () => {
+    fixture = await prepare();
     app = buildApp({ logLevel: "silent", db: fixture.db });
   });
 
   afterEach(async () => {
     await app.close();
-    fixture.db.close();
+    await fixture.db.close();
   });
 
   it("自报 bot 身份与 app_id 写入库,重复上报覆盖同值", async () => {
@@ -62,7 +60,7 @@ describe("PUT /api/agents/self/feishu-bot", () => {
       expect(response.json()).toEqual({ ok: true });
     }
 
-    expect(findAgentById(fixture.db, "agt_a")).toMatchObject({
+    expect(await findAgentById(fixture.db, "agt_a")).toMatchObject({
       feishuBotOpenId: "ou_bot_a",
       feishuBotName: "Agent A Bot",
       feishuAppId: "cli_a",
@@ -83,7 +81,7 @@ describe("PUT /api/agents/self/feishu-bot", () => {
       payload: { open_id: "ou_bot_b", name: "Agent A Bot 2" },
     });
     expect(response.statusCode).toBe(200);
-    expect(findAgentById(fixture.db, "agt_a")).toMatchObject({
+    expect(await findAgentById(fixture.db, "agt_a")).toMatchObject({
       feishuBotOpenId: "ou_bot_b",
       feishuBotName: "Agent A Bot 2",
       feishuAppId: "cli_a",

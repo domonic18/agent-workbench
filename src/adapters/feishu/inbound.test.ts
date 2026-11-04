@@ -28,7 +28,7 @@ function makeEvent(overrides: Partial<InboundMessage> = {}): InboundMessage {
 function makeDeps(overrides: Partial<InboundDeps> = {}): InboundDeps {
   return {
     isAllowed: (openId) => openId === "ou_allowed",
-    claimEvent: vi.fn(() => true),
+    claimEvent: vi.fn(async () => true),
     reply: vi.fn(async () => undefined),
     onCommand: vi.fn(),
     log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -47,7 +47,7 @@ describe("handleInboundMessage", () => {
   });
 
   it("重复 event_id 直接跳过,不重复处理", async () => {
-    const deps = makeDeps({ claimEvent: vi.fn(() => false) });
+    const deps = makeDeps({ claimEvent: vi.fn(async () => false) });
 
     await expect(handleInboundMessage(deps, makeEvent(), NOW)).resolves.toBe("duplicate");
     expect(deps.onCommand).not.toHaveBeenCalled();

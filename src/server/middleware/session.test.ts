@@ -2,7 +2,6 @@ import Fastify from "fastify";
 import { describe, expect, it } from "vitest";
 import { SESSION_TTL_MS } from "../../shared/constants.js";
 import { openDatabase } from "../../store/database.js";
-import { runMigrations } from "../../store/migrator.js";
 import { findActiveSession } from "../../store/repositories/session.js";
 import {
   clearSessionCookie,
@@ -16,10 +15,8 @@ import {
   endSession,
 } from "./session.js";
 
-function prepare() {
-  const db = openDatabase(":memory:");
-  runMigrations(db);
-  return db;
+async function prepare() {
+  return openDatabase();
 }
 
 describe("cookie 与会话", () => {
@@ -35,25 +32,25 @@ describe("cookie 与会话", () => {
     expect(clearSessionCookie()).toContain("Max-Age=0");
   });
 
-  it("会话按库中 expires_at 过期", () => {
-    const db = prepare();
+  it("会话按库中 expires_at 过期", async () => {
+    const db = await prepare();
     let clock = 1_000;
-    const { id } = startSession(db, () => clock);
+    const { id } = await startSession(db, () => clock);
 
-    expect(findActiveSession(db, id, clock)).toBeDefined();
+    expect(await findActiveSession(db, id, clock)).toBeDefined();
     clock += SESSION_TTL_MS - 1;
-    expect(findActiveSession(db, id, clock)).toBeDefined();
+    expect(await findActiveSession(db, id, clock)).toBeDefined();
     clock += 1;
-    expect(findActiveSession(db, id, clock)).toBeUndefined();
+    expect(await findActiveSession(db, id, clock)).toBeUndefined();
 
-    endSession(db, id);
+    await endSession(db, id);
     clock = 0;
-    expect(findActiveSession(db, id, clock)).toBeUndefined();
-    db.close();
+    expect(await findActiveSession(db, id, clock)).toBeUndefined();
+    await db.close();
   });
 
   it("缺失或过期的会话返回 401", async () => {
-    const db = prepare();
+    const db = await prepare();
     let clock = 1_000;
     const app = Fastify();
     app.get("/me", { preHandler: requireSession(db, () => clock) }, async () => ({
@@ -62,7 +59,7 @@ describe("cookie 与会话", () => {
 
     expect((await app.inject({ method: "GET", url: "/me" })).statusCode).toBe(401);
 
-    const { id } = startSession(db, () => clock);
+    const { id } = await startSession(db, () => clock);
     const ok = await app.inject({ method: "GET", url: "/me", headers: { cookie: `aw_session=${id}` } });
     expect(ok.statusCode).toBe(200);
 
@@ -75,7 +72,7 @@ describe("cookie 与会话", () => {
     expect(expired.statusCode).toBe(401);
 
     await app.close();
-    db.close();
+    await db.close();
   });
 });
 

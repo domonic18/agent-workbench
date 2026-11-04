@@ -4,11 +4,11 @@ import { FEISHU_EVENT_WINDOW } from "../../shared/constants.js";
 import type { InboundLogger } from "./inbound.js";
 
 /** 授权记录快照:裁决后用于把卡片刷新成终态 */
-export type CapabilitySnapshot = NonNullable<ReturnType<CapabilityService["find"]>>;
+export type CapabilitySnapshot = NonNullable<Awaited<ReturnType<CapabilityService["find"]>>>;
 
 export interface CardCallbackDeps {
   isAllowed(openId: string): boolean;
-  claimEvent(eventId: string, eventType: string): boolean;
+  claimEvent(eventId: string, eventType: string): Promise<boolean>;
   service: Pick<CapabilityService, "approve" | "reject" | "find">;
   log: InboundLogger;
 }
@@ -118,9 +118,9 @@ export async function handleCardCallback(
   const capabilityId = nonEmptyString(event.value.capabilityId);
   const actor = event.openId;
 
-  if (!deps.claimEvent(event.eventId, EVENT_TYPE)) {
+  if (!(await deps.claimEvent(event.eventId, EVENT_TYPE))) {
     deps.log.info({ eventId: event.eventId }, "重复卡片回调,跳过");
-    const capability = capabilityId === undefined ? undefined : deps.service.find(capabilityId);
+    const capability = capabilityId === undefined ? undefined : await deps.service.find(capabilityId);
     return {
       outcome: "duplicate",
       ...(capabilityId === undefined ? {} : { capabilityId }),
@@ -143,7 +143,7 @@ export async function handleCardCallback(
     const result =
       decision === "approve"
         ? await deps.service.approve(capabilityId, actor)
-        : deps.service.reject(
+        : await deps.service.reject(
             capabilityId,
             actor,
             typeof reason === "string" ? reason : undefined,
@@ -171,7 +171,7 @@ export async function handleCardCallback(
     } else {
       deps.log.error({ err: error, eventId: event.eventId }, "飞书卡片裁决异常");
     }
-    const capability = deps.service.find(capabilityId);
+    const capability = await deps.service.find(capabilityId);
     return {
       outcome: "failed",
       capabilityId,

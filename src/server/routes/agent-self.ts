@@ -36,7 +36,7 @@ export function registerAgentSelfRoutes(
         error: { code: "VALIDATION_FAILED", message: "open_id 与 name 必须是非空字符串" },
       });
     }
-    const applied = updateAgentFeishuBot(
+    const applied = await updateAgentFeishuBot(
       db,
       agent.id,
       parsed.data.open_id,

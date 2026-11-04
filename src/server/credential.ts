@@ -8,7 +8,7 @@ export interface CredentialInit {
 }
 
 /** 首次启动把口令哈希写入库;已存在则忽略种子,不再改写。 */
-export function ensureConsoleCredential(db: Db, initialPassword?: string): Promise<CredentialInit>{
+export async function ensureConsoleCredential(db: Db, initialPassword?: string): Promise<CredentialInit> {
   const existing = await db.get("SELECT 1 FROM console_credential WHERE id = 1");
   if (existing !== undefined) {
     return { created: false };

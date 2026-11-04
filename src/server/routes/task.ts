@@ -69,7 +69,7 @@ export function registerTaskRoutes(app: FastifyInstance, options: TaskRoutesOpti
       }
       try {
         // assignee 恒取 Bearer 身份,请求体自述的 agent_id/assignee 一律忽略
-        const task = service.create({ ...parsed.data, assignee: agent.id });
+        const task = await service.create({ ...parsed.data, assignee: agent.id });
         return reply.code(201).send({ task: toTaskDto(task) });
       } catch (error) {
         if (error instanceof TaskError) {
@@ -91,7 +91,7 @@ export function registerTaskRoutes(app: FastifyInstance, options: TaskRoutesOpti
         return validationError(reply, parsed.error);
       }
       try {
-        const { task, autoClosed } = service.update({
+        const { task, autoClosed } = await service.update({
           ...parsed.data,
           taskId: id,
           assignee: agent.id,
@@ -99,9 +99,9 @@ export function registerTaskRoutes(app: FastifyInstance, options: TaskRoutesOpti
         // ③ 完成播报 + ④ 验收播报:控制台经发件箱直发,不返回 notify 给 proxy(2026-11-02 裁决)
         if (options.collabChatId !== undefined) {
           if (task.status === "done") {
-            const notice = service.completionNotice(task.id);
+            const notice = await service.completionNotice(task.id);
             if (notice !== null) {
-              enqueueCollabBulletin(
+              await enqueueCollabBulletin(
                 db,
                 buildCompletionBulletin(notice, options.collabChatId),
                 options.now?.(),
@@ -109,7 +109,7 @@ export function registerTaskRoutes(app: FastifyInstance, options: TaskRoutesOpti
             }
           }
           for (const closed of autoClosed) {
-            enqueueCollabBulletin(
+            await enqueueCollabBulletin(
               db,
               buildClosureBulletin({ taskId: closed.id, title: closed.title }, options.collabChatId),
               options.now?.(),

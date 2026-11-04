@@ -1,13 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { createCapabilityService } from "../../domain/capability/service.js";
-import { openDatabase } from "../../store/database.js";
-import { runMigrations } from "../../store/migrator.js";
+import { openDatabase, type Db } from "../../store/database.js";
 import { findOutboxByKey } from "../../store/repositories/outbox.js";
 import { createApprovalNotifier } from "./approval.js";
 
-function prepare() {
-  const db = openDatabase(":memory:");
-  runMigrations(db);
+async function prepare(): Promise<Db> {
+  const db = await openDatabase();
   await db.run(
     `INSERT INTO task
        (id, title, assigner, assignee, project, stage, status, origin, created_at, updated_at)
@@ -17,13 +15,13 @@ function prepare() {
 }
 
 describe("审批卡片通知", () => {
-  it("申请落库后入队一张卡片,重复入队不产生第二张", () => {
-    const db = prepare();
+  it("申请落库后入队一张卡片,重复入队不产生第二张", async () => {
+    const db = await prepare();
     const service = createCapabilityService({
       db,
       teleport: { async applyTaskTraits() {} },
     });
-    const record = service.request({
+    const record = await service.request({
       subject: "agent:codex",
       target: "db:prod",
       action: "read",
@@ -37,7 +35,7 @@ describe("审批卡片通知", () => {
     notify?.(record);
     notify?.(record);
 
-    const row = findOutboxByKey(db, `cap:${record.id}:requested`);
+    const row = await findOutboxByKey(db, `cap:${record.id}:requested`);
     expect(row).toMatchObject({
       channel: "push",
       deliveryClass: "notification",
@@ -49,12 +47,12 @@ describe("审批卡片通知", () => {
       card: { schema: "2.0" },
     });
     expect(await db.get("SELECT COUNT(*) AS n FROM outbox")).toEqual({ n: 1 });
-    db.close();
+    await db.close();
   });
 
-  it("未配置审批群时不生成通知器", () => {
-    const db = prepare();
+  it("未配置审批群时不生成通知器", async () => {
+    const db = await prepare();
     expect(createApprovalNotifier({ db, approvalChatId: undefined })).toBeUndefined();
-    db.close();
+    await db.close();
   });
 });

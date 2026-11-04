@@ -67,9 +67,10 @@ export function registerTaskA2aRoutes(
   app.get("/api/tasks/:id/a2a", { preHandler: session }, async (request, reply) => {
     const { id } = request.params as { id: string };
     // 先取水位再读投影,与任务详情 / 事件流一致
-    const revision = revisions.snapshot([taskScopeName(id)])[0]?.revision ?? 0;
+    const revisions0 = await revisions.snapshot([taskScopeName(id)]);
+    const revision = revisions0[0]?.revision ?? 0;
     try {
-      const threads = service.byTask(id);
+      const threads = await service.byTask(id);
       return {
         revision,
         threads: threads.map((thread) => ({

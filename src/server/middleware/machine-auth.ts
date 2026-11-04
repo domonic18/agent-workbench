@@ -28,7 +28,7 @@ export function requireMachineAuth(db: Db): PreHandler {
     if (parts === undefined) {
       return unauthorized(reply);
     }
-    const machine = findMachineById(db, parts.id);
+    const machine = await findMachineById(db, parts.id);
     if (machine === undefined || machine.status !== "active") {
       return unauthorized(reply);
     }

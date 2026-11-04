@@ -103,7 +103,7 @@ function validationError(reply: FastifyReply, issues: z.ZodError): FastifyReply 
 export function registerKnowledgeRoutes(
   app: FastifyInstance,
   options: KnowledgeRoutesOptions,
-): Promise<void>{
+): void {
   const session = requireSession(options.db, options.now ?? Date.now);
   const writeGuards = [session, requireCsrf(), requireIdempotencyKey()];
   const indexer = options.indexer;
@@ -132,7 +132,7 @@ export function registerKnowledgeRoutes(
       }
       const search = q === undefined || q.trim() === "" ? undefined : q.trim();
 
-      const result = entries.list({
+      const result = await entries.list({
         status,
         limit,
         ...(search === undefined ? {} : { search }),

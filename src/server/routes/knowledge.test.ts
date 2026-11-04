@@ -12,7 +12,6 @@ import type { KnowledgeRebuildResult } from "../../domain/knowledge/indexer.js";
 import type { KnowledgeRebuilder } from "../../domain/knowledge/rebuild.js";
 import { openDatabase, type Db } from "../../store/database.js";
 import { insertKnowledgeEntry } from "../../store/repositories/knowledge.js";
-import { runMigrations } from "../../store/migrator.js";
 import { buildApp } from "../app.js";
 import { ensureConsoleCredential } from "../credential.js";
 
@@ -63,9 +62,8 @@ describe("knowledge 路由", () => {
   }
 
   beforeEach(async () => {
-    db = openDatabase(":memory:");
-    runMigrations(db);
-    ensureConsoleCredential(db, PASSWORD);
+    db = await openDatabase();
+    await ensureConsoleCredential(db, PASSWORD);
     running = false;
     start = vi.fn(async () => RESULT);
     reindex = vi.fn<KnowledgeIndexService["reindexEntry"]>(async () => "ready");
@@ -100,7 +98,7 @@ describe("knowledge 路由", () => {
 
   afterEach(async () => {
     await app.close();
-    db.close();
+    await db.close();
     rmSync(dir, { recursive: true, force: true });
   });
 

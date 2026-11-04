@@ -26,7 +26,7 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRoutesOpti
   app.post("/api/auth/login", async (request, reply) => {
     // 锁定期内不校验口令,避免用响应差异探测口令是否正确
     const source = request.ip;
-    if (lockout.isLocked(source)) {
+    if (await lockout.isLocked(source)) {
       return reply.code(429).send({
         error: {
           code: "RATE_LIMITED",
@@ -41,14 +41,14 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRoutesOpti
         error: { code: "VALIDATION_FAILED", message: "请提供口令" },
       });
     }
-    if (!verifyConsolePassword(db, password)) {
-      lockout.fail(source);
+    if (!(await verifyConsolePassword(db, password))) {
+      await lockout.fail(source);
       return reply.code(401).send({
         error: { code: "UNAUTHORIZED", message: "口令错误" },
       });
     }
-    lockout.succeed(source);
-    const { id, expiresAt } = startSession(db, now);
+    await lockout.succeed(source);
+    const { id, expiresAt } = await startSession(db, now);
     reply.header("set-cookie", sessionCookie(id));
     return { ok: true, expiresAt };
   });
@@ -59,7 +59,7 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRoutesOpti
     async (request, reply) => {
       const id = sessionIdFrom(request);
       if (id !== undefined) {
-        endSession(db, id);
+        await endSession(db, id);
       }
       reply.header("set-cookie", clearSessionCookie());
       return { ok: true };

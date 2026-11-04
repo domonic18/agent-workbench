@@ -24,7 +24,7 @@ export function createReplyer(
   sender: FeishuSender,
   log: InboundLogger,
   now: () => number = Date.now,
-): Promise<Replyer>{
+): Replyer {
   return async (event, text) => {
     const mode = chooseReplyMode(event.createTime, now());
     if (mode === "reply") {

@@ -37,23 +37,23 @@ async function deliverOne(
   const payload = JSON.parse(row.payloadJson) as OutboxPushPayload;
 
   // 进入发送即置 sending:此后租约过期只能转 uncertain,不能再静默重投
-  if (!markSending(db, row.id, row.leaseToken)) {
+  if (!(await markSending(db, row.id, row.leaseToken))) {
     logger.warn({ outboxId: row.id }, "发件箱租约已失效,跳过本轮投递");
     return;
   }
 
   try {
     await sender.send(payload);
-    markDelivered(db, row.id, row.leaseToken);
+    await markDelivered(db, row.id, row.leaseToken);
     logger.info({ outboxId: row.id, attempts: row.attempts }, "发件箱投递成功");
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (row.attempts >= OUTBOX_TIMEOUTS.maxAttempts) {
-      markFailed(db, row.id, row.leaseToken, message);
+      await markFailed(db, row.id, row.leaseToken, message);
       logger.error({ outboxId: row.id, attempts: row.attempts, err: error }, "发件箱投递失败,已达重试上限");
     } else {
       const nextAt = at + retryDelayMs(row.attempts);
-      markRetry(db, row.id, row.leaseToken, nextAt, message);
+      await markRetry(db, row.id, row.leaseToken, nextAt, message);
       logger.warn({ outboxId: row.id, attempts: row.attempts, nextAt }, "发件箱投递失败,稍后重试");
     }
   }
@@ -72,7 +72,7 @@ export async function drainOutbox(
 ): Promise<void> {
   for (;;) {
     const at = now();
-    const row = claimDue(db, at, at + OUTBOX_TIMEOUTS.leaseMs);
+    const row = await claimDue(db, at, at + OUTBOX_TIMEOUTS.leaseMs);
     if (row === undefined) {
       return;
     }

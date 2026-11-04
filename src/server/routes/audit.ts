@@ -84,13 +84,13 @@ function forbidden(reply: FastifyReply, message: string): FastifyReply {
 }
 
 /** 审计行必须落在调用方自己的任务上;否则等同伪造他人审计 */
-function ownedTask(
+async function ownedTask(
   reply: FastifyReply,
   db: Db,
   taskId: string,
   agentId: string,
-): TaskRecord | undefined {
-  const task = findTaskById(db, taskId);
+): Promise<TaskRecord | undefined> {
+  const task = await findTaskById(db, taskId);
   if (task === undefined) {
     void reply.code(404).send({ error: { code: "NOT_FOUND", message: `任务 ${taskId} 不存在` } });
     return undefined;
@@ -125,15 +125,18 @@ export function registerAuditRoutes(app: FastifyInstance, options: AuditRoutesOp
           },
         });
       }
-      const task = ownedTask(reply, db, parsed.data.taskId, agent.id);
+      const task = await ownedTask(reply, db, parsed.data.taskId, agent.id);
       if (task === undefined) {
         return reply;
       }
       const capabilityId = parsed.data.capabilityId ?? null;
-      if (capabilityId !== null && findCapability(db, capabilityId)?.taskId !== task.id) {
+      if (
+        capabilityId !== null &&
+        (await findCapability(db, capabilityId))?.taskId !== task.id
+      ) {
         return forbidden(reply, `授权 ${capabilityId} 不属于任务 ${task.id}`);
       }
-      insertToolCallLog(db, {
+      await insertToolCallLog(db, {
         ...parsed.data,
         reason: parsed.data.reason ?? null,
         capabilityId,
@@ -168,7 +171,7 @@ export function registerAuditRoutes(app: FastifyInstance, options: AuditRoutesOp
       });
     }
 
-    const rows = listGaps(db, {
+    const rows = await listGaps(db, {
       ...(kind === undefined ? {} : { kind: kind as AuditGapKind }),
       limit: limitText,
       ...(before === undefined ? {} : { before }),

@@ -2,7 +2,6 @@ import type { FastifyInstance, LightMyRequestResponse } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { TeleportAdapter } from "../../adapters/teleport/tctl.js";
 import { openDatabase, type Db } from "../../store/database.js";
-import { runMigrations } from "../../store/migrator.js";
 import { insertGap, type NewAuditGap } from "../../store/repositories/audit-reconcile.js";
 import { buildApp } from "../app.js";
 import { ensureConsoleCredential } from "../credential.js";
@@ -10,10 +9,9 @@ import { ensureConsoleCredential } from "../credential.js";
 const PASSWORD = "secret123";
 const teleport: TeleportAdapter = { async applyTaskTraits() {} };
 
-function prepare(): Db {
-  const db = openDatabase(":memory:");
-  runMigrations(db);
-  ensureConsoleCredential(db, PASSWORD);
+async function prepare(): Promise<Db> {
+  const db = await openDatabase();
+  await ensureConsoleCredential(db, PASSWORD);
   return db;
 }
 
@@ -47,7 +45,7 @@ describe("audit 路由", () => {
   let cookie: string;
 
   beforeEach(async () => {
-    db = prepare();
+    db = await prepare();
     app = buildApp({ logLevel: "silent", db, teleport });
     const login = await app.inject({
       method: "POST",
@@ -60,7 +58,7 @@ describe("audit 路由", () => {
 
   afterEach(async () => {
     await app.close();
-    db.close();
+    await db.close();
   });
 
   it("未登录返回 401", async () => {

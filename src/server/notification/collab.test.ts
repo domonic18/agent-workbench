@@ -6,7 +6,6 @@ import type {
   HandoffNotice,
 } from "../../domain/collab/notice.js";
 import { openDatabase } from "../../store/database.js";
-import { runMigrations } from "../../store/migrator.js";
 import { findOutboxByKey } from "../../store/repositories/outbox.js";
 import {
   buildAcceptBulletin,
@@ -81,18 +80,18 @@ describe("协作群播报渲染(无 @,控制台直发)", () => {
 });
 
 describe("enqueueCollabBulletin", () => {
-  it("按 collab:{uuid} 幂等入发件箱,同 uuid 只保留首条", () => {
-    const db = openDatabase(":memory:");
-    runMigrations(db);
+  it("按 collab:{uuid} 幂等入发件箱,同 uuid 只保留首条", async () => {
+    const db = await openDatabase();
     const bulletin = buildHandoffBulletin(HANDOFF, "oc_group");
-    enqueueCollabBulletin(db, bulletin, 1_000);
-    enqueueCollabBulletin(db, bulletin, 2_000);
-    const row = findOutboxByKey(db, "collab:msg_1");
+    await enqueueCollabBulletin(db, bulletin, 1_000);
+    await enqueueCollabBulletin(db, bulletin, 2_000);
+    const row = await findOutboxByKey(db, "collab:msg_1");
     expect(row?.kind).toBe("collab_bulletin");
     expect(JSON.parse(row?.payloadJson ?? "{}")).toEqual({
       chatId: "oc_group",
       text: bulletin.text,
       uuid: "msg_1",
     });
+    await db.close();
   });
 });

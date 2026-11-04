@@ -21,15 +21,16 @@ export function startCapabilityReconciler(
   service: CapabilityService,
   logger: JobLogger,
 ): CapabilityReconciler {
-  const run = (label: string, task: () => number): void => {
-    try {
-      const changed = task();
-      if (changed > 0) {
-        logger.info({ changed }, `${label}对账收敛`);
-      }
-    } catch (error) {
-      logger.error({ err: error }, `${label}对账失败`);
-    }
+  const run = (label: string, task: () => Promise<number>): void => {
+    void task()
+      .then((changed) => {
+        if (changed > 0) {
+          logger.info({ changed }, `${label}对账收敛`);
+        }
+      })
+      .catch((error) => {
+        logger.error({ err: error }, `${label}对账失败`);
+      });
   };
 
   const issuingTimer = setInterval(() => {

@@ -28,7 +28,7 @@ export function requireAgentAuth(db: Db): PreHandler {
     if (parts === undefined) {
       return unauthorized(reply);
     }
-    const agent = findAgentById(db, parts.id);
+    const agent = await findAgentById(db, parts.id);
     if (agent === undefined || agent.status !== "active") {
       return unauthorized(reply);
     }

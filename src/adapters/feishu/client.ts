@@ -50,7 +50,7 @@ export async function startFeishuInbound(
   );
 
   const isAllowed = (openId: string): boolean => allowed.has(openId);
-  const claimEvent = (eventId: string, eventType: string): boolean =>
+  const claimEvent = async (eventId: string, eventType: string): Promise<boolean> =>
     claimFeishuEvent(db, eventId, eventType);
 
   const deps = {

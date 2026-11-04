@@ -1,7 +1,6 @@
 import type { FastifyInstance, LightMyRequestResponse } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openDatabase, type Db } from "../../store/database.js";
-import { runMigrations } from "../../store/migrator.js";
 import { insertMessage, insertThread } from "../../store/repositories/a2a.js";
 import { insertOutbox } from "../../store/repositories/outbox.js";
 import { buildApp } from "../app.js";
@@ -19,16 +18,17 @@ function cookieOf(response: LightMyRequestResponse): string {
   return value.split(";")[0] as string;
 }
 
-function prepare(): Db {
-  const db = openDatabase(":memory:");
-  runMigrations(db);
+async function prepare(): Promise<Db> {
+  const db = await openDatabase();
   await db.run(
     "INSERT INTO machine (id, hostname, os, collector_version, collector_secret_hash, status, created_at) VALUES ('m1', 'h', 'linux', '1', 'hash', 'active', 0)",
   );
   for (const id of ["agt_a", "agt_b"]) {
     await db.run(
       `INSERT INTO agent (id, machine_id, project, display_name, secret_hash, status, allowed_targets_json, created_at, updated_at)
-       VALUES (?, 'm1', ?, ?, 'hash', 'active', '[]', 0, 0)`,  id, id, id);
+       VALUES (?, 'm1', ?, ?, 'hash', 'active', '[]', 0, 0)`,
+      id, id, id,
+    );
   }
   for (const [id, assignee] of [
     ["tsk_a", "agt_a"],
@@ -36,20 +36,22 @@ function prepare(): Db {
   ] as const) {
     await db.run(
       `INSERT INTO task (id, title, assigner, assignee, project, stage, status, origin, created_at, updated_at)
-       VALUES (?, ?, 'console', ?, 'aw', 'exec', 'running', 'a2a', 0, 0)`,  id, id, assignee);
+       VALUES (?, ?, 'console', ?, 'aw', 'exec', 'running', 'a2a', 0, 0)`,
+      id, id, assignee,
+    );
   }
   return db;
 }
 
-function seedThread(db: Db): void {
-  insertThread(db, {
+async function seedThread(db: Db): Promise<void> {
+  await insertThread(db, {
     id: "thr_1",
     initiatorTaskId: "tsk_a",
     initiatorAgent: "agt_a",
     responderAgent: "agt_b",
     createdAt: 1_000,
   });
-  insertMessage(db, {
+  await insertMessage(db, {
     id: "msg_1",
     threadId: "thr_1",
     taskId: "tsk_a",
@@ -65,7 +67,7 @@ function seedThread(db: Db): void {
     authTicket: "tkt_001",
     createdAt: 1_000,
   });
-  insertMessage(db, {
+  await insertMessage(db, {
     id: "msg_2",
     threadId: "thr_1",
     taskId: "tsk_b",
@@ -81,7 +83,7 @@ function seedThread(db: Db): void {
     authTicket: null,
     createdAt: 2_000,
   });
-  insertOutbox(db, {
+  await insertOutbox(db, {
     id: "ob_1",
     idempotencyKey: "key_1",
     channel: "pull",
@@ -103,9 +105,9 @@ describe("任务 A2A 线程路由", () => {
   let cookie: string;
 
   beforeEach(async () => {
-    db = prepare();
-    seedThread(db);
-    ensureConsoleCredential(db, PASSWORD);
+    db = await prepare();
+    await seedThread(db);
+    await ensureConsoleCredential(db, PASSWORD);
     app = buildApp({ logLevel: "silent", db, now: () => AT });
     const login = await app.inject({
       method: "POST",
@@ -118,7 +120,7 @@ describe("任务 A2A 线程路由", () => {
 
   afterEach(async () => {
     await app.close();
-    db.close();
+    await db.close();
   });
 
   it("未登录返回 401", async () => {

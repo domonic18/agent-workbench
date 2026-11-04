@@ -2,7 +2,6 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createIdentityService } from "../../domain/identity/service.js";
 import { openDatabase, type Db } from "../../store/database.js";
-import { runMigrations } from "../../store/migrator.js";
 import { requireAgentAuth } from "./agent-auth.js";
 
 let db: Db;
@@ -10,21 +9,15 @@ let app: FastifyInstance;
 let agentId: string;
 let secret: string;
 
-function prepare(): Db {
-  const opened = openDatabase(":memory:");
-  runMigrations(opened);
-  return opened;
-}
-
 beforeEach(async () => {
-  db = prepare();
+  db = await openDatabase();
   const service = createIdentityService({
     db,
     newAgentId: () => "agt_a",
     newSecret: () => "secret-a",
   });
-  service.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
-  const registered = service.registerAgent({
+  await service.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
+  const registered = await service.registerAgent({
     machineId: "m1",
     project: "aw",
     displayName: "Agent A",
@@ -41,7 +34,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await app.close();
-  db.close();
+  await db.close();
 });
 
 describe("requireAgentAuth", () => {

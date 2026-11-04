@@ -8,9 +8,11 @@ describe("loadConfig", () => {
       logLevel: "info",
       host: "127.0.0.1",
       port: 8787,
-      databasePath: "./workspace/console.db",
+      databaseUrl: "postgres://agent_workbench@127.0.0.1:5433/agent_workbench",
+      consoleInitPassword: undefined,
       knowledgeDir: "./workspace/knowledge",
       embedding: undefined,
+      feishu: undefined,
       allowedHosts: ["127.0.0.1:8787"],
       teleport: {
         tctlPath: "tctl",

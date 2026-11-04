@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { openDatabase } from "../../store/database.js";
-import { runMigrations } from "../../store/migrator.js";
 import { createCommandHandler } from "./command-handler.js";
 import type { InboundMessage } from "./inbound.js";
 
@@ -22,9 +21,8 @@ function event(overrides: Partial<InboundMessage> = {}): InboundMessage {
   };
 }
 
-function prepare(replyImpl: (event: InboundMessage, text: string) => Promise<void>) {
-  const db = openDatabase(":memory:");
-  runMigrations(db);
+async function prepare(replyImpl: (event: InboundMessage, text: string) => Promise<void>) {
+  const db = await openDatabase();
   const replies: string[] = [];
   const handler = createCommandHandler(db, {
     reply: async (event, text) => {
@@ -38,7 +36,7 @@ function prepare(replyImpl: (event: InboundMessage, text: string) => Promise<voi
 
 describe("createCommandHandler", () => {
   it("回执查询结果并写审计", async () => {
-    const { db, handler, replies } = prepare(async () => {});
+    const { db, handler, replies } = await prepare(async () => {});
 
     await handler(event());
 
@@ -51,11 +49,11 @@ describe("createCommandHandler", () => {
       open_id: "ou_1",
       reply_text: "当前没有任务。",
     });
-    db.close();
+    await db.close();
   });
 
   it("非文本与未登记指令都回不支持且留审计", async () => {
-    const { db, handler, replies } = prepare(async () => {});
+    const { db, handler, replies } = await prepare(async () => {});
 
     await handler(event({ messageType: "image", content: JSON.stringify({ image_key: "img" }) }));
     await handler(event({ eventId: "evt_2", content: JSON.stringify({ text: "你好" }) }));
@@ -68,16 +66,16 @@ describe("createCommandHandler", () => {
       { command: null, outcome: "unsupported" },
       { command: null, outcome: "unsupported" },
     ]);
-    db.close();
+    await db.close();
   });
 
   it("回执失败不抛错,审计仍落库", async () => {
-    const { db, handler } = prepare(async () => {
+    const { db, handler } = await prepare(async () => {
       throw new Error("网络抖动");
     });
 
     await expect(handler(event())).resolves.toBeUndefined();
     expect(await db.get("SELECT COUNT(*) AS n FROM feishu_command")).toEqual({ n: 1 });
-    db.close();
+    await db.close();
   });
 });

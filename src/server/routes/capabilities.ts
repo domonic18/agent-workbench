@@ -122,7 +122,7 @@ function parseCursor(cursor: string): { createdAt: number; id: string } | undefi
 export function registerCapabilityRoutes(
   app: FastifyInstance,
   options: CapabilityRoutesOptions,
-): Promise<void>{
+): void {
   const db = options.db;
   const now = options.now ?? Date.now;
   const service =
@@ -172,12 +172,12 @@ export function registerCapabilityRoutes(
 
     const rows =
       view !== undefined && isCapabilityView(view)
-        ? service.list({
+        ? await service.list({
             statuses: CAPABILITY_VIEW_STATUSES[view],
             limit: limitText,
             ...(before === undefined ? {} : { before }),
           })
-        : service.list({
+        : await service.list({
             ...(status === undefined ? {} : { status: status as CapabilityStatus }),
             limit: limitText,
             ...(before === undefined ? {} : { before }),
@@ -194,9 +194,9 @@ export function registerCapabilityRoutes(
   app.post("/api/capabilities", { preHandler: writeGuards }, async (request, reply) => {
     // requireIdempotencyKey 已保证存在且非空
     const key = request.headers["idempotency-key"] as string;
-    const existingId = idempotency.find(CREATE_SCOPE, key);
+    const existingId = await idempotency.find(CREATE_SCOPE, key);
     if (existingId !== undefined) {
-      const previous = service.find(existingId);
+      const previous = await service.find(existingId);
       if (previous !== undefined) {
         return reply.code(201).send({ capability: toDto(previous) });
       }
@@ -218,7 +218,7 @@ export function registerCapabilityRoutes(
 
     try {
       // 建单与幂等键同事务:崩溃窗口内不会留下「已建单但重放又建一单」
-      const row = idempotency.run(CREATE_SCOPE, key, () =>
+      const row = await idempotency.run(CREATE_SCOPE, key, () =>
         service.request({ ...parsed.data, actor: CONSOLE_ACTOR }),
       );
       if (options.onRequested !== undefined) {
@@ -262,7 +262,7 @@ export function registerCapabilityRoutes(
       const parsed = decisionSchema.safeParse(request.body ?? {});
       const reason = parsed.success ? parsed.data.reason : undefined;
       try {
-        const result = service.reject(id, CONSOLE_ACTOR, reason);
+        const result = await service.reject(id, CONSOLE_ACTOR, reason);
         return { applied: result.applied, capability: toDto(result.capability) };
       } catch (error) {
         if (error instanceof CapabilityError) {
@@ -281,7 +281,7 @@ export function registerCapabilityRoutes(
       const parsed = decisionSchema.safeParse(request.body ?? {});
       const reason = parsed.success ? parsed.data.reason : undefined;
       try {
-        const result = service.revoke(id, CONSOLE_ACTOR, reason);
+        const result = await service.revoke(id, CONSOLE_ACTOR, reason);
         return { applied: result.applied, capability: toDto(result.capability) };
       } catch (error) {
         if (error instanceof CapabilityError) {

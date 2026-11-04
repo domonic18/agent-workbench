@@ -1,16 +1,14 @@
 import type { FastifyInstance, LightMyRequestResponse } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openDatabase, type Db } from "../../store/database.js";
-import { runMigrations } from "../../store/migrator.js";
 import { buildApp } from "../app.js";
 import { ensureConsoleCredential } from "../credential.js";
 
 const PASSWORD = "secret123";
 
-function prepare(): Db {
-  const db = openDatabase(":memory:");
-  runMigrations(db);
-  ensureConsoleCredential(db, PASSWORD);
+async function prepare(): Promise<Db> {
+  const db = await openDatabase();
+  await ensureConsoleCredential(db, PASSWORD);
   return db;
 }
 
@@ -34,7 +32,7 @@ describe("identity 路由", () => {
   }
 
   beforeEach(async () => {
-    db = prepare();
+    db = await prepare();
     app = buildApp({ logLevel: "silent", db });
     const login = await app.inject({
       method: "POST",
@@ -47,7 +45,7 @@ describe("identity 路由", () => {
 
   afterEach(async () => {
     await app.close();
-    db.close();
+    await db.close();
   });
 
   async function registerAgent(

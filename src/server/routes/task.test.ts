@@ -2,7 +2,6 @@ import type { FastifyInstance, LightMyRequestResponse } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createIdentityService } from "../../domain/identity/service.js";
 import { openDatabase, type Db } from "../../store/database.js";
-import { runMigrations } from "../../store/migrator.js";
 import { insertCapability } from "../../store/repositories/capability.js";
 import { findOutboxByKey } from "../../store/repositories/outbox.js";
 import { bindRunTaskIfEmpty, insertRun } from "../../store/repositories/run.js";
@@ -34,10 +33,9 @@ function cookieOf(response: LightMyRequestResponse): string {
   return value.split(";")[0] as string;
 }
 
-function prepare(): Fixture {
-  const db = openDatabase(":memory:");
-  runMigrations(db);
-  ensureConsoleCredential(db, PASSWORD);
+async function prepare(): Promise<Fixture> {
+  const db = await openDatabase();
+  await ensureConsoleCredential(db, PASSWORD);
   const ids = ["agt_a", "agt_b"];
   const secrets = ["secret-a", "secret-b"];
   let idSeq = 0;
@@ -47,9 +45,9 @@ function prepare(): Fixture {
     newAgentId: () => ids[idSeq++] ?? "agt_x",
     newSecret: () => secrets[secretSeq++] ?? "secret-x",
   });
-  identity.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
-  const agentA = identity.registerAgent({ machineId: "m1", project: "pa", displayName: "A" });
-  const agentB = identity.registerAgent({ machineId: "m1", project: "pb", displayName: "B" });
+  await identity.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
+  const agentA = await identity.registerAgent({ machineId: "m1", project: "pa", displayName: "A" });
+  const agentB = await identity.registerAgent({ machineId: "m1", project: "pb", displayName: "B" });
   return {
     db,
     secrets: {
@@ -76,14 +74,14 @@ describe("task 路由", () => {
     };
   }
 
-  beforeEach(() => {
-    fixture = prepare();
+  beforeEach(async () => {
+    fixture = await prepare();
     app = buildApp({ logLevel: "silent", db: fixture.db, feishu: FEISHU });
   });
 
   afterEach(async () => {
     await app.close();
-    fixture.db.close();
+    await fixture.db.close();
   });
 
   async function createTask(agentId = "agt_a"): Promise<string> {
@@ -206,13 +204,13 @@ describe("task 路由", () => {
     expect(response.json()).toMatchObject({ task: { id: "tsk_child", status: "done" } });
     expect(response.json()).not.toHaveProperty("notify");
 
-    const completion = findOutboxByKey(fixture.db, "collab:task_done:tsk_child");
+    const completion = await findOutboxByKey(fixture.db, "collab:task_done:tsk_child");
     expect(JSON.parse(completion?.payloadJson ?? "{}")).toEqual({
       chatId: "oc_group",
       text: "〔完成〕B 已完成「下游任务」,结论已同步给 A · 任务 tsk_child",
       uuid: "task_done:tsk_child",
     });
-    const closure = findOutboxByKey(fixture.db, "collab:task_closed:tsk_parent");
+    const closure = await findOutboxByKey(fixture.db, "collab:task_closed:tsk_parent");
     expect(JSON.parse(closure?.payloadJson ?? "{}")).toEqual({
       chatId: "oc_group",
       text: "〔验收〕任务「上游任务」已闭环 · 任务 tsk_parent",
@@ -262,8 +260,8 @@ describe("task 路由", () => {
       return cookieOf(login);
     }
 
-    function seedUsage(taskId: string): void {
-      insertRun(fixture.db, {
+    async function seedUsage(taskId: string): Promise<void> {
+      await insertRun(fixture.db, {
         id: "run_1",
         agentId: "agt_a",
         machine: "m1",
@@ -271,8 +269,8 @@ describe("task 路由", () => {
         streamId: "s1",
         startedAt: 1,
       });
-      expect(bindRunTaskIfEmpty(fixture.db, "run_1", taskId)).toBe(true);
-      insertTokenUsage(fixture.db, {
+      expect(await bindRunTaskIfEmpty(fixture.db, "run_1", taskId)).toBe(true);
+      await insertTokenUsage(fixture.db, {
         id: "tu_1",
         agentId: "agt_a",
         taskId,
@@ -288,7 +286,7 @@ describe("task 路由", () => {
         receiptHash: "hash",
         occurredAt: Date.now(),
       });
-      insertCapability(fixture.db, {
+      await insertCapability(fixture.db, {
         id: "cap_1",
         subject: "agt_a",
         target: "db.prod",
@@ -372,7 +370,7 @@ describe("task 路由", () => {
 
     it("详情一次返回任务、授权摘要与 token 汇总", async () => {
       const taskId = await createTask();
-      seedUsage(taskId);
+      await seedUsage(taskId);
       const cookie = await consoleCookie();
 
       const response = await app.inject({

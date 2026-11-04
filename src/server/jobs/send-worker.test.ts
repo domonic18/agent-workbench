@@ -1,17 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { CardSender, CardTarget } from "../../adapters/feishu/card.js";
 import { enqueuePush } from "../../reliability/outbox.js";
-import { openDatabase } from "../../store/database.js";
-import { runMigrations } from "../../store/migrator.js";
+import { openDatabase, type Db } from "../../store/database.js";
 import { findOutboxByKey } from "../../store/repositories/outbox.js";
 import { drainOutbox, retryDelayMs } from "./send-worker.js";
 
 const silentLogger = { info() {}, warn() {}, error() {} };
 
-function prepare() {
-  const db = openDatabase(":memory:");
-  runMigrations(db);
-  enqueuePush(db, {
+async function prepare(): Promise<Db> {
+  const db = await openDatabase();
+  await enqueuePush(db, {
     idempotencyKey: "cap:cap_1:requested",
     kind: "capability_approval",
     chatId: "oc_1",
@@ -23,23 +21,23 @@ function prepare() {
 
 describe("drainOutbox", () => {
   it("同步发送期间出箱置 sending", async () => {
-    const db = prepare();
+    const db = await prepare();
     let observed: string | undefined;
     const sender: CardSender = {
       async send() {
-        observed = findOutboxByKey(db, "cap:cap_1:requested")?.status;
+        observed = (await findOutboxByKey(db, "cap:cap_1:requested"))?.status;
       },
     };
 
     await drainOutbox(db, sender, silentLogger, () => 0);
 
     expect(observed).toBe("sending");
-    expect(findOutboxByKey(db, "cap:cap_1:requested")?.status).toBe("delivered");
-    db.close();
+    expect((await findOutboxByKey(db, "cap:cap_1:requested"))?.status).toBe("delivered");
+    await db.close();
   });
 
   it("投递成功置 delivered", async () => {
-    const db = prepare();
+    const db = await prepare();
     const sent: CardTarget[] = [];
     const sender: CardSender = {
       async send(target) {
@@ -50,15 +48,15 @@ describe("drainOutbox", () => {
     await drainOutbox(db, sender, silentLogger, () => 0);
 
     expect(sent).toEqual([{ chatId: "oc_1", card: { schema: "2.0" } }]);
-    expect(findOutboxByKey(db, "cap:cap_1:requested")).toMatchObject({
+    expect(await findOutboxByKey(db, "cap:cap_1:requested")).toMatchObject({
       status: "delivered",
       attempts: 1,
     });
-    db.close();
+    await db.close();
   });
 
   it("失败回 retry_wait,到点后重投成功", async () => {
-    const db = prepare();
+    const db = await prepare();
     let fail = true;
     const sender: CardSender = {
       async send() {
@@ -69,22 +67,22 @@ describe("drainOutbox", () => {
     };
 
     await drainOutbox(db, sender, silentLogger, () => 0);
-    expect(findOutboxByKey(db, "cap:cap_1:requested")).toMatchObject({
+    expect(await findOutboxByKey(db, "cap:cap_1:requested")).toMatchObject({
       status: "retry_wait",
       attempts: 1,
     });
 
     fail = false;
     await drainOutbox(db, sender, silentLogger, () => retryDelayMs(1));
-    expect(findOutboxByKey(db, "cap:cap_1:requested")).toMatchObject({
+    expect(await findOutboxByKey(db, "cap:cap_1:requested")).toMatchObject({
       status: "delivered",
       attempts: 2,
     });
-    db.close();
+    await db.close();
   });
 
   it("连续失败到上限判 failed", async () => {
-    const db = prepare();
+    const db = await prepare();
     const sender: CardSender = {
       async send() {
         throw new Error("boom");
@@ -96,12 +94,12 @@ describe("drainOutbox", () => {
       clock += 60 * 60 * 1000;
     }
 
-    expect(findOutboxByKey(db, "cap:cap_1:requested")).toMatchObject({
+    expect(await findOutboxByKey(db, "cap:cap_1:requested")).toMatchObject({
       status: "failed",
       attempts: 8,
       lastError: "boom",
     });
-    db.close();
+    await db.close();
   });
 
 });

@@ -1,27 +1,25 @@
 import type { FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { LOGIN_LOCKOUT } from "../../shared/constants.js";
-import { openDatabase } from "../../store/database.js";
-import { runMigrations } from "../../store/migrator.js";
+import { openDatabase, type Db } from "../../store/database.js";
 import { buildApp } from "../app.js";
 import { ensureConsoleCredential } from "../credential.js";
 
 const PASSWORD = "secret123";
 
 describe("登录失败锁定", () => {
-  let db: ReturnType<typeof openDatabase>;
+  let db: Db;
   let app: FastifyInstance;
 
-  beforeEach(() => {
-    db = openDatabase(":memory:");
-    runMigrations(db);
-    ensureConsoleCredential(db, PASSWORD);
+  beforeEach(async () => {
+    db = await openDatabase();
+    await ensureConsoleCredential(db, PASSWORD);
     app = buildApp({ logLevel: "silent", db });
   });
 
   afterEach(async () => {
     await app.close();
-    db.close();
+    await db.close();
   });
 
   function login(password: string) {

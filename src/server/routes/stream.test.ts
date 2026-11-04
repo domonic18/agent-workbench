@@ -2,7 +2,6 @@ import type { AddressInfo } from "node:net";
 import Fastify, { type FastifyInstance, type LightMyRequestResponse } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openDatabase, type Db } from "../../store/database.js";
-import { runMigrations } from "../../store/migrator.js";
 import { insertAgent, insertMachine } from "../../store/repositories/identity.js";
 import { ensureConsoleCredential } from "../credential.js";
 import { createStreamRegistry, type StreamRegistry } from "../stream/registry.js";
@@ -89,9 +88,8 @@ describe("stream 路由", () => {
   let registry: StreamRegistry;
 
   beforeEach(async () => {
-    db = openDatabase(":memory:");
-    runMigrations(db);
-    ensureConsoleCredential(db, PASSWORD);
+    db = await openDatabase();
+    await ensureConsoleCredential(db, PASSWORD);
     app = Fastify({ logger: false });
     registry = createStreamRegistry(2);
     registerAuthRoutes(app, { db, now: () => AT });
@@ -122,7 +120,7 @@ describe("stream 路由", () => {
     while (registry.clientCount() !== 0 && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
-    db.close();
+    await db.close();
   });
 
   function connect(query: string): Promise<Response> {
@@ -167,7 +165,7 @@ describe("stream 路由", () => {
       data: { scopes: [{ scope: "overview", revision: 0 }], at: AT },
     });
 
-    insertMachine(db, {
+    await insertMachine(db, {
       id: "m1",
       hostname: "host",
       os: "darwin",
@@ -175,7 +173,7 @@ describe("stream 路由", () => {
       collectorSecretHash: "h",
       createdAt: AT,
     });
-    insertAgent(db, {
+    await insertAgent(db, {
       id: "a1",
       machineId: "m1",
       project: "proj",
