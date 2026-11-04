@@ -64,8 +64,6 @@ export function createAuditReconciler(deps: AuditReconcilerDeps): AuditReconcile
         void insertGap(db, { ...gap, detectedAt: at }).then((ok) => {
           if (ok) { inserted += 1; }
         });
-          inserted += 1;
-        }
       };
 
       const rows = await findToolCallsWithCapability(db, { since: at - WINDOW_MS });
@@ -115,7 +113,8 @@ export function createAuditReconciler(deps: AuditReconcilerDeps): AuditReconcile
       }
 
       // 反向:Teleport 侧有会话、库里查不到对应票据 → 多出来的连接
-      const knownTickets = new Set(listCapabilityTickets(db).map((row) => row.ticketId));
+      const tickets = await listCapabilityTickets(db);
+      const knownTickets = new Set(tickets.map((row) => row.ticketId));
       for (const event of events) {
         if (event.ticketId === null || knownTickets.has(event.ticketId)) {
           continue;
