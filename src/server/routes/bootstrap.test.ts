@@ -235,12 +235,13 @@ describe("GET /api/bootstrap/status", () => {
     expect(withMachine.json().phase).toBe("awaiting_agents");
 
     await identity.registerAgent({ machineId: "m1", project: "p", displayName: "A" });
-    const ready = await fixture.app.inject({
+    const withAgent = await fixture.app.inject({
       method: "GET",
       url: "/api/bootstrap/status",
       headers: { cookie },
     });
-    expect(ready.json().phase).toBe("ready");
+    // Agent 存在但未装配:停在第 4 步等默认 bug_fix 确认
+    expect(withAgent.json()).toMatchObject({ phase: "awaiting_completion", assembly: null });
     await fixture.db.close();
     await fixture.app.close();
   });
