@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { openDatabase, type Db } from "../database.js";
-import { runMigrations } from "../migrator.js";
 import {
   bindRunTaskIfEmpty,
   endRun,
@@ -15,9 +14,8 @@ import {
   type NewAgentRun,
 } from "./run.js";
 
-function prepare(): Db {
-  const db = openDatabase(":memory:");
-  runMigrations(db);
+async function prepare(): Promise<Db> {
+  const db = await openDatabase();
   await db.run(
     "INSERT INTO machine (id, hostname, os, collector_version, collector_secret_hash, status, created_at) VALUES ('m1', 'h', 'linux', '1', 'hash', 'active', 0)",
   );
@@ -45,11 +43,11 @@ function newRun(overrides: Partial<NewAgentRun> = {}) {
 }
 
 describe("agent_run 仓储", () => {
-  it("插入后可按 id 与流查到 running run", () => {
-    const db = prepare();
-    insertRun(db, newRun());
+  it("插入后可按 id 与流查到 running run", async () => {
+    const db = await prepare();
+    await insertRun(db, newRun());
 
-    expect(findRunById(db, "run_1")).toMatchObject({
+    expect(await findRunById(db, "run_1")).toMatchObject({
       id: "run_1",
       agentId: "agt_a",
       machine: "m1",
@@ -61,63 +59,63 @@ describe("agent_run 仓储", () => {
       lastSeenAt: 1_000,
       endedAt: null,
     });
-    expect(findRunningRunForStream(db, "agt_a", "claude-session:s1")?.id).toBe("run_1");
-    expect(findRunningRunForStream(db, "agt_a", "claude-session:s2")).toBeUndefined();
-    db.close();
+    expect((await findRunningRunForStream(db, "agt_a", "claude-session:s1"))?.id).toBe("run_1");
+    expect(await findRunningRunForStream(db, "agt_a", "claude-session:s2")).toBeUndefined();
+    await db.close();
   });
 
-  it("同一流不允许两条 running run", () => {
-    const db = prepare();
-    insertRun(db, newRun());
-    expect(() => insertRun(db, newRun({ id: "run_2" }))).toThrow();
-    db.close();
+  it("同一流不允许两条 running run", async () => {
+    const db = await prepare();
+    await insertRun(db, newRun());
+    await expect(insertRun(db, newRun({ id: "run_2" }))).rejects.toThrow();
+    await db.close();
   });
 
-  it("endRun 收尾后不再是当前 run", () => {
-    const db = prepare();
-    insertRun(db, newRun());
+  it("endRun 收尾后不再是当前 run", async () => {
+    const db = await prepare();
+    await insertRun(db, newRun());
 
-    expect(endRun(db, "run_1", 2_000)).toBe(true);
-    expect(endRun(db, "run_1", 3_000)).toBe(false);
-    expect(findRunningRunForStream(db, "agt_a", "claude-session:s1")).toBeUndefined();
-    expect(findRunById(db, "run_1")).toMatchObject({ status: "ended", endedAt: 2_000 });
-    db.close();
+    expect(await endRun(db, "run_1", 2_000)).toBe(true);
+    expect(await endRun(db, "run_1", 3_000)).toBe(false);
+    expect(await findRunningRunForStream(db, "agt_a", "claude-session:s1")).toBeUndefined();
+    expect(await findRunById(db, "run_1")).toMatchObject({ status: "ended", endedAt: 2_000 });
+    await db.close();
   });
 
-  it("任务绑定只写一次", () => {
-    const db = prepare();
-    insertRun(db, newRun());
+  it("任务绑定只写一次", async () => {
+    const db = await prepare();
+    await insertRun(db, newRun());
 
-    expect(bindRunTaskIfEmpty(db, "run_1", "tsk_a")).toBe(true);
-    expect(bindRunTaskIfEmpty(db, "run_1", "tsk_a")).toBe(false);
-    expect(findRunById(db, "run_1")?.taskId).toBe("tsk_a");
-    expect(bindRunTaskIfEmpty(db, "run_missing", "tsk_a")).toBe(false);
-    db.close();
+    expect(await bindRunTaskIfEmpty(db, "run_1", "tsk_a")).toBe(true);
+    expect(await bindRunTaskIfEmpty(db, "run_1", "tsk_a")).toBe(false);
+    expect((await findRunById(db, "run_1"))?.taskId).toBe("tsk_a");
+    expect(await bindRunTaskIfEmpty(db, "run_missing", "tsk_a")).toBe(false);
+    await db.close();
   });
 
-  it("取最近活跃且未绑定任务的 running run,跳过空闲与已绑定", () => {
-    const db = prepare();
-    insertRun(db, newRun({ id: "run_1", streamId: "s1" }));
-    insertRun(db, newRun({ id: "run_2", streamId: "s2" }));
-    touchRunLastSeen(db, "run_1", 2_400);
-    touchRunLastSeen(db, "run_2", 3_000);
+  it("取最近活跃且未绑定任务的 running run,跳过空闲与已绑定", async () => {
+    const db = await prepare();
+    await insertRun(db, newRun({ id: "run_1", streamId: "s1" }));
+    await insertRun(db, newRun({ id: "run_2", streamId: "s2" }));
+    await touchRunLastSeen(db, "run_1", 2_400);
+    await touchRunLastSeen(db, "run_2", 3_000);
 
-    expect(findLatestUnboundRunningRunByAgent(db, "agt_a", 2_000)?.id).toBe("run_2");
-    expect(bindRunTaskIfEmpty(db, "run_2", "tsk_a")).toBe(true);
-    expect(findLatestUnboundRunningRunByAgent(db, "agt_a", 2_000)?.id).toBe("run_1");
+    expect((await findLatestUnboundRunningRunByAgent(db, "agt_a", 2_000))?.id).toBe("run_2");
+    expect(await bindRunTaskIfEmpty(db, "run_2", "tsk_a")).toBe(true);
+    expect((await findLatestUnboundRunningRunByAgent(db, "agt_a", 2_000))?.id).toBe("run_1");
     // 超出活跃窗口的 run 不再参与建单绑定
-    expect(findLatestUnboundRunningRunByAgent(db, "agt_a", 2_500)).toBeUndefined();
+    expect(await findLatestUnboundRunningRunByAgent(db, "agt_a", 2_500)).toBeUndefined();
 
-    endRun(db, "run_1", 4_000);
-    expect(findLatestUnboundRunningRunByAgent(db, "agt_a", 2_000)).toBeUndefined();
-    db.close();
+    await endRun(db, "run_1", 4_000);
+    expect(await findLatestUnboundRunningRunByAgent(db, "agt_a", 2_000)).toBeUndefined();
+    await db.close();
   });
 });
 
 describe("timeline_event 仓储", () => {
-  it("按 occurred_at / ord 升序返回并保留块内最大新鲜度", () => {
-    const db = prepare();
-    insertRun(db, newRun());
+  it("按 occurred_at / ord 升序返回并保留块内最大新鲜度", async () => {
+    const db = await prepare();
+    await insertRun(db, newRun());
     const base = {
       runId: "run_1",
       turnId: "turn_1",
@@ -126,14 +124,14 @@ describe("timeline_event 仓储", () => {
       kind: "assistant_text",
       payload: {},
     };
-    insertTimelineEvent(db, {
+    await insertTimelineEvent(db, {
       ...base,
       id: "tle_2",
       ord: 2,
       blockRev: 3,
       occurredAt: 1_200,
     });
-    insertTimelineEvent(db, {
+    await insertTimelineEvent(db, {
       ...base,
       id: "tle_1",
       ord: 1,
@@ -141,18 +139,18 @@ describe("timeline_event 仓储", () => {
       occurredAt: 1_100,
     });
 
-    expect(listTimelineEventsByRun(db, "run_1").map((event) => event.id)).toEqual([
+    expect((await listTimelineEventsByRun(db, "run_1")).map((event) => event.id)).toEqual([
       "tle_1",
       "tle_2",
     ]);
-    expect(maxBlockRev(db, "run_1", "blk_1")).toBe(3);
-    expect(maxBlockRev(db, "run_1", "blk_missing")).toBe(0);
-    db.close();
+    expect(await maxBlockRev(db, "run_1", "blk_1")).toBe(3);
+    expect(await maxBlockRev(db, "run_1", "blk_missing")).toBe(0);
+    await db.close();
   });
 
-  it("同一 turn 内 ord 唯一", () => {
-    const db = prepare();
-    insertRun(db, newRun());
+  it("同一 turn 内 ord 唯一", async () => {
+    const db = await prepare();
+    await insertRun(db, newRun());
     const event = {
       runId: "run_1",
       turnId: "turn_1",
@@ -164,8 +162,8 @@ describe("timeline_event 仓储", () => {
       payload: {},
       occurredAt: 1_100,
     };
-    insertTimelineEvent(db, { ...event, id: "tle_1" });
-    expect(() => insertTimelineEvent(db, { ...event, id: "tle_2" })).toThrow();
-    db.close();
+    await insertTimelineEvent(db, { ...event, id: "tle_1" });
+    await expect(insertTimelineEvent(db, { ...event, id: "tle_2" })).rejects.toThrow();
+    await db.close();
   });
 });

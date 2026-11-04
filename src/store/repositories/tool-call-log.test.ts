@@ -1,11 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { openDatabase, type Db } from "../database.js";
-import { runMigrations } from "../migrator.js";
 import { insertToolCallLog } from "./tool-call-log.js";
 
-function prepare(): Db {
-  const db = openDatabase(":memory:");
-  runMigrations(db);
+async function prepare(): Promise<Db> {
+  const db = await openDatabase();
   await db.run(
     `INSERT INTO task (id, title, assigner, assignee, project, stage, status, origin, created_at, updated_at)
      VALUES ('T-1', '测试任务', 'human', 'agt_1', 'proj', 'exec', 'running', 'a2a', 1000, 1000)`,
@@ -14,9 +12,9 @@ function prepare(): Db {
 }
 
 describe("tool_call_log 仓储", () => {
-  it("写入判定记录", () => {
-    const db = prepare();
-    insertToolCallLog(db, {
+  it("写入判定记录", async () => {
+    const db = await prepare();
+    await insertToolCallLog(db, {
       runId: "run_1",
       agentId: "agt_1",
       taskId: "T-1",
@@ -32,9 +30,9 @@ describe("tool_call_log 仓储", () => {
 
     expect(
       await db.get(
-          `SELECT run_id AS runId, tool, level, verdict, reason, occurred_at AS occurredAt
+        `SELECT run_id AS "runId", tool, level, verdict, reason, occurred_at AS "occurredAt"
            FROM tool_call_log`,
-        ),
+      ),
     ).toEqual({
       runId: "run_1",
       tool: "task.create",
@@ -43,12 +41,12 @@ describe("tool_call_log 仓储", () => {
       reason: null,
       occurredAt: 2000,
     });
-    db.close();
+    await db.close();
   });
 
-  it("append-only:更新与删除都被拒绝", () => {
-    const db = prepare();
-    insertToolCallLog(db, {
+  it("append-only:更新与删除都被拒绝", async () => {
+    const db = await prepare();
+    await insertToolCallLog(db, {
       runId: "run_1",
       agentId: "agt_1",
       taskId: "T-1",
@@ -62,16 +60,16 @@ describe("tool_call_log 仓储", () => {
       occurredAt: 2000,
     });
 
-    expect(() => await db.run("UPDATE tool_call_log SET reason = 'x'")).toThrow(
+    await expect(db.run("UPDATE tool_call_log SET reason = 'x'")).rejects.toThrow(
       /append-only/,
     );
-    expect(() => await db.run("DELETE FROM tool_call_log")).toThrow(/append-only/);
-    db.close();
+    await expect(db.run("DELETE FROM tool_call_log")).rejects.toThrow(/append-only/);
+    await db.close();
   });
 
-  it("任务不存在时写入失败,由闸门转为拒绝", () => {
-    const db = prepare();
-    expect(() =>
+  it("任务不存在时写入失败,由闸门转为拒绝", async () => {
+    const db = await prepare();
+    await expect(
       insertToolCallLog(db, {
         runId: "run_1",
         agentId: "agt_1",
@@ -85,7 +83,7 @@ describe("tool_call_log 仓储", () => {
         durationMs: null,
         occurredAt: 2000,
       }),
-    ).toThrow(/FOREIGN KEY/);
-    db.close();
+    ).rejects.toThrow(/foreign key/i);
+    await db.close();
   });
 });

@@ -18,24 +18,23 @@ export interface OverviewWindow {
 }
 
 /** 五项指标一次取回,避免前端为同一屏打多次接口 */
-export function getOverviewMetrics(db: Db, window: OverviewWindow): OverviewMetrics {
-  return db
-    .prepare(
-      `SELECT
-         (SELECT COUNT(DISTINCT r.agent_id)
-            FROM agent_run r JOIN agent a ON a.id = r.agent_id
-           WHERE r.status = 'running' AND r.last_seen_at >= @idleSince
-             AND a.status = 'active') AS runningAgents,
-         (SELECT COUNT(*) FROM task WHERE status = 'running') AS runningTasks,
-         (SELECT COALESCE(SUM(
-                   input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens), 0)
-            FROM token_usage WHERE occurred_at >= @since) AS todayTokens,
-         (SELECT COUNT(*) FROM capability WHERE status = 'pending') AS pendingApprovals,
-         (SELECT COUNT(*) FROM machine
-           WHERE status = 'active' AND last_seen_at IS NOT NULL
-             AND last_seen_at < @heartbeatSince) AS heartbeatTimeouts`,
-    )
-    .get(window) as OverviewMetrics;
+export async function getOverviewMetrics(db: Db, window: OverviewWindow): Promise<OverviewMetrics> {
+  return (await db.get(
+    `SELECT
+       (SELECT COUNT(DISTINCT r.agent_id)
+          FROM agent_run r JOIN agent a ON a.id = r.agent_id
+         WHERE r.status = 'running' AND r.last_seen_at >= ?
+           AND a.status = 'active') AS "runningAgents",
+       (SELECT COUNT(*) FROM task WHERE status = 'running') AS "runningTasks",
+       (SELECT COALESCE(SUM(
+                 input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens), 0)
+          FROM token_usage WHERE occurred_at >= ?) AS "todayTokens",
+       (SELECT COUNT(*) FROM capability WHERE status = 'pending') AS "pendingApprovals",
+       (SELECT COUNT(*) FROM machine
+         WHERE status = 'active' AND last_seen_at IS NOT NULL
+           AND last_seen_at < ?) AS "heartbeatTimeouts"`,
+    window.idleSince, window.since, window.heartbeatSince,
+  )) as OverviewMetrics;
 }
 
 export interface AgentOverviewRow {
@@ -65,55 +64,54 @@ export interface AgentOverviewWindow {
  * 一行一 Agent。当前任务取「最近一条仍存活的 running run」绑定的任务;
  * 空闲超过 RUN_IDLE_GAP_MS 的 run 不再算运行中(与指标口径一致)。
  */
-export function listAgentOverviewRows(
+export async function listAgentOverviewRows(
   db: Db,
   window: AgentOverviewWindow,
-): AgentOverviewRow[] {
-  return db
-    .prepare(
-      `SELECT
-         a.id,
-         a.display_name AS displayName,
-         a.project,
-         a.machine_id AS machineId,
-         m.hostname AS machineHostname,
-         m.last_seen_at AS machineLastSeenAt,
-         lr.lastRunAt,
-         CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS running,
-         r.task_id AS currentTaskId,
-         t.title AS currentTaskTitle,
-         t.stage AS currentTaskStage,
-         t.status AS currentTaskStatus,
-         (SELECT substr(json_extract(e.payload_json, '$.text'), 1, 200)
-            FROM timeline_event e
-           WHERE e.run_id = r.id AND e.kind = 'user_message'
-             -- 运行时注入的 <task-notification> 之类也记为 user_message,不代表人的指令
-             AND ltrim(json_extract(e.payload_json, '$.text')) NOT LIKE '<%'
-           ORDER BY e.occurred_at DESC, e.ord DESC LIMIT 1) AS currentInstruction,
-         COALESCE(tok.totalTokens, 0) AS todayTokens
-       FROM agent a
-       JOIN machine m ON m.id = a.machine_id
-       LEFT JOIN agent_run r ON r.id = (
-         SELECT id FROM agent_run
-          WHERE agent_id = a.id AND status = 'running' AND last_seen_at >= @idleSince
-          ORDER BY last_seen_at DESC, id DESC
-          LIMIT 1
-       )
-       LEFT JOIN task t ON t.id = r.task_id
-       LEFT JOIN (
-         SELECT agent_id, MAX(last_seen_at) AS lastRunAt
-           FROM agent_run GROUP BY agent_id
-       ) lr ON lr.agent_id = a.id
-       LEFT JOIN (
-         SELECT agent_id,
-                SUM(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens)
-                  AS totalTokens
-           FROM token_usage
-          WHERE occurred_at >= @since
-          GROUP BY agent_id
-       ) tok ON tok.agent_id = a.id
-       WHERE a.status = 'active'
-       ORDER BY (r.id IS NULL), r.last_seen_at DESC, a.id`,
-    )
-    .all(window) as AgentOverviewRow[];
+): Promise<AgentOverviewRow[]> {
+  return (await db.all(
+    `SELECT
+       a.id,
+       a.display_name AS "displayName",
+       a.project,
+       a.machine_id AS "machineId",
+       m.hostname AS "machineHostname",
+       m.last_seen_at AS "machineLastSeenAt",
+       lr."lastRunAt",
+       CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS running,
+       r.task_id AS "currentTaskId",
+       t.title AS "currentTaskTitle",
+       t.stage AS "currentTaskStage",
+       t.status AS "currentTaskStatus",
+       (SELECT substr(e.payload_json::jsonb->>'text', 1, 200)
+          FROM timeline_event e
+         WHERE e.run_id = r.id AND e.kind = 'user_message'
+           -- 运行时注入的 <task-notification> 之类也记为 user_message,不代表人的指令
+           AND ltrim(e.payload_json::jsonb->>'text') NOT LIKE '<%'
+         ORDER BY e.occurred_at DESC, e.ord DESC LIMIT 1) AS "currentInstruction",
+       COALESCE(tok."totalTokens", 0) AS "todayTokens"
+     FROM agent a
+     JOIN machine m ON m.id = a.machine_id
+     LEFT JOIN agent_run r ON r.id = (
+       SELECT id FROM agent_run
+        WHERE agent_id = a.id AND status = 'running' AND last_seen_at >= ?
+        ORDER BY last_seen_at DESC, id DESC
+        LIMIT 1
+     )
+     LEFT JOIN task t ON t.id = r.task_id
+     LEFT JOIN (
+       SELECT agent_id, MAX(last_seen_at) AS "lastRunAt"
+         FROM agent_run GROUP BY agent_id
+     ) lr ON lr.agent_id = a.id
+     LEFT JOIN (
+       SELECT agent_id,
+              SUM(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens)
+                AS "totalTokens"
+         FROM token_usage
+        WHERE occurred_at >= ?
+        GROUP BY agent_id
+     ) tok ON tok.agent_id = a.id
+     WHERE a.status = 'active'
+     ORDER BY (r.id IS NULL), r.last_seen_at DESC, a.id`,
+    window.idleSince, window.since,
+  )) as AgentOverviewRow[];
 }

@@ -59,8 +59,8 @@ export async function findToolCallsWithCapability(
   query: { since: number },
 ): Promise<ToolCallWithCapability[]> {
   return (await db.all(
-    `SELECT t.id AS toolCallLogId, t.task_id AS taskId, c.ticket_id AS ticketId,
-            t.capability_id AS capabilityId
+    `SELECT t.id AS "toolCallLogId", t.task_id AS "taskId", c.ticket_id AS "ticketId",
+            t.capability_id AS "capabilityId"
      FROM tool_call_log t
      JOIN capability c ON c.id = t.capability_id
      WHERE t.capability_id IS NOT NULL AND t.occurred_at >= ?
@@ -72,15 +72,15 @@ export async function findToolCallsWithCapability(
 /** 库中所有已签发票据,用于判定 Teleport 侧是否为「多出来的会话」 */
 export async function listCapabilityTickets(db: Db): Promise<CapabilityTicket[]> {
   return (await db.all(
-    `SELECT id AS capabilityId, ticket_id AS ticketId, task_id AS taskId
+    `SELECT id AS "capabilityId", ticket_id AS "ticketId", task_id AS "taskId"
      FROM capability WHERE ticket_id IS NOT NULL`,
   )) as CapabilityTicket[];
 }
 
 const COLUMNS = `
-  id, dedup_key AS dedupKey, kind, tool_call_log_id AS toolCallLogId,
-  capability_id AS capabilityId, task_id AS taskId, ticket_id AS ticketId, sid,
-  detail_json AS detailJson, detected_at AS detectedAt
+  id, dedup_key AS "dedupKey", kind, tool_call_log_id AS "toolCallLogId",
+  capability_id AS "capabilityId", task_id AS "taskId", ticket_id AS "ticketId", sid,
+  detail_json AS "detailJson", detected_at AS "detectedAt"
 `;
 
 export interface GapListQuery {

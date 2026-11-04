@@ -1,22 +1,23 @@
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
-import { openDatabase } from "./database.js";
+import { createTestDatabase, resolveTestAdminUrl, type Db } from "./database.js";
 import { defaultMigrationsDir, runMigrations } from "./migrator.js";
 
-function tableNames(db: Database.Database): string[] {
-  const rows = await db.all("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name") as { name: string }[];
+async function tableNames(db: Db): Promise<string[]> {
+  const rows = (await db.all(
+    "SELECT table_name AS name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name",
+  )) as { name: string }[];
   return rows.map((row) => row.name);
 }
 
 describe("runMigrations", () => {
-  it("空库执行建表并记账", () => {
-    const db = openDatabase(":memory:");
+  it("空库执行建表并记账", async () => {
+    const db = await createTestDatabase(resolveTestAdminUrl());
 
-    expect(runMigrations(db)).toBe(18);
-    expect(tableNames(db)).toEqual(
+    expect(await runMigrations(db)).toBe(1);
+    expect(await tableNames(db)).toEqual(
       expect.arrayContaining([
         "task",
         "task_event",
@@ -43,68 +44,49 @@ describe("runMigrations", () => {
         "scope_revision",
         "knowledge_entry",
         "knowledge_chunk",
-        "knowledge_fts",
+        "knowledge_vec",
         "schema_migration",
       ]),
     );
 
     const applied = await db.all("SELECT version, name FROM schema_migration");
-    expect(applied).toEqual([
-      { version: 1, name: "task" },
-      { version: 2, name: "console_credential" },
-      { version: 3, name: "feishu_event" },
-      { version: 4, name: "feishu_command" },
-      { version: 5, name: "capability" },
-      { version: 6, name: "session" },
-      { version: 7, name: "outbox" },
-      { version: 8, name: "audit_reconciliation" },
-      { version: 9, name: "identity" },
-      { version: 10, name: "a2a" },
-      { version: 11, name: "run" },
-      { version: 12, name: "token_usage" },
-      { version: 13, name: "ingest_receipt" },
-      { version: 14, name: "console_auth" },
-      { version: 15, name: "scope_revision" },
-      { version: 16, name: "agent_feishu_bot" },
-      { version: 17, name: "knowledge" },
-      { version: 18, name: "knowledge_index" },
-    ]);
-    db.close();
+    expect(applied).toEqual([{ version: 1, name: "pg_bootstrap" }]);
+    await db.close();
   });
 
-  it("重复启动不重跑", () => {
-    const db = openDatabase(":memory:");
+  it("重复启动不重跑", async () => {
+    const db = await createTestDatabase(resolveTestAdminUrl());
 
-    runMigrations(db);
-    expect(runMigrations(db)).toBe(0);
-    db.close();
+    await runMigrations(db);
+    expect(await runMigrations(db)).toBe(0);
+    await db.close();
   });
 
-  it("已应用的迁移被改写时启动失败", () => {
+  it("已应用的迁移被改写时启动失败", async () => {
     const dir = mkdtempSync(join(tmpdir(), "aw-migrations-"));
-    const source = readFileSync(join(defaultMigrationsDir(), "0001_task.sql"), "utf8");
-    const file = join(dir, "0001_task.sql");
+    const source = readFileSync(join(defaultMigrationsDir(), "0001_pg_bootstrap.sql"), "utf8");
+    const file = join(dir, "0001_pg_bootstrap.sql");
     writeFileSync(file, source);
 
-    const db = openDatabase(":memory:");
-    runMigrations(db, dir);
+    const db = await createTestDatabase(resolveTestAdminUrl());
+    await runMigrations(db, dir);
 
     writeFileSync(file, `${source}\n-- 事后补丁\n`);
-    expect(() => runMigrations(db, dir)).toThrow(/已应用但内容已变更/);
-    db.close();
+    await expect(runMigrations(db, dir)).rejects.toThrow(/已应用但内容已变更/);
+    await db.close();
   });
 
-  it("迁移在事务内执行,失败不留半成品", () => {
+  it("迁移在事务内执行,失败不留半成品", async () => {
     const dir = mkdtempSync(join(tmpdir(), "aw-migrations-"));
     writeFileSync(
       join(dir, "0001_broken.sql"),
       "CREATE TABLE ok_table (id TEXT PRIMARY KEY);\nCREATE TABLE bad_table (id TEXT,);\n",
     );
 
-    const db = openDatabase(":memory:");
-    expect(() => runMigrations(db, dir)).toThrow();
-    expect(tableNames(db)).not.toContain("ok_table");
+    const db = await createTestDatabase(resolveTestAdminUrl());
+    await expect(runMigrations(db, dir)).rejects.toThrow();
+    expect(await tableNames(db)).not.toContain("ok_table");
     expect(await db.get("SELECT COUNT(*) AS n FROM schema_migration")).toEqual({ n: 0 });
-    db.close();
+    await db.close();
   });
 });

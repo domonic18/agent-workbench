@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { openDatabase, type Db } from "../database.js";
-import { runMigrations } from "../migrator.js";
 import { insertOutbox, type NewOutbox } from "./outbox.js";
 import {
   findMessageById,
@@ -17,9 +16,8 @@ import {
   type NewA2aThread,
 } from "./a2a.js";
 
-function prepare(): Db {
-  const db = openDatabase(":memory:");
-  runMigrations(db);
+async function prepare(): Promise<Db> {
+  const db = await openDatabase();
   await db.run(
     "INSERT INTO machine (id, hostname, os, collector_version, collector_secret_hash, status, created_at) VALUES ('m1', 'h', 'linux', '1', 'hash', 'active', 0)",
   );
@@ -29,7 +27,9 @@ function prepare(): Db {
   ] as const) {
     await db.run(
       `INSERT INTO agent (id, machine_id, project, display_name, secret_hash, status, allowed_targets_json, created_at, updated_at)
-       VALUES (?, 'm1', ?, ?, 'hash', 'active', '[]', 0, 0)`,  id, project, id);
+       VALUES (?, 'm1', ?, ?, 'hash', 'active', '[]', 0, 0)`,
+      id, project, id,
+    );
   }
   for (const [id, assignee] of [
     ["tsk_a", "agt_a"],
@@ -37,7 +37,9 @@ function prepare(): Db {
   ] as const) {
     await db.run(
       `INSERT INTO task (id, title, assigner, assignee, project, stage, status, origin, created_at, updated_at)
-       VALUES (?, ?, 'console', ?, 'aw', 'exec', 'running', 'a2a', 0, 0)`,  id, id, assignee);
+       VALUES (?, ?, 'console', ?, 'aw', 'exec', 'running', 'a2a', 0, 0)`,
+      id, id, assignee,
+    );
   }
   return db;
 }
@@ -91,117 +93,117 @@ function outbox(msgId: string, overrides: Partial<NewOutbox> = {}): NewOutbox {
 }
 
 describe("a2a 线程与消息仓储", () => {
-  it("线程按 (发起方任务, 收件方) 唯一", () => {
-    const db = prepare();
-    insertThread(db, thread());
+  it("线程按 (发起方任务, 收件方) 唯一", async () => {
+    const db = await prepare();
+    await insertThread(db, thread());
 
-    expect(findThreadById(db, "thr_1")).toMatchObject({ initiatorAgent: "agt_a" });
-    expect(findThreadByInitiator(db, "tsk_a", "agt_b")?.id).toBe("thr_1");
-    expect(findThreadByInitiator(db, "tsk_a", "agt_a")).toBeUndefined();
-    expect(() => insertThread(db, thread({ id: "thr_dup" }))).toThrow(/UNIQUE/);
-    db.close();
+    expect(await findThreadById(db, "thr_1")).toMatchObject({ initiatorAgent: "agt_a" });
+    expect((await findThreadByInitiator(db, "tsk_a", "agt_b"))?.id).toBe("thr_1");
+    expect(await findThreadByInitiator(db, "tsk_a", "agt_a")).toBeUndefined();
+    await expect(insertThread(db, thread({ id: "thr_dup" }))).rejects.toThrow(/unique/i);
+    await db.close();
   });
 
-  it("round 按线程单调,同线程同 round 唯一", () => {
-    const db = prepare();
-    insertThread(db, thread());
-    expect(maxRound(db, "thr_1")).toBe(0);
-    insertMessage(db, message());
-    expect(maxRound(db, "thr_1")).toBe(1);
-    expect(findMessageById(db, "msg_1")).toMatchObject({ round: 1, toAgent: "agt_b" });
+  it("round 按线程单调,同线程同 round 唯一", async () => {
+    const db = await prepare();
+    await insertThread(db, thread());
+    expect(await maxRound(db, "thr_1")).toBe(0);
+    await insertMessage(db, message());
+    expect(await maxRound(db, "thr_1")).toBe(1);
+    expect(await findMessageById(db, "msg_1")).toMatchObject({ round: 1, toAgent: "agt_b" });
 
-    expect(() => insertMessage(db, message({ id: "msg_dup" }))).toThrow(/UNIQUE/);
-    db.close();
+    await expect(insertMessage(db, message({ id: "msg_dup" }))).rejects.toThrow(/unique/i);
+    await db.close();
   });
 
-  it("ACK 只写一次,重复 ACK 返回 false", () => {
-    const db = prepare();
-    insertThread(db, thread());
-    insertMessage(db, message());
+  it("ACK 只写一次,重复 ACK 返回 false", async () => {
+    const db = await prepare();
+    await insertThread(db, thread());
+    await insertMessage(db, message());
 
-    expect(markAck(db, "msg_1", 5_000)).toBe(true);
-    expect(findMessageById(db, "msg_1")?.ackAt).toBe(5_000);
-    expect(markAck(db, "msg_1", 6_000)).toBe(false);
-    db.close();
+    expect(await markAck(db, "msg_1", 5_000)).toBe(true);
+    expect((await findMessageById(db, "msg_1"))?.ackAt).toBe(5_000);
+    expect(await markAck(db, "msg_1", 6_000)).toBe(false);
+    await db.close();
   });
 
-  it("信箱只返回发给自己、未 ACK 且出箱可见的消息", () => {
-    const db = prepare();
-    insertThread(db, thread());
-    insertMessage(db, message({ id: "msg_visible", createdAt: 1_000 }));
-    insertMessage(db, message({ id: "msg_acked", round: 2, createdAt: 2_000 }));
-    insertMessage(db, message({ id: "msg_theirs", round: 3, toAgent: "agt_a", createdAt: 3_000 }));
-    insertMessage(db, message({ id: "msg_future", round: 4, createdAt: 4_000 }));
-    insertOutbox(db, outbox("msg_visible"));
-    insertOutbox(db, outbox("msg_acked"));
-    insertOutbox(db, outbox("msg_theirs", { taskId: "tsk_a" }));
-    insertOutbox(db, outbox("msg_future", { availableAt: 9_000 }));
-    markAck(db, "msg_acked", 5_000);
+  it("信箱只返回发给自己、未 ACK 且出箱可见的消息", async () => {
+    const db = await prepare();
+    await insertThread(db, thread());
+    await insertMessage(db, message({ id: "msg_visible", createdAt: 1_000 }));
+    await insertMessage(db, message({ id: "msg_acked", round: 2, createdAt: 2_000 }));
+    await insertMessage(db, message({ id: "msg_theirs", round: 3, toAgent: "agt_a", createdAt: 3_000 }));
+    await insertMessage(db, message({ id: "msg_future", round: 4, createdAt: 4_000 }));
+    await insertOutbox(db, outbox("msg_visible"));
+    await insertOutbox(db, outbox("msg_acked"));
+    await insertOutbox(db, outbox("msg_theirs", { taskId: "tsk_a" }));
+    await insertOutbox(db, outbox("msg_future", { availableAt: 9_000 }));
+    await markAck(db, "msg_acked", 5_000);
 
-    expect(listInbox(db, "agt_b", { now: 1_000, limit: 10 }).map((row) => row.id)).toEqual([
+    expect((await listInbox(db, "agt_b", { now: 1_000, limit: 10 })).map((row) => row.id)).toEqual([
       "msg_visible",
     ]);
-    expect(listInbox(db, "agt_b", { now: 10_000, limit: 10 }).map((row) => row.id)).toEqual([
+    expect((await listInbox(db, "agt_b", { now: 10_000, limit: 10 })).map((row) => row.id)).toEqual([
       "msg_visible",
       "msg_future",
     ]);
-    db.close();
+    await db.close();
   });
 
-  it("信箱游标按 (createdAt, id) 升序取下一页", () => {
-    const db = prepare();
-    insertThread(db, thread());
-    insertMessage(db, message({ id: "msg_1", createdAt: 1_000 }));
-    insertMessage(db, message({ id: "msg_2", round: 2, createdAt: 2_000 }));
-    insertMessage(db, message({ id: "msg_3", round: 3, createdAt: 3_000 }));
+  it("信箱游标按 (createdAt, id) 升序取下一页", async () => {
+    const db = await prepare();
+    await insertThread(db, thread());
+    await insertMessage(db, message({ id: "msg_1", createdAt: 1_000 }));
+    await insertMessage(db, message({ id: "msg_2", round: 2, createdAt: 2_000 }));
+    await insertMessage(db, message({ id: "msg_3", round: 3, createdAt: 3_000 }));
     for (const id of ["msg_1", "msg_2", "msg_3"]) {
-      insertOutbox(db, outbox(id));
+      await insertOutbox(db, outbox(id));
     }
 
-    const first = listInbox(db, "agt_b", { now: 1_000, limit: 2 });
+    const first = await listInbox(db, "agt_b", { now: 1_000, limit: 2 });
     expect(first.map((row) => row.id)).toEqual(["msg_1", "msg_2"]);
-    const second = listInbox(db, "agt_b", {
+    const second = await listInbox(db, "agt_b", {
       now: 1_000,
       limit: 2,
       after: { createdAt: first[1]!.createdAt, id: first[1]!.id },
     });
     expect(second.map((row) => row.id)).toEqual(["msg_3"]);
-    db.close();
+    await db.close();
   });
 });
 
 describe("按任务读取线程", () => {
-  it("发起方任务与消息 task_id 所属任务都能看到同一线程", () => {
-    const db = prepare();
-    insertThread(db, thread());
-    insertMessage(db, message({ id: "msg_1", round: 1 }));
-    insertMessage(db, message({ id: "msg_2", round: 2, taskId: "tsk_b", intent: "reply" }));
+  it("发起方任务与消息 task_id 所属任务都能看到同一线程", async () => {
+    const db = await prepare();
+    await insertThread(db, thread());
+    await insertMessage(db, message({ id: "msg_1", round: 1 }));
+    await insertMessage(db, message({ id: "msg_2", round: 2, taskId: "tsk_b", intent: "reply" }));
 
-    const initiator = listThreadsForTask(db, "tsk_a");
+    const initiator = await listThreadsForTask(db, "tsk_a");
     expect(initiator.map((row) => row.id)).toEqual(["thr_1"]);
-    expect(listThreadsForTask(db, "tsk_b").map((row) => row.id)).toEqual(["thr_1"]);
-    expect(listThreadsForTask(db, "tsk_missing")).toEqual([]);
-    db.close();
+    expect((await listThreadsForTask(db, "tsk_b")).map((row) => row.id)).toEqual(["thr_1"]);
+    expect(await listThreadsForTask(db, "tsk_missing")).toEqual([]);
+    await db.close();
   });
 
-  it("消息按 round 升序,投递状态取该 msg_id 最新一条出箱行", () => {
-    const db = prepare();
-    insertThread(db, thread());
-    insertMessage(db, message({ id: "msg_1", round: 2 }));
-    insertMessage(db, message({ id: "msg_2", round: 1 }));
-    insertOutbox(db, outbox("msg_1", { id: "ob_old", idempotencyKey: "key_old", createdAt: 1_000 }));
+  it("消息按 round 升序,投递状态取该 msg_id 最新一条出箱行", async () => {
+    const db = await prepare();
+    await insertThread(db, thread());
+    await insertMessage(db, message({ id: "msg_1", round: 2 }));
+    await insertMessage(db, message({ id: "msg_2", round: 1 }));
+    await insertOutbox(db, outbox("msg_1", { id: "ob_old", idempotencyKey: "key_old", createdAt: 1_000 }));
     await db.run("UPDATE outbox SET status = 'retry_wait' WHERE id = 'ob_old'");
-    insertOutbox(db, outbox("msg_1", { id: "ob_new", idempotencyKey: "key_new", createdAt: 2_000 }));
+    await insertOutbox(db, outbox("msg_1", { id: "ob_new", idempotencyKey: "key_new", createdAt: 2_000 }));
     await db.run("UPDATE outbox SET status = 'failed', last_error = 'boom' WHERE id = 'ob_new'");
 
-    const rows = listMessagesByThreadIds(db, ["thr_1"]);
+    const rows = await listMessagesByThreadIds(db, ["thr_1"]);
     expect(rows.map((row) => row.id)).toEqual(["msg_2", "msg_1"]);
     expect(rows[1]).toMatchObject({
       deliveryStatus: "failed",
       deliveryError: "boom",
     });
     expect(rows[0]).toMatchObject({ deliveryStatus: null });
-    expect(listMessagesByThreadIds(db, [])).toEqual([]);
-    db.close();
+    expect(await listMessagesByThreadIds(db, [])).toEqual([]);
+    await db.close();
   });
 });

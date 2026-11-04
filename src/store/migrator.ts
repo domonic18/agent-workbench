@@ -87,7 +87,7 @@ export async function runMigrations(db: Db, dir?: string): Promise<number> {
       await tx.exec(migration.sql);
       await tx.run(
         "INSERT INTO schema_migration (version, name, checksum, applied_at) VALUES (?, ?, ?, ?)",
-        [migration.version, migration.name, migration.checksum, Date.now()],
+        migration.version, migration.name, migration.checksum, Date.now(),
       );
     });
     count += 1;

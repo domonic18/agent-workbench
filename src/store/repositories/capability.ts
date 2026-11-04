@@ -23,9 +23,9 @@ export interface CapabilityRecord {
 }
 
 const COLUMNS = `
-  id, subject, target, action, scope_json AS scopeJson, ttl_seconds AS ttlSeconds,
-  status, ticket_id AS ticketId, task_id AS taskId, issued_at AS issuedAt,
-  expires_at AS expiresAt, revoked_at AS revokedAt, created_at AS createdAt, updated_at AS updatedAt
+  id, subject, target, action, scope_json AS "scopeJson", ttl_seconds AS "ttlSeconds",
+  status, ticket_id AS "ticketId", task_id AS "taskId", issued_at AS "issuedAt",
+  expires_at AS "expiresAt", revoked_at AS "revokedAt", created_at AS "createdAt", updated_at AS "updatedAt"
 `;
 
 export interface NewCapability {
@@ -39,16 +39,18 @@ export interface NewCapability {
   createdAt: number;
 }
 
-export function insertCapability(db: Db, row: NewCapability): void {
-  db.prepare(
+export async function insertCapability(db: Db, row: NewCapability): Promise<void> {
+  await db.run(
     `INSERT INTO capability
        (id, subject, target, action, scope_json, ttl_seconds, status, task_id, created_at, updated_at)
-     VALUES (@id, @subject, @target, @action, @scopeJson, @ttlSeconds, 'pending', @taskId, @createdAt, @createdAt)`,
-  ).run(row);
+     VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
+    row.id, row.subject, row.target, row.action, row.scopeJson, row.ttlSeconds,
+    row.taskId, row.createdAt, row.createdAt,
+  );
 }
 
-export function findCapability(db: Db, id: string): CapabilityRecord | undefined {
-  return db.prepare(`SELECT ${COLUMNS} FROM capability WHERE id = ?`).get(id) as
+export async function findCapability(db: Db, id: string): Promise<CapabilityRecord | undefined> {
+  return (await db.get(`SELECT ${COLUMNS} FROM capability WHERE id = ?`, id)) as
     | CapabilityRecord
     | undefined;
 }
@@ -63,30 +65,29 @@ export interface CapabilityListQuery {
 }
 
 /** 按键集分页:`created_at DESC, id DESC`,不用 offset */
-export function listCapabilities(db: Db, query: CapabilityListQuery): CapabilityRecord[] {
+export async function listCapabilities(db: Db, query: CapabilityListQuery): Promise<CapabilityRecord[]> {
   const conditions: string[] = [];
-  const params: Record<string, unknown> = { limit: query.limit };
+  const params: unknown[] = [];
   if (query.statuses !== undefined && query.statuses.length > 0) {
-    const placeholders = query.statuses.map((status, index) => {
-      params[`status${index}`] = status;
-      return `@status${index}`;
-    });
+    const base = params.length;
+    const placeholders = query.statuses.map((_, index) => `$${base + index + 1}`);
+    params.push(...query.statuses);
     conditions.push(`status IN (${placeholders.join(", ")})`);
   } else if (query.status !== undefined) {
-    conditions.push("status = @status");
-    params.status = query.status;
+    conditions.push("status = ?");
+    params.push(query.status);
   }
   if (query.before !== undefined) {
-    conditions.push("(created_at < @beforeCreatedAt OR (created_at = @beforeCreatedAt AND id < @beforeId))");
-    params.beforeCreatedAt = query.before.createdAt;
-    params.beforeId = query.before.id;
+    conditions.push("(created_at < ? OR (created_at = ? AND id < ?))");
+    params.push(query.before.createdAt, query.before.createdAt, query.before.id);
   }
+  params.push(query.limit);
+  const limitIdx = `$${params.length}`;
   const where = conditions.length === 0 ? "" : `WHERE ${conditions.join(" AND ")}`;
-  return db
-    .prepare(
-      `SELECT ${COLUMNS} FROM capability ${where} ORDER BY created_at DESC, id DESC LIMIT @limit`,
-    )
-    .all(params) as CapabilityRecord[];
+  return (await db.all(
+    `SELECT ${COLUMNS} FROM capability ${where} ORDER BY created_at DESC, id DESC LIMIT ${limitIdx}`,
+    ...params,
+  )) as CapabilityRecord[];
 }
 
 export interface CapabilitySummary {
@@ -100,14 +101,13 @@ export interface CapabilitySummary {
 }
 
 /** 任务详情附带的授权摘要:不含 ticket 标识与证书内容 */
-export function listCapabilitySummariesByTask(db: Db, taskId: string): CapabilitySummary[] {
-  return db
-    .prepare(
-      `SELECT id, target, action, scope_json AS scopeJson, status,
-              expires_at AS expiresAt, created_at AS createdAt
-         FROM capability WHERE task_id = ? ORDER BY created_at DESC, id DESC`,
-    )
-    .all(taskId) as CapabilitySummary[];
+export async function listCapabilitySummariesByTask(db: Db, taskId: string): Promise<CapabilitySummary[]> {
+  return (await db.all(
+    `SELECT id, target, action, scope_json AS "scopeJson", status,
+            expires_at AS "expiresAt", created_at AS "createdAt"
+       FROM capability WHERE task_id = ? ORDER BY created_at DESC, id DESC`,
+    taskId,
+  )) as CapabilitySummary[];
 }
 
 export interface CapabilityTransition {
@@ -122,33 +122,29 @@ export interface CapabilityTransition {
 }
 
 /** 条件更新(CAS):只有当前状态仍是 `from` 才迁移,返回是否真正发生跃迁 */
-export function transitionCapability(db: Db, input: CapabilityTransition): boolean {
-  const sets = ["status = @to", "updated_at = @now"];
-  const params: Record<string, unknown> = {
-    id: input.id,
-    from: input.from,
-    to: input.to,
-    now: input.now,
-  };
+export async function transitionCapability(db: Db, input: CapabilityTransition): Promise<boolean> {
+  const sets = ["status = ?", "updated_at = ?"];
+  const params: unknown[] = [input.to, input.now];
   if (input.ticketId !== undefined) {
-    sets.push("ticket_id = @ticketId");
-    params.ticketId = input.ticketId;
+    sets.push("ticket_id = ?");
+    params.push(input.ticketId);
   }
   if (input.issuedAt !== undefined) {
-    sets.push("issued_at = @issuedAt");
-    params.issuedAt = input.issuedAt;
+    sets.push("issued_at = ?");
+    params.push(input.issuedAt);
   }
   if (input.expiresAt !== undefined) {
-    sets.push("expires_at = @expiresAt");
-    params.expiresAt = input.expiresAt;
+    sets.push("expires_at = ?");
+    params.push(input.expiresAt);
   }
   if (input.revokedAt !== undefined) {
-    sets.push("revoked_at = @revokedAt");
-    params.revokedAt = input.revokedAt;
+    sets.push("revoked_at = ?");
+    params.push(input.revokedAt);
   }
-  const result = db
-    .prepare(`UPDATE capability SET ${sets.join(", ")} WHERE id = @id AND status = @from`)
-    .run(params);
+  const result = await db.run(
+    `UPDATE capability SET ${sets.join(", ")} WHERE id = ? AND status = ?`,
+    ...params, input.id, input.from,
+  );
   return result.changes === 1;
 }
 
@@ -160,35 +156,29 @@ export interface NewAuditEntry {
   occurredAt: number;
 }
 
-export function appendCapabilityAudit(db: Db, entry: NewAuditEntry): void {
-  db.prepare(
+export async function appendCapabilityAudit(db: Db, entry: NewAuditEntry): Promise<void> {
+  await db.run(
     `INSERT INTO capability_audit (capability_id, action, actor, detail_json, occurred_at)
      VALUES (?, ?, ?, ?, ?)`,
-  ).run(
-    entry.capabilityId,
-    entry.action,
-    entry.actor,
-    JSON.stringify(entry.detail ?? {}),
-    entry.occurredAt,
+    entry.capabilityId, entry.action, entry.actor,
+    JSON.stringify(entry.detail ?? {}), entry.occurredAt,
   );
 }
 
-export function findStalePending(db: Db, cutoff: number, limit = 100): CapabilityRecord[] {
-  return db
-    .prepare(
-      `SELECT ${COLUMNS} FROM capability
-       WHERE status = 'pending' AND created_at < ?
-       ORDER BY created_at ASC LIMIT ?`,
-    )
-    .all(cutoff, limit) as CapabilityRecord[];
+export async function findStalePending(db: Db, cutoff: number, limit = 100): Promise<CapabilityRecord[]> {
+  return (await db.all(
+    `SELECT ${COLUMNS} FROM capability
+     WHERE status = 'pending' AND created_at < ?
+     ORDER BY created_at ASC LIMIT ?`,
+    cutoff, limit,
+  )) as CapabilityRecord[];
 }
 
-export function findStaleIssuing(db: Db, cutoff: number, limit = 100): CapabilityRecord[] {
-  return db
-    .prepare(
-      `SELECT ${COLUMNS} FROM capability
-       WHERE status = 'issuing' AND updated_at < ?
-       ORDER BY updated_at ASC LIMIT ?`,
-    )
-    .all(cutoff, limit) as CapabilityRecord[];
+export async function findStaleIssuing(db: Db, cutoff: number, limit = 100): Promise<CapabilityRecord[]> {
+  return (await db.all(
+    `SELECT ${COLUMNS} FROM capability
+     WHERE status = 'issuing' AND updated_at < ?
+     ORDER BY updated_at ASC LIMIT ?`,
+    cutoff, limit,
+  )) as CapabilityRecord[];
 }

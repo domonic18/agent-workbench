@@ -1,6 +1,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { Pool, type PoolClient, types, type QueryResult } from "pg";
+// pg 是 CommonJS 模块:值经默认导入解构,类型仍用具名 type 导入(编译期擦除)
+import pg from "pg";
+import type { Pool as PgPool, PoolClient, QueryResult } from "pg";
+
+const { Pool, types } = pg;
+type Pool = PgPool;
 
 /**
  * PostgreSQL 事务域句柄(2026-11-03 重基线,02 §1)。
@@ -102,7 +107,7 @@ types.setTypeParser(20, (value: string) => Number.parseInt(value, 10));
 export type { QueryResult };
 
 /** 生产连接池。连接串来自 DATABASE_URL(env),池大小按单机部署默认 10 */
-export function createDb(connectionString: string, poolSize = 10): Promise<Db>{
+export function createDb(connectionString: string, poolSize = 10): Db {
   const pool = new Pool({ connectionString, max: poolSize });
   return new PgHandle(pool, async () => {
     await pool.end();
@@ -132,14 +137,14 @@ export async function createTestDatabase(adminUrl: string): Promise<Db> {
 const DEFAULT_TEST_PG_URL = "postgres://agent_workbench@127.0.0.1:5433/agent_workbench";
 
 /** 测试口令从 docker/.env(仓库根向上查找)读取;compose 的 postgres 在 127.0.0.1:5433 */
-function resolveTestAdminUrl(): string {
+export function resolveTestAdminUrl(): string {
   let dir = process.cwd();
   for (let i = 0; i < 4; i += 1) {
     try {
       const text = readFileSync(join(dir, "docker/.env"), "utf8");
       const match = /POSTGRES_PASSWORD=(.*)/.exec(text);
-      if (match !== null) {
-        const password = match[1].trim();
+      const password = match?.[1]?.trim();
+      if (password !== undefined && password !== "") {
         return `postgres://agent_workbench:${encodeURIComponent(password)}@127.0.0.1:5433/agent_workbench`;
       }
     } catch {

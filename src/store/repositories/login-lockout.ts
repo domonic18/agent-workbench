@@ -8,26 +8,27 @@ export interface LoginFailureRecord {
 }
 
 const COLUMNS = `
-  source, failures, locked_until AS lockedUntil, updated_at AS updatedAt
+  source, failures, locked_until AS "lockedUntil", updated_at AS "updatedAt"
 `;
 
-export function findLoginFailure(db: Db, source: string): LoginFailureRecord | undefined {
-  return db.prepare(`SELECT ${COLUMNS} FROM login_failure WHERE source = ?`).get(source) as
+export async function findLoginFailure(db: Db, source: string): Promise<LoginFailureRecord | undefined> {
+  return (await db.get(`SELECT ${COLUMNS} FROM login_failure WHERE source = ?`, source)) as
     | LoginFailureRecord
     | undefined;
 }
 
-export function upsertLoginFailure(db: Db, row: LoginFailureRecord): void {
-  db.prepare(
+export async function upsertLoginFailure(db: Db, row: LoginFailureRecord): Promise<void> {
+  await db.run(
     `INSERT INTO login_failure (source, failures, locked_until, updated_at)
-     VALUES (@source, @failures, @lockedUntil, @updatedAt)
+     VALUES (?, ?, ?, ?)
      ON CONFLICT(source) DO UPDATE SET
        failures = excluded.failures,
        locked_until = excluded.locked_until,
        updated_at = excluded.updated_at`,
-  ).run(row);
+    row.source, row.failures, row.lockedUntil, row.updatedAt,
+  );
 }
 
-export function clearLoginFailures(db: Db, source: string): void {
-  db.prepare("DELETE FROM login_failure WHERE source = ?").run(source);
+export async function clearLoginFailures(db: Db, source: string): Promise<void> {
+  await db.run("DELETE FROM login_failure WHERE source = ?", source);
 }

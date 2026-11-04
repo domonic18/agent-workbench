@@ -1,42 +1,45 @@
-import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
-import { openDatabase } from "../database.js";
-import { runMigrations } from "../migrator.js";
+import { openDatabase, type Db } from "../database.js";
 
 const NOW = 1_700_000_000_000;
 
-function prepare(): Database.Database {
-  const db = openDatabase(":memory:");
-  runMigrations(db);
-  return db;
+async function prepare(): Promise<Db> {
+  return openDatabase();
 }
 
-function insertEntry(db: Database.Database, overrides: Record<string, unknown> = {}): void {
-  const row = {
+async function insertEntry(db: Db, overrides: Record<string, unknown> = {}): Promise<void> {
+  const row: Record<string, unknown> = {
     id: "kb_1",
     path: "notes/deploy.md",
     title: "部署手册",
     status: "candidate",
+    source_task_id: null,
+    source_agent_id: null,
     created_at: NOW,
     updated_at: NOW,
     ...overrides,
   };
   await db.run(
     `INSERT INTO knowledge_entry (id, path, title, status, source_task_id, source_agent_id, created_at, updated_at)
-     VALUES (@id, @path, @title, @status, @source_task_id, @source_agent_id, @created_at, @updated_at)`,  { source_task_id: null, source_agent_id: null, ...row });
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    row.id, row.path, row.title, row.status, row.source_task_id ?? null,
+    row.source_agent_id ?? null, row.created_at, row.updated_at,
+  );
 }
 
 describe("knowledge_entry 表约束", () => {
-  it("未给状态时落库为 draft,来源留空,索引待嵌入", () => {
-    const db = prepare();
+  it("未给状态时落库为 draft,来源留空,索引待嵌入", async () => {
+    const db = await prepare();
     await db.run(
       `INSERT INTO knowledge_entry (id, path, title, created_at, updated_at)
-       VALUES ('kb_default', 'notes/a.md', 'A', ?, ?)`,  NOW, NOW);
+       VALUES ('kb_default', 'notes/a.md', 'A', ?, ?)`,
+      NOW, NOW,
+    );
     expect(
       await db.get(
-          `SELECT status, source_task_id, source_agent_id, deleted_at, content_hash, embedding_status
-             FROM knowledge_entry`,
-        ),
+        `SELECT status, source_task_id, source_agent_id, deleted_at, content_hash, embedding_status
+           FROM knowledge_entry`,
+      ),
     ).toEqual({
       status: "draft",
       source_task_id: null,
@@ -45,53 +48,60 @@ describe("knowledge_entry 表约束", () => {
       content_hash: null,
       embedding_status: "pending",
     });
-    db.close();
+    await db.close();
   });
 
-  it("status 只收枚举", () => {
-    const db = prepare();
-    expect(() => insertEntry(db, { id: "kb_bad", status: "published" })).toThrow(
-      /CHECK constraint failed/,
+  it("status 只收枚举", async () => {
+    const db = await prepare();
+    await expect(insertEntry(db, { id: "kb_bad", status: "published" })).rejects.toThrow(
+      /check constraint/i,
     );
-    db.close();
+    await db.close();
   });
 
-  it("path 唯一", () => {
-    const db = prepare();
-    insertEntry(db);
-    expect(() => insertEntry(db, { id: "kb_dup" })).toThrow(/UNIQUE constraint failed/);
-    db.close();
+  it("path 唯一", async () => {
+    const db = await prepare();
+    await insertEntry(db);
+    await expect(insertEntry(db, { id: "kb_dup" })).rejects.toThrow(/duplicate key|unique/i);
+    await db.close();
   });
 
-  it("分块增删同步 FTS,删除条目级联删分块", () => {
-    const db = prepare();
-    insertEntry(db);
+  it("关键词检索走分块 LIKE,删除条目级联删分块", async () => {
+    const db = await prepare();
+    await insertEntry(db);
     await db.run(
-      "INSERT INTO knowledge_chunk (entry_id, chunk_no, content) VALUES ('kb_1', 0, ?)",  "部署手册与回滚步骤");
-    const hits = (): number =>
+      "INSERT INTO knowledge_chunk (entry_id, chunk_no, content) VALUES ('kb_1', 0, ?)",
+      "部署手册与回滚步骤",
+    );
+    const hits = async (): Promise<number> =>
       (
-        await db.get("SELECT COUNT(*) AS n FROM knowledge_fts WHERE knowledge_fts MATCH ?", '"部署手册"') as { n: number }
+        (await db.get(
+          "SELECT COUNT(*) AS n FROM knowledge_chunk WHERE content LIKE ?",
+          "%部署手册%",
+        )) as { n: number }
       ).n;
 
-    expect(hits()).toBe(1);
+    expect(await hits()).toBe(1);
     await db.run("DELETE FROM knowledge_chunk WHERE entry_id = 'kb_1'");
-    expect(hits()).toBe(0);
+    expect(await hits()).toBe(0);
 
     await db.run(
-      "INSERT INTO knowledge_chunk (entry_id, chunk_no, content) VALUES ('kb_1', 0, ?)",  "连接失败排查");
+      "INSERT INTO knowledge_chunk (entry_id, chunk_no, content) VALUES ('kb_1', 0, ?)",
+      "连接失败排查",
+    );
     await db.run("DELETE FROM knowledge_entry WHERE id = 'kb_1'");
     expect(await db.get("SELECT COUNT(*) AS n FROM knowledge_chunk")).toEqual({ n: 0 });
-    db.close();
+    await db.close();
   });
 
-  it("来源任务与来源 Agent 必须存在", () => {
-    const db = prepare();
-    expect(() => insertEntry(db, { id: "kb_task", source_task_id: "tsk_missing" })).toThrow(
-      /FOREIGN KEY/,
-    );
-    expect(() => insertEntry(db, { id: "kb_agent", source_agent_id: "agt_missing" })).toThrow(
-      /FOREIGN KEY/,
-    );
-    db.close();
+  it("来源任务与来源 Agent 必须存在", async () => {
+    const db = await prepare();
+    await expect(
+      insertEntry(db, { id: "kb_task", source_task_id: "tsk_missing" }),
+    ).rejects.toThrow(/foreign key/i);
+    await expect(
+      insertEntry(db, { id: "kb_agent", source_agent_id: "agt_missing" }),
+    ).rejects.toThrow(/foreign key/i);
+    await db.close();
   });
 });

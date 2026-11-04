@@ -10,8 +10,8 @@ export interface A2aThreadRecord {
 }
 
 const THREAD_COLUMNS = `
-  id, initiator_task_id AS initiatorTaskId, initiator_agent AS initiatorAgent,
-  responder_agent AS responderAgent, created_at AS createdAt
+  id, initiator_task_id AS "initiatorTaskId", initiator_agent AS "initiatorAgent",
+  responder_agent AS "responderAgent", created_at AS "createdAt"
 `;
 
 export interface NewA2aThread {
@@ -69,11 +69,11 @@ export interface A2aMessageRecord {
 
 function messageColumns(alias: string): string {
   return `
-  ${alias}.id, ${alias}.thread_id AS threadId, ${alias}.task_id AS taskId, ${alias}.round,
-  ${alias}.reply_to_msg_id AS replyToMsgId, ${alias}.from_agent AS fromAgent,
-  ${alias}.to_agent AS toAgent, ${alias}.intent, ${alias}.summary, ${alias}.expect,
-  ${alias}.deadline_at AS deadlineAt, ${alias}.refs_json AS refsJson,
-  ${alias}.auth_ticket AS authTicket, ${alias}.ack_at AS ackAt, ${alias}.created_at AS createdAt
+  ${alias}.id, ${alias}.thread_id AS "threadId", ${alias}.task_id AS "taskId", ${alias}.round,
+  ${alias}.reply_to_msg_id AS "replyToMsgId", ${alias}.from_agent AS "fromAgent",
+  ${alias}.to_agent AS "toAgent", ${alias}.intent, ${alias}.summary, ${alias}.expect,
+  ${alias}.deadline_at AS "deadlineAt", ${alias}.refs_json AS "refsJson",
+  ${alias}.auth_ticket AS "authTicket", ${alias}.ack_at AS "ackAt", ${alias}.created_at AS "createdAt"
 `;
 }
 
@@ -157,8 +157,8 @@ export interface NewA2aDeadLetter {
 }
 
 const DEAD_LETTER_COLUMNS = `
-  id, msg_id AS msgId, from_agent AS fromAgent, to_agent AS toAgent,
-  task_id AS taskId, reason, payload_json AS payloadJson, created_at AS createdAt
+  id, msg_id AS "msgId", from_agent AS "fromAgent", to_agent AS "toAgent",
+  task_id AS "taskId", reason, payload_json AS "payloadJson", created_at AS "createdAt"
 `;
 
 export async function insertDeadLetter(db: Db, row: NewA2aDeadLetter): Promise<void> {
@@ -212,22 +212,21 @@ export async function listInbox(db: Db, agentId: string, query: InboxQuery): Pro
   const params: unknown[] = [agentId, query.now];
   let cursor = "";
   if (query.after !== undefined) {
-    cursor = "AND (m.created_at > $3 OR (m.created_at = $3 AND m.id > $4))";
-    params.push(query.after.createdAt, query.after.id);
+    cursor = "AND (m.created_at > ? OR (m.created_at = ? AND m.id > ?))";
+    params.push(query.after.createdAt, query.after.createdAt, query.after.id);
   }
-  params.push(query.now, query.limit);
-  const limitIdx = `$${params.length}`;
+  params.push(query.limit);
   return (await db.all(
     `SELECT ${MESSAGE_COLUMNS} FROM a2a_message
      WHERE id IN (
        SELECT m.id FROM a2a_message m
        JOIN outbox o ON o.msg_id = m.id AND o.channel = 'pull'
-       WHERE m.to_agent = $1 AND m.ack_at IS NULL
-         AND o.status IN ('pending', 'retry_wait') AND o.available_at <= $2
+       WHERE m.to_agent = ? AND m.ack_at IS NULL
+         AND o.status IN ('pending', 'retry_wait') AND o.available_at <= ?
          ${cursor}
        )
-     ORDER BY created_at ASC, id ASC LIMIT ${limitIdx}`,
-    params,
+     ORDER BY created_at ASC, id ASC LIMIT ?`,
+    ...params,
   )) as A2aMessageRecord[];
 }
 
@@ -272,8 +271,8 @@ export async function listMessagesByThreadIds(
   const placeholders = threadIds.map((_, i) => `$${i + 1}`).join(", ");
   return (await db.all(
     `SELECT ${messageColumns("m")},
-            o.status AS deliveryStatus, o.attempts AS deliveryAttempts,
-            o.last_error AS deliveryError
+            o.status AS "deliveryStatus", o.attempts AS "deliveryAttempts",
+            o.last_error AS "deliveryError"
      FROM a2a_message m
      LEFT JOIN outbox o ON o.id = (
        SELECT o2.id FROM outbox o2 WHERE o2.msg_id = m.id

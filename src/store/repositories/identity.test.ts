@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { openDatabase } from "../database.js";
-import { runMigrations } from "../migrator.js";
+import { openDatabase, type Db } from "../database.js";
 import {
   findAgentById,
   findAgentByMachineProject,
@@ -15,10 +14,8 @@ import {
   type NewMachine,
 } from "./identity.js";
 
-function prepare() {
-  const db = openDatabase(":memory:");
-  runMigrations(db);
-  return db;
+async function prepare(): Promise<Db> {
+  return openDatabase();
 }
 
 function machine(overrides: Partial<NewMachine> = {}): NewMachine {
@@ -48,100 +45,100 @@ function agent(overrides: Partial<NewAgent> = {}): NewAgent {
 }
 
 describe("machine 仓储", () => {
-  it("插入后按 id 读取,默认 active", () => {
-    const db = prepare();
-    insertMachine(db, machine());
+  it("插入后按 id 读取,默认 active", async () => {
+    const db = await prepare();
+    await insertMachine(db, machine());
 
-    expect(findMachineById(db, "macmini-01")).toMatchObject({
+    expect(await findMachineById(db, "macmini-01")).toMatchObject({
       id: "macmini-01",
       collectorSecretHash: "hash-1",
       status: "active",
       lastSeenAt: null,
     });
-    expect(findMachineById(db, "missing")).toBeUndefined();
-    db.close();
+    expect(await findMachineById(db, "missing")).toBeUndefined();
+    await db.close();
   });
 
-  it("轮换哈希后读回新值", () => {
-    const db = prepare();
-    insertMachine(db, machine());
+  it("轮换哈希后读回新值", async () => {
+    const db = await prepare();
+    await insertMachine(db, machine());
 
-    expect(updateMachineSecretHash(db, "macmini-01", "hash-2")).toBe(true);
-    expect(findMachineById(db, "macmini-01")?.collectorSecretHash).toBe("hash-2");
-    expect(updateMachineSecretHash(db, "missing", "hash-2")).toBe(false);
-    db.close();
+    expect(await updateMachineSecretHash(db, "macmini-01", "hash-2")).toBe(true);
+    expect((await findMachineById(db, "macmini-01"))?.collectorSecretHash).toBe("hash-2");
+    expect(await updateMachineSecretHash(db, "missing", "hash-2")).toBe(false);
+    await db.close();
   });
 
-  it("列表按创建时间倒序键集分页", () => {
-    const db = prepare();
-    insertMachine(db, machine({ id: "m1", createdAt: 1_000 }));
-    insertMachine(db, machine({ id: "m2", createdAt: 2_000 }));
-    insertMachine(db, machine({ id: "m3", createdAt: 3_000 }));
+  it("列表按创建时间倒序键集分页", async () => {
+    const db = await prepare();
+    await insertMachine(db, machine({ id: "m1", createdAt: 1_000 }));
+    await insertMachine(db, machine({ id: "m2", createdAt: 2_000 }));
+    await insertMachine(db, machine({ id: "m3", createdAt: 3_000 }));
 
-    const first = listMachines(db, { limit: 2 });
+    const first = await listMachines(db, { limit: 2 });
     expect(first.map((row) => row.id)).toEqual(["m3", "m2"]);
-    const second = listMachines(db, {
+    const second = await listMachines(db, {
       limit: 2,
       before: { createdAt: first[1]!.createdAt, id: first[1]!.id },
     });
     expect(second.map((row) => row.id)).toEqual(["m1"]);
-    db.close();
+    await db.close();
   });
 });
 
 describe("agent 仓储", () => {
-  it("按 id 与 (machine, project) 查询", () => {
-    const db = prepare();
-    insertMachine(db, machine());
-    insertAgent(db, agent());
+  it("按 id 与 (machine, project) 查询", async () => {
+    const db = await prepare();
+    await insertMachine(db, machine());
+    await insertAgent(db, agent());
 
-    expect(findAgentById(db, "agt_a")).toMatchObject({
+    expect(await findAgentById(db, "agt_a")).toMatchObject({
       id: "agt_a",
       machineId: "macmini-01",
       project: "aw",
       status: "active",
       allowedTargetsJson: '["agt_b"]',
     });
-    expect(findAgentByMachineProject(db, "macmini-01", "aw")?.id).toBe("agt_a");
-    expect(findAgentByMachineProject(db, "macmini-01", "other")).toBeUndefined();
-    db.close();
+    expect((await findAgentByMachineProject(db, "macmini-01", "aw"))?.id).toBe("agt_a");
+    expect(await findAgentByMachineProject(db, "macmini-01", "other")).toBeUndefined();
+    await db.close();
   });
 
-  it("(machine_id, project) 唯一", () => {
-    const db = prepare();
-    insertMachine(db, machine());
-    insertAgent(db, agent());
+  it("(machine_id, project) 唯一", async () => {
+    const db = await prepare();
+    await insertMachine(db, machine());
+    await insertAgent(db, agent());
 
-    expect(() => insertAgent(db, agent({ id: "agt_dup" }))).toThrow(/UNIQUE/);
-    db.close();
+    await expect(insertAgent(db, agent({ id: "agt_dup" }))).rejects.toThrow(/unique/i);
+    await db.close();
   });
 
-  it("轮换哈希并更新 updated_at", () => {
-    const db = prepare();
-    insertMachine(db, machine());
-    insertAgent(db, agent());
+  it("轮换哈希并更新 updated_at", async () => {
+    const db = await prepare();
+    await insertMachine(db, machine());
+    await insertAgent(db, agent());
 
-    expect(updateAgentSecretHash(db, "agt_a", "hash-b", 9_000)).toBe(true);
-    expect(findAgentById(db, "agt_a")).toMatchObject({
+    expect(await updateAgentSecretHash(db, "agt_a", "hash-b", 9_000)).toBe(true);
+    expect(await findAgentById(db, "agt_a")).toMatchObject({
       secretHash: "hash-b",
       updatedAt: 9_000,
     });
-    db.close();
+    await db.close();
   });
 
-  it("列表按创建时间倒序键集分页", () => {
-    const db = prepare();
-    insertMachine(db, machine());
-    insertAgent(db, agent({ id: "agt_1", project: "p1", createdAt: 1_000 }));
-    insertAgent(db, agent({ id: "agt_2", project: "p2", createdAt: 2_000 }));
+  it("列表按创建时间倒序键集分页", async () => {
+    const db = await prepare();
+    await insertMachine(db, machine());
+    await insertAgent(db, agent({ id: "agt_1", project: "p1", createdAt: 1_000 }));
+    await insertAgent(db, agent({ id: "agt_2", project: "p2", createdAt: 2_000 }));
 
-    const first = listAgents(db, { limit: 1 });
+    const first = await listAgents(db, { limit: 1 });
     expect(first.map((row) => row.id)).toEqual(["agt_2"]);
-    const second = listAgents(db, {
+    const second = await listAgents(db, {
       limit: 1,
       before: { createdAt: first[0]!.createdAt, id: first[0]!.id },
     });
     expect(second.map((row) => row.id)).toEqual(["agt_1"]);
-    db.close();
+    await db.close();
   });
 });
