@@ -17,8 +17,14 @@ export interface CollectorConfig {
   stateDir: string;
   claudeDir: string;
   ccConnectDir: string;
+  /** cc-connect 配置文件列表(发现扫描用);空数组走默认候选路径 */
+  ccConnectConfigs: string[];
+  /** 受管 MCP 写入的 Claude Code 配置文件 */
+  claudeJsonPath: string;
   pollMs: number;
   heartbeatMs: number;
+  discoveryMs: number;
+  configSyncMs: number;
   batchMax: number;
   backfill: BackfillMode;
   spoolMaxBytes: number;
@@ -55,7 +61,7 @@ function requireText(env: ConfigEnv, key: string): string {
   return raw.trim();
 }
 
-function parseProjects(raw: string | undefined): string[] {
+function parseList(raw: string | undefined): string[] {
   if (raw === undefined) {
     return [];
   }
@@ -95,19 +101,23 @@ export function loadConfig(options: LoadConfigOptions = {}): CollectorConfig {
   const env = options.env ?? process.env;
   const requireAuth = options.requireAuth ?? true;
   const url = normalizeIngestUrl(env.AW_INGEST_URL ?? "http://127.0.0.1:8787");
-  const stateDir = env.AW_STATE_DIR ?? join(homedir(), ".aw-collector");
+  const stateDir = env.AW_STATE_DIR ?? join(homedir(), ".aw-node");
 
   return {
     ingestUrl: url.ingestUrl,
     baseUrl: url.baseUrl,
     collectorId: requireAuth ? requireText(env, "AW_COLLECTOR_ID") : (env.AW_COLLECTOR_ID ?? ""),
     secret: requireAuth ? requireText(env, "AW_COLLECTOR_SECRET") : (env.AW_COLLECTOR_SECRET ?? ""),
-    registeredProjects: parseProjects(env.AW_AGENT_PROJECTS),
+    registeredProjects: parseList(env.AW_AGENT_PROJECTS),
     stateDir,
     claudeDir: env.AW_CLAUDE_DIR ?? join(homedir(), ".claude"),
     ccConnectDir: env.AW_CC_CONNECT_DIR ?? join(homedir(), ".cc-connect"),
+    ccConnectConfigs: parseList(env.AW_CC_CONNECT_CONFIG),
+    claudeJsonPath: env.AW_CLAUDE_JSON ?? join(homedir(), ".claude.json"),
     pollMs: readInt(env, "AW_POLL_MS", 1_000, 100, 10 * 60 * 1_000),
     heartbeatMs: readInt(env, "AW_HEARTBEAT_MS", 60_000, 5_000, 60 * 60 * 1_000),
+    discoveryMs: readInt(env, "AW_DISCOVERY_MS", 5 * 60_1_000, 30_000, 60 * 60_1_000),
+    configSyncMs: readInt(env, "AW_CONFIG_SYNC_MS", 60_000, 10_000, 60 * 60_1_000),
     batchMax: readInt(env, "AW_BATCH_MAX", 500, 1, 500),
     backfill: parseBackfill(env.AW_BACKFILL),
     spoolMaxBytes: readInt(env, "AW_SPOOL_MAX_BYTES", 512 * 1024 * 1024, 1024 * 1024, 8 * 1024 * 1024 * 1024),

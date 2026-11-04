@@ -1,3 +1,11 @@
+import { randomUUID } from "node:crypto";
+import type {
+  ConfigAckRequest,
+  ConfigAckResponse,
+  DiscoveryReport,
+  PullConfigResponse,
+} from "../../src/shared/aw-node-wire.js";
+
 export interface OutgoingEvent {
   seq: number;
   inode: number;
@@ -56,6 +64,9 @@ export interface ConsoleClient {
   postHeartbeat(payload: Record<string, unknown>): Promise<{ ok: boolean; projects: string[] }>;
   getProjects(): Promise<string[]>;
   healthz(): Promise<boolean>;
+  postDiscovery(report: DiscoveryReport): Promise<{ ok: boolean; received_at: number }>;
+  pullConfig(): Promise<PullConfigResponse>;
+  ackConfig(acks: ConfigAckRequest["agents"]): Promise<ConfigAckResponse>;
 }
 
 function asProjects(value: unknown): string[] {
@@ -141,6 +152,34 @@ export function createConsoleClient(options: ConsoleClientOptions): ConsoleClien
       } catch {
         return false;
       }
+    },
+
+    async postDiscovery(report) {
+      const body = await request(`${options.baseUrl}/api/aw-node/discovery`, {
+        method: "POST",
+        headers: { "idempotency-key": randomUUID() },
+        body: JSON.stringify(report),
+      });
+      const ok = (body as Record<string, unknown> | null)?.ok === true;
+      if (!ok) {
+        throw new Error("发现上报响应异常");
+      }
+      return body as { ok: boolean; received_at: number };
+    },
+
+    async pullConfig() {
+      return (await request(`${options.baseUrl}/api/aw-node/config`, {
+        method: "POST",
+        body: "{}",
+      })) as PullConfigResponse;
+    },
+
+    async ackConfig(acks: ConfigAckRequest["agents"]) {
+      return (await request(`${options.baseUrl}/api/aw-node/config/ack`, {
+        method: "POST",
+        headers: { "idempotency-key": randomUUID() },
+        body: JSON.stringify({ agents: acks } satisfies ConfigAckRequest),
+      })) as ConfigAckResponse;
     },
   };
 }
