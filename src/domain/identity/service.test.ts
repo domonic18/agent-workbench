@@ -73,7 +73,7 @@ describe("身份注册", () => {
       allowedTargets: ["agt_9", "agt_9", "agt_8"],
     });
     expect(agent.id).toBe("agt_1");
-    expect(verifySecret(secret, agent.secretHash)).toBe(true);
+    expect(verifySecret(secret, agent.secretHash as string)).toBe(true);
     expect(JSON.parse(agent.allowedTargetsJson)).toEqual(["agt_9", "agt_8"]);
     await db.close();
   });
@@ -101,8 +101,8 @@ describe("身份注册", () => {
 
     const rotated = await service.rotateAgentSecret(first.agent.id);
     expect(rotated.secret).not.toBe(first.secret);
-    expect(verifySecret(first.secret, rotated.agent.secretHash)).toBe(false);
-    expect(verifySecret(rotated.secret, rotated.agent.secretHash)).toBe(true);
+    expect(verifySecret(first.secret, rotated.agent.secretHash as string)).toBe(false);
+    expect(verifySecret(rotated.secret, rotated.agent.secretHash as string)).toBe(true);
 
     const machine = await service.registerMachine({
       id: "m2",

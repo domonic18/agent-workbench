@@ -10,12 +10,19 @@ export interface MachineRecord {
   lastSeenAt: number | null;
   status: IdentityStatus;
   createdAt: number;
+  discoveryJson: string | null;
+  discoveryReceivedAt: number | null;
+  configStatus: MachineConfigStatus;
 }
+
+export type MachineConfigStatus = "pending" | "delivered" | "effective";
 
 const MACHINE_COLUMNS = `
   id, hostname, os, collector_version AS "collectorVersion",
   collector_secret_hash AS "collectorSecretHash", last_seen_at AS "lastSeenAt",
-  status, created_at AS "createdAt"
+  status, created_at AS "createdAt",
+  discovery_json AS "discoveryJson", discovery_received_at AS "discoveryReceivedAt",
+  config_status AS "configStatus"
 `;
 
 export interface NewMachine {
@@ -69,6 +76,34 @@ export async function listActiveAgentProjects(db: Db, machineId: string): Promis
   return rows.map((row) => row.project);
 }
 
+/** aw-node 上报的 cc-connect 发现结果整包覆盖保存;读取侧由 GET /api/bootstrap/discovery 预填 */
+export async function saveMachineDiscovery(
+  db: Db,
+  id: string,
+  discoveryJson: string,
+  receivedAt: number,
+): Promise<boolean> {
+  return (
+    (
+      await db.run(
+        "UPDATE machine SET discovery_json = ?, discovery_received_at = ? WHERE id = ?",
+        discoveryJson, receivedAt, id,
+      )
+    ).changes === 1
+  );
+}
+
+/** 配置下发状态机:pending(确认待下发)→ delivered(已拉取待 ACK)→ effective(ACK 已回执) */
+export async function updateMachineConfigStatus(
+  db: Db,
+  id: string,
+  status: MachineConfigStatus,
+): Promise<boolean> {
+  return (
+    (await db.run("UPDATE machine SET config_status = ? WHERE id = ?", status, id)).changes === 1
+  );
+}
+
 export interface MachineListQuery {
   limit: number;
   /** keyset 游标:上一页最后一行的 (createdAt, id) */
@@ -88,17 +123,26 @@ export async function listMachines(db: Db, query: MachineListQuery): Promise<Mac
   )) as MachineRecord[];
 }
 
+export type AgentBootstrapStatus = "confirmed" | "registered";
+
 export interface AgentRecord {
   id: string;
   machineId: string;
   project: string;
   displayName: string;
-  secretHash: string;
+  /** 项目确认阶段只建身份,为 null 表示尚未经 /api/aw-node/config 签发 */
+  secretHash: string | null;
   feishuAppId: string | null;
   feishuBotOpenId: string | null;
   feishuBotName: string | null;
   status: IdentityStatus;
   allowedTargetsJson: string;
+  /** confirmed=bootstrap 确认(密钥走配置下发);registered=人工注册(密钥即响应明文) */
+  bootstrapStatus: AgentBootstrapStatus;
+  key: string | null;
+  mcpConfigJson: string | null;
+  configVersion: number;
+  configAckAt: number | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -107,7 +151,10 @@ const AGENT_COLUMNS = `
   id, machine_id AS "machineId", project, display_name AS "displayName",
   secret_hash AS "secretHash", feishu_app_id AS "feishuAppId",
   feishu_bot_open_id AS "feishuBotOpenId", feishu_bot_name AS "feishuBotName", status,
-  allowed_targets_json AS "allowedTargetsJson", created_at AS "createdAt", updated_at AS "updatedAt"
+  allowed_targets_json AS "allowedTargetsJson", bootstrap_status AS "bootstrapStatus",
+  key, mcp_config_json AS "mcpConfigJson",
+  config_version AS "configVersion", config_ack_at AS "configAckAt",
+  created_at AS "createdAt", updated_at AS "updatedAt"
 `;
 
 export interface NewAgent {
@@ -115,7 +162,11 @@ export interface NewAgent {
   machineId: string;
   project: string;
   displayName: string;
-  secretHash: string;
+  secretHash: string | null;
+  /** 缺省视为人工注册:无稳定 key、无待下发配置 */
+  key?: string | null;
+  mcpConfigJson?: string | null;
+  bootstrapStatus?: AgentBootstrapStatus;
   feishuAppId: string | null;
   allowedTargetsJson: string;
   createdAt: number;
@@ -125,10 +176,11 @@ export async function insertAgent(db: Db, row: NewAgent): Promise<void> {
   await db.run(
     `INSERT INTO agent
        (id, machine_id, project, display_name, secret_hash, feishu_app_id, status,
-        allowed_targets_json, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)`,
+        allowed_targets_json, key, mcp_config_json, bootstrap_status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)`,
     row.id, row.machineId, row.project, row.displayName, row.secretHash, row.feishuAppId,
-    row.allowedTargetsJson, row.createdAt, row.createdAt,
+    row.allowedTargetsJson, row.key ?? null, row.mcpConfigJson ?? null,
+    row.bootstrapStatus ?? "registered", row.createdAt, row.createdAt,
   );
 }
 
@@ -153,6 +205,58 @@ export async function updateAgentSecretHash(db: Db, id: string, hash: string, no
   return (
     (
       await db.run("UPDATE agent SET secret_hash = ?, updated_at = ? WHERE id = ?", hash, now, id)
+    ).changes === 1
+  );
+}
+
+export async function findAgentByKey(db: Db, key: string): Promise<AgentRecord | undefined> {
+  return (await db.get(`SELECT ${AGENT_COLUMNS} FROM agent WHERE key = ?`, key)) as
+    | AgentRecord
+    | undefined;
+}
+
+export async function listAgentsByMachine(db: Db, machineId: string): Promise<AgentRecord[]> {
+  return (await db.all(
+    `SELECT ${AGENT_COLUMNS} FROM agent WHERE machine_id = ? ORDER BY project`,
+    machineId,
+  )) as AgentRecord[];
+}
+
+/** ACK 前的配置拉取轮换:覆盖哈希、推进版本并清空回执——旧明文立即失效 */
+export async function rotateAgentDeliverySecret(
+  db: Db,
+  id: string,
+  hash: string,
+  configVersion: number,
+  now: number,
+): Promise<boolean> {
+  return (
+    (
+      await db.run(
+        `UPDATE agent
+           SET secret_hash = ?, config_version = ?, config_ack_at = NULL, updated_at = ?
+         WHERE id = ?`,
+        hash, configVersion, now, id,
+      )
+    ).changes === 1
+  );
+}
+
+/** ACK 只对已下发且版本一致的行为生效;版本不符返回 false 由上层按过期配置处理 */
+export async function markAgentConfigAck(
+  db: Db,
+  id: string,
+  configVersion: number,
+  now: number,
+): Promise<boolean> {
+  return (
+    (
+      await db.run(
+        `UPDATE agent
+           SET config_ack_at = ?, updated_at = ?
+         WHERE id = ? AND config_version = ? AND secret_hash IS NOT NULL`,
+        now, now, id, configVersion,
+      )
     ).changes === 1
   );
 }

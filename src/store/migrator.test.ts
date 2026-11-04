@@ -16,7 +16,7 @@ describe("runMigrations", () => {
   it("空库执行建表并记账", async () => {
     const db = await createTestDatabase(resolveTestAdminUrl());
 
-    expect(await runMigrations(db)).toBe(2);
+    expect(await runMigrations(db)).toBe(4);
     expect(await tableNames(db)).toEqual(
       expect.arrayContaining([
         "task",
@@ -53,6 +53,8 @@ describe("runMigrations", () => {
     expect(applied).toEqual([
       { version: 1, name: "pg_bootstrap" },
       { version: 2, name: "pg_mcp_tool_calls" },
+      { version: 3, name: "one_time_tokens" },
+      { version: 4, name: "bootstrap_delivery" },
     ]);
     await db.close();
   });
