@@ -76,3 +76,32 @@ describe("前端静态托管", () => {
     }
   });
 });
+
+describe("执行面安装脚本下发", () => {
+  let dir: string;
+  let app: FastifyInstance;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "aw-install-"));
+    writeFileSync(join(dir, "install-aw-node.sh"), "#!/bin/sh\necho aw-node\n");
+    app = buildApp({ logLevel: "silent", installScriptPath: join(dir, "install-aw-node.sh") });
+  });
+
+  afterEach(async () => {
+    await app.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("匿名可读,按 shell 脚本类型下发", async () => {
+    const response = await app.inject({ method: "GET", url: "/artifacts/install.sh" });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toContain("text/x-shellscript");
+    expect(response.headers["cache-control"]).toBe("no-cache");
+    expect(response.body).toContain("echo aw-node");
+  });
+
+  it("只暴露安装脚本本身,不开放目录", async () => {
+    const response = await app.inject({ method: "GET", url: "/artifacts/backup.sh" });
+    expect(response.statusCode).toBe(404);
+  });
+});

@@ -12,6 +12,8 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/api": "http://127.0.0.1:8787",
+      // 安装脚本由控制台下发,开发期与生产同源路径
+      "/artifacts": "http://127.0.0.1:8787",
     },
   },
 });

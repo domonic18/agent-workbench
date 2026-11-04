@@ -82,34 +82,19 @@ export function registerWebRoutes(app: FastifyInstance, root: string): void {
 }
 
 /**
- * 执行面部署包静态下发(2026-11-02):新机器 `curl $CONSOLE/artifacts/install.sh | bash`
- * 一键装齐采集器 / proxy bundle / 调度器。仅文件直读,无 SPA 回退;
- * 内容即仓库构建产物,非敏感,匿名可读。
+ * 执行面安装脚本下发(04 §8):新机器 `curl -fsSL $CONSOLE/artifacts/install.sh | sh -s -- --url $CONSOLE`。
+ * 只下发仓库内的安装脚本本身——aw-node 二进制与校验和走 GitHub Release,
+ * 不在本机拼 tarball,控制台也不持有执行面产物。内容非敏感,匿名可读。
  */
-export function registerArtifactRoutes(app: FastifyInstance, root: string): void {
-  const rootPath = resolve(root);
-  if (!existsSync(rootPath)) {
-    app.log.info({ root: rootPath }, "未找到执行面部署包目录,跳过 artifacts 托管");
+export function registerInstallScriptRoute(app: FastifyInstance, scriptPath: string): void {
+  if (!existsSync(scriptPath)) {
+    app.log.info({ path: scriptPath }, "未找到执行面安装脚本,跳过 /artifacts/install.sh");
     return;
   }
-  app.get("/artifacts/*", (request, reply) => {
-    const pathname = (request.url.split("?")[0] ?? "").replace(/^\/artifacts/, "");
-    let decoded: string;
-    try {
-      decoded = decodeURIComponent(pathname);
-    } catch {
-      return reply.code(400).send({ error: { code: "VALIDATION_FAILED", message: "非法路径" } });
-    }
-    const target = resolve(rootPath, `.${decoded}`);
-    if (!target.startsWith(`${rootPath}${sep}`) || decoded.includes("\0")) {
-      return reply.code(404).send(NOT_FOUND);
-    }
-    if (!existsSync(target) || !statSync(target).isFile()) {
-      return reply.code(404).send(NOT_FOUND);
-    }
-    return reply
-      .header("content-type", MIME_TYPES[extname(target).toLowerCase()] ?? "application/octet-stream")
+  app.get("/artifacts/install.sh", (_request, reply) =>
+    reply
+      .header("content-type", "text/x-shellscript; charset=utf-8")
       .header("cache-control", "no-cache")
-      .send(createReadStream(target));
-  });
+      .send(createReadStream(scriptPath)),
+  );
 }
