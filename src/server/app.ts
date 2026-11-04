@@ -10,11 +10,14 @@ import type { KnowledgeRebuilder } from "../domain/knowledge/rebuild.js";
 import { healthPayload, type DatabaseStatus } from "../shared/health.js";
 import type { Db } from "../store/database.js";
 import { requireAllowedHost } from "./middleware/host.js";
+import { requireConsoleReadiness } from "./middleware/bootstrap-mode.js";
 import { createApprovalNotifier } from "./notification/approval.js";
 import { registerA2aRoutes } from "./routes/a2a.js";
 import { registerAgentSelfRoutes } from "./routes/agent-self.js";
 import { registerAuditRoutes } from "./routes/audit.js";
 import { registerAuthRoutes } from "./routes/auth.js";
+import { registerAwNodeRoutes } from "./routes/aw-node.js";
+import { registerBootstrapRoutes } from "./routes/bootstrap.js";
 import { registerCapabilityRoutes } from "./routes/capabilities.js";
 import { registerIdentityRoutes } from "./routes/identity.js";
 import { registerIngestRoutes } from "./routes/ingest.js";
@@ -73,6 +76,11 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     app.addHook("onRequest", requireAllowedHost(options.allowedHosts));
   }
 
+  if (options.db !== undefined) {
+    // bootstrap mode 门控先于一切业务路由:无凭据时只放行 /healthz、bootstrap、enroll 与静态资源
+    app.addHook("onRequest", requireConsoleReadiness(options.db));
+  }
+
   app.get("/healthz", (_request, reply) => {
     const db = databaseStatus();
     return reply
@@ -93,6 +101,8 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     registerIdentityRoutes(app, { db, ...timing });
     registerAgentSelfRoutes(app, { db, ...timing });
     registerOverviewRoutes(app, { db, ...timing });
+    registerBootstrapRoutes(app, { db, ...timing });
+    registerAwNodeRoutes(app, { db, ...timing });
     registerTaskRoutes(app, { db, ...timing, ...collab });
     registerTaskReadRoutes(app, { db, ...timing });
     registerTaskA2aRoutes(app, { db, ...timing });

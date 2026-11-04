@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createIdentityService } from "../../domain/identity/service.js";
 import { openDatabase, type Db } from "../../store/database.js";
 import { findAgentById } from "../../store/repositories/identity.js";
+import { ensureConsoleCredential } from "../credential.js";
 import { buildApp } from "../app.js";
 
 interface Fixture {
@@ -13,6 +14,7 @@ interface Fixture {
 
 async function prepare(): Promise<Fixture> {
   const db = await openDatabase();
+  await ensureConsoleCredential(db, "simple-123");
   const identity = createIdentityService({
     db,
     newAgentId: () => "agt_a",

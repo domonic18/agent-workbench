@@ -8,17 +8,19 @@ import { createProcessRunner } from "../adapters/teleport/process-runner.js";
 import { createTeleportAdapter } from "../adapters/teleport/tctl.js";
 import { loadConfig } from "../config/env.js";
 import { createA2aService } from "../domain/a2a/service.js";
+import { issueOneTimeToken } from "../domain/bootstrap/one-time-token.js";
 import { createAuditReconciler } from "../domain/capability/audit-reconcile.js";
 import { createCapabilityService } from "../domain/capability/service.js";
 import { createEmbeddingClient } from "../domain/knowledge/embedding.js";
 import { createKnowledgeEntryService } from "../domain/knowledge/entry-service.js";
 import { createKnowledgeIndexService } from "../domain/knowledge/index-service.js";
 import { createKnowledgeRebuilder } from "../domain/knowledge/rebuild.js";
+import { ONE_TIME_TOKEN } from "../shared/constants.js";
 import { createDb } from "../store/database.js";
 import { acquireInstanceLock } from "../store/lock.js";
 import { runMigrations } from "../store/migrator.js";
 import { buildApp } from "./app.js";
-import { ensureConsoleCredential } from "./credential.js";
+import { ensureConsoleCredential, hasConsoleCredential } from "./credential.js";
 import { startAuditReconciler } from "./jobs/audit-reconcile.js";
 import { startDeadLetterSweeper } from "./jobs/dead-letter.js";
 import { startIngestReceiptCleaner } from "./jobs/ingest-receipt.js";
@@ -35,6 +37,17 @@ const db = await createDb(config.databaseUrl);
 try {
   await runMigrations(db);
   await ensureConsoleCredential(db, config.consoleInitPassword);
+  if (!(await hasConsoleCredential(db))) {
+    // 无凭据且无种子:进入 bootstrap mode,本机一次性打印 bootstrap_admin token(01 §2)
+    const issued = await issueOneTimeToken(db, {
+      purpose: "bootstrap_admin",
+      ttlMs: ONE_TIME_TOKEN.adminTtlMs,
+    });
+    console.info(
+      `[bootstrap] 控制台无管理员凭据,已进入 bootstrap mode;` +
+        `一次性 token(${ONE_TIME_TOKEN.adminTtlMs / 60_000} 分钟内有效,仅本次打印): ${issued.token}`,
+    );
+  }
 } catch (error) {
   await db.close();
   lock.release();

@@ -5,6 +5,7 @@ import { openDatabase, type Db } from "../../store/database.js";
 import { hasIngestReceipt } from "../../store/repositories/ingest-receipt.js";
 import { findMachineById } from "../../store/repositories/identity.js";
 import { findRunningRunForStream, listTimelineEventsByRun } from "../../store/repositories/run.js";
+import { ensureConsoleCredential } from "../credential.js";
 import { buildApp } from "../app.js";
 
 interface Fixture {
@@ -15,6 +16,7 @@ interface Fixture {
 
 async function prepare(): Promise<Fixture> {
   const db = await openDatabase();
+  await ensureConsoleCredential(db, "simple-123");
   const identity = createIdentityService({ db, newSecret: () => "secret-m1" });
   const machine = await identity.registerMachine({
     id: "m1",

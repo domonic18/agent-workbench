@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createIdentityService } from "../../domain/identity/service.js";
 import { openDatabase, type Db } from "../../store/database.js";
 import { findOutboxByKey } from "../../store/repositories/outbox.js";
+import { ensureConsoleCredential } from "../credential.js";
 import { buildApp } from "../app.js";
 
 const DEADLINE = "2026-10-30T12:00:00Z";
@@ -22,6 +23,7 @@ interface Fixture {
 
 async function prepare(): Promise<Fixture> {
   const db = await openDatabase();
+  await ensureConsoleCredential(db, "simple-123");
   const ids = ["agt_a", "agt_b", "agt_c"];
   const secrets = ["secret-a", "secret-b", "secret-c"];
   let idSeq = 0;

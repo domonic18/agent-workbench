@@ -4,6 +4,7 @@ import { createIdentityService } from "../../domain/identity/service.js";
 import { openDatabase, type Db } from "../../store/database.js";
 import { insertCapability } from "../../store/repositories/capability.js";
 import { insertTask } from "../../store/repositories/task.js";
+import { ensureConsoleCredential } from "../credential.js";
 import { buildApp } from "../app.js";
 
 interface Fixture {
@@ -13,6 +14,7 @@ interface Fixture {
 
 async function prepare(): Promise<Fixture> {
   const db = await openDatabase();
+  await ensureConsoleCredential(db, "simple-123");
   const ids = ["agt_a", "agt_b"];
   const secrets = ["secret-a", "secret-b"];
   let idSeq = 0;

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { openDatabase } from "../store/database.js";
+import { ensureConsoleCredential } from "./credential.js";
 import { buildApp } from "./app.js";
 
 describe("buildApp", () => {
@@ -66,6 +67,7 @@ describe("buildApp", () => {
 
   it("只注入 db 时也注册身份与 A2A 路由(返回 401 而非 404)", async () => {
     const db = await openDatabase();
+    await ensureConsoleCredential(db, "simple-123");
     const app = buildApp({ logLevel: "silent", db });
 
     expect((await app.inject({ method: "GET", url: "/api/machines" })).statusCode).toBe(401);
