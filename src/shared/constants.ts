@@ -247,6 +247,13 @@ export const MACHINE_HEARTBEAT = {
 /** 内部记账伪模型:不是真实网关调用,不入 token_usage(02 §3.6) */
 export const SYNTHETIC_MODEL = "<synthetic>";
 
+/** 一次性令牌(01 §2 / 04 §密钥):bootstrap_admin 供 /setup 首次设置管理员,enroll 供安装脚本兑换机器密钥 */
+export const ONE_TIME_TOKEN = {
+  prefix: "ott_",
+  adminTtlMs: 60 * 60 * 1000,
+  enrollTtlMs: 15 * 60 * 1000,
+} as const;
+
 /** 采集入库(01 §3.1 / 04 §4):批次上限、7 天去重窗口与清理周期 */
 export const INGEST = {
   batchMax: 500,
