@@ -39,6 +39,8 @@ services:
     environment:
       HOST: 0.0.0.0
       DATABASE_URL: postgres://agent_workbench:${POSTGRES_PASSWORD}@postgres:5432/agent_workbench
+      # 仅空库首次启动需要;口令哈希落库后可留空(01 §2)
+      CONSOLE_INIT_PASSWORD: ${CONSOLE_INIT_PASSWORD:-}
     depends_on:
       postgres:
         condition: service_healthy

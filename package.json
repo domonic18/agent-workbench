@@ -11,7 +11,7 @@
   "scripts": {
     "dev": "tsx watch src/server/main.ts",
     "dev:web": "pnpm --filter @aw/web run dev",
-    "build": "rm -rf dist && tsc -p tsconfig.build.json && cp -R src/store/migrations dist/store/migrations && pnpm --filter @aw/web run build",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && cp -R src/store/migrations dist/store/migrations && cp -R src/store/migrations-pg dist/store/migrations-pg && pnpm --filter @aw/web run build",
     "bundle:proxy": "pnpm --filter @aw/collector exec esbuild ../dist/mcp/proxy/main.js --bundle --platform=node --target=node22 --format=esm --banner:js=\"import { createRequire as __awCjsRequire } from 'node:module'; const require = __awCjsRequire(import.meta.url);\" --outfile=../dist/agent-host/aw-proxy.mjs",
     "typecheck": "tsc --noEmit",
     "typecheck:web": "pnpm --filter @aw/web run typecheck",
