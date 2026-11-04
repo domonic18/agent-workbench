@@ -24,11 +24,11 @@ const COLUMNS = `
 `;
 
 /** 只读摘要,供指令回执与控制台列表使用;完整任务聚合等 M2.5 建单后再补 */
-export async function listTaskSummaries(db: Db, limit: number): Promise<TaskSummary[]>{
+export async function listTaskSummaries(db: Db, limit: number): TaskSummary[] {
   return await db.all(`SELECT ${COLUMNS} FROM task ORDER BY created_at DESC, id DESC LIMIT ?`, limit) as TaskSummary[];
 }
 
-export async function findTaskSummary(db: Db, id: string): Promise<TaskSummary | undefined>{
+export async function findTaskSummary(db: Db, id: string): TaskSummary | undefined {
   return await db.get(`SELECT ${COLUMNS} FROM task WHERE id = ?`, id) as TaskSummary | undefined;
 }
 
@@ -43,7 +43,7 @@ export interface TaskListQuery {
 }
 
 /** 控制台任务列表:按键集分页,不扫事件表(02 §4 投影口径) */
-export async function listTasks(db: Db, query: TaskListQuery): Promise<TaskRecord[]>{
+export async function listTasks(db: Db, query: TaskListQuery): TaskRecord[] {
   const conditions: string[] = [];
   const params: Record<string, unknown> = { limit: query.limit };
   if (query.status !== undefined) {
@@ -74,7 +74,7 @@ export async function findTaskOwnedBy(
   db: Db,
   id: string,
   assignee: string,
-): Promise<TaskSummary | undefined>{
+): TaskSummary | undefined {
   return await db.get(`SELECT ${COLUMNS} FROM task WHERE id = ? AND assignee = ?`, id, assignee) as TaskSummary | undefined;
 }
 
@@ -84,14 +84,14 @@ export async function setTaskParentIfEmpty(
   id: string,
   parentTaskId: string,
   now: number,
-): Promise<boolean>{
+): boolean {
   return (
     (await db.run(
         "UPDATE task SET parent_task_id = ?, updated_at = ? WHERE id = ? AND parent_task_id IS NULL",  parentTaskId, now, id)).changes === 1
   );
 }
 
-export async function findTaskParent(db: Db, id: string): Promise<string | null | undefined>{
+export async function findTaskParent(db: Db, id: string): string | null | undefined {
   const row = await db.get("SELECT parent_task_id AS parentTaskId FROM task WHERE id = ?", id) as
     | { parentTaskId: string | null }
     | undefined;
@@ -117,7 +117,7 @@ export async function listTaskEvents(
   taskId: string,
   afterSeq: number,
   limit: number,
-): Promise<TaskEventRecord[]>{
+): TaskEventRecord[] {
   return await db.all(
       `SELECT ${EVENT_COLUMNS} FROM task_event
         WHERE task_id = @taskId AND seq > @afterSeq
@@ -174,7 +174,7 @@ export interface NewTask {
 }
 
 /** 新任务恒从 intake/pending 起跑,round、rework_count、total_tokens 由表默认值兜底 */
-export async function insertTask(db: Db, task: NewTask): Promise<void>{
+export async function insertTask(db: Db, task: NewTask): void {
   await db.run(
     `INSERT INTO task
        (id, title, assigner, assignee, project, parent_task_id, round, rework_count,
@@ -193,7 +193,7 @@ export async function insertTask(db: Db, task: NewTask): Promise<void>{
     task.createdAt);
 }
 
-export async function findTaskById(db: Db, id: string): Promise<TaskRecord | undefined>{
+export async function findTaskById(db: Db, id: string): TaskRecord | undefined {
   return await db.get(`SELECT ${FULL_COLUMNS} FROM task WHERE id = ?`, id) as
     | TaskRecord
     | undefined;
@@ -214,7 +214,7 @@ export interface TaskUpdatePatch {
 }
 
 /** CAS:以读到的 stage/status 作 WHERE,并发下只有一方成功,另一方按冲突回到上层 */
-export async function updateTask(db: Db, patch: TaskUpdatePatch): Promise<boolean>{
+export async function updateTask(db: Db, patch: TaskUpdatePatch): boolean {
   return (
     (await db.run(
         `UPDATE task
@@ -238,7 +238,7 @@ export async function updateTask(db: Db, patch: TaskUpdatePatch): Promise<boolea
 }
 
 /** seq 由服务端按任务内单调分配,外面只给事件内容 */
-export async function appendTaskEvent(db: Db, entry: NewTaskEvent): Promise<void>{
+export async function appendTaskEvent(db: Db, entry: NewTaskEvent): void {
   const { seq } = await db.get("SELECT COALESCE(MAX(seq), 0) + 1 AS seq FROM task_event WHERE task_id = ?", entry.taskId) as { seq: number };
   await db.run(
     `INSERT INTO task_event (id, task_id, seq, kind, payload_json, occurred_at)

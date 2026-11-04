@@ -13,14 +13,16 @@ export function findIdempotencyResource(
   db: Db,
   scope: string,
   key: string,
-): Promise<string | undefined>{
-  const row = await db.get("SELECT resource_id AS resourceId FROM idempotency_record WHERE scope = ? AND key = ?", scope, key) as { resourceId: string } | undefined;
+): string | undefined {
+  const row = db
+    .prepare("SELECT resource_id AS resourceId FROM idempotency_record WHERE scope = ? AND key = ?")
+    .get(scope, key) as { resourceId: string } | undefined;
   return row?.resourceId;
 }
 
-export function saveIdempotencyResource(db: Db, row: NewIdempotencyRecord): Promise<void>{
-  await db.run(
+export function saveIdempotencyResource(db: Db, row: NewIdempotencyRecord): void {
+  db.prepare(
     `INSERT INTO idempotency_record (scope, key, resource_id, created_at)
      VALUES (@scope, @key, @resourceId, @createdAt)`,
-  , row);
+  ).run(row);
 }
