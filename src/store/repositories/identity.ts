@@ -1,4 +1,4 @@
-import type { IdentityStatus } from "../../shared/constants.js";
+import type { AgentRuntime, IdentityStatus } from "../../shared/constants.js";
 import type { Db } from "../database.js";
 
 export interface MachineRecord {
@@ -127,7 +127,8 @@ export type AgentBootstrapStatus = "confirmed" | "registered";
 
 export interface AgentRecord {
   id: string;
-  machineId: string;
+  machineId: string | null;
+  runtime: AgentRuntime;
   project: string;
   displayName: string;
   /** 项目确认阶段只建身份,为 null 表示尚未经 /api/aw-node/config 签发 */
@@ -148,7 +149,7 @@ export interface AgentRecord {
 }
 
 const AGENT_COLUMNS = `
-  id, machine_id AS "machineId", project, display_name AS "displayName",
+  id, machine_id AS "machineId", runtime, project, display_name AS "displayName",
   secret_hash AS "secretHash", feishu_app_id AS "feishuAppId",
   feishu_bot_open_id AS "feishuBotOpenId", feishu_bot_name AS "feishuBotName", status,
   allowed_targets_json AS "allowedTargetsJson", bootstrap_status AS "bootstrapStatus",
@@ -159,7 +160,8 @@ const AGENT_COLUMNS = `
 
 export interface NewAgent {
   id: string;
-  machineId: string;
+  machineId: string | null;
+  runtime: AgentRuntime;
   project: string;
   displayName: string;
   secretHash: string | null;
@@ -175,11 +177,11 @@ export interface NewAgent {
 export async function insertAgent(db: Db, row: NewAgent): Promise<void> {
   await db.run(
     `INSERT INTO agent
-       (id, machine_id, project, display_name, secret_hash, feishu_app_id, status,
+       (id, machine_id, runtime, project, display_name, secret_hash, feishu_app_id, status,
         allowed_targets_json, key, mcp_config_json, bootstrap_status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)`,
-    row.id, row.machineId, row.project, row.displayName, row.secretHash, row.feishuAppId,
-    row.allowedTargetsJson, row.key ?? null, row.mcpConfigJson ?? null,
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)`,
+    row.id, row.machineId, row.runtime, row.project, row.displayName, row.secretHash,
+    row.feishuAppId, row.allowedTargetsJson, row.key ?? null, row.mcpConfigJson ?? null,
     row.bootstrapStatus ?? "registered", row.createdAt, row.createdAt,
   );
 }

@@ -1,4 +1,4 @@
-import { MACHINE_HEARTBEAT, RUN_IDLE_GAP_MS } from "../../shared/constants.js";
+import { MACHINE_HEARTBEAT, RUN_IDLE_GAP_MS, type AgentRuntime } from "../../shared/constants.js";
 import { OVERVIEW_SCOPE } from "../../shared/scopes.js";
 import type { Db } from "../../store/database.js";
 import {
@@ -15,8 +15,9 @@ export interface OverviewAgent {
   id: string;
   displayName: string;
   project: string;
-  machineId: string;
-  machineHostname: string;
+  machineId: string | null;
+  runtime: AgentRuntime;
+  machineHostname: string | null;
   machineLastSeenAt: number | null;
   heartbeat: HeartbeatState;
   lastRunAt: number | null;
@@ -104,6 +105,7 @@ export function createOverviewService(deps: OverviewServiceDeps): OverviewServic
         displayName: row.displayName,
         project: row.project,
         machineId: row.machineId,
+        runtime: row.runtime,
         machineHostname: row.machineHostname,
         machineLastSeenAt: row.machineLastSeenAt,
         heartbeat: heartbeatState(row.machineLastSeenAt, at),

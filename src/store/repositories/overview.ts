@@ -1,3 +1,4 @@
+import type { AgentRuntime } from "../../shared/constants.js";
 import type { Db } from "../database.js";
 
 export interface OverviewMetrics {
@@ -41,8 +42,9 @@ export interface AgentOverviewRow {
   id: string;
   displayName: string;
   project: string;
-  machineId: string;
-  machineHostname: string;
+  machineId: string | null;
+  runtime: AgentRuntime;
+  machineHostname: string | null;
   machineLastSeenAt: number | null;
   lastRunAt: number | null;
   running: number;
@@ -74,6 +76,7 @@ export async function listAgentOverviewRows(
        a.display_name AS "displayName",
        a.project,
        a.machine_id AS "machineId",
+       a.runtime AS "runtime",
        m.hostname AS "machineHostname",
        m.last_seen_at AS "machineLastSeenAt",
        lr."lastRunAt",
@@ -90,7 +93,7 @@ export async function listAgentOverviewRows(
          ORDER BY e.occurred_at DESC, e.ord DESC LIMIT 1) AS "currentInstruction",
        COALESCE(tok."totalTokens", 0) AS "todayTokens"
      FROM agent a
-     JOIN machine m ON m.id = a.machine_id
+     LEFT JOIN machine m ON m.id = a.machine_id
      LEFT JOIN agent_run r ON r.id = (
        SELECT id FROM agent_run
         WHERE agent_id = a.id AND status = 'running' AND last_seen_at >= ?

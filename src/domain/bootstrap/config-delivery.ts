@@ -120,6 +120,7 @@ export async function confirmAgents(
       await insertAgent(tx, {
         id,
         machineId: input.machineId,
+        runtime: "claude_code",
         project,
         displayName,
         secretHash: null,

@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import { IdentityError } from "../../domain/identity/errors.js";
 import { createIdentityService, type IdentityService } from "../../domain/identity/service.js";
-import { LIST_LIMITS, type IdentityStatus } from "../../shared/constants.js";
+import { AGENT_RUNTIMES, LIST_LIMITS, type AgentRuntime, type IdentityStatus } from "../../shared/constants.js";
 import { formatKeysetCursor, parseKeysetCursor } from "../../shared/cursor.js";
 import type { Db } from "../../store/database.js";
 import { parseJsonStringArray } from "../../store/json.js";
@@ -17,7 +17,8 @@ const machineCreateSchema = z.object({
 });
 
 const agentCreateSchema = z.object({
-  machineId: z.string(),
+  machineId: z.string().nullable().optional(),
+  runtime: z.enum(AGENT_RUNTIMES).optional(),
   project: z.string(),
   displayName: z.string(),
   feishuAppId: z.string().nullable().optional(),
@@ -46,7 +47,8 @@ interface MachineDto {
 
 interface AgentDto {
   id: string;
-  machineId: string;
+  machineId: string | null;
+  runtime: AgentRuntime;
   project: string;
   displayName: string;
   feishuAppId: string | null;
@@ -72,6 +74,7 @@ function toAgentDto(row: AgentRecord): AgentDto {
   return {
     id: row.id,
     machineId: row.machineId,
+    runtime: row.runtime,
     project: row.project,
     displayName: row.displayName,
     feishuAppId: row.feishuAppId,

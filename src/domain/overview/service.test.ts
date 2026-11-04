@@ -33,10 +33,17 @@ async function addMachine(db: Db, id: string, lastSeenAt: number | null): Promis
   }
 }
 
-async function addAgent(db: Db, id: string, machineId: string, disabled = false): Promise<void> {
+async function addAgent(
+  db: Db,
+  id: string,
+  machineId: string | null,
+  disabled = false,
+  runtime: "claude_code" | "workbuddy" | "codex" | "deepseek" = "claude_code",
+): Promise<void> {
   await insertAgent(db, {
     id,
     machineId,
+    runtime,
     project: `p-${id}`,
     displayName: id,
     secretHash: "h",
@@ -143,6 +150,7 @@ describe("overview 服务", () => {
     await addAgent(db, "a-offline", "m-offline");
     await addAgent(db, "a-unknown", "m-unknown");
     await addAgent(db, "a-disabled", "m-ok", true);
+    await addAgent(db, "a-workbuddy", null, false, "workbuddy");
 
     await addTask(db, "t1", "running");
     await addTask(db, "t2", "running");
@@ -229,6 +237,7 @@ describe("overview 服务", () => {
       "a-timeout",
       "a-offline",
       "a-unknown",
+      "a-workbuddy",
     ]);
 
     expect(agents[0]).toMatchObject({
@@ -259,6 +268,15 @@ describe("overview 服务", () => {
       running: false,
       lastRunAt: null,
       currentInstruction: null,
+      todayTokens: 0,
+    });
+    expect(agents[4]).toMatchObject({
+      heartbeat: "unknown",
+      machineId: null,
+      machineHostname: null,
+      runtime: "workbuddy",
+      running: false,
+      lastRunAt: null,
       todayTokens: 0,
     });
   });

@@ -59,6 +59,19 @@ export type CommandOutcome = (typeof COMMAND_OUTCOMES)[number];
 export const IDENTITY_STATUSES = ["active", "disabled"] as const;
 export type IdentityStatus = (typeof IDENTITY_STATUSES)[number];
 
+/**
+ * Agent 运行时(01 §6):claude_code=aw-node 采集器绑定的本机运行时;
+ * 其余为无 aw-node 的外部运行时(WorkBuddy/Codex/DeepSeek harness),直接拿 Agent Bearer 打 /mcp,
+ * 控制台不采集其 run/对话/Token。新增运行时 = 追一句 CHECK 值 + 本元组,行为逻辑只看 machine_id 是否 NULL。
+ */
+export const AGENT_RUNTIMES = ["claude_code", "workbuddy", "codex", "deepseek"] as const;
+export type AgentRuntime = (typeof AGENT_RUNTIMES)[number];
+
+/** 无 aw-node 的外部运行时集合;与 claude_code 互斥,注册机器无关 Agent 时必须给出 */
+export const EXTERNAL_RUNTIMES = AGENT_RUNTIMES.filter(
+  (runtime) => runtime !== "claude_code",
+) as readonly Exclude<AgentRuntime, "claude_code">[];
+
 /** 注册字段长度上限;id 由调用方给(machine)或服务端生成(agent) */
 export const IDENTITY_LIMITS = {
   id: 128,

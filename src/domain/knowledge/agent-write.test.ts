@@ -33,6 +33,7 @@ describe("writeKnowledgeCandidate", () => {
       await insertAgent(db, {
         id,
         machineId: "m1",
+        runtime: "claude_code",
         project,
         displayName: id,
         secretHash: "hash",

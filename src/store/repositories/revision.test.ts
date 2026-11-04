@@ -22,6 +22,7 @@ async function seedIdentity(db: Db): Promise<void> {
   await insertAgent(db, {
     id: "a1",
     machineId: "m1",
+    runtime: "claude_code",
     project: "p1",
     displayName: "A1",
     secretHash: "h",
@@ -32,6 +33,7 @@ async function seedIdentity(db: Db): Promise<void> {
   await insertAgent(db, {
     id: "a2",
     machineId: "m1",
+    runtime: "claude_code",
     project: "p2",
     displayName: "A2",
     secretHash: "h",

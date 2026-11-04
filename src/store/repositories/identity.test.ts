@@ -34,6 +34,7 @@ function agent(overrides: Partial<NewAgent> = {}): NewAgent {
   return {
     id: "agt_a",
     machineId: "macmini-01",
+    runtime: "claude_code",
     project: "aw",
     displayName: "Agent A",
     secretHash: "hash-a",

@@ -176,6 +176,7 @@ describe("stream 路由", () => {
     await insertAgent(db, {
       id: "a1",
       machineId: "m1",
+      runtime: "claude_code",
       project: "proj",
       displayName: "Agent",
       secretHash: "h",

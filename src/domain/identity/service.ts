@@ -1,4 +1,4 @@
-import { IDENTITY_LIMITS } from "../../shared/constants.js";
+import { EXTERNAL_RUNTIMES, IDENTITY_LIMITS, type AgentRuntime } from "../../shared/constants.js";
 import { newPrefixedId } from "../../shared/ids.js";
 import type { Db } from "../../store/database.js";
 import {
@@ -28,7 +28,10 @@ export interface RegisterMachineInput {
 }
 
 export interface RegisterAgentInput {
-  machineId: string;
+  /** 机器绑定 Agent 必填;机器无关 Agent(无 aw-node 的外部运行时)留空,改由 runtime 区分 */
+  machineId?: string | null | undefined;
+  /** 机器绑定 Agent 强制 claude_code;机器无关 Agent 必须显式给出外部 runtime */
+  runtime?: AgentRuntime | undefined;
   project: string;
   displayName: string;
   feishuAppId?: string | null | undefined;
@@ -129,26 +132,52 @@ export function createIdentityService(deps: IdentityServiceDeps): IdentityServic
   }
 
   async function registerAgent(input: RegisterAgentInput): Promise<RegisteredAgent> {
-    const machineId = requireText(input.machineId, "machineId", IDENTITY_LIMITS.id);
     const project = requireText(input.project, "project", IDENTITY_LIMITS.project);
     const displayName = requireText(input.displayName, "displayName", IDENTITY_LIMITS.displayName);
-    if ((await findMachineById(db, machineId)) === undefined) {
-      throw new IdentityError("NOT_FOUND", `机器 ${machineId} 未注册`);
-    }
-    if ((await findAgentByMachineProject(db, machineId, project)) !== undefined) {
-      throw new IdentityError("CONFLICT", `机器 ${machineId} 下已存在项目 ${project} 的 Agent`);
-    }
     const feishuAppId =
       input.feishuAppId === undefined || input.feishuAppId === null || input.feishuAppId === ""
         ? null
         : requireText(input.feishuAppId, "feishuAppId", IDENTITY_LIMITS.id);
     const allowedTargetsJson = JSON.stringify(normalizeTargets(input.allowedTargets));
+
+    let machineId: string | null;
+    let runtime: AgentRuntime;
+    if (input.machineId === null || input.machineId === undefined) {
+      // 机器无关 Agent:无 aw-node 的外部运行时(WorkBuddy/Codex/DeepSeek harness),
+      // machine_id 写 NULL,要求显式给出属于外部集合的 runtime。
+      if (input.runtime === undefined || !(EXTERNAL_RUNTIMES as readonly AgentRuntime[]).includes(input.runtime)) {
+        throw new IdentityError(
+          "VALIDATION_FAILED",
+          `机器无关 Agent 必须给出 runtime(属于 ${EXTERNAL_RUNTIMES.join(" / ")} 之一)`,
+        );
+      }
+      machineId = null;
+      runtime = input.runtime;
+    } else {
+      // 机器绑定 Agent:claude_code 经 aw-node 调度,强制校验机器存在与项目去重
+      machineId = requireText(input.machineId, "machineId", IDENTITY_LIMITS.id);
+      if (input.runtime !== undefined && input.runtime !== "claude_code") {
+        throw new IdentityError(
+          "VALIDATION_FAILED",
+          `绑定机器的 Agent 只能是 claude_code 运行时,收到 ${input.runtime}`,
+        );
+      }
+      if ((await findMachineById(db, machineId)) === undefined) {
+        throw new IdentityError("NOT_FOUND", `机器 ${machineId} 未注册`);
+      }
+      if ((await findAgentByMachineProject(db, machineId, project)) !== undefined) {
+        throw new IdentityError("CONFLICT", `机器 ${machineId} 下已存在项目 ${project} 的 Agent`);
+      }
+      runtime = "claude_code";
+    }
+
     const id = newAgentId();
     const secret = generateSecret();
     await db.transaction(async (tx) => {
       await insertAgent(tx, {
         id,
         machineId,
+        runtime,
         project,
         displayName,
         secretHash: hashSecret(secret),

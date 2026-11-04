@@ -164,6 +164,53 @@ describe("身份注册", () => {
     expect((await service.listAgents({ limit: 10 })).map((row) => row.project)).toEqual(["aw"]);
     await db.close();
   });
+
+  it("注册机器无关 Agent:无 machineId,给定外部 runtime,machine_id 写 NULL", async () => {
+    const { db, service } = await prepare();
+    const { agent, secret } = await service.registerAgent({
+      project: "workbuddy-proj",
+      displayName: "WorkBuddy A",
+      runtime: "workbuddy",
+    });
+    expect(agent.machineId).toBeNull();
+    expect(agent.runtime).toBe("workbuddy");
+    expect(secret).toBe("secret-1");
+    expect(verifySecret(secret, agent.secretHash as string)).toBe(true);
+    await db.close();
+  });
+
+  it("机器无关 Agent 必须显式外部 runtime:缺省或 claude_code 都被拒", async () => {
+    const { db, service } = await prepare();
+    await expectCode(
+      () => service.registerAgent({ project: "p", displayName: "A" }),
+      "VALIDATION_FAILED",
+    );
+    await expectCode(
+      () => service.registerAgent({ project: "p", displayName: "A", runtime: "claude_code" }),
+      "VALIDATION_FAILED",
+    );
+    await db.close();
+  });
+
+  it("机器无关 Agent 同项目可注册多个(按 id 唯一,不强行项目去重)", async () => {
+    const { db, service } = await prepare();
+    const first = await service.registerAgent({ project: "p", displayName: "A", runtime: "workbuddy" });
+    const second = await service.registerAgent({ project: "p", displayName: "B", runtime: "codex" });
+    expect(first.agent.id).not.toBe(second.agent.id);
+    expect(first.agent.machineId).toBeNull();
+    expect(second.agent.runtime).toBe("codex");
+    await db.close();
+  });
+
+  it("绑定机器的 Agent 拒绝外部 runtime,不静默改写", async () => {
+    const { db, service } = await prepare();
+    await service.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
+    await expectCode(
+      () => service.registerAgent({ machineId: "m1", project: "p", displayName: "A", runtime: "workbuddy" }),
+      "VALIDATION_FAILED",
+    );
+    await db.close();
+  });
 });
 
 describe("委派白名单", () => {

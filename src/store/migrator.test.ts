@@ -12,11 +12,14 @@ async function tableNames(db: Db): Promise<string[]> {
   return rows.map((row) => row.name);
 }
 
+const AGENT_INSERT =
+  "INSERT INTO agent (id, machine_id, runtime, project, display_name, secret_hash, allowed_targets_json, created_at, updated_at, bootstrap_status) VALUES (?, ?, ?, ?, ?, ?, '[]', 0, 0, 'registered')";
+
 describe("runMigrations", () => {
   it("空库执行建表并记账", async () => {
     const db = await createTestDatabase(resolveTestAdminUrl());
 
-    expect(await runMigrations(db)).toBe(5);
+    expect(await runMigrations(db)).toBe(6);
     expect(await tableNames(db)).toEqual(
       expect.arrayContaining([
         "task",
@@ -57,6 +60,7 @@ describe("runMigrations", () => {
       { version: 3, name: "one_time_tokens" },
       { version: 4, name: "bootstrap_delivery" },
       { version: 5, name: "bootstrap_assembly" },
+      { version: 6, name: "machine_less_agent" },
     ]);
     await db.close();
   });
@@ -66,6 +70,35 @@ describe("runMigrations", () => {
 
     await runMigrations(db);
     expect(await runMigrations(db)).toBe(0);
+    await db.close();
+  });
+
+  it("机器无关 Agent:machine_id 可空、runtime 受限、唯一性只在机器维度生效", async () => {
+    const db = await createTestDatabase(resolveTestAdminUrl());
+    await runMigrations(db);
+
+    const machineId = await db.get<{ nullable: string }>(
+      "SELECT is_nullable AS nullable FROM information_schema.columns WHERE table_name = 'agent' AND column_name = 'machine_id'",
+    );
+    expect(machineId).toEqual({ nullable: "YES" });
+
+    const runtime = await db.get<{ nullable: string; def: string }>(
+      "SELECT is_nullable AS nullable, column_default AS def FROM information_schema.columns WHERE table_name = 'agent' AND column_name = 'runtime'",
+    );
+    expect(runtime).toEqual({ nullable: "NO", def: "'claude_code'::text" });
+
+    await expect(
+      db.run(AGENT_INSERT, "agt_bad", null, "bogus", "p", "d", "h"),
+    ).rejects.toThrow();
+
+    // 机器无关 Agent 不受 (machine_id, project) 去重约束
+    await db.run(AGENT_INSERT, "agt_a", null, "workbuddy", "p", "d", "h");
+    await db.run(AGENT_INSERT, "agt_b", null, "workbuddy", "p", "d", "h");
+    const count = await db.get<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM agent WHERE machine_id IS NULL",
+    );
+    expect(count).toEqual({ n: 2 });
+
     await db.close();
   });
 

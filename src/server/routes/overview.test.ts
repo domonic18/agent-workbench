@@ -79,6 +79,7 @@ describe("overview 路由", () => {
     insertAgent(db, {
       id: "a1",
       machineId: "m1",
+      runtime: "claude_code",
       project: "p1",
       displayName: "Agent One",
       secretHash: "h",
