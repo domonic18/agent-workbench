@@ -1,8 +1,6 @@
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
-import { awaitApproval } from "../../domain/capability/approval.js";
 import { decide, type ToolCall } from "../../domain/capability/gate.js";
-import { TOOL_GATE } from "../../shared/constants.js";
-import { hashArgs } from "./hash.js";
+import { hashArgs } from "../../shared/args-hash.js";
 import type { GatewayOptions, NativeTool, Upstream } from "./types.js";
 
 export interface Gateway {
@@ -44,7 +42,6 @@ export function createGateway(options: GatewayOptions): Gateway {
   const { ctx, upstreams, audit } = options;
   const nativeTools = options.nativeTools ?? [];
   const now = options.now ?? Date.now;
-  const approvalTimeoutMs = options.approvalTimeoutMs ?? TOOL_GATE.approvalTimeoutMs;
 
   function listTools(): Tool[] {
     return [
@@ -115,22 +112,6 @@ export function createGateway(options: GatewayOptions): Gateway {
 
     if (decision.verdict === "deny") {
       return errorResult(decision.reason);
-    }
-    if (decision.verdict === "require_approval") {
-      const outcome = await awaitApproval(
-        { ctx, call, reason: decision.reason },
-        options.approval,
-        approvalTimeoutMs,
-      );
-      if (outcome !== "approved") {
-        const why =
-          outcome === "timeout"
-            ? `审批超时(${approvalTimeoutMs}ms)`
-            : outcome === "rejected"
-              ? "审批未通过"
-              : "审批通道不可用或异常";
-        return errorResult(`「${gateName}」需人工审批,${why},已拒绝`);
-      }
     }
     return execute();
   }

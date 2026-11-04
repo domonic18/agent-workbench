@@ -13,10 +13,12 @@ export interface Grant {
 }
 
 export interface RunContext {
-  runId: string;
+  /** 执行面 proxy 带 run 上下文;控制台 /mcp 远程调用无 run,为 null(05 §6.4) */
+  runId: string | null;
   agentId: string;
-  taskId: string;
-  workspaceRoot: string;
+  /** 审计落库前按工具参数抽取任务归属;无任务维度的调用(kb.search 等)为 null */
+  taskId: string | null;
+  workspaceRoot: string | null;
   usage: UsageState;
   /** 命中即放行,免去逐次审批;capabilityId 写入审计 */
   grants: readonly Grant[];
@@ -30,7 +32,6 @@ export interface ToolCall {
 
 export type Decision =
   | { verdict: "allow"; level: ToolLevel; reason?: string; capabilityId?: string }
-  | { verdict: "require_approval"; level: "L2"; reason: string }
   | { verdict: "deny"; level: ToolLevel; reason: string };
 
 const L0_TOOLS = new Set<string>(TOOL_GATE.l0);
@@ -67,7 +68,8 @@ function usageDecision(usage: UsageState, level: ToolLevel): Decision | undefine
 
 /**
  * 唯一判定实现(05 §6.3):用量硬停 → 能力/白名单 → 等级。
- * 任何异常都按 deny 处理,不允许 fail-open。
+ * L2 默认拒绝(05 §6.1):控制工具是封闭集合,清单外没有审批通道;
+ * 资源类常驻授权走能力申请(飞书卡片),与本闸门无关。任何异常都按 deny 处理,不允许 fail-open。
  */
 export function decide(ctx: RunContext, call: ToolCall): Decision {
   try {
@@ -84,9 +86,9 @@ export function decide(ctx: RunContext, call: ToolCall): Decision {
       return { verdict: "allow", level, reason: "命中已生效授权", capabilityId: grant.capabilityId };
     }
     return {
-      verdict: "require_approval",
+      verdict: "deny",
       level: "L2",
-      reason: `「${call.tool}」属于 L2 高危动作,需人工审批;常驻需求请在控制台申请能力授权`,
+      reason: `「${call.tool}」不在控制工具清单内,已拒绝;如属常驻资源需求,请在控制台申请能力授权`,
     };
   } catch (error) {
     return {

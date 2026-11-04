@@ -28,7 +28,6 @@ const envSchema = z.object({
   /** 空数组 = 只挂原生工具,不接管任何上游 MCP server */
   AW_UPSTREAMS: z.string().min(1).default("[]"),
   AW_GRANTS: z.string().optional(),
-  AW_APPROVAL_TIMEOUT_MS: z.coerce.number().int().min(1).optional(),
   /** 该 Agent 的 cc-connect 项目名;未显式配置飞书凭据时据此自动发现 */
   AW_PROJECT: z.string().min(1).optional(),
   // 各 Agent 自己的飞书应用凭据;两者同时配置才启用协作群通知
@@ -41,7 +40,6 @@ const envSchema = z.object({
 export interface ProxyConfig {
   agentSecret: string;
   consoleBaseUrl: string;
-  approvalTimeoutMs: number | undefined;
   upstreams: UpstreamConfig[];
   toolMap: Record<string, Record<string, string>>;
   /** 未配置飞书凭据时不发协作群通知,工具调用照常 */
@@ -161,7 +159,6 @@ export function loadProxyConfig(env: NodeJS.ProcessEnv = process.env): ProxyConf
   return {
     agentSecret: parsed.data.AW_AGENT_SECRET,
     consoleBaseUrl: parsed.data.CONSOLE_URL,
-    approvalTimeoutMs: parsed.data.AW_APPROVAL_TIMEOUT_MS,
     upstreams: entries.map((entry) => ({
       id: entry.id,
       command: entry.command,

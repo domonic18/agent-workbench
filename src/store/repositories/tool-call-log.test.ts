@@ -53,7 +53,7 @@ describe("tool_call_log 仓储", () => {
       tool: "fs.write",
       argsHash: "abc",
       level: "L2",
-      verdict: "require_approval",
+      verdict: "deny",
       reason: "L2",
       capabilityId: null,
       durationMs: null,

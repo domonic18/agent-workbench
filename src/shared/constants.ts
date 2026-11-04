@@ -191,16 +191,15 @@ export const OUTBOX_TIMEOUTS = {
 export const TOOL_LEVELS = ["L0", "L1", "L2"] as const;
 export type ToolLevel = (typeof TOOL_LEVELS)[number];
 
-export const TOOL_VERDICTS = ["allow", "deny", "require_approval"] as const;
+export const TOOL_VERDICTS = ["allow", "deny"] as const;
 export type ToolVerdict = (typeof TOOL_VERDICTS)[number];
 
 /**
- * 分级白名单(05 §6.1):L0/L1 只收明确登记的点分名,清单外一律按 L2 审批。
- * L2 审批挂起 300s,超时按拒绝处理。
+ * 分级白名单(05 §6.1):L0/L1 只收明确登记的点分名,清单外一律按 L2 默认拒绝。
+ * 控制工具是封闭集合;资源类常驻授权走能力申请(飞书卡片),不经本清单。
  */
 export const TOOL_GATE = {
-  approvalTimeoutMs: 5 * 60 * 1000,
-  l0: ["fs.read", "db.query", "kb.search", "a2a.inbox"],
+  l0: ["kb.search", "a2a.inbox"],
   l1: ["task.create", "task.update", "a2a.send", "a2a.ack", "kb.write"],
 } as const;
 

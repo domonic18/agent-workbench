@@ -145,7 +145,7 @@ CREATE TABLE tool_call_log (
   tool TEXT NOT NULL,
   args_hash TEXT NOT NULL,
   level TEXT NOT NULL CHECK (level IN ('L0', 'L1', 'L2')),
-  verdict TEXT NOT NULL CHECK (verdict IN ('allow', 'deny', 'require_approval')),
+  verdict TEXT NOT NULL CHECK (verdict IN ('allow', 'deny')),
   reason TEXT,
   capability_id TEXT REFERENCES capability (id) ON DELETE SET NULL,
   duration_ms INTEGER CHECK (duration_ms IS NULL OR duration_ms >= 0),

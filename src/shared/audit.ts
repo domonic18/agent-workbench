@@ -1,12 +1,13 @@
 import type { ToolLevel, ToolVerdict } from "./constants.js";
 
 /**
- * 工具调用审计负载:proxy 判定后经 HTTP 交给控制台落库(05 §6.4)。
- * agent_id 不在负载里,由控制台按 Bearer 身份注入,避免自述身份。
+ * 工具调用审计负载:控制台 /mcp 在判定后直接落库(05 §6.4)。
+ * agent_id 由调用方按 Bearer 身份注入,避免自述身份;远程 MCP 调用无 run 上下文,runId 为 null;
+ * 无任务维度的只读调用(kb.search / a2a.inbox)taskId 亦为 null。
  */
 export interface ToolCallAudit {
-  runId: string;
-  taskId: string;
+  runId: string | null;
+  taskId: string | null;
   /** 闸门点分名,如 `task.create` */
   tool: string;
   /** 参数哈希(不落原文) */

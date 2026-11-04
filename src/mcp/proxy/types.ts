@@ -1,5 +1,4 @@
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
-import type { ApprovalRequester } from "../../domain/capability/approval.js";
 import type { RunContext } from "../../domain/capability/gate.js";
 import type { ToolCallAudit } from "../../shared/audit.js";
 
@@ -37,8 +36,6 @@ export interface GatewayOptions {
   /** 控制面原生工具,对外裸名排在 listTools 前面 */
   nativeTools?: readonly NativeTool[];
   audit: AuditSink;
-  approval?: ApprovalRequester;
-  approvalTimeoutMs?: number;
   /** upstreamId → 上游工具名 → 闸门点分名 */
   toolMap?: Record<string, Record<string, string>>;
   now?: () => number;

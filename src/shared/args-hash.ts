@@ -16,7 +16,7 @@ function stableStringify(value: unknown): string {
   return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`).join(",")}}`;
 }
 
-/** 审计只存参数哈希,不落原文(可能含敏感内容) */
+/** 审计只存参数哈希,不落原文(可能含敏感内容);键序无关,代理与控制台 /mcp 共用 */
 export function hashArgs(args: Readonly<Record<string, unknown>>): string {
   return createHash("sha256").update(stableStringify(args)).digest("hex");
 }

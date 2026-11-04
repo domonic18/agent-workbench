@@ -54,7 +54,7 @@ function setup(toolNames: readonly string[] = ["read", "exec"]) {
     audit: (entry) => {
       audited.push(entry);
     },
-    toolMap: { fs: { read: "fs.read" } },
+    toolMap: { fs: { read: "kb.search" } },
   });
   return { upstream, audited, gateway };
 }
@@ -76,7 +76,7 @@ describe("gateway", () => {
     expect(textOf(result)).toBe("ok:read");
     expect(upstream.calls).toEqual([{ name: "read", args: { path: "/workspace/a.md" } }]);
     expect(audited[0]).toMatchObject({
-      tool: "fs.read",
+      tool: "kb.search",
       level: "L0",
       verdict: "allow",
       taskId: "T-1",
@@ -115,7 +115,7 @@ describe("gateway", () => {
       ctx: context({ taskId: "T-missing" }),
       upstreams: [upstream],
       audit: (entry) => insertToolCallLog(db, { ...entry, agentId: "agt_1" }),
-      toolMap: { fs: { read: "fs.read" } },
+      toolMap: { fs: { read: "kb.search" } },
     });
 
     const result = await gateway.callTool("fs__read", {});
@@ -124,57 +124,17 @@ describe("gateway", () => {
     await db.close();
   });
 
-  it("L2 未接入审批通道时拒绝", async () => {
+  it("L2 不在控制工具清单内直接拒绝(无审批通道)", async () => {
     const { upstream, audited, gateway } = setup();
     const result = await gateway.callTool("fs__exec", { cmd: "rm -rf /" });
 
     expect(result.isError).toBe(true);
-    expect(textOf(result)).toContain("审批通道不可用");
+    expect(textOf(result)).toContain("已拒绝");
     expect(upstream.calls).toHaveLength(0);
-    expect(audited[0]).toMatchObject({ level: "L2", verdict: "require_approval" });
+    expect(audited[0]).toMatchObject({ level: "L2", verdict: "deny" });
   });
 
-  it("审批通过后转发", async () => {
-    const upstream = fakeUpstream("fs", ["exec"]);
-    const audited: ToolCallAudit[] = [];
-    const gateway = createGateway({
-      ctx: context(),
-      upstreams: [upstream],
-      audit: (entry) => {
-      audited.push(entry);
-    },
-      approval: async () => true,
-    });
-
-    const result = await gateway.callTool("fs__exec", {});
-    expect(result.isError).toBeUndefined();
-    expect(upstream.calls).toEqual([{ name: "exec", args: {} }]);
-  });
-
-  it("审批拒绝或超时都不转发", async () => {
-    const upstream = fakeUpstream("fs", ["exec"]);
-    const rejected = createGateway({
-      ctx: context(),
-      upstreams: [upstream],
-      audit: () => undefined,
-      approval: async () => false,
-    });
-    expect((await rejected.callTool("fs__exec", {})).isError).toBe(true);
-    expect(upstream.calls).toHaveLength(0);
-
-    const timedOut = createGateway({
-      ctx: context(),
-      upstreams: [upstream],
-      audit: () => undefined,
-      approval: () => new Promise<boolean>(() => undefined),
-      approvalTimeoutMs: 10,
-    });
-    const result = await timedOut.callTool("fs__exec", {});
-    expect(textOf(result)).toContain("审批超时");
-    expect(upstream.calls).toHaveLength(0);
-  });
-
-  it("命中已生效授权时不等审批,审计带回 capabilityId", async () => {
+  it("命中已生效授权时放行,审计带回 capabilityId", async () => {
     const upstream = fakeUpstream("fs", ["exec"]);
     const audited: ToolCallAudit[] = [];
     const gateway = createGateway({

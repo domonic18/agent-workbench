@@ -31,9 +31,6 @@ export async function main(): Promise<void> {
     upstreams,
     nativeTools,
     audit: (entry) => postToolCallAudit(consoleClient, entry),
-    ...(config.approvalTimeoutMs === undefined
-      ? {}
-      : { approvalTimeoutMs: config.approvalTimeoutMs }),
     toolMap: config.toolMap,
     log,
   });

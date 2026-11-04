@@ -32,7 +32,7 @@ describe("MCP proxy 协议层", () => {
       ctx,
       upstreams: [fakeUpstream()],
       audit: () => undefined,
-      toolMap: { fs: { read: "fs.read" } },
+      toolMap: { fs: { read: "kb.search" } },
     });
     const server = createProxyServer(gateway);
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
