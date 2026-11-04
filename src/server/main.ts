@@ -69,6 +69,7 @@ const app = buildApp({
   teleport,
   service,
   a2a,
+  knowledgeDir: config.knowledgeDir,
   knowledgeRebuilder,
   knowledgeIndexer,
   knowledgeEntries,

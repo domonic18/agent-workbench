@@ -19,6 +19,7 @@ import { registerCapabilityRoutes } from "./routes/capabilities.js";
 import { registerIdentityRoutes } from "./routes/identity.js";
 import { registerIngestRoutes } from "./routes/ingest.js";
 import { registerKnowledgeRoutes } from "./routes/knowledge.js";
+import { registerMcpRoutes } from "./routes/mcp.js";
 import { registerOverviewRoutes } from "./routes/overview.js";
 import { registerArtifactRoutes, registerWebRoutes } from "./routes/static.js";
 import { registerStreamRoutes } from "./routes/stream.js";
@@ -52,6 +53,8 @@ export interface BuildAppOptions {
   knowledgeEntries?: KnowledgeEntryService;
   /** 飞书配置存在且带 approvalChatId 时,申请落库后推送审批卡片 */
   feishu?: FeishuConfig;
+  /** 知识目录(kb_write 的 Markdown 真相源);注入才注册远程 MCP `/mcp` */
+  knowledgeDir?: string;
   /** 执行面部署包目录;存在时按 /artifacts/* 匿名直读(新机器一键安装的取件口) */
   artifactsRoot?: string;
   /** 前端构建产物目录;存在 index.html 时才注册静态托管与 SPA 回退 */
@@ -114,6 +117,17 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       ...collab,
       ...(options.a2a === undefined ? {} : { service: options.a2a }),
     });
+
+    // 远程 MCP 与业务 API 共进程同鉴权(arch01 §5.2);kb_write 需要知识目录,未注入不注册
+    if (options.knowledgeDir !== undefined) {
+      registerMcpRoutes(app, {
+        db,
+        knowledgeDir: options.knowledgeDir,
+        ...timing,
+        ...collab,
+        ...(options.a2a === undefined ? {} : { a2a: options.a2a }),
+      });
+    }
 
     // 授权路由依赖 Teleport 适配器;身份 / A2A / 审计只要库
     if (options.teleport !== undefined) {
