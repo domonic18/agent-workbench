@@ -8,6 +8,8 @@ import {
 import {
   HEARTBEAT_LABEL,
   HEARTBEAT_TONE,
+  NOT_COLLECTED,
+  RUNTIME_LABEL,
   TASK_STAGE_LABEL,
   TASK_STATUS_LABEL,
   type Tone,
@@ -56,8 +58,11 @@ function statusLabel(value: string | null): string {
   return TASK_STATUS_LABEL[value as keyof typeof TASK_STATUS_LABEL] ?? value;
 }
 
-/** 统一为「项目@机器名」:自报名是自由文本,各机器写法不一,拼出来才可比 */
+/** 机器绑定 Agent 统一为「项目@机器名」;机器无关 Agent(无 aw-node)显示「项目 · 运行时」,不拼出 @undefined */
 function agentLabel(agent: OverviewAgent): string {
+  if (agent.machineHostname === null) {
+    return `${agent.project} · ${RUNTIME_LABEL[agent.runtime]}`;
+  }
   return `${agent.project}@${agent.machineHostname}`;
 }
 
@@ -98,7 +103,11 @@ export function AgentCards({ agents, now, onManageKey }: AgentCardsProps) {
             <div className={styles.meta}>
               <span title={agent.lastRunAt === null ? undefined : formatDateTime(agent.lastRunAt)}>
                 最近运行 ·{" "}
-                {agent.lastRunAt === null ? "从未运行" : formatRelativeTime(agent.lastRunAt, now)}
+                {agent.machineId === null
+                  ? NOT_COLLECTED
+                  : agent.lastRunAt === null
+                    ? "从未运行"
+                    : formatRelativeTime(agent.lastRunAt, now)}
               </span>
             </div>
 
@@ -128,13 +137,17 @@ export function AgentCards({ agents, now, onManageKey }: AgentCardsProps) {
             )}
 
             <div className={styles.footer}>
-              <span>
-                今日{" "}
-                <strong title={formatExactTokens(agent.todayTokens)}>
-                  {formatTokens(agent.todayTokens)}
-                </strong>{" "}
-                tok
-              </span>
+              {agent.machineId === null ? (
+                <span>{NOT_COLLECTED}</span>
+              ) : (
+                <span>
+                  今日{" "}
+                  <strong title={formatExactTokens(agent.todayTokens)}>
+                    {formatTokens(agent.todayTokens)}
+                  </strong>{" "}
+                  tok
+                </span>
+              )}
               {onManageKey === undefined ? null : (
                 <button
                   type="button"

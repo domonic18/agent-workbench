@@ -13,9 +13,20 @@ import type {
   TaskStage,
   TaskStatus,
 } from "../api/tasks.js";
-import type { HeartbeatState } from "../api/types.js";
+import type { AgentRuntime, HeartbeatState } from "../api/types.js";
 
 export type Tone = "positive" | "warning" | "danger" | "muted" | "info";
+
+/** 机器无关(无 aw-node)的外部运行时:控制台不采集其 run/对话/Token,只显示分类标签 */
+export const RUNTIME_LABEL: Record<AgentRuntime, string> = {
+  claude_code: "Claude Code",
+  workbuddy: "WorkBuddy",
+  codex: "Codex",
+  deepseek: "DeepSeek",
+};
+
+/** 控制台未采集该 Agent 的过程数据(机器无关运行时或尚未上报)时的统一占位文案 */
+export const NOT_COLLECTED = "未接入 / —";
 
 /** 状态到文案/色调的映射只在这里维护,组件不自行判断业务枚举(03 §6) */
 export const HEARTBEAT_LABEL: Record<HeartbeatState, string> = {

@@ -14,6 +14,7 @@ function agent(id: string, displayName: string, allowedTargets: string[] = []): 
   return {
     id,
     machineId: "m1",
+    runtime: "claude_code",
     project: id,
     displayName,
     feishuAppId: null,

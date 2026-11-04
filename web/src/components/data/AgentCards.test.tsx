@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { OverviewAgent } from "../../api/types.js";
+import { NOT_COLLECTED } from "../../shared/labels.js";
 import { AgentCards } from "./AgentCards.js";
 
 function agent(overrides: Partial<OverviewAgent> = {}): OverviewAgent {
@@ -9,6 +10,7 @@ function agent(overrides: Partial<OverviewAgent> = {}): OverviewAgent {
     displayName: "构建 Agent",
     project: "aw",
     machineId: "m1",
+    runtime: "claude_code",
     machineHostname: "build-box",
     machineLastSeenAt: 1_699_999_999_000,
     heartbeat: "ok",
@@ -126,5 +128,30 @@ describe("Agent 卡片", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "管理 构建 Agent 的密钥" }));
     expect(onManageKey).toHaveBeenCalledWith(expect.objectContaining({ id: "agt_a" }));
+  });
+
+  it("机器无关 Agent 不拼 @机器名,过程数据统一显示未接入", () => {
+    render(
+      <AgentCards
+        agents={[
+          agent({
+            id: "agt_wb",
+            displayName: "WorkBuddy Agent",
+            project: "wb-proj",
+            machineId: null,
+            runtime: "workbuddy",
+            machineHostname: null,
+            machineLastSeenAt: null,
+            heartbeat: "unknown",
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("wb-proj · WorkBuddy")).toBeTruthy();
+    expect(screen.queryByText("wb-proj@undefined")).toBeNull();
+    expect(screen.getByText(`最近运行 · ${NOT_COLLECTED}`)).toBeTruthy();
+    expect(screen.getByText(NOT_COLLECTED)).toBeTruthy();
+    expect(screen.queryByText(/tok/)).toBeNull();
   });
 });

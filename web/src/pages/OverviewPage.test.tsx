@@ -86,6 +86,7 @@ describe("总览页", () => {
                 displayName: "构建 Agent",
                 project: "aw",
                 machineId: "m1",
+                runtime: "claude_code",
                 machineHostname: "build-box",
                 machineLastSeenAt: 1_699_999_999_000,
                 heartbeat: "ok",

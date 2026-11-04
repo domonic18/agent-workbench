@@ -40,6 +40,7 @@ describe("Agent 注册弹窗", () => {
       agent: {
         id: "agt_new",
         machineId: "m1",
+        runtime: "claude_code",
         project: "aw",
         displayName: "构建 Agent",
         feishuAppId: null,

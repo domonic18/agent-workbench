@@ -1,10 +1,12 @@
 import { api, newIdempotencyKey } from "./client.js";
+import type { AgentRuntime } from "./types.js";
 
 export type IdentityStatus = "active" | "disabled";
 
 export interface AgentSummary {
   id: string;
-  machineId: string;
+  machineId: string | null;
+  runtime: AgentRuntime;
   project: string;
   displayName: string;
   feishuAppId: string | null;
@@ -25,7 +27,9 @@ export interface MachineSummary {
 }
 
 export interface CreateAgentInput {
-  machineId: string;
+  /** 机器绑定 Agent 必填;机器无关 Agent 留空(改由 runtime 区分) */
+  machineId?: string;
+  runtime?: AgentRuntime;
   project: string;
   displayName: string;
   feishuAppId?: string;
