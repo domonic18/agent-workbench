@@ -1,14 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { verifySecret } from "../security/secrets.js";
-import { openDatabase } from "../../store/database.js";
-import { runMigrations } from "../../store/migrator.js";
-import type { Db } from "../../store/database.js";
+import { openDatabase, type Db } from "../../store/database.js";
 import { IdentityError } from "./errors.js";
 import { createIdentityService, type IdentityService } from "./service.js";
 
-function prepare(): { db: Db; service: IdentityService } {
-  const db = openDatabase(":memory:");
-  runMigrations(db);
+async function prepare(): Promise<{ db: Db; service: IdentityService }> {
+  const db = await openDatabase();
   let agentSeq = 0;
   let secretSeq = 0;
   const service = createIdentityService({
@@ -20,9 +17,9 @@ function prepare(): { db: Db; service: IdentityService } {
   return { db, service };
 }
 
-function expectCode(fn: () => unknown, code: IdentityError["code"]): void {
+async function expectCode(fn: () => Promise<unknown>, code: IdentityError["code"]): Promise<void> {
   try {
-    fn();
+    await fn();
   } catch (error) {
     expect(error).toBeInstanceOf(IdentityError);
     expect((error as IdentityError).code).toBe(code);
@@ -32,9 +29,9 @@ function expectCode(fn: () => unknown, code: IdentityError["code"]): void {
 }
 
 describe("身份注册", () => {
-  it("注册机器:明文只出现在返回值,库中只有哈希", () => {
-    const { db, service } = prepare();
-    const { machine, secret } = service.registerMachine({
+  it("注册机器:明文只出现在返回值,库中只有哈希", async () => {
+    const { db, service } = await prepare();
+    const { machine, secret } = await service.registerMachine({
       id: "macmini-01",
       hostname: "macmini.local",
       os: "darwin",
@@ -45,20 +42,20 @@ describe("身份注册", () => {
     expect(secret).toBe("secret-1");
     expect(machine.collectorSecretHash).not.toBe(secret);
     expect(verifySecret(secret, machine.collectorSecretHash)).toBe(true);
-    db.close();
+    await db.close();
   });
 
-  it("重复机器 id 返回 409 语义", () => {
-    const { db, service } = prepare();
+  it("重复机器 id 返回 409 语义", async () => {
+    const { db, service } = await prepare();
     const input = { id: "m1", hostname: "h", os: "linux", collectorVersion: "1" };
-    service.registerMachine(input);
-    expectCode(() => service.registerMachine(input), "CONFLICT");
-    db.close();
+    await service.registerMachine(input);
+    await expectCode(() => service.registerMachine(input), "CONFLICT");
+    await db.close();
   });
 
-  it("注册 Agent:机器必须存在,allowedTargets 去重后入库", () => {
-    const { db, service } = prepare();
-    expectCode(
+  it("注册 Agent:机器必须存在,allowedTargets 去重后入库", async () => {
+    const { db, service } = await prepare();
+    await expectCode(
       () =>
         service.registerAgent({
           machineId: "missing",
@@ -68,8 +65,8 @@ describe("身份注册", () => {
       "NOT_FOUND",
     );
 
-    service.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
-    const { agent, secret } = service.registerAgent({
+    await service.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
+    const { agent, secret } = await service.registerAgent({
       machineId: "m1",
       project: "aw",
       displayName: "Agent A",
@@ -78,64 +75,65 @@ describe("身份注册", () => {
     expect(agent.id).toBe("agt_1");
     expect(verifySecret(secret, agent.secretHash)).toBe(true);
     expect(JSON.parse(agent.allowedTargetsJson)).toEqual(["agt_9", "agt_8"]);
-    db.close();
+    await db.close();
   });
 
-  it("同机器同项目冲突,不同项目可注册", () => {
-    const { db, service } = prepare();
-    service.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
-    service.registerAgent({ machineId: "m1", project: "aw", displayName: "A" });
+  it("同机器同项目冲突,不同项目可注册", async () => {
+    const { db, service } = await prepare();
+    await service.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
+    await service.registerAgent({ machineId: "m1", project: "aw", displayName: "A" });
 
-    expectCode(
+    await expectCode(
       () => service.registerAgent({ machineId: "m1", project: "aw", displayName: "B" }),
       "CONFLICT",
     );
     expect(
-      service.registerAgent({ machineId: "m1", project: "other", displayName: "B" }).agent.project,
+      (await service.registerAgent({ machineId: "m1", project: "other", displayName: "B" })).agent
+        .project,
     ).toBe("other");
-    db.close();
+    await db.close();
   });
 
-  it("轮换后旧密钥立即失效", () => {
-    const { db, service } = prepare();
-    service.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
-    const first = service.registerAgent({ machineId: "m1", project: "aw", displayName: "A" });
+  it("轮换后旧密钥立即失效", async () => {
+    const { db, service } = await prepare();
+    await service.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
+    const first = await service.registerAgent({ machineId: "m1", project: "aw", displayName: "A" });
 
-    const rotated = service.rotateAgentSecret(first.agent.id);
+    const rotated = await service.rotateAgentSecret(first.agent.id);
     expect(rotated.secret).not.toBe(first.secret);
     expect(verifySecret(first.secret, rotated.agent.secretHash)).toBe(false);
     expect(verifySecret(rotated.secret, rotated.agent.secretHash)).toBe(true);
 
-    const machine = service.registerMachine({
+    const machine = await service.registerMachine({
       id: "m2",
       hostname: "h",
       os: "linux",
       collectorVersion: "1",
     });
-    const machineRotated = service.rotateMachineSecret(machine.machine.id);
+    const machineRotated = await service.rotateMachineSecret(machine.machine.id);
     expect(verifySecret(machine.secret, machineRotated.machine.collectorSecretHash)).toBe(false);
     expect(
       verifySecret(machineRotated.secret, machineRotated.machine.collectorSecretHash),
     ).toBe(true);
-    db.close();
+    await db.close();
   });
 
-  it("轮换未知 id 返回 404 语义", () => {
-    const { db, service } = prepare();
-    expectCode(() => service.rotateAgentSecret("agt_missing"), "NOT_FOUND");
-    expectCode(() => service.rotateMachineSecret("missing"), "NOT_FOUND");
-    db.close();
+  it("轮换未知 id 返回 404 语义", async () => {
+    const { db, service } = await prepare();
+    await expectCode(() => service.rotateAgentSecret("agt_missing"), "NOT_FOUND");
+    await expectCode(() => service.rotateMachineSecret("missing"), "NOT_FOUND");
+    await db.close();
   });
 
-  it("字段校验:空值、超长、超量都拒绝", () => {
-    const { db, service } = prepare();
-    expectCode(
+  it("字段校验:空值、超长、超量都拒绝", async () => {
+    const { db, service } = await prepare();
+    await expectCode(
       () =>
         service.registerMachine({ id: " ", hostname: "h", os: "linux", collectorVersion: "1" }),
       "VALIDATION_FAILED",
     );
-    service.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
-    expectCode(
+    await service.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
+    await expectCode(
       () =>
         service.registerAgent({
           machineId: "m1",
@@ -144,7 +142,7 @@ describe("身份注册", () => {
         }),
       "VALIDATION_FAILED",
     );
-    expectCode(
+    await expectCode(
       () =>
         service.registerAgent({
           machineId: "m1",
@@ -154,54 +152,55 @@ describe("身份注册", () => {
         }),
       "VALIDATION_FAILED",
     );
-    db.close();
+    await db.close();
   });
 
-  it("列表返回注册结果", () => {
-    const { db, service } = prepare();
-    service.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
-    service.registerAgent({ machineId: "m1", project: "aw", displayName: "A" });
+  it("列表返回注册结果", async () => {
+    const { db, service } = await prepare();
+    await service.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
+    await service.registerAgent({ machineId: "m1", project: "aw", displayName: "A" });
 
-    expect(service.listMachines({ limit: 10 }).map((row) => row.id)).toEqual(["m1"]);
-    expect(service.listAgents({ limit: 10 }).map((row) => row.project)).toEqual(["aw"]);
-    db.close();
+    expect((await service.listMachines({ limit: 10 })).map((row) => row.id)).toEqual(["m1"]);
+    expect((await service.listAgents({ limit: 10 })).map((row) => row.project)).toEqual(["aw"]);
+    await db.close();
   });
 });
 
 describe("委派白名单", () => {
-  function prepareAgents() {
-    const context = prepare();
-    context.service.registerMachine({
+  async function prepareAgents() {
+    const context = await prepare();
+    await context.service.registerMachine({
       id: "m1",
       hostname: "h",
       os: "linux",
       collectorVersion: "1",
     });
-    const a = context.service.registerAgent({ machineId: "m1", project: "a", displayName: "A" });
-    const b = context.service.registerAgent({ machineId: "m1", project: "b", displayName: "B" });
-    const c = context.service.registerAgent({ machineId: "m1", project: "c", displayName: "C" });
+    const a = await context.service.registerAgent({ machineId: "m1", project: "a", displayName: "A" });
+    const b = await context.service.registerAgent({ machineId: "m1", project: "b", displayName: "B" });
+    const c = await context.service.registerAgent({ machineId: "m1", project: "c", displayName: "C" });
     return { ...context, a: a.agent, b: b.agent, c: c.agent };
   }
 
-  it("保存去重后的目标,空数组清空", () => {
-    const { db, service, a, b, c } = prepareAgents();
-    const updated = service.setAllowedTargets(a.id, [b.id, b.id, c.id]);
+  it("保存去重后的目标,空数组清空", async () => {
+    const { db, service, a, b, c } = await prepareAgents();
+    const updated = await service.setAllowedTargets(a.id, [b.id, b.id, c.id]);
     expect(JSON.parse(updated.allowedTargetsJson)).toEqual([b.id, c.id]);
 
-    const reloaded = service.listAgents({ limit: 10 }).find((row) => row.id === a.id);
+    const reloaded = (await service.listAgents({ limit: 10 })).find((row) => row.id === a.id);
     expect(reloaded === undefined ? null : JSON.parse(reloaded.allowedTargetsJson)).toEqual([
       b.id,
       c.id,
     ]);
-    expect(JSON.parse(service.setAllowedTargets(a.id, []).allowedTargetsJson)).toEqual([]);
-    db.close();
+    const cleared = await service.setAllowedTargets(a.id, []);
+    expect(JSON.parse(cleared.allowedTargetsJson)).toEqual([]);
+    await db.close();
   });
 
-  it("自我委派、未知目标与未知发起方都拒绝", () => {
-    const { db, service, a } = prepareAgents();
-    expectCode(() => service.setAllowedTargets(a.id, [a.id]), "VALIDATION_FAILED");
-    expectCode(() => service.setAllowedTargets(a.id, ["agt_missing"]), "VALIDATION_FAILED");
-    expectCode(() => service.setAllowedTargets("agt_missing", [a.id]), "NOT_FOUND");
-    db.close();
+  it("自我委派、未知目标与未知发起方都拒绝", async () => {
+    const { db, service, a } = await prepareAgents();
+    await expectCode(() => service.setAllowedTargets(a.id, [a.id]), "VALIDATION_FAILED");
+    await expectCode(() => service.setAllowedTargets(a.id, ["agt_missing"]), "VALIDATION_FAILED");
+    await expectCode(() => service.setAllowedTargets("agt_missing", [a.id]), "NOT_FOUND");
+    await db.close();
   });
 });

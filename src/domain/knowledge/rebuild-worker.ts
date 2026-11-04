@@ -2,7 +2,7 @@ import { parentPort, workerData } from "node:worker_threads";
 import type { EmbeddingConfig } from "./embedding.js";
 
 interface RebuildWorkerData {
-  databasePath: string;
+  databaseUrl: string;
   knowledgeDir: string;
   embedding?: EmbeddingConfig;
 }
@@ -13,12 +13,12 @@ async function main(): Promise<void> {
     const { register } = await import("tsx/esm/api");
     register();
   }
-  const { openDatabase } = await import("../../store/database.js");
+  const { createDb } = await import("../../store/database.js");
   const { createEmbeddingClient } = await import("./embedding.js");
   const { rebuildKnowledgeIndex } = await import("./indexer.js");
 
   const data = workerData as RebuildWorkerData;
-  const db = openDatabase(data.databasePath);
+  const db = createDb(data.databaseUrl);
   try {
     const embedding =
       data.embedding === undefined ? undefined : createEmbeddingClient(data.embedding);
@@ -33,7 +33,7 @@ async function main(): Promise<void> {
       error: error instanceof Error ? error.message : String(error),
     });
   } finally {
-    db.close();
+    await db.close();
   }
 }
 

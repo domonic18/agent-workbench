@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { RUN_IDLE_GAP_MS } from "../../shared/constants.js";
 import { openDatabase, type Db } from "../../store/database.js";
-import { runMigrations } from "../../store/migrator.js";
 import {
   findRunById,
   findRunningRunForStream,
@@ -9,9 +8,8 @@ import {
 } from "../../store/repositories/run.js";
 import { createRunService, type RecordEventInput, type RunService } from "./service.js";
 
-function prepare(): { db: Db; service: RunService } {
-  const db = openDatabase(":memory:");
-  runMigrations(db);
+async function prepare(): Promise<{ db: Db; service: RunService }> {
+  const db = await openDatabase();
   await db.run(
     "INSERT INTO machine (id, hostname, os, collector_version, collector_secret_hash, status, created_at) VALUES ('m1', 'h', 'linux', '1', 'hash', 'active', 0)",
   );
@@ -48,10 +46,10 @@ function eventInput(overrides: Partial<RecordEventInput> = {}): RecordEventInput
 }
 
 describe("run 记录事件", () => {
-  it("首个事件开出 running run 并落时间线", () => {
-    const { db, service } = prepare();
+  it("首个事件开出 running run 并落时间线", async () => {
+    const { db, service } = await prepare();
 
-    const result = service.recordEvent(
+    const result = await service.recordEvent(
       eventInput({
         turnId: "turn_1",
         blockId: "blk_1",
@@ -66,7 +64,7 @@ describe("run 记录事件", () => {
       startedRun: true,
       staleRev: false,
     });
-    expect(findRunById(db, "run_1")).toMatchObject({
+    expect(await findRunById(db, "run_1")).toMatchObject({
       agentId: "agt_a",
       machine: "m1",
       project: "pa",
@@ -76,7 +74,7 @@ describe("run 记录事件", () => {
       lastSeenAt: 1_000,
       endedAt: null,
     });
-    expect(listTimelineEventsByRun(db, "run_1")).toMatchObject([
+    expect(await listTimelineEventsByRun(db, "run_1")).toMatchObject([
       {
         id: "tle_1",
         turnId: "turn_1",
@@ -89,85 +87,85 @@ describe("run 记录事件", () => {
         occurredAt: 1_000,
       },
     ]);
-    db.close();
+    await db.close();
   });
 
-  it("同一流复用 run 并推进 last_seen_at", () => {
-    const { db, service } = prepare();
-    service.recordEvent(eventInput({ occurredAt: 1_000, ord: 1 }));
-    const result = service.recordEvent(eventInput({ occurredAt: 2_000, ord: 2 }));
+  it("同一流复用 run 并推进 last_seen_at", async () => {
+    const { db, service } = await prepare();
+    await service.recordEvent(eventInput({ occurredAt: 1_000, ord: 1 }));
+    const result = await service.recordEvent(eventInput({ occurredAt: 2_000, ord: 2 }));
 
     expect(result.startedRun).toBe(false);
     expect(result.runId).toBe("run_1");
-    expect(findRunById(db, "run_1")?.lastSeenAt).toBe(2_000);
-    expect(listTimelineEventsByRun(db, "run_1")).toHaveLength(2);
-    db.close();
+    expect((await findRunById(db, "run_1"))?.lastSeenAt).toBe(2_000);
+    expect(await listTimelineEventsByRun(db, "run_1")).toHaveLength(2);
+    await db.close();
   });
 
-  it("空闲满 30 分钟切分新 run,旧 run 停在最后一次活动", () => {
-    const { db, service } = prepare();
-    service.recordEvent(eventInput({ occurredAt: 1_000, ord: 1 }));
+  it("空闲满 30 分钟切分新 run,旧 run 停在最后一次活动", async () => {
+    const { db, service } = await prepare();
+    await service.recordEvent(eventInput({ occurredAt: 1_000, ord: 1 }));
 
-    const result = service.recordEvent(
+    const result = await service.recordEvent(
       eventInput({ occurredAt: 1_000 + RUN_IDLE_GAP_MS, ord: 2 }),
     );
 
     expect(result).toMatchObject({ runId: "run_2", startedRun: true });
-    expect(findRunById(db, "run_1")).toMatchObject({ status: "ended", endedAt: 1_000 });
-    expect(findRunById(db, "run_2")).toMatchObject({
+    expect(await findRunById(db, "run_1")).toMatchObject({ status: "ended", endedAt: 1_000 });
+    expect(await findRunById(db, "run_2")).toMatchObject({
       status: "running",
       startedAt: 1_000 + RUN_IDLE_GAP_MS,
       lastSeenAt: 1_000 + RUN_IDLE_GAP_MS,
     });
-    expect(findRunningRunForStream(db, "agt_a", "claude-session:s1")?.id).toBe("run_2");
-    db.close();
+    expect((await findRunningRunForStream(db, "agt_a", "claude-session:s1"))?.id).toBe("run_2");
+    await db.close();
   });
 
-  it("未满 30 分钟不切分", () => {
-    const { db, service } = prepare();
-    service.recordEvent(eventInput({ occurredAt: 1_000, ord: 1 }));
-    const result = service.recordEvent(
+  it("未满 30 分钟不切分", async () => {
+    const { db, service } = await prepare();
+    await service.recordEvent(eventInput({ occurredAt: 1_000, ord: 1 }));
+    const result = await service.recordEvent(
       eventInput({ occurredAt: 1_000 + RUN_IDLE_GAP_MS - 1, ord: 2 }),
     );
 
     expect(result).toMatchObject({ runId: "run_1", startedRun: false });
-    expect(findRunById(db, "run_1")?.status).toBe("running");
-    db.close();
+    expect((await findRunById(db, "run_1"))?.status).toBe("running");
+    await db.close();
   });
 
-  it("同 Agent 的不同流各成一段 run", () => {
-    const { db, service } = prepare();
-    service.recordEvent(eventInput({ occurredAt: 1_000, ord: 1 }));
-    const other = service.recordEvent(
+  it("同 Agent 的不同流各成一段 run", async () => {
+    const { db, service } = await prepare();
+    await service.recordEvent(eventInput({ occurredAt: 1_000, ord: 1 }));
+    const other = await service.recordEvent(
       eventInput({ streamId: "claude-session:s2", occurredAt: 1_001, ord: 1 }),
     );
 
     expect(other).toMatchObject({ runId: "run_2", startedRun: true });
-    expect(findRunningRunForStream(db, "agt_a", "claude-session:s1")?.id).toBe("run_1");
-    expect(findRunningRunForStream(db, "agt_a", "claude-session:s2")?.id).toBe("run_2");
-    db.close();
+    expect((await findRunningRunForStream(db, "agt_a", "claude-session:s1"))?.id).toBe("run_1");
+    expect((await findRunningRunForStream(db, "agt_a", "claude-session:s2"))?.id).toBe("run_2");
+    await db.close();
   });
 
-  it("晚到事件不切分也不回拨 last_seen_at", () => {
-    const { db, service } = prepare();
-    service.recordEvent(eventInput({ occurredAt: 5_000, ord: 2 }));
-    const late = service.recordEvent(eventInput({ occurredAt: 1_000, ord: 1 }));
+  it("晚到事件不切分也不回拨 last_seen_at", async () => {
+    const { db, service } = await prepare();
+    await service.recordEvent(eventInput({ occurredAt: 5_000, ord: 2 }));
+    const late = await service.recordEvent(eventInput({ occurredAt: 1_000, ord: 1 }));
 
     expect(late).toMatchObject({ runId: "run_1", startedRun: false, staleRev: false });
-    expect(findRunById(db, "run_1")).toMatchObject({ startedAt: 5_000, lastSeenAt: 5_000 });
-    expect(listTimelineEventsByRun(db, "run_1").map((event) => event.ord)).toEqual([1, 2]);
-    db.close();
+    expect(await findRunById(db, "run_1")).toMatchObject({ startedAt: 5_000, lastSeenAt: 5_000 });
+    expect((await listTimelineEventsByRun(db, "run_1")).map((event) => event.ord)).toEqual([1, 2]);
+    await db.close();
   });
 });
 
 describe("block_rev 新鲜度", () => {
-  it("旧 block_rev 被丢弃,不回写新内容", () => {
-    const { db, service } = prepare();
-    service.recordEvent(
+  it("旧 block_rev 被丢弃,不回写新内容", async () => {
+    const { db, service } = await prepare();
+    await service.recordEvent(
       eventInput({ occurredAt: 1_000, ord: 1, blockId: "blk_1", blockRev: 2 }),
     );
 
-    const stale = service.recordEvent(
+    const stale = await service.recordEvent(
       eventInput({ occurredAt: 2_000, ord: 2, blockId: "blk_1", blockRev: 1 }),
     );
 
@@ -177,53 +175,53 @@ describe("block_rev 新鲜度", () => {
       startedRun: false,
       staleRev: true,
     });
-    expect(listTimelineEventsByRun(db, "run_1")).toHaveLength(1);
+    expect(await listTimelineEventsByRun(db, "run_1")).toHaveLength(1);
     // 事件被丢弃,但它仍是 run 存活的证据
-    expect(findRunById(db, "run_1")?.lastSeenAt).toBe(2_000);
-    db.close();
+    expect((await findRunById(db, "run_1"))?.lastSeenAt).toBe(2_000);
+    await db.close();
   });
 
-  it("更新的 block_rev 正常写入", () => {
-    const { db, service } = prepare();
-    service.recordEvent(
+  it("更新的 block_rev 正常写入", async () => {
+    const { db, service } = await prepare();
+    await service.recordEvent(
       eventInput({ occurredAt: 1_000, ord: 1, blockId: "blk_1", blockRev: 2 }),
     );
-    const next = service.recordEvent(
+    const next = await service.recordEvent(
       eventInput({ occurredAt: 2_000, ord: 2, blockId: "blk_1", blockRev: 3 }),
     );
 
     expect(next.staleRev).toBe(false);
-    expect(listTimelineEventsByRun(db, "run_1")).toHaveLength(2);
-    db.close();
+    expect(await listTimelineEventsByRun(db, "run_1")).toHaveLength(2);
+    await db.close();
   });
 });
 
 describe("run 收尾与任务绑定", () => {
-  it("endStream 收尾当前 run,重复调用返回 null", () => {
-    const { db, service } = prepare();
-    service.recordEvent(eventInput({ occurredAt: 1_000, ord: 1 }));
+  it("endStream 收尾当前 run,重复调用返回 null", async () => {
+    const { db, service } = await prepare();
+    await service.recordEvent(eventInput({ occurredAt: 1_000, ord: 1 }));
 
-    expect(service.endStream("agt_a", "claude-session:s1", 2_000)).toBe("run_1");
-    expect(findRunById(db, "run_1")).toMatchObject({ status: "ended", endedAt: 2_000 });
-    expect(service.endStream("agt_a", "claude-session:s1", 3_000)).toBeNull();
-    db.close();
+    expect(await service.endStream("agt_a", "claude-session:s1", 2_000)).toBe("run_1");
+    expect(await findRunById(db, "run_1")).toMatchObject({ status: "ended", endedAt: 2_000 });
+    expect(await service.endStream("agt_a", "claude-session:s1", 3_000)).toBeNull();
+    await db.close();
   });
 
-  it("一个 run 只绑定一次任务", () => {
-    const { db, service } = prepare();
-    service.recordEvent(eventInput({ occurredAt: 1_000, ord: 1 }));
+  it("一个 run 只绑定一次任务", async () => {
+    const { db, service } = await prepare();
+    await service.recordEvent(eventInput({ occurredAt: 1_000, ord: 1 }));
 
-    expect(service.bindTask("run_1", "tsk_a")).toBe(true);
-    expect(service.bindTask("run_1", "tsk_a")).toBe(false);
-    expect(findRunById(db, "run_1")?.taskId).toBe("tsk_a");
-    db.close();
+    expect(await service.bindTask("run_1", "tsk_a")).toBe(true);
+    expect(await service.bindTask("run_1", "tsk_a")).toBe(false);
+    expect((await findRunById(db, "run_1"))?.taskId).toBe("tsk_a");
+    await db.close();
   });
 
-  it("非法坐标在开 run 之前就被拒绝", () => {
-    const { db, service } = prepare();
+  it("非法坐标在开 run 之前就被拒绝", async () => {
+    const { db, service } = await prepare();
 
-    expect(() => service.recordEvent(eventInput({ ord: 0 }))).toThrow("ord");
-    expect(findRunningRunForStream(db, "agt_a", "claude-session:s1")).toBeUndefined();
-    db.close();
+    await expect(service.recordEvent(eventInput({ ord: 0 }))).rejects.toThrow("ord");
+    expect(await findRunningRunForStream(db, "agt_a", "claude-session:s1")).toBeUndefined();
+    await db.close();
   });
 });

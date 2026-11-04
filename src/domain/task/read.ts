@@ -51,9 +51,9 @@ export interface TaskEventsResult {
 }
 
 export interface TaskReadService {
-  list(query: TaskListQuery): TaskListResult;
-  detail(taskId: string): TaskDetailResult;
-  events(taskId: string, query: TaskEventsQuery): TaskEventsResult;
+  list(query: TaskListQuery): Promise<TaskListResult>;
+  detail(taskId: string): Promise<TaskDetailResult>;
+  events(taskId: string, query: TaskEventsQuery): Promise<TaskEventsResult>;
 }
 
 export interface TaskReadServiceDeps {
@@ -63,8 +63,8 @@ export interface TaskReadServiceDeps {
 export function createTaskReadService(deps: TaskReadServiceDeps): TaskReadService {
   const { db } = deps;
 
-  function requireTask(taskId: string): TaskRecord {
-    const task = findTaskById(db, taskId);
+  async function requireTask(taskId: string): Promise<TaskRecord> {
+    const task = await findTaskById(db, taskId);
     if (task === undefined) {
       throw new TaskError("NOT_FOUND", `任务 ${taskId} 不存在`);
     }
@@ -72,29 +72,29 @@ export function createTaskReadService(deps: TaskReadServiceDeps): TaskReadServic
   }
 
   return {
-    list(query) {
+    async list(query) {
       // 多取一行判断是否还有下一页,避免为翻页额外 COUNT
-      const rows = listTasks(db, { ...query, limit: query.limit + 1 });
+      const rows = await listTasks(db, { ...query, limit: query.limit + 1 });
       const hasMore = rows.length > query.limit;
       return { items: hasMore ? rows.slice(0, query.limit) : rows, hasMore };
     },
 
-    detail(taskId) {
+    async detail(taskId) {
       // 与总览同理:先取水位再读投影
-      const revision = currentRevision(db, taskScopeName(taskId));
-      const task = requireTask(taskId);
+      const revision = await currentRevision(db, taskScopeName(taskId));
+      const task = await requireTask(taskId);
       return {
         task,
-        capabilities: listCapabilitySummariesByTask(db, taskId),
-        tokens: summarizeTaskTokens(db, taskId),
+        capabilities: await listCapabilitySummariesByTask(db, taskId),
+        tokens: await summarizeTaskTokens(db, taskId),
         revision,
       };
     },
 
-    events(taskId, query) {
-      const revision = currentRevision(db, taskScopeName(taskId));
-      requireTask(taskId);
-      const rows = listTaskEvents(db, taskId, query.afterSeq, query.limit + 1);
+    async events(taskId, query) {
+      const revision = await currentRevision(db, taskScopeName(taskId));
+      await requireTask(taskId);
+      const rows = await listTaskEvents(db, taskId, query.afterSeq, query.limit + 1);
       const hasMore = rows.length > query.limit;
       return { revision, items: hasMore ? rows.slice(0, query.limit) : rows, hasMore };
     },

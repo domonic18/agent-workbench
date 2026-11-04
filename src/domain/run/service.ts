@@ -36,11 +36,11 @@ export interface RecordEventResult {
 }
 
 export interface RunService {
-  recordEvent(input: RecordEventInput): RecordEventResult;
+  recordEvent(input: RecordEventInput): Promise<RecordEventResult>;
   /** 进程退出时收尾当前 run;没有 running run 返回 null */
-  endStream(agentId: string, streamId: string, endedAt?: number): string | null;
+  endStream(agentId: string, streamId: string, endedAt?: number): Promise<string | null>;
   /** run 内首次绑定任务;已绑定或 run 不存在返回 false */
-  bindTask(runId: string, taskId: string): boolean;
+  bindTask(runId: string, taskId: string): Promise<boolean>;
 }
 
 export interface RunServiceDeps {
@@ -77,7 +77,7 @@ export function createRunService(deps: RunServiceDeps): RunService {
   const newRunId = deps.newRunId ?? (() => newPrefixedId("run"));
   const newEventId = deps.newEventId ?? (() => newPrefixedId("tle"));
 
-  function recordEvent(input: RecordEventInput): RecordEventResult {
+  async function recordEvent(input: RecordEventInput): Promise<RecordEventResult> {
     const agentId = requireText(input.agentId, "agentId");
     const machine = requireText(input.machine, "machine");
     const project = requireText(input.project, "project");
@@ -93,13 +93,13 @@ export function createRunService(deps: RunServiceDeps): RunService {
     const turnId = optionalText(input.turnId, "turnId");
     const blockId = optionalText(input.blockId, "blockId");
 
-    return db.transaction((): RecordEventResult => {
-      let run = findRunningRunForStream(db, agentId, streamId);
+    return db.transaction(async (tx): Promise<RecordEventResult> => {
+      let run = await findRunningRunForStream(tx, agentId, streamId);
       let startedRun = false;
 
       // 空闲 ≥30 分钟:旧 run 停在最后一次活动,新事件顶替(02 §3.2)
       if (run !== undefined && occurredAt - run.lastSeenAt >= RUN_IDLE_GAP_MS) {
-        endRun(db, run.id, run.lastSeenAt);
+        await endRun(tx, run.id, run.lastSeenAt);
         run = undefined;
       }
       if (run === undefined) {
@@ -111,7 +111,7 @@ export function createRunService(deps: RunServiceDeps): RunService {
           streamId,
           startedAt: occurredAt,
         };
-        insertRun(db, created);
+        await insertRun(tx, created);
         run = {
           ...created,
           taskId: null,
@@ -124,16 +124,16 @@ export function createRunService(deps: RunServiceDeps): RunService {
 
       // 晚到事件不回拨 last_seen_at;它仍是 run 存活的证据
       if (occurredAt > run.lastSeenAt) {
-        touchRunLastSeen(db, run.id, occurredAt);
+        await touchRunLastSeen(tx, run.id, occurredAt);
       }
 
       // 旧 block_rev 不得覆盖新内容:直接丢弃,不做内容拼接猜测(02 §3.2)
-      if (blockId !== null && blockRev < maxBlockRev(db, run.id, blockId)) {
+      if (blockId !== null && blockRev < (await maxBlockRev(tx, run.id, blockId))) {
         return { runId: run.id, eventId: null, startedRun, staleRev: true };
       }
 
       const eventId = newEventId();
-      insertTimelineEvent(db, {
+      await insertTimelineEvent(tx, {
         id: eventId,
         runId: run.id,
         turnId,
@@ -149,17 +149,17 @@ export function createRunService(deps: RunServiceDeps): RunService {
     });
   }
 
-  function endStream(agentId: string, streamId: string, endedAt?: number): string | null {
-    const run = findRunningRunForStream(db, agentId, streamId);
+  async function endStream(agentId: string, streamId: string, endedAt?: number): Promise<string | null> {
+    const run = await findRunningRunForStream(db, agentId, streamId);
     if (run === undefined) {
       return null;
     }
     const at = Math.max(run.lastSeenAt, endedAt ?? now());
-    endRun(db, run.id, at);
+    await endRun(db, run.id, at);
     return run.id;
   }
 
-  function bindTask(runId: string, taskId: string): boolean {
+  async function bindTask(runId: string, taskId: string): Promise<boolean> {
     return bindRunTaskIfEmpty(
       db,
       requireText(runId, "runId"),

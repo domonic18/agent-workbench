@@ -44,7 +44,7 @@ import type {
   A2aServiceDeps,
 } from "./types.js";
 
-export function createA2aService(deps: A2aServiceDeps): Promise<A2aService>{
+export function createA2aService(deps: A2aServiceDeps): A2aService {
   const { db } = deps;
   const now = deps.now ?? Date.now;
   const newMsgId = deps.newMsgId ?? (() => newPrefixedId("msg"));
@@ -88,9 +88,14 @@ export function createA2aService(deps: A2aServiceDeps): Promise<A2aService>{
     });
   }
 
-  async function resolveThread(input: A2aSendInput, sender: AgentRecord, at: number): Promise<A2aThreadRecord> {
+  async function resolveThread(
+    tx: typeof db,
+    input: A2aSendInput,
+    sender: AgentRecord,
+    at: number,
+  ): Promise<A2aThreadRecord> {
     if (input.threadId !== undefined) {
-      const thread = await findThreadById(db, input.threadId);
+      const thread = await findThreadById(tx, input.threadId);
       if (thread === undefined) {
         throw new A2aError("NOT_FOUND", `线程 ${input.threadId} 不存在`);
       }
@@ -104,7 +109,7 @@ export function createA2aService(deps: A2aServiceDeps): Promise<A2aService>{
       }
       return thread;
     }
-    const existing = await findThreadByInitiator(db, input.taskId, input.to);
+    const existing = await findThreadByInitiator(tx, input.taskId, input.to);
     if (existing !== undefined) {
       return existing;
     }
@@ -115,7 +120,7 @@ export function createA2aService(deps: A2aServiceDeps): Promise<A2aService>{
       responderAgent: input.to,
       createdAt: at,
     };
-    insertThread(db, thread);
+    await insertThread(tx, thread);
     return thread;
   }
 
@@ -164,16 +169,16 @@ export function createA2aService(deps: A2aServiceDeps): Promise<A2aService>{
     const at = now();
     const msgId = newMsgId();
 
-    const result = await db.transaction(async (): Promise<A2aSendResult> => {
-      const thread = await resolveThread(input, sender, at);
+    const result = await db.transaction(async (tx): Promise<A2aSendResult> => {
+      const thread = await resolveThread(tx, input, sender, at);
       if (input.replyToMsgId !== undefined) {
-        const referenced = await findMessageById(db, input.replyToMsgId);
+        const referenced = await findMessageById(tx, input.replyToMsgId);
         if (referenced === undefined || referenced.threadId !== thread.id) {
           throw new A2aError("VALIDATION_FAILED", "reply_to 必须是同一线程内的消息");
         }
       }
-      const round = (await maxRound(db, thread.id)) + 1;
-      await insertMessage(db, {
+      const round = (await maxRound(tx, thread.id)) + 1;
+      await insertMessage(tx, {
         id: msgId,
         threadId: thread.id,
         taskId: input.taskId,
@@ -189,11 +194,11 @@ export function createA2aService(deps: A2aServiceDeps): Promise<A2aService>{
         authTicket: input.authTicketId,
         createdAt: at,
       });
-      const row = await findMessageById(db, msgId);
+      const row = await findMessageById(tx, msgId);
       if (row === undefined) {
         throw new Error(`A2A 消息落库后读不到: ${msgId}`);
       }
-      const outbox = enqueuePull(db, {
+      const outbox = await enqueuePull(tx, {
         idempotencyKey: input.idempotencyKey,
         kind: "a2a_message",
         taskId: input.taskId,
@@ -262,8 +267,8 @@ export function createA2aService(deps: A2aServiceDeps): Promise<A2aService>{
 
   async function ack(agentId: string, msgId: string, input: A2aAckInput = {}): Promise<TaskRecord[]> {
     const at = now();
-    return db.transaction(async () => {
-      const message = await findMessageById(db, msgId);
+    return db.transaction(async (tx): Promise<TaskRecord[]> => {
+      const message = await findMessageById(tx, msgId);
       if (message === undefined) {
         throw new A2aError("NOT_FOUND", `消息 ${msgId} 不存在`);
       }
@@ -274,7 +279,7 @@ export function createA2aService(deps: A2aServiceDeps): Promise<A2aService>{
         return [];
       }
       // 已进死信说明发起方已收到「重新发起」回执,迟到的 ACK 不能再改写结果
-      if ((await findDeadLetterByMsgId(db, msgId)) !== undefined) {
+      if ((await findDeadLetterByMsgId(tx, msgId)) !== undefined) {
         throw new A2aError("CONFLICT", "消息已过期进入死信,请由发起方重新发送");
       }
       if (message.intent === "request" || message.intent === "escalate") {
@@ -285,17 +290,17 @@ export function createA2aService(deps: A2aServiceDeps): Promise<A2aService>{
             "ACK request/escalate 必须携带自己承接的 task_id",
           );
         }
-        const downstream = await findTaskSummary(db, taskId);
+        const downstream = await findTaskSummary(tx, taskId);
         if (downstream === undefined) {
           throw new A2aError("NOT_FOUND", `下游任务 ${taskId} 不存在`);
         }
         if (downstream.assignee !== agentId) {
           throw new A2aError("FORBIDDEN", "下游任务不属于当前 Agent");
         }
-        const currentParent = findTaskParent(db, taskId);
+        const currentParent = await findTaskParent(tx, taskId);
         if (currentParent === null) {
-          if (setTaskParentIfEmpty(db, taskId, message.taskId, at)) {
-            appendTaskEvent(db, {
+          if (await setTaskParentIfEmpty(tx, taskId, message.taskId, at)) {
+            await appendTaskEvent(tx, {
               id: newTaskEventId(),
               taskId,
               kind: "handoff",
@@ -311,11 +316,11 @@ export function createA2aService(deps: A2aServiceDeps): Promise<A2aService>{
           throw new A2aError("CONFLICT", "下游任务已挂在另一条链路上,不能改写");
         }
       }
-      markAck(db, msgId, at);
-      markDeliveredByMsgId(db, msgId);
+      await markAck(tx, msgId, at);
+      await markDeliveredByMsgId(tx, msgId);
       // 回执确认可能补齐收口条件(下游全部终态+回执已确认),沿 parent 链收口(2026-11-02 裁决);
       // request/escalate 的 ack 走到这也是空操作(根任务无 parent 或子任务未终态)
-      return closeAncestorsIfComplete(db, message.taskId, at);
+      return closeAncestorsIfComplete(tx, message.taskId, at);
     });
   }
 

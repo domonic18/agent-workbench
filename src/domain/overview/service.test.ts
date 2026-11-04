@@ -5,7 +5,6 @@ import {
 } from "../../shared/constants.js";
 import { OVERVIEW_SCOPE } from "../../shared/scopes.js";
 import { openDatabase, type Db } from "../../store/database.js";
-import { runMigrations } from "../../store/migrator.js";
 import { insertCapability } from "../../store/repositories/capability.js";
 import { insertAgent, insertMachine } from "../../store/repositories/identity.js";
 import { currentRevision } from "../../store/repositories/revision.js";
@@ -20,8 +19,8 @@ import { createOverviewService, heartbeatState, startOfLocalDay } from "./servic
 
 const AT = 1_700_000_000_000;
 
-function addMachine(db: Db, id: string, lastSeenAt: number | null): void {
-  insertMachine(db, {
+async function addMachine(db: Db, id: string, lastSeenAt: number | null): Promise<void> {
+  await insertMachine(db, {
     id,
     hostname: `${id}.example.com`,
     os: "darwin",
@@ -34,8 +33,8 @@ function addMachine(db: Db, id: string, lastSeenAt: number | null): void {
   }
 }
 
-function addAgent(db: Db, id: string, machineId: string, disabled = false): void {
-  insertAgent(db, {
+async function addAgent(db: Db, id: string, machineId: string, disabled = false): Promise<void> {
+  await insertAgent(db, {
     id,
     machineId,
     project: `p-${id}`,
@@ -50,8 +49,8 @@ function addAgent(db: Db, id: string, machineId: string, disabled = false): void
   }
 }
 
-function addTask(db: Db, id: string, status: "running" | "done"): void {
-  insertTask(db, {
+async function addTask(db: Db, id: string, status: "running" | "done"): Promise<void> {
+  await insertTask(db, {
     id,
     title: id,
     assigner: "human",
@@ -63,7 +62,7 @@ function addTask(db: Db, id: string, status: "running" | "done"): void {
     output: null,
     createdAt: AT,
   });
-  const applied = updateTask(db, {
+  const applied = await updateTask(db, {
     id,
     fromStage: "intake",
     fromStatus: "pending",
@@ -79,15 +78,15 @@ function addTask(db: Db, id: string, status: "running" | "done"): void {
   expect(applied).toBe(true);
 }
 
-function addRun(
+async function addRun(
   db: Db,
   id: string,
   agentId: string,
   machineId: string,
   lastSeenAt: number,
   taskId?: string,
-): void {
-  insertRun(db, {
+): Promise<void> {
+  await insertRun(db, {
     id,
     agentId,
     machine: machineId,
@@ -97,11 +96,11 @@ function addRun(
   });
   await db.run("UPDATE agent_run SET last_seen_at = ? WHERE id = ?", lastSeenAt, id);
   if (taskId !== undefined) {
-    expect(bindRunTaskIfEmpty(db, id, taskId)).toBe(true);
+    expect(await bindRunTaskIfEmpty(db, id, taskId)).toBe(true);
   }
 }
 
-function addTokens(
+async function addTokens(
   db: Db,
   id: string,
   agentId: string,
@@ -109,8 +108,8 @@ function addTokens(
   taskId: string | null,
   occurredAt: number,
   total: number,
-): void {
-  insertTokenUsage(db, {
+): Promise<void> {
+  await insertTokenUsage(db, {
     id,
     agentId,
     taskId,
@@ -131,33 +130,32 @@ function addTokens(
 describe("overview 服务", () => {
   let db: Db;
 
-  beforeEach(() => {
-    db = openDatabase(":memory:");
-    runMigrations(db);
+  beforeEach(async () => {
+    db = await openDatabase();
 
-    addMachine(db, "m-ok", AT - 60_000);
-    addMachine(db, "m-timeout", AT - MACHINE_HEARTBEAT.timeoutMs - 1);
-    addMachine(db, "m-offline", AT - MACHINE_HEARTBEAT.offlineMs - 1);
-    addMachine(db, "m-unknown", null);
+    await addMachine(db, "m-ok", AT - 60_000);
+    await addMachine(db, "m-timeout", AT - MACHINE_HEARTBEAT.timeoutMs - 1);
+    await addMachine(db, "m-offline", AT - MACHINE_HEARTBEAT.offlineMs - 1);
+    await addMachine(db, "m-unknown", null);
 
-    addAgent(db, "a-ok", "m-ok");
-    addAgent(db, "a-timeout", "m-timeout");
-    addAgent(db, "a-offline", "m-offline");
-    addAgent(db, "a-unknown", "m-unknown");
-    addAgent(db, "a-disabled", "m-ok", true);
+    await addAgent(db, "a-ok", "m-ok");
+    await addAgent(db, "a-timeout", "m-timeout");
+    await addAgent(db, "a-offline", "m-offline");
+    await addAgent(db, "a-unknown", "m-unknown");
+    await addAgent(db, "a-disabled", "m-ok", true);
 
-    addTask(db, "t1", "running");
-    addTask(db, "t2", "running");
-    addTask(db, "t3", "done");
+    await addTask(db, "t1", "running");
+    await addTask(db, "t2", "running");
+    await addTask(db, "t3", "done");
 
-    addRun(db, "r-ok", "a-ok", "m-ok", AT - 60_000, "t1");
-    addRun(db, "r-timeout", "a-timeout", "m-timeout", AT - 10 * 60_000, "t2");
-    addRun(db, "r-offline", "a-offline", "m-offline", AT - RUN_IDLE_GAP_MS - 1, "t3");
-    addRun(db, "r-disabled", "a-disabled", "m-ok", AT - 60_000);
+    await addRun(db, "r-ok", "a-ok", "m-ok", AT - 60_000, "t1");
+    await addRun(db, "r-timeout", "a-timeout", "m-timeout", AT - 10 * 60_000, "t2");
+    await addRun(db, "r-offline", "a-offline", "m-offline", AT - RUN_IDLE_GAP_MS - 1, "t3");
+    await addRun(db, "r-disabled", "a-disabled", "m-ok", AT - 60_000);
 
-    addTokens(db, "tu-1", "a-ok", "r-ok", "t1", AT - 60 * 60_000, 165);
-    addTokens(db, "tu-2", "a-timeout", "r-timeout", "t2", AT - 2 * 60 * 60_000, 7);
-    addTokens(
+    await addTokens(db, "tu-1", "a-ok", "r-ok", "t1", AT - 60 * 60_000, 165);
+    await addTokens(db, "tu-2", "a-timeout", "r-timeout", "t2", AT - 2 * 60 * 60_000, 7);
+    await addTokens(
       db,
       "tu-3",
       "a-offline",
@@ -167,7 +165,7 @@ describe("overview 服务", () => {
       999,
     );
 
-    insertCapability(db, {
+    await insertCapability(db, {
       id: "c1",
       subject: "a-ok",
       target: "db.prod",
@@ -177,7 +175,7 @@ describe("overview 服务", () => {
       taskId: "t1",
       createdAt: AT,
     });
-    insertCapability(db, {
+    await insertCapability(db, {
       id: "c2",
       subject: "a-ok",
       target: "db.prod",
@@ -187,7 +185,7 @@ describe("overview 服务", () => {
       taskId: "t2",
       createdAt: AT,
     });
-    insertCapability(db, {
+    await insertCapability(db, {
       id: "c3",
       subject: "a-ok",
       target: "db.prod",
@@ -200,13 +198,13 @@ describe("overview 服务", () => {
     await db.run("UPDATE capability SET status = 'active' WHERE id = 'c3'");
   });
 
-  afterEach(() => {
-    db.close();
+  afterEach(async () => {
+    await db.close();
   });
 
-  it("五项指标与 Agent 列表共用同一时间窗口", () => {
+  it("五项指标与 Agent 列表共用同一时间窗口", async () => {
     const service = createOverviewService({ db, now: () => AT });
-    const snapshot = service.get();
+    const snapshot = await service.get();
 
     expect(snapshot.generatedAt).toBe(AT);
     expect(snapshot.todayStart).toBe(startOfLocalDay(AT));
@@ -218,13 +216,13 @@ describe("overview 服务", () => {
       // m-timeout 与 m-offline 都超过 5 分钟;m-unknown 从未上报,不计入
       heartbeatTimeouts: 2,
     });
-    expect(snapshot.revision).toBe(currentRevision(db, OVERVIEW_SCOPE));
+    expect(snapshot.revision).toBe(await currentRevision(db, OVERVIEW_SCOPE));
     expect(snapshot.revision).toBeGreaterThan(0);
   });
 
-  it("一行一 Agent:运行中置前,停用 Agent 不出现", () => {
+  it("一行一 Agent:运行中置前,停用 Agent 不出现", async () => {
     const service = createOverviewService({ db, now: () => AT });
-    const agents = service.get().agents;
+    const agents = (await service.get()).agents;
 
     expect(agents.map((agent) => agent.id)).toEqual([
       "a-ok",
@@ -265,10 +263,10 @@ describe("overview 服务", () => {
     });
   });
 
-  it("无任务归属时带出当前 run 最近一条用户指令并压平空白", () => {
-    addMachine(db, "m-live", AT - 60_000);
-    addAgent(db, "a-live", "m-live");
-    addRun(db, "r-live", "a-live", "m-live", AT - 60_000);
+  it("无任务归属时带出当前 run 最近一条用户指令并压平空白", async () => {
+    await addMachine(db, "m-live", AT - 60_000);
+    await addAgent(db, "a-live", "m-live");
+    await addRun(db, "r-live", "a-live", "m-live", AT - 60_000);
     const base = {
       runId: "r-live",
       turnId: "turn-live",
@@ -276,7 +274,7 @@ describe("overview 服务", () => {
       blockRev: 1,
       offset: null,
     };
-    insertTimelineEvent(db, {
+    await insertTimelineEvent(db, {
       ...base,
       id: "tle-old",
       ord: 1,
@@ -284,7 +282,7 @@ describe("overview 服务", () => {
       payload: { text: "更早的指令" },
       occurredAt: AT - 50_000,
     });
-    insertTimelineEvent(db, {
+    await insertTimelineEvent(db, {
       ...base,
       id: "tle-new",
       ord: 2,
@@ -292,7 +290,7 @@ describe("overview 服务", () => {
       payload: { text: "  先看一下\n\n发件箱的重试策略  " },
       occurredAt: AT - 30_000,
     });
-    insertTimelineEvent(db, {
+    await insertTimelineEvent(db, {
       ...base,
       id: "tle-reply",
       ord: 3,
@@ -301,7 +299,7 @@ describe("overview 服务", () => {
       occurredAt: AT - 20_000,
     });
     // 运行时注入的尖括号块也走 user_message,但不算人的指令
-    insertTimelineEvent(db, {
+    await insertTimelineEvent(db, {
       ...base,
       id: "tle-injected",
       ord: 4,
@@ -310,7 +308,7 @@ describe("overview 服务", () => {
       occurredAt: AT - 10_000,
     });
 
-    const agents = createOverviewService({ db, now: () => AT }).get().agents;
+    const agents = (await createOverviewService({ db, now: () => AT }).get()).agents;
     expect(agents.find((agent) => agent.id === "a-live")).toMatchObject({
       running: true,
       currentTaskId: null,

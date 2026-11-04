@@ -31,10 +31,10 @@ export interface KnowledgeIndexService {
 
 export function createKnowledgeIndexService(
   options: KnowledgeIndexServiceOptions,
-): Promise<KnowledgeIndexService>{
+): KnowledgeIndexService {
   return {
     async reindexEntry(id) {
-      const entry = findKnowledgeEntry(options.db, id);
+      const entry = await findKnowledgeEntry(options.db, id);
       if (entry === undefined || entry.deletedAt !== null) {
         throw new KnowledgeEntryNotFoundError(id);
       }

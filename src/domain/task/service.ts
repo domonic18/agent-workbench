@@ -120,7 +120,7 @@ function eventsForStatusChange(to: TaskStatus): "blocked" | "resumed" | "complet
   return null;
 }
 
-export function createTaskService(deps: TaskServiceDeps): Promise<TaskService>{
+export function createTaskService(deps: TaskServiceDeps): TaskService {
   const { db } = deps;
   const now = deps.now ?? Date.now;
   const newTaskId = deps.newTaskId ?? (() => newPrefixedId("tsk"));
@@ -130,10 +130,10 @@ export function createTaskService(deps: TaskServiceDeps): Promise<TaskService>{
    * 「谁干活谁建单」落到具体 run:只认调用方最近活跃、尚未归属任务的 run。
    * 找不到活动 run(或已有归属)时静默跳过,不影响任务本身落库。
    */
-  function bindActiveRun(agentId: string, taskId: string, at: number): void {
-    const run = findLatestUnboundRunningRunByAgent(db, agentId, at - RUN_IDLE_GAP_MS);
+  async function bindActiveRun(handle: Db, agentId: string, taskId: string, at: number): Promise<void> {
+    const run = await findLatestUnboundRunningRunByAgent(handle, agentId, at - RUN_IDLE_GAP_MS);
     if (run !== undefined) {
-      bindRunTaskIfEmpty(db, run.id, taskId);
+      await bindRunTaskIfEmpty(handle, run.id, taskId);
     }
   }
 
@@ -161,8 +161,8 @@ export function createTaskService(deps: TaskServiceDeps): Promise<TaskService>{
 
     const id = newTaskId();
     const at = now();
-    await db.transaction(async () => {
-      await insertTask(db, {
+    await db.transaction(async (tx) => {
+      await insertTask(tx, {
         id,
         title,
         assigner,
@@ -174,7 +174,7 @@ export function createTaskService(deps: TaskServiceDeps): Promise<TaskService>{
         output,
         createdAt: at,
       });
-      await appendTaskEvent(db, {
+      await appendTaskEvent(tx, {
         id: newEventId(),
         taskId: id,
         kind: "created",
@@ -182,7 +182,7 @@ export function createTaskService(deps: TaskServiceDeps): Promise<TaskService>{
         occurredAt: at,
       });
       if (parentTaskId !== null) {
-        await appendTaskEvent(db, {
+        await appendTaskEvent(tx, {
           id: newEventId(),
           taskId: id,
           kind: "handoff",
@@ -190,7 +190,7 @@ export function createTaskService(deps: TaskServiceDeps): Promise<TaskService>{
           occurredAt: at,
         });
       }
-      await bindActiveRun(assignee, id, at);
+      await bindActiveRun(tx, assignee, id, at);
     });
 
     const created = await findTaskById(db, id);
@@ -244,8 +244,8 @@ export function createTaskService(deps: TaskServiceDeps): Promise<TaskService>{
     const endedAt =
       nextStatus === "done" || nextStatus === "cancelled" ? (task.endedAt ?? at) : task.endedAt;
 
-    const autoClosed: TaskRecord[] = await db.transaction(async () => {
-      const applied = await updateTask(db, {
+    const autoClosed: TaskRecord[] = await db.transaction(async (tx) => {
+      const applied = await updateTask(tx, {
         id: task.id,
         fromStage: task.stage,
         fromStatus: task.status,
@@ -262,7 +262,7 @@ export function createTaskService(deps: TaskServiceDeps): Promise<TaskService>{
         throw new TaskError("CONFLICT", "任务已被并发修改,请重读后再试");
       }
       if (stageChanged) {
-        await appendTaskEvent(db, {
+        await appendTaskEvent(tx, {
           id: newEventId(),
           taskId: task.id,
           kind: "stage_changed",
@@ -271,7 +271,7 @@ export function createTaskService(deps: TaskServiceDeps): Promise<TaskService>{
         });
       }
       if (rework) {
-        await appendTaskEvent(db, {
+        await appendTaskEvent(tx, {
           id: newEventId(),
           taskId: task.id,
           kind: "rework",
@@ -281,7 +281,7 @@ export function createTaskService(deps: TaskServiceDeps): Promise<TaskService>{
       } else if (statusChanged) {
         const kind = eventsForStatusChange(nextStatus);
         if (kind !== null) {
-          appendTaskEvent(db, {
+          await appendTaskEvent(tx, {
             id: newEventId(),
             taskId: task.id,
             kind,
@@ -297,11 +297,11 @@ export function createTaskService(deps: TaskServiceDeps): Promise<TaskService>{
       }
       // 续接 / 返工可能换了新 run:未收尾的任务同样补一次绑定
       if (nextStatus !== "done" && nextStatus !== "cancelled") {
-        bindActiveRun(task.assignee, task.id, at);
+        await bindActiveRun(tx, task.assignee, task.id, at);
       }
       // 下游落终态后沿 parent 链自动收口(2026-11-02 裁决):验收 = 回执确认,系统代关单
       return nextStatus === "done" || nextStatus === "cancelled"
-        ? closeAncestorsIfComplete(db, task.id, at)
+        ? closeAncestorsIfComplete(tx, task.id, at)
         : [];
     });
 

@@ -60,10 +60,16 @@ export function createAuditReconciler(deps: AuditReconcilerDeps): AuditReconcile
       }
 
       let inserted = 0;
+      const writes: Promise<boolean>[] = [];
       const add = (gap: Omit<NewAuditGap, "detectedAt">): void => {
-        void insertGap(db, { ...gap, detectedAt: at }).then((ok) => {
-          if (ok) { inserted += 1; }
-        });
+        writes.push(
+          insertGap(db, { ...gap, detectedAt: at }).then((ok) => {
+            if (ok) {
+              inserted += 1;
+            }
+            return ok;
+          }),
+        );
       };
 
       const rows = await findToolCallsWithCapability(db, { since: at - WINDOW_MS });
@@ -130,6 +136,8 @@ export function createAuditReconciler(deps: AuditReconcilerDeps): AuditReconcile
           detail: { user: event.user, login: event.login, time: event.time },
         });
       }
+      // 缺口全部落库后再返回:调用方据此断言计数与留档
+      await Promise.all(writes);
 
       return { scanned: rows.length, sessions: events.length, inserted };
     },

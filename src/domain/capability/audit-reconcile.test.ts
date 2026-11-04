@@ -1,16 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { SessionStartEvent, TeleportAuditAdapter } from "../../adapters/teleport/audit.js";
 import { openDatabase, type Db } from "../../store/database.js";
-import { runMigrations } from "../../store/migrator.js";
 import { listGaps } from "../../store/repositories/audit-reconcile.js";
 import { insertToolCallLog } from "../../store/repositories/tool-call-log.js";
 import { createAuditReconciler } from "./audit-reconcile.js";
 
 const NOW = 1_000_000;
 
-function prepare(): Db {
-  const db = openDatabase(":memory:");
-  runMigrations(db);
+async function prepare(): Promise<Db> {
+  const db = await openDatabase();
   await db.run(
     `INSERT INTO task
        (id, title, assigner, assignee, project, stage, status, origin, created_at, updated_at)
@@ -19,16 +17,18 @@ function prepare(): Db {
   return db;
 }
 
-function seedCapability(db: Db, id: string, ticketId: string, taskId = "T-1"): void {
+async function seedCapability(db: Db, id: string, ticketId: string, taskId = "T-1"): Promise<void> {
   await db.run(
     `INSERT INTO capability
        (id, subject, target, action, scope_json, ttl_seconds, status, ticket_id, task_id,
         issued_at, expires_at, created_at, updated_at)
-     VALUES (?, 'agent:x', 'db:prod', 'read', '{}', 900, 'active', ?, ?, 0, 0, 0, 0)`,  id, ticketId, taskId);
+     VALUES (?, 'agent:x', 'db:prod', 'read', '{}', 900, 'active', ?, ?, 0, 0, 0, 0)`,
+    id, ticketId, taskId,
+  );
 }
 
-function seedCall(db: Db, capabilityId: string, taskId = "T-1"): void {
-  insertToolCallLog(db, {
+async function seedCall(db: Db, capabilityId: string, taskId = "T-1"): Promise<void> {
+  await insertToolCallLog(db, {
     runId: "run_1",
     agentId: "agt_1",
     taskId,
@@ -61,9 +61,9 @@ function session(ticketId: string, taskId: string, sid: string): SessionStartEve
 
 describe("审计对账", () => {
   it("会话与票据、任务都对得上时不记缺口", async () => {
-    const db = prepare();
-    seedCapability(db, "cap_1", "tkt_1");
-    seedCall(db, "cap_1");
+    const db = await prepare();
+    await seedCapability(db, "cap_1", "tkt_1");
+    await seedCall(db, "cap_1");
     const reconciler = createAuditReconciler({
       db,
       teleportAudit: adapter([session("tkt_1", "T-1", "sid_1")]),
@@ -72,26 +72,26 @@ describe("审计对账", () => {
 
     const result = await reconciler.reconcile();
     expect(result).toEqual({ scanned: 1, sessions: 1, inserted: 0 });
-    expect(listGaps(db, { limit: 10 })).toHaveLength(0);
-    db.close();
+    expect(await listGaps(db, { limit: 10 })).toHaveLength(0);
+    await db.close();
   });
 
   it("Teleport 无对应会话时记 missing_session", async () => {
-    const db = prepare();
-    seedCapability(db, "cap_1", "tkt_1");
-    seedCall(db, "cap_1");
+    const db = await prepare();
+    await seedCapability(db, "cap_1", "tkt_1");
+    await seedCall(db, "cap_1");
     const reconciler = createAuditReconciler({ db, teleportAudit: adapter([]), now: () => NOW });
 
     expect((await reconciler.reconcile()).inserted).toBe(1);
-    const [gap] = listGaps(db, { limit: 10 });
+    const [gap] = await listGaps(db, { limit: 10 });
     expect(gap).toMatchObject({ kind: "missing_session", ticketId: "tkt_1", taskId: "T-1" });
-    db.close();
+    await db.close();
   });
 
   it("会话 ticket 对上但 task 对不上时记 ticket_mismatch", async () => {
-    const db = prepare();
-    seedCapability(db, "cap_1", "tkt_1");
-    seedCall(db, "cap_1");
+    const db = await prepare();
+    await seedCapability(db, "cap_1", "tkt_1");
+    await seedCall(db, "cap_1");
     const reconciler = createAuditReconciler({
       db,
       teleportAudit: adapter([session("tkt_1", "T-OTHER", "sid_1")]),
@@ -99,13 +99,13 @@ describe("审计对账", () => {
     });
 
     expect((await reconciler.reconcile()).inserted).toBe(1);
-    const [gap] = listGaps(db, { limit: 10 });
+    const [gap] = await listGaps(db, { limit: 10 });
     expect(gap).toMatchObject({ kind: "ticket_mismatch", ticketId: "tkt_1", sid: "sid_1" });
-    db.close();
+    await db.close();
   });
 
   it("Teleport 有会话但库里查不到票据时记 orphan_session", async () => {
-    const db = prepare();
+    const db = await prepare();
     const reconciler = createAuditReconciler({
       db,
       teleportAudit: adapter([session("tkt_orphan", "T-9", "sid_9")]),
@@ -113,20 +113,20 @@ describe("审计对账", () => {
     });
 
     expect((await reconciler.reconcile()).inserted).toBe(1);
-    const [gap] = listGaps(db, { limit: 10 });
+    const [gap] = await listGaps(db, { limit: 10 });
     expect(gap).toMatchObject({ kind: "orphan_session", ticketId: "tkt_orphan", sid: "sid_9" });
-    db.close();
+    await db.close();
   });
 
   it("重跑同一批数据不重复记缺口", async () => {
-    const db = prepare();
-    seedCapability(db, "cap_1", "tkt_1");
-    seedCall(db, "cap_1");
+    const db = await prepare();
+    await seedCapability(db, "cap_1", "tkt_1");
+    await seedCall(db, "cap_1");
     const reconciler = createAuditReconciler({ db, teleportAudit: adapter([]), now: () => NOW });
 
     expect((await reconciler.reconcile()).inserted).toBe(1);
     expect((await reconciler.reconcile()).inserted).toBe(0);
-    expect(listGaps(db, { limit: 10 })).toHaveLength(1);
-    db.close();
+    expect(await listGaps(db, { limit: 10 })).toHaveLength(1);
+    await db.close();
   });
 });

@@ -35,7 +35,7 @@ export interface EnqueuePullInput {
 }
 
 /** 入队一条飞书推送(notification 类,失败只重试);同幂等键只保留首条 */
-export function enqueuePush(db: Db, input: EnqueuePushInput): Promise<OutboxRecord>{
+export async function enqueuePush(db: Db, input: EnqueuePushInput): Promise<OutboxRecord> {
   const payload: OutboxPushPayload = {
     chatId: input.chatId,
     ...(input.card === undefined ? {} : { card: input.card }),

@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { KNOWLEDGE_INDEX } from "../../shared/constants.js";
 import { openDatabase, type Db } from "../../store/database.js";
-import { runMigrations } from "../../store/migrator.js";
 import {
   findKnowledgeEntry,
   insertKnowledgeEntry,
@@ -25,16 +24,15 @@ interface Fixture {
   db: Db;
 }
 
-function openFixture(): Fixture {
+async function openFixture(): Promise<Fixture> {
   const dir = mkdtempSync(join(tmpdir(), "aw-knowledge-"));
   mkdirSync(join(dir, "notes"), { recursive: true });
-  const db = openDatabase(":memory:");
-  runMigrations(db);
+  const db = await openDatabase();
   return { dir, db };
 }
 
-function addEntry(db: Db, id: string, path: string): void {
-  insertKnowledgeEntry(db, {
+async function addEntry(db: Db, id: string, path: string): Promise<void> {
+  await insertKnowledgeEntry(db, {
     id,
     path,
     title: id,
@@ -58,14 +56,17 @@ function fakeEmbedding(): EmbeddingClient {
   };
 }
 
-function ftsHits(db: Db, term: string): number {
+async function keywordHits(db: Db, term: string): Promise<number> {
   return (
-    await db.get("SELECT COUNT(*) AS n FROM knowledge_fts WHERE knowledge_fts MATCH ?", `"${term}"`) as { n: number }
+    (await db.get(
+      "SELECT COUNT(*) AS n FROM knowledge_chunk WHERE content LIKE ?",
+      `%${term}%`,
+    )) as { n: number }
   ).n;
 }
 
-function vectorCount(db: Db): number {
-  return (await db.get("SELECT COUNT(*) AS n FROM knowledge_vec") as { n: number }).n;
+async function vectorCount(db: Db): Promise<number> {
+  return ((await db.get("SELECT COUNT(*) AS n FROM knowledge_vec")) as { n: number }).n;
 }
 
 function options(fixture: Fixture, embedding?: EmbeddingClient) {
@@ -77,80 +78,80 @@ function options(fixture: Fixture, embedding?: EmbeddingClient) {
 }
 
 describe("indexKnowledgeEntry", () => {
-  it("首次索引写入分块、FTS 与向量并标 ready", async () => {
-    const fixture = openFixture();
-    addEntry(fixture.db, "kb_1", "notes/deploy.md");
+  it("首次索引写入分块、关键词索引与向量并标 ready", async () => {
+    const fixture = await openFixture();
+    await addEntry(fixture.db, "kb_1", "notes/deploy.md");
     writeEntry(fixture.dir, "notes/deploy.md", "部署手册\n\n回滚步骤: 执行回滚");
 
-    const entry = findKnowledgeEntry(fixture.db, "kb_1");
+    const entry = await findKnowledgeEntry(fixture.db, "kb_1");
     if (entry === undefined) throw new Error("条目未落库");
     expect(await indexKnowledgeEntry(fixture.db, entry, options(fixture, fakeEmbedding()))).toBe(
       "ready",
     );
 
-    const updated = findKnowledgeEntry(fixture.db, "kb_1");
+    const updated = await findKnowledgeEntry(fixture.db, "kb_1");
     expect(updated?.embeddingStatus).toBe("ready");
     expect(updated?.contentHash).toMatch(/^[0-9a-f]{64}$/);
 
-    const chunks = listKnowledgeChunks(fixture.db, "kb_1");
+    const chunks = await listKnowledgeChunks(fixture.db, "kb_1");
     expect(chunks.length).toBeGreaterThan(0);
-    expect(ftsHits(fixture.db, "部署手册")).toBe(1);
-    expect(vectorCount(fixture.db)).toBe(chunks.length);
-    fixture.db.close();
+    expect(await keywordHits(fixture.db, "部署手册")).toBe(1);
+    expect(await vectorCount(fixture.db)).toBe(chunks.length);
+    await fixture.db.close();
   });
 
   it("内容未变时跳过且分块保持不变", async () => {
-    const fixture = openFixture();
-    addEntry(fixture.db, "kb_1", "notes/deploy.md");
+    const fixture = await openFixture();
+    await addEntry(fixture.db, "kb_1", "notes/deploy.md");
     writeEntry(fixture.dir, "notes/deploy.md", "部署手册");
     const embedding = fakeEmbedding();
 
-    const entry = findKnowledgeEntry(fixture.db, "kb_1");
+    const entry = await findKnowledgeEntry(fixture.db, "kb_1");
     if (entry === undefined) throw new Error("条目未落库");
     await indexKnowledgeEntry(fixture.db, entry, options(fixture, embedding));
-    const before = listKnowledgeChunkIds(fixture.db, "kb_1");
+    const before = await listKnowledgeChunkIds(fixture.db, "kb_1");
 
-    const again = findKnowledgeEntry(fixture.db, "kb_1");
+    const again = await findKnowledgeEntry(fixture.db, "kb_1");
     if (again === undefined) throw new Error("条目未落库");
     expect(await indexKnowledgeEntry(fixture.db, again, options(fixture, embedding))).toBe(
       "skipped",
     );
-    expect(listKnowledgeChunkIds(fixture.db, "kb_1")).toEqual(before);
-    fixture.db.close();
+    expect(await listKnowledgeChunkIds(fixture.db, "kb_1")).toEqual(before);
+    await fixture.db.close();
   });
 
   it("内容变更后替换分块,force 也能强制重建", async () => {
-    const fixture = openFixture();
-    addEntry(fixture.db, "kb_1", "notes/deploy.md");
+    const fixture = await openFixture();
+    await addEntry(fixture.db, "kb_1", "notes/deploy.md");
     writeEntry(fixture.dir, "notes/deploy.md", "部署手册");
     const embedding = fakeEmbedding();
 
-    const first = findKnowledgeEntry(fixture.db, "kb_1");
+    const first = await findKnowledgeEntry(fixture.db, "kb_1");
     if (first === undefined) throw new Error("条目未落库");
     await indexKnowledgeEntry(fixture.db, first, options(fixture, embedding));
-    const before = listKnowledgeChunkIds(fixture.db, "kb_1");
+    const before = await listKnowledgeChunkIds(fixture.db, "kb_1");
 
     writeEntry(fixture.dir, "notes/deploy.md", "回滚步骤");
-    const changed = findKnowledgeEntry(fixture.db, "kb_1");
+    const changed = await findKnowledgeEntry(fixture.db, "kb_1");
     if (changed === undefined) throw new Error("条目未落库");
     expect(await indexKnowledgeEntry(fixture.db, changed, options(fixture, embedding))).toBe(
       "ready",
     );
-    expect(listKnowledgeChunkIds(fixture.db, "kb_1")).not.toEqual(before);
-    expect(ftsHits(fixture.db, "回滚步骤")).toBe(1);
-    expect(ftsHits(fixture.db, "部署手册")).toBe(0);
+    expect(await listKnowledgeChunkIds(fixture.db, "kb_1")).not.toEqual(before);
+    expect(await keywordHits(fixture.db, "回滚步骤")).toBe(1);
+    expect(await keywordHits(fixture.db, "部署手册")).toBe(0);
 
-    const forced = findKnowledgeEntry(fixture.db, "kb_1");
+    const forced = await findKnowledgeEntry(fixture.db, "kb_1");
     if (forced === undefined) throw new Error("条目未落库");
     expect(
       await indexKnowledgeEntry(fixture.db, forced, { ...options(fixture, embedding), force: true }),
     ).toBe("ready");
-    fixture.db.close();
+    await fixture.db.close();
   });
 
   it("嵌入失败仍保留关键词索引并标 failed", async () => {
-    const fixture = openFixture();
-    addEntry(fixture.db, "kb_1", "notes/deploy.md");
+    const fixture = await openFixture();
+    await addEntry(fixture.db, "kb_1", "notes/deploy.md");
     writeEntry(fixture.dir, "notes/deploy.md", "部署手册");
     const broken: EmbeddingClient = {
       embed: async () => {
@@ -158,39 +159,38 @@ describe("indexKnowledgeEntry", () => {
       },
     };
 
-    const entry = findKnowledgeEntry(fixture.db, "kb_1");
+    const entry = await findKnowledgeEntry(fixture.db, "kb_1");
     if (entry === undefined) throw new Error("条目未落库");
     expect(await indexKnowledgeEntry(fixture.db, entry, options(fixture, broken))).toBe("failed");
 
-    expect(findKnowledgeEntry(fixture.db, "kb_1")?.embeddingStatus).toBe("failed");
-    expect(ftsHits(fixture.db, "部署手册")).toBe(1);
-    expect(
-      await fixture.db.get("SELECT name FROM sqlite_master WHERE name = 'knowledge_vec'"),
-    ).toBeUndefined();
-    fixture.db.close();
+    expect((await findKnowledgeEntry(fixture.db, "kb_1"))?.embeddingStatus).toBe("failed");
+    expect(await keywordHits(fixture.db, "部署手册")).toBe(1);
+    // 向量表常驻(pgvector 由迁移创建),失败路径下不写向量行
+    expect(await vectorCount(fixture.db)).toBe(0);
+    await fixture.db.close();
   });
 
   it("未配置嵌入时只建关键词索引并标 pending", async () => {
-    const fixture = openFixture();
-    addEntry(fixture.db, "kb_1", "notes/deploy.md");
+    const fixture = await openFixture();
+    await addEntry(fixture.db, "kb_1", "notes/deploy.md");
     writeEntry(fixture.dir, "notes/deploy.md", "部署手册");
 
-    const entry = findKnowledgeEntry(fixture.db, "kb_1");
+    const entry = await findKnowledgeEntry(fixture.db, "kb_1");
     if (entry === undefined) throw new Error("条目未落库");
     expect(await indexKnowledgeEntry(fixture.db, entry, options(fixture))).toBe("pending");
 
-    expect(findKnowledgeEntry(fixture.db, "kb_1")?.embeddingStatus).toBe("pending");
-    expect(ftsHits(fixture.db, "部署手册")).toBe(1);
-    fixture.db.close();
+    expect((await findKnowledgeEntry(fixture.db, "kb_1"))?.embeddingStatus).toBe("pending");
+    expect(await keywordHits(fixture.db, "部署手册")).toBe(1);
+    await fixture.db.close();
   });
 });
 
 describe("rebuildKnowledgeIndex", () => {
   it("统计缺失文件与越界路径,其余正常索引", async () => {
-    const fixture = openFixture();
-    addEntry(fixture.db, "kb_1", "notes/deploy.md");
-    addEntry(fixture.db, "kb_missing", "notes/gone.md");
-    addEntry(fixture.db, "kb_escape", "../outside.md");
+    const fixture = await openFixture();
+    await addEntry(fixture.db, "kb_1", "notes/deploy.md");
+    await addEntry(fixture.db, "kb_missing", "notes/gone.md");
+    await addEntry(fixture.db, "kb_escape", "../outside.md");
     writeEntry(fixture.dir, "notes/deploy.md", "部署手册");
 
     const result: KnowledgeRebuildResult = await rebuildKnowledgeIndex(
@@ -199,9 +199,9 @@ describe("rebuildKnowledgeIndex", () => {
     );
 
     expect(result).toEqual({ indexed: 1, skipped: 0, failed: 1, missing: 1 });
-    expect(findKnowledgeEntry(fixture.db, "kb_1")?.embeddingStatus).toBe("ready");
-    expect(findKnowledgeEntry(fixture.db, "kb_escape")?.embeddingStatus).toBe("failed");
-    expect(findKnowledgeEntry(fixture.db, "kb_missing")?.embeddingStatus).toBe("pending");
-    fixture.db.close();
+    expect((await findKnowledgeEntry(fixture.db, "kb_1"))?.embeddingStatus).toBe("ready");
+    expect((await findKnowledgeEntry(fixture.db, "kb_escape"))?.embeddingStatus).toBe("failed");
+    expect((await findKnowledgeEntry(fixture.db, "kb_missing"))?.embeddingStatus).toBe("pending");
+    await fixture.db.close();
   });
 });

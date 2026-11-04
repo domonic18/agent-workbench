@@ -37,23 +37,23 @@ export interface DeadLetterSweepResult {
  * 回执是同线程的 notify 消息,由「收件方」发回「发起方」,走信箱拉取送达。
  * 以出箱 CAS 做幂等:已 delivered 的 ACK 先到则本轮跳过,不自动重发。
  */
-export function sweepDeadLetters(deps: DeadLetterSweepDeps): DeadLetterSweepResult {
+export async function sweepDeadLetters(deps: DeadLetterSweepDeps): Promise<DeadLetterSweepResult> {
   const { db } = deps;
   const now = deps.now ?? Date.now;
   const newMsgId = deps.newMsgId ?? (() => newPrefixedId("msg"));
   const newDeadLetterId = deps.newDeadLetterId ?? (() => newPrefixedId("dlq"));
   const at = now();
-  const expired = listExpiredUnacked(db, at, A2A_DEAD_LETTER.batchSize);
+  const expired = await listExpiredUnacked(db, at, A2A_DEAD_LETTER.batchSize);
 
   const senders = new Set<string>();
   let deadLettered = 0;
 
   for (const message of expired) {
-    const handled = db.transaction((): boolean => {
-      if (!markFailedByMsgId(db, message.id, DEAD_LETTER_REASON_EXPIRED)) {
+    const handled = await db.transaction(async (tx): Promise<boolean> => {
+      if (!(await markFailedByMsgId(tx, message.id, DEAD_LETTER_REASON_EXPIRED))) {
         return false;
       }
-      insertDeadLetter(db, {
+      await insertDeadLetter(tx, {
         id: newDeadLetterId(),
         msgId: message.id,
         fromAgent: message.fromAgent,
@@ -65,11 +65,11 @@ export function sweepDeadLetters(deps: DeadLetterSweepDeps): DeadLetterSweepResu
       });
 
       const receiptId = newMsgId();
-      insertMessage(db, {
+      await insertMessage(tx, {
         id: receiptId,
         threadId: message.threadId,
         taskId: message.taskId,
-        round: maxRound(db, message.threadId) + 1,
+        round: (await maxRound(tx, message.threadId)) + 1,
         replyToMsgId: message.id,
         fromAgent: message.toAgent,
         toAgent: message.fromAgent,
@@ -81,11 +81,11 @@ export function sweepDeadLetters(deps: DeadLetterSweepDeps): DeadLetterSweepResu
         authTicket: null,
         createdAt: at,
       });
-      const receipt = findMessageById(db, receiptId);
+      const receipt = await findMessageById(tx, receiptId);
       if (receipt === undefined) {
         throw new Error(`回执落库后读不到: ${receiptId}`);
       }
-      enqueuePull(db, {
+      await enqueuePull(tx, {
         idempotencyKey: `a2a_receipt:${message.id}`,
         kind: "a2a_message",
         taskId: message.taskId,

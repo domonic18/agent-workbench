@@ -38,7 +38,7 @@ function run(options: KnowledgeRebuilderOptions): Promise<KnowledgeRebuildResult
   return new Promise((resolve, reject) => {
     const worker = new Worker(resolveWorkerEntry(), {
       workerData: {
-        databasePath: options.databasePath,
+        databaseUrl: options.databaseUrl,
         knowledgeDir: options.knowledgeDir,
         ...(options.embedding === undefined ? {} : { embedding: options.embedding }),
       },

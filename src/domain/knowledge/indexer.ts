@@ -11,7 +11,6 @@ import {
 } from "../../store/repositories/knowledge.js";
 import {
   deleteKnowledgeVectors,
-  ensureKnowledgeVectorTable,
   insertKnowledgeVector,
 } from "../../store/repositories/knowledge-vector.js";
 import { splitMarkdown } from "./chunk.js";
@@ -49,7 +48,7 @@ async function embedChunks(
 }
 
 /**
- * 单条重建:先算哈希与嵌入(异步),再在一个事务内替换分块、FTS 与向量,
+ * 单条重建:先算哈希与嵌入(异步),再在一个事务内替换分块、关键词索引与向量,
  * 避免重建中途被检索读到半成品。嵌入失败仍写关键词索引并标 failed。
  */
 export async function indexKnowledgeEntry(
@@ -78,40 +77,35 @@ export async function indexKnowledgeEntry(
     }
   }
 
-  let usesVectors = vectors !== undefined || entry.embeddingStatus === "ready";
-  if (usesVectors) {
-    try {
-      ensureKnowledgeVectorTable(db);
-    } catch {
-      // 原生扩展不可用不拖垮关键词索引:本次退化为 pending,待修复后重建
-      vectors = undefined;
-      usesVectors = false;
-    }
-  }
-
   const status: KnowledgeEmbeddingStatus = embeddingFailed
     ? "failed"
     : vectors === undefined
       ? "pending"
       : "ready";
   const now = (options.now ?? Date.now)();
+  // 曾嵌入成功的条目即使本轮拿不到向量,也要先清旧向量,保持「状态=库里事实」一致
+  const usesVectors = vectors !== undefined || entry.embeddingStatus === "ready";
 
-  db.transaction(async () => {
-    const oldChunkIds = listKnowledgeChunkIds(db, entry.id);
-    deleteKnowledgeChunks(db, entry.id);
-    const newChunkIds = chunks.map((chunk, index) =>
-      insertKnowledgeChunk(db, entry.id, index, chunk),
-    );
-    if (usesVectors) {
-      deleteKnowledgeVectors(db, oldChunkIds);
-      vectors?.forEach((vector, index) => {
-        const chunkId = newChunkIds[index];
-        if (chunkId !== undefined) {
-          insertKnowledgeVector(db, chunkId, vector);
-        }
-      });
+  await db.transaction(async (tx) => {
+    const oldChunkIds = await listKnowledgeChunkIds(tx, entry.id);
+    await deleteKnowledgeChunks(tx, entry.id);
+    const newChunkIds: number[] = [];
+    for (let index = 0; index < chunks.length; index += 1) {
+      newChunkIds.push(await insertKnowledgeChunk(tx, entry.id, index, chunks[index] ?? ""));
     }
-    updateKnowledgeIndex(db, { id: entry.id, contentHash, embeddingStatus: status, now });
+    if (usesVectors) {
+      await deleteKnowledgeVectors(tx, oldChunkIds);
+    }
+    if (vectors !== undefined) {
+      for (let index = 0; index < vectors.length; index += 1) {
+        const chunkId = newChunkIds[index];
+        const vector = vectors[index];
+        if (chunkId !== undefined && vector !== undefined) {
+          await insertKnowledgeVector(tx, chunkId, vector);
+        }
+      }
+    }
+    await updateKnowledgeIndex(tx, { id: entry.id, contentHash, embeddingStatus: status, now });
   });
 
   return status;
@@ -131,7 +125,7 @@ export async function rebuildKnowledgeIndex(
   options: KnowledgeIndexOptions,
 ): Promise<KnowledgeRebuildResult> {
   const result: KnowledgeRebuildResult = { indexed: 0, skipped: 0, failed: 0, missing: 0 };
-  for (const entry of listIndexableEntries(db)) {
+  for (const entry of await listIndexableEntries(db)) {
     try {
       const outcome = await indexKnowledgeEntry(db, entry, options);
       if (outcome === "skipped") {
@@ -147,7 +141,7 @@ export async function rebuildKnowledgeIndex(
         continue;
       }
       result.failed += 1;
-      updateKnowledgeIndex(db, {
+      await updateKnowledgeIndex(db, {
         id: entry.id,
         contentHash: entry.contentHash,
         embeddingStatus: "failed",

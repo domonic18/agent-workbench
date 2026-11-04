@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { openDatabase, type Db } from "../../store/database.js";
-import { runMigrations } from "../../store/migrator.js";
 import { findMessageById } from "../../store/repositories/a2a.js";
-import { insertOutbox } from "../../store/repositories/outbox.js";
-import { findOutboxByKey, reconcileStaleLeases } from "../../store/repositories/outbox.js";
+import { findOutboxByKey, insertOutbox, reconcileStaleLeases } from "../../store/repositories/outbox.js";
 import { A2aError } from "./errors.js";
 import { createA2aService } from "./service.js";
 import type { A2aSendInput, A2aService } from "./types.js";
@@ -11,9 +9,12 @@ import type { A2aSendInput, A2aService } from "./types.js";
 const NOW = 1_000;
 const LEASE_MS = 30_000;
 
-function prepare(): { db: Db; service: A2aService; setNow: (value: number) => void } {
-  const db = openDatabase(":memory:");
-  runMigrations(db);
+async function prepare(): Promise<{
+  db: Db;
+  service: A2aService;
+  setNow: (value: number) => void;
+}> {
+  const db = await openDatabase();
   await db.run(
     "INSERT INTO machine (id, hostname, os, collector_version, collector_secret_hash, status, created_at) VALUES ('m1', 'h', 'linux', '1', 'hash', 'active', 0)",
   );
@@ -25,7 +26,9 @@ function prepare(): { db: Db; service: A2aService; setNow: (value: number) => vo
   for (const [id, targets] of agents) {
     await db.run(
       `INSERT INTO agent (id, machine_id, project, display_name, secret_hash, status, allowed_targets_json, created_at, updated_at)
-       VALUES (?, 'm1', ?, ?, 'hash', 'active', ?, 0, 0)`,  id, id, id, JSON.stringify(targets));
+       VALUES (?, 'm1', ?, ?, 'hash', 'active', ?, 0, 0)`,
+      id, id, id, JSON.stringify(targets),
+    );
   }
   const tasks: [string, string][] = [
     ["tsk_a", "agt_a"],
@@ -36,7 +39,9 @@ function prepare(): { db: Db; service: A2aService; setNow: (value: number) => vo
   for (const [id, assignee] of tasks) {
     await db.run(
       `INSERT INTO task (id, title, assigner, assignee, project, stage, status, origin, created_at, updated_at)
-       VALUES (?, ?, 'console', ?, 'aw', 'exec', 'running', 'a2a', 0, 0)`,  id, id, assignee);
+       VALUES (?, ?, 'console', ?, 'aw', 'exec', 'running', 'a2a', 0, 0)`,
+      id, id, assignee,
+    );
   }
   let msgSeq = 0;
   let threadSeq = 0;
@@ -69,9 +74,9 @@ function sendInput(overrides: Partial<A2aSendInput> = {}): A2aSendInput {
   };
 }
 
-function expectCode(fn: () => unknown, code: A2aError["code"]): void {
+async function expectCode(fn: () => Promise<unknown>, code: A2aError["code"]): Promise<void> {
   try {
-    fn();
+    await fn();
   } catch (error) {
     expect(error).toBeInstanceOf(A2aError);
     expect((error as A2aError).code).toBe(code);
@@ -81,43 +86,43 @@ function expectCode(fn: () => unknown, code: A2aError["code"]): void {
 }
 
 describe("a2a send", () => {
-  it("首条消息建线程、分配 round 1,并落 pull 出箱行", () => {
-    const { db, service } = prepare();
-    const result = service.send(sendInput());
+  it("首条消息建线程、分配 round 1,并落 pull 出箱行", async () => {
+    const { db, service } = await prepare();
+    const result = await service.send(sendInput());
 
     expect(result).toEqual({ msgId: "msg_1", threadId: "thr_1", round: 1 });
-    expect(findMessageById(db, "msg_1")).toMatchObject({
+    expect(await findMessageById(db, "msg_1")).toMatchObject({
       threadId: "thr_1",
       taskId: "tsk_a",
       fromAgent: "agt_a",
       toAgent: "agt_b",
       round: 1,
     });
-    expect(findOutboxByKey(db, "idem-1")).toMatchObject({
+    expect(await findOutboxByKey(db, "idem-1")).toMatchObject({
       channel: "pull",
       deliveryClass: "business",
       msgId: "msg_1",
       taskId: "tsk_a",
       status: "pending",
     });
-    db.close();
+    await db.close();
   });
 
-  it("同 (发起方任务, 收件方) 复用线程并递增 round", () => {
-    const { db, service } = prepare();
-    service.send(sendInput());
-    const second = service.send(sendInput({ idempotencyKey: "idem-2" }));
+  it("同 (发起方任务, 收件方) 复用线程并递增 round", async () => {
+    const { db, service } = await prepare();
+    await service.send(sendInput());
+    const second = await service.send(sendInput({ idempotencyKey: "idem-2" }));
 
     expect(second.threadId).toBe("thr_1");
     expect(second.round).toBe(2);
     expect(await db.get("SELECT COUNT(*) AS n FROM a2a_message")).toEqual({ n: 2 });
-    db.close();
+    await db.close();
   });
 
-  it("收件方带 thread_id 续接线程,只能发回另一方", () => {
-    const { db, service } = prepare();
-    service.send(sendInput());
-    const reply = service.send(
+  it("收件方带 thread_id 续接线程,只能发回另一方", async () => {
+    const { service, db } = await prepare();
+    await service.send(sendInput());
+    const reply = await service.send(
       sendInput({
         idempotencyKey: "idem-reply",
         fromAgentId: "agt_b",
@@ -130,7 +135,7 @@ describe("a2a send", () => {
     );
     expect(reply).toMatchObject({ threadId: "thr_1", round: 2 });
 
-    expectCode(
+    await expectCode(
       () =>
         service.send(
           sendInput({
@@ -143,47 +148,47 @@ describe("a2a send", () => {
         ),
       "FORBIDDEN",
     );
-    db.close();
+    await db.close();
   });
 
-  it("同 Idempotency-Key 返回首次 msg_id 且不重复落库", () => {
-    const { db, service } = prepare();
-    const first = service.send(sendInput());
-    const again = service.send(sendInput({ summary: "换个说法也是同一条" }));
+  it("同 Idempotency-Key 返回首次 msg_id 且不重复落库", async () => {
+    const { db, service } = await prepare();
+    const first = await service.send(sendInput());
+    const again = await service.send(sendInput({ summary: "换个说法也是同一条" }));
 
     expect(again).toEqual(first);
     expect(await db.get("SELECT COUNT(*) AS n FROM a2a_message")).toEqual({ n: 1 });
-    db.close();
+    await db.close();
   });
 
-  it("白名单拒绝时回带可达目标", () => {
-    const { db, service } = prepare();
+  it("白名单拒绝时回带可达目标", async () => {
+    const { db, service } = await prepare();
     try {
-      service.send(sendInput({ fromAgentId: "agt_b", taskId: "tsk_b", to: "agt_c" }));
+      await service.send(sendInput({ fromAgentId: "agt_b", taskId: "tsk_b", to: "agt_c" }));
       throw new Error("预期被白名单拒绝");
     } catch (error) {
       expect(error).toBeInstanceOf(A2aError);
       expect((error as A2aError).code).toBe("FORBIDDEN");
       expect((error as A2aError).detail).toEqual({ allowedTargets: ["agt_a"] });
     }
-    db.close();
+    await db.close();
   });
 
-  it("目标不在白名单、未注册、任务不属于自己都拒绝", () => {
-    const { db, service } = prepare();
-    expectCode(
+  it("目标不在白名单、未注册、任务不属于自己都拒绝", async () => {
+    const { service, db } = await prepare();
+    await expectCode(
       () => service.send(sendInput({ fromAgentId: "agt_c", taskId: "tsk_c", to: "agt_a" })),
       "FORBIDDEN",
     );
-    expectCode(() => service.send(sendInput({ to: "agt_missing" })), "NOT_FOUND");
-    expectCode(() => service.send(sendInput({ taskId: "tsk_b" })), "FORBIDDEN");
-    expectCode(() => service.send(sendInput({ taskId: "tsk_missing" })), "NOT_FOUND");
-    db.close();
+    await expectCode(() => service.send(sendInput({ to: "agt_missing" })), "NOT_FOUND");
+    await expectCode(() => service.send(sendInput({ taskId: "tsk_b" })), "FORBIDDEN");
+    await expectCode(() => service.send(sendInput({ taskId: "tsk_missing" })), "NOT_FOUND");
+    await db.close();
   });
 
-  it("任务存在 uncertain 业务出箱行时冻结新发送", () => {
-    const { db, service } = prepare();
-    insertOutbox(db, {
+  it("任务存在 uncertain 业务出箱行时冻结新发送", async () => {
+    const { db, service } = await prepare();
+    await insertOutbox(db, {
       id: "ob_fence",
       idempotencyKey: "fence",
       channel: "pull",
@@ -198,27 +203,27 @@ describe("a2a send", () => {
     });
     await db.run("UPDATE outbox SET status = 'uncertain' WHERE id = 'ob_fence'");
 
-    expectCode(() => service.send(sendInput()), "CONFLICT");
-    db.close();
+    await expectCode(() => service.send(sendInput()), "CONFLICT");
+    await db.close();
   });
 
-  it("reply_to 必须指向同线程消息", () => {
-    const { db, service } = prepare();
-    const other = service.send(
+  it("reply_to 必须指向同线程消息", async () => {
+    const { service, db } = await prepare();
+    const other = await service.send(
       sendInput({ idempotencyKey: "idem-c", to: "agt_c", summary: "另一线程" }),
     );
-    expectCode(
+    await expectCode(
       () => service.send(sendInput({ idempotencyKey: "idem-b", replyToMsgId: other.msgId })),
       "VALIDATION_FAILED",
     );
-    db.close();
+    await db.close();
   });
 });
 
 describe("a2a inbox", () => {
   it("拉取即领取,重复拉取为空,租约过期后重新可见", async () => {
-    const { db, service, setNow } = prepare();
-    service.send(sendInput());
+    const { db, service, setNow } = await prepare();
+    await service.send(sendInput());
 
     const first = await service.inbox("agt_b");
     expect(first.items.map((item) => item.msg_id)).toEqual(["msg_1"]);
@@ -231,23 +236,23 @@ describe("a2a inbox", () => {
 
     expect((await service.inbox("agt_b")).items).toEqual([]);
     setNow(NOW + LEASE_MS + 1);
-    reconcileStaleLeases(db, NOW + LEASE_MS + 1);
+    await reconcileStaleLeases(db, NOW + LEASE_MS + 1);
     expect((await service.inbox("agt_b")).items.map((item) => item.msg_id)).toEqual(["msg_1"]);
-    db.close();
+    await db.close();
   });
 
   it("空信箱挂起时被新消息唤醒", async () => {
-    const { db, service } = prepare();
+    const { service, db } = await prepare();
     const pending = service.inbox("agt_b", { waitMs: 1_000 });
-    service.send(sendInput());
+    await service.send(sendInput());
 
     const result = await pending;
     expect(result.items.map((item) => item.msg_id)).toEqual(["msg_1"]);
-    db.close();
+    await db.close();
   });
 
   it("非法 cursor 返回 422 语义", async () => {
-    const { service } = prepare();
+    const { service } = await prepare();
     await expect(service.inbox("agt_b", { cursor: "bad" })).rejects.toMatchObject({
       code: "VALIDATION_FAILED",
     });
@@ -255,18 +260,22 @@ describe("a2a inbox", () => {
 });
 
 describe("a2a ack", () => {
-  it("ACK request 同事务写下游 parent_task_id 与 handoff 事件", () => {
-    const { db, service } = prepare();
-    service.send(sendInput());
+  it("ACK request 同事务写下游 parent_task_id 与 handoff 事件", async () => {
+    const { db, service } = await prepare();
+    await service.send(sendInput());
 
-    service.ack("agt_b", "msg_1", { taskId: "tsk_b2" });
+    await service.ack("agt_b", "msg_1", { taskId: "tsk_b2" });
 
-    const task = await db.get("SELECT parent_task_id AS parentTaskId FROM task WHERE id = 'tsk_b2'") as { parentTaskId: string | null };
+    const task = (await db.get(
+      'SELECT parent_task_id AS "parentTaskId" FROM task WHERE id = \'tsk_b2\'',
+    )) as { parentTaskId: string | null };
     expect(task.parentTaskId).toBe("tsk_a");
-    expect(findMessageById(db, "msg_1")?.ackAt).toBe(NOW);
-    expect(findOutboxByKey(db, "idem-1")?.status).toBe("delivered");
+    expect((await findMessageById(db, "msg_1"))?.ackAt).toBe(NOW);
+    expect((await findOutboxByKey(db, "idem-1"))?.status).toBe("delivered");
 
-    const event = await db.get("SELECT kind, payload_json AS payload FROM task_event WHERE task_id = 'tsk_b2'") as { kind: string; payload: string };
+    const event = (await db.get(
+      "SELECT kind, payload_json AS payload FROM task_event WHERE task_id = 'tsk_b2'",
+    )) as { kind: string; payload: string };
     expect(event.kind).toBe("handoff");
     expect(JSON.parse(event.payload)).toMatchObject({
       relation: "a2a",
@@ -274,26 +283,26 @@ describe("a2a ack", () => {
       upstream_task_id: "tsk_a",
     });
 
-    service.ack("agt_b", "msg_1", { taskId: "tsk_b2" });
+    await service.ack("agt_b", "msg_1", { taskId: "tsk_b2" });
     expect(await db.get("SELECT COUNT(*) AS n FROM task_event")).toEqual({ n: 1 });
-    db.close();
+    await db.close();
   });
 
-  it("ACK request 缺 task_id / 任务不属于自己都拒绝", () => {
-    const { db, service } = prepare();
-    service.send(sendInput());
+  it("ACK request 缺 task_id / 任务不属于自己都拒绝", async () => {
+    const { service, db } = await prepare();
+    await service.send(sendInput());
 
-    expectCode(() => service.ack("agt_b", "msg_1"), "VALIDATION_FAILED");
-    expectCode(() => service.ack("agt_b", "msg_1", { taskId: "tsk_a" }), "FORBIDDEN");
-    expectCode(() => service.ack("agt_a", "msg_1", { taskId: "tsk_b2" }), "FORBIDDEN");
-    expectCode(() => service.ack("agt_b", "msg_missing"), "NOT_FOUND");
-    db.close();
+    await expectCode(() => service.ack("agt_b", "msg_1"), "VALIDATION_FAILED");
+    await expectCode(() => service.ack("agt_b", "msg_1", { taskId: "tsk_a" }), "FORBIDDEN");
+    await expectCode(() => service.ack("agt_a", "msg_1", { taskId: "tsk_b2" }), "FORBIDDEN");
+    await expectCode(() => service.ack("agt_b", "msg_missing"), "NOT_FOUND");
+    await db.close();
   });
 
-  it("ACK reply / notify 不收 task_id,不写链路", () => {
-    const { db, service } = prepare();
-    service.send(sendInput());
-    service.send(
+  it("ACK reply / notify 不收 task_id,不写链路", async () => {
+    const { db, service } = await prepare();
+    await service.send(sendInput());
+    await service.send(
       sendInput({
         idempotencyKey: "idem-reply",
         fromAgentId: "agt_b",
@@ -304,22 +313,22 @@ describe("a2a ack", () => {
       }),
     );
 
-    service.ack("agt_a", "msg_2");
-    expect(findMessageById(db, "msg_2")?.ackAt).toBe(NOW);
+    await service.ack("agt_a", "msg_2");
+    expect((await findMessageById(db, "msg_2"))?.ackAt).toBe(NOW);
     expect(await db.get("SELECT COUNT(*) AS n FROM task_event")).toEqual({ n: 0 });
     expect(
       await db.get("SELECT parent_task_id AS p FROM task WHERE id = 'tsk_b'"),
     ).toEqual({ p: null });
-    db.close();
+    await db.close();
   });
 });
 
 describe("handoffNotice", () => {
-  it("request 返回参与方(播报由控制台直发,不再带 bot open_id)", () => {
-    const { db, service } = prepare();
-    const { msgId } = service.send(sendInput());
+  it("request 返回参与方(播报由控制台直发,不再带 bot open_id)", async () => {
+    const { service, db } = await prepare();
+    const { msgId } = await service.send(sendInput());
 
-    expect(service.handoffNotice(msgId)).toEqual({
+    expect(await service.handoffNotice(msgId)).toEqual({
       msgId: "msg_1",
       taskId: "tsk_a",
       threadId: "thr_1",
@@ -327,13 +336,13 @@ describe("handoffNotice", () => {
       from: { id: "agt_a", displayName: "agt_a" },
       to: { id: "agt_b", displayName: "agt_b" },
     });
-    db.close();
+    await db.close();
   });
 
-  it("reply 与未知消息返回 null", () => {
-    const { db, service } = prepare();
-    service.send(sendInput());
-    const reply = service.send(
+  it("reply 与未知消息返回 null", async () => {
+    const { service, db } = await prepare();
+    await service.send(sendInput());
+    const reply = await service.send(
       sendInput({
         idempotencyKey: "idem-2",
         fromAgentId: "agt_b",
@@ -344,8 +353,8 @@ describe("handoffNotice", () => {
       }),
     );
 
-    expect(service.handoffNotice(reply.msgId)).toBeNull();
-    expect(service.handoffNotice("msg_missing")).toBeNull();
-    db.close();
+    expect(await service.handoffNotice(reply.msgId)).toBeNull();
+    expect(await service.handoffNotice("msg_missing")).toBeNull();
+    await db.close();
   });
 });

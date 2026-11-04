@@ -74,7 +74,7 @@ export interface KnowledgeEntryList {
 }
 
 export interface KnowledgeEntryService {
-  list(query: KnowledgeListQuery): KnowledgeEntryList;
+  list(query: KnowledgeListQuery): Promise<KnowledgeEntryList>;
   read(id: string): Promise<KnowledgeEntryRead>;
   update(id: string, input: KnowledgeUpdateInput): Promise<KnowledgeEntryRecord>;
   adopt(id: string): Promise<KnowledgeEntryRecord>;
@@ -83,12 +83,12 @@ export interface KnowledgeEntryService {
 
 export function createKnowledgeEntryService(
   options: KnowledgeEntryServiceOptions,
-): Promise<KnowledgeEntryService>{
+): KnowledgeEntryService {
   const db = options.db;
   const now = options.now ?? Date.now;
 
-  function requireEntry(id: string): KnowledgeEntryRecord {
-    const entry = findKnowledgeEntry(db, id);
+  async function requireEntry(id: string): Promise<KnowledgeEntryRecord> {
+    const entry = await findKnowledgeEntry(db, id);
     if (entry === undefined || entry.deletedAt !== null) {
       throw new KnowledgeError("NOT_FOUND", `知识条目不存在: ${id}`);
     }
@@ -106,10 +106,10 @@ export function createKnowledgeEntryService(
     }
   }
 
-  function changeStatus(
+  async function changeStatus(
     entry: KnowledgeEntryRecord,
     target: KnowledgeStatus,
-  ): KnowledgeEntryRecord {
+  ): Promise<KnowledgeEntryRecord> {
     if (entry.status === target) {
       return entry;
     }
@@ -121,22 +121,22 @@ export function createKnowledgeEntryService(
       }
       throw error;
     }
-    if (!updateKnowledgeEntryStatus(db, entry.id, target, now())) {
+    if (!(await updateKnowledgeEntryStatus(db, entry.id, target, now()))) {
       throw new KnowledgeError("NOT_FOUND", `知识条目不存在: ${entry.id}`);
     }
     return requireEntry(entry.id);
   }
 
   return {
-    list(query) {
+    async list(query) {
       return {
-        items: listKnowledgeEntries(db, query),
-        counts: countKnowledgeEntriesByStatus(db),
+        items: await listKnowledgeEntries(db, query),
+        counts: await countKnowledgeEntriesByStatus(db),
       };
     },
 
     async read(id) {
-      const entry = requireEntry(id);
+      const entry = await requireEntry(id);
       try {
         const content = await readFile(resolveEntryPath(options.knowledgeDir, entry.path), "utf8");
         return { entry, content };
@@ -149,7 +149,7 @@ export function createKnowledgeEntryService(
     },
 
     async update(id, input) {
-      const entry = requireEntry(id);
+      const entry = await requireEntry(id);
       if (isProtectedKnowledgePath(entry.path)) {
         throw new KnowledgeError("PROTECTED", `受保护文件只读: ${entry.path}`);
       }
@@ -168,11 +168,11 @@ export function createKnowledgeEntryService(
       if (input.category !== undefined) {
         meta.category = input.category;
       }
-      db.transaction(async () => {
-        if (!updateKnowledgeEntryMeta(db, meta)) {
+      await db.transaction(async (tx) => {
+        if (!(await updateKnowledgeEntryMeta(tx, meta))) {
           throw new KnowledgeError("NOT_FOUND", `知识条目不存在: ${id}`);
         }
-        invalidateKnowledgeIndex(db, id, timestamp);
+        await invalidateKnowledgeIndex(tx, id, timestamp);
       });
 
       await reindex(id);
@@ -180,13 +180,13 @@ export function createKnowledgeEntryService(
     },
 
     async adopt(id) {
-      const updated = changeStatus(requireEntry(id), "active");
+      const updated = await changeStatus(await requireEntry(id), "active");
       await reindex(id);
       return requireEntry(updated.id);
     },
 
     async archive(id) {
-      return changeStatus(requireEntry(id), "archived");
+      return changeStatus(await requireEntry(id), "archived");
     },
   };
 }

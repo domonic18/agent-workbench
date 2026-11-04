@@ -31,9 +31,9 @@ export type RecordTokenUsageResult =
   | { status: "skipped"; reason: "synthetic" };
 
 export interface TokenUsageService {
-  record(input: TokenUsageInput): RecordTokenUsageResult;
+  record(input: TokenUsageInput): Promise<RecordTokenUsageResult>;
   /** 按 token_usage 重算 task.total_tokens;修复用,正常路径在同一事务内增量维护 */
-  recomputeTaskTotal(taskId: string): number;
+  recomputeTaskTotal(taskId: string): Promise<number>;
 }
 
 export interface TokenUsageServiceDeps {
@@ -59,7 +59,7 @@ export function createTokenUsageService(deps: TokenUsageServiceDeps): TokenUsage
   const { db } = deps;
   const newId = deps.newId ?? (() => newPrefixedId("tku"));
 
-  function record(input: TokenUsageInput): RecordTokenUsageResult {
+  async function record(input: TokenUsageInput): Promise<RecordTokenUsageResult> {
     const model = requireText(input.model, "model");
     if (model.trim() === SYNTHETIC_MODEL) {
       return { status: "skipped", reason: "synthetic" };
@@ -77,8 +77,8 @@ export function createTokenUsageService(deps: TokenUsageServiceDeps): TokenUsage
     const sequence = requireInteger(input.sequence, "sequence");
     const occurredAt = requireInteger(input.occurredAt, "occurredAt", 1);
 
-    return db.transaction((): RecordTokenUsageResult => {
-      const run = findRunById(db, runId);
+    return db.transaction(async (tx): Promise<RecordTokenUsageResult> => {
+      const run = await findRunById(tx, runId);
       if (run === undefined) {
         throw new TokenUsageError("NOT_FOUND", `run ${runId} 不存在`);
       }
@@ -86,7 +86,7 @@ export function createTokenUsageService(deps: TokenUsageServiceDeps): TokenUsage
         throw new TokenUsageError("VALIDATION_FAILED", "agentId 与 run 归属不一致");
       }
 
-      const existing = findTokenUsageByKey(db, agentId, runId, source, sequence);
+      const existing = await findTokenUsageByKey(tx, agentId, runId, source, sequence);
       if (existing !== undefined) {
         if (existing.receiptHash !== receiptHash) {
           throw new TokenUsageError("CONFLICT", "同一用量事件带着不同回执哈希,拒绝覆盖");
@@ -95,7 +95,7 @@ export function createTokenUsageService(deps: TokenUsageServiceDeps): TokenUsage
       }
 
       const id = newId();
-      insertTokenUsage(db, {
+      await insertTokenUsage(tx, {
         id,
         agentId,
         taskId: run.taskId,
@@ -112,21 +112,21 @@ export function createTokenUsageService(deps: TokenUsageServiceDeps): TokenUsage
         occurredAt,
       });
       if (run.taskId !== null) {
-        setTaskTotalTokens(db, run.taskId, sumTaskTokens(db, run.taskId));
+        await setTaskTotalTokens(tx, run.taskId, await sumTaskTokens(tx, run.taskId));
       }
       return { status: "recorded", id, taskId: run.taskId };
     });
   }
 
-  function recomputeTaskTotal(taskId: string): number {
+  async function recomputeTaskTotal(taskId: string): Promise<number> {
     const id = requireText(taskId, "taskId");
-    return db.transaction((): number => {
-      const task = findTaskById(db, id);
+    return db.transaction(async (tx): Promise<number> => {
+      const task = await findTaskById(tx, id);
       if (task === undefined) {
         throw new TokenUsageError("NOT_FOUND", `任务 ${id} 不存在`);
       }
-      const total = sumTaskTokens(db, id);
-      setTaskTotalTokens(db, id, total);
+      const total = await sumTaskTokens(tx, id);
+      await setTaskTotalTokens(tx, id, total);
       return total;
     });
   }

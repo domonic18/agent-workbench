@@ -41,7 +41,7 @@ export interface OverviewSnapshot {
 }
 
 export interface OverviewService {
-  get(): OverviewSnapshot;
+  get(): Promise<OverviewSnapshot>;
 }
 
 export interface OverviewServiceDeps {
@@ -82,7 +82,7 @@ export function createOverviewService(deps: OverviewServiceDeps): OverviewServic
   const { db } = deps;
   const now = deps.now ?? Date.now;
 
-  function get(): OverviewSnapshot {
+  async function get(): Promise<OverviewSnapshot> {
     const at = now();
     const since = startOfLocalDay(at);
     // 四项指标与 Agent 列表必须共用同一时间窗口,否则同屏数字会互相打架
@@ -90,9 +90,9 @@ export function createOverviewService(deps: OverviewServiceDeps): OverviewServic
     const heartbeatSince = at - MACHINE_HEARTBEAT.timeoutMs;
 
     // 先取水位再读投影:期间发生的变更只会让 revision 更大,不会出现「新版本配旧数据」
-    const revision = currentRevision(db, OVERVIEW_SCOPE);
-    const metrics = getOverviewMetrics(db, { since, idleSince, heartbeatSince });
-    const rows = listAgentOverviewRows(db, { since, idleSince });
+    const revision = await currentRevision(db, OVERVIEW_SCOPE);
+    const metrics = await getOverviewMetrics(db, { since, idleSince, heartbeatSince });
+    const rows = await listAgentOverviewRows(db, { since, idleSince });
 
     return {
       revision,

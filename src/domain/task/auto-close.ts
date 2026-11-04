@@ -20,7 +20,7 @@ interface ChildStatus {
 }
 
 async function findChildren(db: Db, parentId: string): Promise<ChildStatus[]> {
-  return db.all(`SELECT id, status FROM task WHERE parent_task_id = ?`, parentId) as Promise<ChildStatus[]>;
+  return (await db.all(`SELECT id, status FROM task WHERE parent_task_id = ?`, parentId)) as ChildStatus[];
 }
 
 async function hasUnackedReplies(db: Db, childIds: string[]): Promise<boolean> {
@@ -36,8 +36,8 @@ async function hasUnackedReplies(db: Db, childIds: string[]): Promise<boolean> {
 
 /** pending 根任务先补 running(系统代推进),再落 done;两级都走 CAS,事件记 system actor */
 async function closeOne(db: Db, parent: TaskRecord, at: number): Promise<TaskRecord> {
-  const patch = (fromStatus: TaskRecord["status"], toStatus: TaskRecord["status"]) => {
-    const applied = updateTask(db, {
+  const patch = async (fromStatus: TaskRecord["status"], toStatus: TaskRecord["status"]) => {
+    const applied = await updateTask(db, {
       id: parent.id,
       fromStage: parent.stage,
       fromStatus,
@@ -55,8 +55,8 @@ async function closeOne(db: Db, parent: TaskRecord, at: number): Promise<TaskRec
     }
   };
   if (parent.status === "pending") {
-    patch("pending", "running");
-    appendTaskEvent(db, {
+    await patch("pending", "running");
+    await appendTaskEvent(db, {
       id: newPrefixedId("tev"),
       taskId: parent.id,
       kind: "resumed",
@@ -64,15 +64,15 @@ async function closeOne(db: Db, parent: TaskRecord, at: number): Promise<TaskRec
       occurredAt: at,
     });
   }
-  patch(parent.status === "pending" ? "running" : parent.status, "done");
-  appendTaskEvent(db, {
+  await patch(parent.status === "pending" ? "running" : parent.status, "done");
+  await appendTaskEvent(db, {
     id: newPrefixedId("tev"),
     taskId: parent.id,
     kind: "completed",
     payload: { from: parent.status, to: "done", actor: "system", reason: "auto_close" },
     occurredAt: at,
   });
-  const closed = findTaskById(db, parent.id);
+  const closed = await findTaskById(db, parent.id);
   if (closed === undefined) {
     throw new Error(`根任务 ${parent.id} 收口后读不到记录`);
   }
@@ -82,9 +82,9 @@ async function closeOne(db: Db, parent: TaskRecord, at: number): Promise<TaskRec
 /** 从 taskId 沿 parent 链向上收口;返回本轮被系统关单的任务(调用方据此发〔验收〕播报) */
 export async function closeAncestorsIfComplete(db: Db, taskId: string, at: number): Promise<TaskRecord[]> {
   const closed: TaskRecord[] = [];
-  let parentId = findTaskParent(db, taskId);
+  let parentId = await findTaskParent(db, taskId);
   while (typeof parentId === "string") {
-    const parent = findTaskById(db, parentId);
+    const parent = await findTaskById(db, parentId);
     if (parent === undefined || parent.status === "done" || parent.status === "cancelled") {
       break;
     }
@@ -96,7 +96,7 @@ export async function closeAncestorsIfComplete(db: Db, taskId: string, at: numbe
       break;
     }
     closed.push(await closeOne(db, parent, at));
-    parentId = findTaskParent(db, parent.id);
+    parentId = await findTaskParent(db, parent.id);
   }
   return closed;
 }

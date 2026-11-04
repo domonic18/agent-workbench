@@ -10,8 +10,8 @@ export interface CommandResult {
 }
 
 export interface CommandDeps {
-  listTasks(limit: number): readonly TaskSummary[];
-  findTask(id: string): TaskSummary | undefined;
+  listTasks(limit: number): Promise<readonly TaskSummary[]>;
+  findTask(id: string): Promise<TaskSummary | undefined>;
 }
 
 /** 回执走飞书单条文本,列表截断到 10 条,避免刷屏 */
@@ -69,7 +69,7 @@ function failure(failure: ParseFailure): CommandResult {
  * 已登记指令只做查询与「记录待接入」回执,永不建单(01 §8.1)。
  * 审批与重发的数据面在 M2 / M2.5,当前只校验目标任务并如实说明。
  */
-export function executeCommand(deps: CommandDeps, text: string | undefined): CommandResult {
+export async function executeCommand(deps: CommandDeps, text: string | undefined): Promise<CommandResult> {
   const parsed = parseCommand(text);
   if (!parsed.ok) {
     return failure(parsed);
@@ -78,7 +78,7 @@ export function executeCommand(deps: CommandDeps, text: string | undefined): Com
   const command = parsed.command;
   switch (command.kind) {
     case "task.list": {
-      const tasks = deps.listTasks(LIST_LIMIT);
+      const tasks = await deps.listTasks(LIST_LIMIT);
       if (tasks.length === 0) {
         return { outcome: "handled", command: "task.list", reply: "当前没有任务。" };
       }
@@ -90,7 +90,7 @@ export function executeCommand(deps: CommandDeps, text: string | undefined): Com
       };
     }
     case "task.show": {
-      const task = deps.findTask(command.taskId);
+      const task = await deps.findTask(command.taskId);
       if (task === undefined) {
         return { ...notFound(command.taskId), command: "task.show" };
       }
@@ -98,7 +98,7 @@ export function executeCommand(deps: CommandDeps, text: string | undefined): Com
     }
     case "approve":
     case "reject": {
-      const task = deps.findTask(command.taskId);
+      const task = await deps.findTask(command.taskId);
       if (task === undefined) {
         return { ...notFound(command.taskId), command: command.kind };
       }
@@ -111,7 +111,7 @@ export function executeCommand(deps: CommandDeps, text: string | undefined): Com
       };
     }
     case "resend": {
-      const task = deps.findTask(command.taskId);
+      const task = await deps.findTask(command.taskId);
       if (task === undefined) {
         return { ...notFound(command.taskId), command: "resend" };
       }

@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { KNOWLEDGE_INDEX } from "../../shared/constants.js";
 import { openDatabase, type Db } from "../../store/database.js";
-import { runMigrations } from "../../store/migrator.js";
 import {
   findKnowledgeEntry,
   insertKnowledgeEntry,
@@ -17,12 +16,11 @@ import {
 
 const NOW = 1_700_000_000_000;
 
-function fixture(): { db: Db; dir: string; entryPath: string } {
+async function fixture(): Promise<{ db: Db; dir: string; entryPath: string }> {
   const dir = mkdtempSync(join(tmpdir(), "aw-knowledge-"));
   mkdirSync(join(dir, "notes"), { recursive: true });
-  const db = openDatabase(":memory:");
-  runMigrations(db);
-  insertKnowledgeEntry(db, {
+  const db = await openDatabase();
+  await insertKnowledgeEntry(db, {
     id: "kb_1",
     path: "notes/deploy.md",
     title: "部署手册",
@@ -43,7 +41,7 @@ const embedding: EmbeddingClient = {
 
 describe("KnowledgeIndexService.reindexEntry", () => {
   it("未登记或已删除的条目报不存在", async () => {
-    const { db, dir } = fixture();
+    const { db, dir } = await fixture();
     const service = createKnowledgeIndexService({ db, knowledgeDir: dir, embedding });
 
     await expect(service.reindexEntry("kb_missing")).rejects.toBeInstanceOf(
@@ -54,25 +52,25 @@ describe("KnowledgeIndexService.reindexEntry", () => {
     await expect(service.reindexEntry("kb_1")).rejects.toBeInstanceOf(
       KnowledgeEntryNotFoundError,
     );
-    db.close();
+    await db.close();
   });
 
   it("文件缺失返回 missing,不改索引状态", async () => {
-    const { db, dir } = fixture();
+    const { db, dir } = await fixture();
     const service = createKnowledgeIndexService({ db, knowledgeDir: dir, embedding });
 
     expect(await service.reindexEntry("kb_1")).toBe("missing");
-    expect(findKnowledgeEntry(db, "kb_1")?.embeddingStatus).toBe("pending");
-    db.close();
+    expect((await findKnowledgeEntry(db, "kb_1"))?.embeddingStatus).toBe("pending");
+    await db.close();
   });
 
   it("文件存在时重建并返回结果", async () => {
-    const { db, dir, entryPath } = fixture();
+    const { db, dir, entryPath } = await fixture();
     writeFileSync(entryPath, "部署手册");
     const service = createKnowledgeIndexService({ db, knowledgeDir: dir, embedding });
 
     expect(await service.reindexEntry("kb_1")).toBe("ready");
-    expect(findKnowledgeEntry(db, "kb_1")?.embeddingStatus).toBe("ready");
-    db.close();
+    expect((await findKnowledgeEntry(db, "kb_1"))?.embeddingStatus).toBe("ready");
+    await db.close();
   });
 });

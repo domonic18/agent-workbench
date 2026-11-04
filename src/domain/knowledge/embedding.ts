@@ -15,8 +15,8 @@ interface EmbeddingResponse {
   error?: { message?: unknown };
 }
 
-/** OpenAI 兼容 /embeddings;维度必须与 vec0 的 float[768] 一致,不一致即失败而不是截断 */
-export function createEmbeddingClient(config: EmbeddingConfig): Promise<EmbeddingClient>{
+/** OpenAI 兼容 /embeddings;维度必须与 pgvector 列一致,不一致即失败而不是截断 */
+export function createEmbeddingClient(config: EmbeddingConfig): EmbeddingClient {
   const url = `${config.baseUrl.replace(/\/+$/, "")}/embeddings`;
   return {
     async embed(texts) {

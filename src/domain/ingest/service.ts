@@ -33,7 +33,7 @@ export interface IngestBatchResult {
 }
 
 export interface IngestService {
-  ingestBatch(input: IngestBatchInput): IngestBatchResult;
+  ingestBatch(input: IngestBatchInput): Promise<IngestBatchResult>;
 }
 
 export interface IngestServiceDeps {
@@ -138,11 +138,9 @@ function errorMessage(error: unknown): string {
 export function createIngestService(deps: IngestServiceDeps): IngestService {
   const { db } = deps;
   const now = deps.now ?? Date.now;
-  const runService = deps.runService ?? createRunService({ db });
-  const tokenService = deps.tokenService ?? createTokenUsageService({ db });
 
-  function ingestBatch(input: IngestBatchInput): IngestBatchResult {
-    const agent = findAgentByMachineProject(db, input.collectorId, input.agentProject);
+  async function ingestBatch(input: IngestBatchInput): Promise<IngestBatchResult> {
+    const agent = await findAgentByMachineProject(db, input.collectorId, input.agentProject);
     if (agent === undefined || agent.status !== "active") {
       throw new IngestError(
         "BAD_REQUEST",
@@ -160,16 +158,19 @@ export function createIngestService(deps: IngestServiceDeps): IngestService {
         streamId: input.streamId,
         seq: item.seq,
       };
-      if (hasIngestReceipt(db, key)) {
+      if (await hasIngestReceipt(db, key)) {
         skipped += 1;
         ackedSeq = item.seq;
         continue;
       }
 
       try {
-        db.transaction(async () => {
+        await db.transaction(async (tx) => {
+          // 注入的服务可能绑定外部句柄;默认以 tx 重建,保证事件/用量/回执同一事务域
+          const txRunService = deps.runService ?? createRunService({ db: tx });
+          const txTokenService = deps.tokenService ?? createTokenUsageService({ db: tx });
           const payload = asRecord(item.payload);
-          const recorded = runService.recordEvent({
+          const recorded = await txRunService.recordEvent({
             agentId: agent.id,
             machine: input.collectorId,
             project: input.agentProject,
@@ -186,7 +187,7 @@ export function createIngestService(deps: IngestServiceDeps): IngestService {
 
           if (item.kind === INGEST_TOKEN_USAGE_KIND) {
             const usage = parseTokenPayload(item.payload);
-            tokenService.record({
+            await txTokenService.record({
               agentId: agent.id,
               runId: recorded.runId,
               provider: usage.provider,
@@ -202,7 +203,7 @@ export function createIngestService(deps: IngestServiceDeps): IngestService {
             });
           }
 
-          insertIngestReceipt(db, { ...key, receivedAt: now() });
+          await insertIngestReceipt(tx, { ...key, receivedAt: now() });
         });
       } catch (error) {
         return {

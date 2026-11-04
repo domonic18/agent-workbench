@@ -16,7 +16,7 @@ export interface A2aThreadView extends A2aThreadRecord {
 
 export interface A2aThreadReadService {
   /** 任务不存在抛 TaskError NOT_FOUND */
-  byTask(taskId: string): A2aThreadView[];
+  byTask(taskId: string): Promise<A2aThreadView[]>;
 }
 
 export interface A2aThreadReadServiceDeps {
@@ -63,13 +63,14 @@ export function createA2aThreadReadService(
   const now = deps.now ?? Date.now;
 
   return {
-    byTask(taskId) {
-      if (findTaskById(db, taskId) === undefined) {
+    async byTask(taskId) {
+      if ((await findTaskById(db, taskId)) === undefined) {
         throw new TaskError("NOT_FOUND", `任务 ${taskId} 不存在`);
       }
-      const threads = listThreadsForTask(db, taskId);
+      const threads = await listThreadsForTask(db, taskId);
       const grouped = new Map<string, A2aThreadMessageRecord[]>();
-      for (const message of listMessagesByThreadIds(db, threads.map((thread) => thread.id))) {
+      const messages = await listMessagesByThreadIds(db, threads.map((thread) => thread.id));
+      for (const message of messages) {
         const list = grouped.get(message.threadId);
         if (list === undefined) {
           grouped.set(message.threadId, [message]);
@@ -79,8 +80,8 @@ export function createA2aThreadReadService(
       }
       const at = now();
       return threads.map((thread) => {
-        const messages = grouped.get(thread.id) ?? [];
-        return { ...thread, status: threadStatus(messages, at), messages };
+        const threadMessages = grouped.get(thread.id) ?? [];
+        return { ...thread, status: threadStatus(threadMessages, at), messages: threadMessages };
       });
     },
   };

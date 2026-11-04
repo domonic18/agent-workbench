@@ -1,15 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { TaskTraits, TeleportAdapter } from "../../adapters/teleport/tctl.js";
-import { openDatabase } from "../../store/database.js";
-import { runMigrations } from "../../store/migrator.js";
+import { openDatabase, type Db } from "../../store/database.js";
 import { findCapability } from "../../store/repositories/capability.js";
 import { CapabilityError } from "./errors.js";
 import { deriveBotName } from "./identity.js";
 import { createCapabilityService } from "./service.js";
 
-function prepare() {
-  const db = openDatabase(":memory:");
-  runMigrations(db);
+async function prepare(): Promise<Db> {
+  const db = await openDatabase();
   await db.run(
     `INSERT INTO task
        (id, title, assigner, assignee, project, stage, status, origin, created_at, updated_at)
@@ -43,8 +41,10 @@ const input = {
   actor: "console",
 };
 
-function audits(db: ReturnType<typeof prepare>) {
-  return await db.all("SELECT action, actor, detail_json AS detail FROM capability_audit ORDER BY id") as { action: string; actor: string; detail: string }[];
+async function audits(db: Db) {
+  return (await db.all(
+    'SELECT action, actor, detail_json AS detail FROM capability_audit ORDER BY id',
+  )) as { action: string; actor: string; detail: string }[];
 }
 
 describe("deriveBotName", () => {
@@ -55,8 +55,8 @@ describe("deriveBotName", () => {
 });
 
 describe("capability 服务", () => {
-  it("申请写入 pending 并审计 requested", () => {
-    const db = prepare();
+  it("申请写入 pending 并审计 requested", async () => {
+    const db = await prepare();
     const service = createCapabilityService({
       db,
       teleport: fakeTeleport().adapter,
@@ -64,7 +64,7 @@ describe("capability 服务", () => {
       newId: () => "cap_1",
     });
 
-    const row = service.request(input);
+    const row = await service.request(input);
 
     expect(row).toMatchObject({
       id: "cap_1",
@@ -72,26 +72,26 @@ describe("capability 服务", () => {
       scopeJson: JSON.stringify({ schema: "public" }),
       createdAt: 1_000,
     });
-    expect(audits(db)).toEqual([
+    expect(await audits(db)).toEqual([
       { action: "requested", actor: "console", detail: JSON.stringify({ target: "db:prod", action: "read", ttlSeconds: 900 }) },
     ]);
-    db.close();
+    await db.close();
   });
 
-  it("非法 action / ttl / 缺任务均拒收", () => {
-    const db = prepare();
+  it("非法 action / ttl / 缺任务均拒收", async () => {
+    const db = await prepare();
     const service = createCapabilityService({ db, teleport: fakeTeleport().adapter });
 
-    expect(() => service.request({ ...input, action: "delete" })).toThrow(CapabilityError);
-    expect(() => service.request({ ...input, ttlSeconds: 0 })).toThrow(CapabilityError);
-    expect(() => service.request({ ...input, ttlSeconds: 14_401 })).toThrow(CapabilityError);
-    expect(() => service.request({ ...input, taskId: "T-9" })).toThrow(CapabilityError);
-    expect(() => service.request({ ...input, subject: "" })).toThrow(CapabilityError);
-    db.close();
+    await expect(service.request({ ...input, action: "delete" })).rejects.toThrow(CapabilityError);
+    await expect(service.request({ ...input, ttlSeconds: 0 })).rejects.toThrow(CapabilityError);
+    await expect(service.request({ ...input, ttlSeconds: 14_401 })).rejects.toThrow(CapabilityError);
+    await expect(service.request({ ...input, taskId: "T-9" })).rejects.toThrow(CapabilityError);
+    await expect(service.request({ ...input, subject: "" })).rejects.toThrow(CapabilityError);
+    await db.close();
   });
 
   it("批准经 issuing 落 active,写入票据与过期时间", async () => {
-    const db = prepare();
+    const db = await prepare();
     const teleport = fakeTeleport();
     let clock = 1_000;
     const service = createCapabilityService({
@@ -101,7 +101,7 @@ describe("capability 服务", () => {
       newId: () => "cap_1",
       newTicketId: () => "tkt_1",
     });
-    service.request(input);
+    await service.request(input);
 
     clock = 2_000;
     const result = await service.approve("cap_1", "console");
@@ -116,12 +116,12 @@ describe("capability 服务", () => {
     expect(teleport.calls).toEqual([
       { botName: "aw-agent-codex", taskId: "T-1", ticketId: "tkt_1" },
     ]);
-    expect(audits(db).map((row) => row.action)).toEqual(["requested", "approved", "issued"]);
-    db.close();
+    expect((await audits(db)).map((row) => row.action)).toEqual(["requested", "approved", "issued"]);
+    await db.close();
   });
 
   it("签发失败转 rejected 并抛 503,可重新申请", async () => {
-    const db = prepare();
+    const db = await prepare();
     const teleport = fakeTeleport(true);
     let clock = 1_000;
     let seq = 0;
@@ -132,67 +132,67 @@ describe("capability 服务", () => {
       newId: () => `cap_${++seq}`,
       newTicketId: () => "tkt_1",
     });
-    service.request(input);
+    await service.request(input);
 
     clock = 2_000;
     const error = await service.approve("cap_1", "console").catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(CapabilityError);
     expect(error).toMatchObject({ code: "UPSTREAM_UNAVAILABLE", status: 503 });
-    expect(findCapability(db, "cap_1")).toMatchObject({ status: "rejected", ticketId: "tkt_1" });
-    expect(audits(db).map((row) => row.action)).toEqual([
+    expect(await findCapability(db, "cap_1")).toMatchObject({ status: "rejected", ticketId: "tkt_1" });
+    expect((await audits(db)).map((row) => row.action)).toEqual([
       "requested",
       "approved",
       "issue_failed",
     ]);
     expect(teleport.calls).toHaveLength(0);
 
-    const again = service.request({ ...input, actor: "console" });
+    const again = await service.request({ ...input, actor: "console" });
     expect(again.status).toBe("pending");
-    db.close();
+    await db.close();
   });
 
   it("重复批准返回首次结果", async () => {
-    const db = prepare();
+    const db = await prepare();
     const service = createCapabilityService({
       db,
       teleport: fakeTeleport().adapter,
       newId: () => "cap_1",
       newTicketId: () => "tkt_1",
     });
-    service.request(input);
+    await service.request(input);
     await service.approve("cap_1", "console");
 
     const repeat = await service.approve("cap_1", "console");
     expect(repeat.applied).toBe(false);
     expect(repeat.capability.status).toBe("active");
-    db.close();
+    await db.close();
   });
 
-  it("拒绝只对 pending 生效,并审计原因", () => {
-    const db = prepare();
+  it("拒绝只对 pending 生效,并审计原因", async () => {
+    const db = await prepare();
     const service = createCapabilityService({
       db,
       teleport: fakeTeleport().adapter,
       newId: () => "cap_1",
     });
-    service.request(input);
+    await service.request(input);
 
-    const result = service.reject("cap_1", "console", "范围过大");
+    const result = await service.reject("cap_1", "console", "范围过大");
     expect(result.applied).toBe(true);
     expect(result.capability.status).toBe("rejected");
-    expect(audits(db).at(-1)).toEqual({
+    expect((await audits(db)).at(-1)).toEqual({
       action: "rejected",
       actor: "console",
       detail: JSON.stringify({ reason: "范围过大" }),
     });
 
-    expect(service.reject("cap_1", "console").applied).toBe(false);
-    db.close();
+    expect((await service.reject("cap_1", "console")).applied).toBe(false);
+    await db.close();
   });
 
   it("吊销只对 active 生效", async () => {
-    const db = prepare();
+    const db = await prepare();
     const service = createCapabilityService({
       db,
       teleport: fakeTeleport().adapter,
@@ -200,20 +200,20 @@ describe("capability 服务", () => {
       newId: () => "cap_1",
       newTicketId: () => "tkt_1",
     });
-    service.request(input);
+    await service.request(input);
 
-    expect(service.revoke("cap_1", "console").applied).toBe(false);
+    expect((await service.revoke("cap_1", "console")).applied).toBe(false);
     await service.approve("cap_1", "console");
 
-    const result = service.revoke("cap_1", "console");
+    const result = await service.revoke("cap_1", "console");
     expect(result.applied).toBe(true);
     expect(result.capability).toMatchObject({ status: "revoked", revokedAt: 1_000 });
-    expect(audits(db).at(-1)?.action).toBe("revoked");
-    db.close();
+    expect((await audits(db)).at(-1)?.action).toBe("revoked");
+    await db.close();
   });
 
-  it("待批超 24h 由对账收敛为 rejected", () => {
-    const db = prepare();
+  it("待批超 24h 由对账收敛为 rejected", async () => {
+    const db = await prepare();
     let clock = 1_000;
     const service = createCapabilityService({
       db,
@@ -221,24 +221,24 @@ describe("capability 服务", () => {
       now: () => clock,
       newId: () => "cap_1",
     });
-    service.request(input);
+    await service.request(input);
 
     clock = 1_000 + 24 * 60 * 60 * 1_000 - 1;
-    expect(service.expireStalePending()).toBe(0);
+    expect(await service.expireStalePending()).toBe(0);
 
     clock += 2;
-    expect(service.expireStalePending()).toBe(1);
-    expect(findCapability(db, "cap_1")).toMatchObject({ status: "rejected" });
-    expect(audits(db).at(-1)).toEqual({
+    expect(await service.expireStalePending()).toBe(1);
+    expect(await findCapability(db, "cap_1")).toMatchObject({ status: "rejected" });
+    expect((await audits(db)).at(-1)).toEqual({
       action: "rejected",
       actor: "system",
       detail: JSON.stringify({ reason: "pending_timeout" }),
     });
-    db.close();
+    await db.close();
   });
 
   it("issuing 超 60s 由对账收敛为 rejected", async () => {
-    const db = prepare();
+    const db = await prepare();
     let clock = 1_000;
     let release: (() => void) | undefined;
     const pendingTeleport: TeleportAdapter = {
@@ -254,20 +254,22 @@ describe("capability 服务", () => {
       newId: () => "cap_1",
       newTicketId: () => "tkt_1",
     });
-    service.request(input);
+    await service.request(input);
     const approving = service.approve("cap_1", "console");
-    expect(findCapability(db, "cap_1")?.status).toBe("issuing");
+    // approve 在签发前是 pending → issuing;等待中的签发让状态停在 issuing
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect((await findCapability(db, "cap_1"))?.status).toBe("issuing");
 
     clock = 1_000 + 60_001;
-    expect(service.reconcileStaleIssuing()).toBe(1);
-    expect(findCapability(db, "cap_1")?.status).toBe("rejected");
-    expect(audits(db).at(-1)).toMatchObject({ action: "reconciled", actor: "system" });
+    expect(await service.reconcileStaleIssuing()).toBe(1);
+    expect(await findCapability(db, "cap_1")).toMatchObject({ status: "rejected" });
+    expect((await audits(db)).at(-1)).toMatchObject({ action: "reconciled", actor: "system" });
 
     release?.();
     const late = await approving;
     // 补偿已把行推到 rejected,迟到的签发成功不能再把它改成 active
     expect(late.applied).toBe(false);
-    expect(findCapability(db, "cap_1")?.status).toBe("rejected");
-    db.close();
+    expect(await findCapability(db, "cap_1")).toMatchObject({ status: "rejected" });
+    await db.close();
   });
 });
