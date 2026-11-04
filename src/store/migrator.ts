@@ -13,7 +13,7 @@ export interface Migration {
 
 const MIGRATION_FILE = /^(\d{4})_([a-z0-9_]+)\.sql$/;
 
-/** PG 迁移目录(greenfield 合并基线,与旧 SQLite migrations 互不相干) */
+/** PG 迁移目录(greenfield 合并基线) */
 export function defaultMigrationsDir(): string {
   return fileURLToPath(new URL("./migrations-pg/", import.meta.url));
 }

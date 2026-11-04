@@ -14,11 +14,11 @@ type Pool = PgPool;
  * 保证同事务的语句走同一连接。
  *
  * 占位符沿用仓库既有的 `?` 写法,由本适配器翻译为 `$n`;SQL 文本保持原样,
- * 方言差异(`json_valid`/`strftime`/`INSERT OR IGNORE`)在迁移与仓储落 PG 方言。
+ * 迁移与仓储一律落 PG 方言。
  */
 export interface Db {
   query(sql: string, params?: unknown[]): Promise<QueryResult>;
-  /** 取第一行;无行返回 undefined。等价旧 better-sqlite3 的 `get`(变参绑定) */
+  /** 取第一行;无行返回 undefined(变参绑定) */
   get<T = Record<string, unknown>>(sql: string, ...params: unknown[]): Promise<T | undefined>;
   all<T = Record<string, unknown>>(sql: string, ...params: unknown[]): Promise<T[]>;
   /** 写语句;`changes` 取 affected rows,供 CAS(`changes === 1`)判定 */
