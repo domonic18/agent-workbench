@@ -16,7 +16,7 @@ describe("runMigrations", () => {
   it("空库执行建表并记账", async () => {
     const db = await createTestDatabase(resolveTestAdminUrl());
 
-    expect(await runMigrations(db)).toBe(4);
+    expect(await runMigrations(db)).toBe(5);
     expect(await tableNames(db)).toEqual(
       expect.arrayContaining([
         "task",
@@ -32,6 +32,7 @@ describe("runMigrations", () => {
         "audit_reconcile_gap",
         "machine",
         "agent",
+        "bootstrap_assembly",
         "a2a_thread",
         "a2a_message",
         "a2a_dead_letter",
@@ -55,6 +56,7 @@ describe("runMigrations", () => {
       { version: 2, name: "pg_mcp_tool_calls" },
       { version: 3, name: "one_time_tokens" },
       { version: 4, name: "bootstrap_delivery" },
+      { version: 5, name: "bootstrap_assembly" },
     ]);
     await db.close();
   });
