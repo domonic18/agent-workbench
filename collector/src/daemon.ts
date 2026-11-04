@@ -1,91 +1,32 @@
-import { readdirSync, statSync } from "node:fs";
-import { cpus, freemem, loadavg, totalmem } from "node:os";
+import { statSync } from "node:fs";
+import { cpus } from "node:os";
 import { join } from "node:path";
 import { loadAttributionIndex, type AttributionIndex } from "./attribution.js";
 import type { CollectorConfig } from "./config.js";
 import { ensureStateDirs } from "./config.js";
+import {
+  createConfigSyncCycle,
+  createDiscoveryCycle,
+  createHeartbeatCycle,
+} from "./cycles.js";
 import {
   createConsoleClient,
   type ConsoleClient,
   type OutgoingEvent,
 } from "./http.js";
 import { createLogger, type Logger } from "./log.js";
-import { mapLine } from "./mapper.js";
+import { acquireLock, type SingleInstanceLock } from "./lock.js";
+import { appendEvents, ensureStream } from "./scan.js";
+import { classifyStream, listSessionFiles } from "./sessions.js";
 import { Spool } from "./spool.js";
 import {
   loadState,
   saveState,
-  sortedStreams,
-  streamIdFor,
   type PersistedState,
-  type StreamState,
-  type StreamStatus,
 } from "./state.js";
 import { readNewLines } from "./tailer.js";
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ATTRIBUTION_TTL_MS = 60_000;
-const SEQ_PER_LINE = 100;
-
-export interface SessionFile {
-  sessionId: string;
-  path: string;
-}
-
-export function listSessionFiles(claudeDir: string): SessionFile[] {
-  const root = join(claudeDir, "projects");
-  const files: SessionFile[] = [];
-  let dirs: string[];
-  try {
-    dirs = readdirSync(root, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name);
-  } catch {
-    return files;
-  }
-  for (const dir of dirs) {
-    let names: string[];
-    try {
-      names = readdirSync(join(root, dir));
-    } catch {
-      continue;
-    }
-    for (const name of names) {
-      if (!name.endsWith(".jsonl")) {
-        continue;
-      }
-      const sessionId = name.slice(0, -".jsonl".length);
-      if (UUID.test(sessionId)) {
-        files.push({ sessionId: sessionId.toLowerCase(), path: join(root, dir, name) });
-      }
-    }
-  }
-  return files;
-}
-
-export interface Classification {
-  status: StreamStatus;
-  project: string | null;
-}
-
-export function classifyStream(
-  index: AttributionIndex,
-  sessionId: string,
-  registered: ReadonlySet<string>,
-): Classification {
-  const projects = index.resolve(sessionId);
-  if (projects.length === 0) {
-    return { status: "unattributed", project: null };
-  }
-  if (projects.length > 1) {
-    return { status: "ambiguous", project: null };
-  }
-  const project = projects[0] ?? null;
-  if (project === null) {
-    return { status: "unattributed", project: null };
-  }
-  return { status: registered.has(project) ? "ok" : "unregistered", project };
-}
 
 interface Backoff {
   attempt: number;
@@ -125,11 +66,33 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
   const registered = new Set(config.registeredProjects);
   const backoff = new Map<string, Backoff>();
   const startedAt = now();
+  const discovery = createDiscoveryCycle({ configs: config.ccConnectConfigs, client, logger });
+  const configSync = createConfigSyncCycle({
+    client,
+    stateDir: config.stateDir,
+    baseUrl: config.baseUrl,
+    claudeJsonPath: config.claudeJsonPath,
+    cwdByProject: discovery.cwdByProject,
+    logger,
+    now,
+  });
+  const heartbeat = createHeartbeatCycle({
+    client,
+    spool,
+    state,
+    registered,
+    startedAt,
+    logger,
+    now,
+  });
+  let lock: SingleInstanceLock | null = null;
   let index: AttributionIndex = loadAttributionIndex(config.ccConnectDir);
   let indexAt = 0;
   let running = true;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  let discoveryTimer: ReturnType<typeof setInterval> | null = null;
+  let configSyncTimer: ReturnType<typeof setInterval> | null = null;
   let stopping: (() => void) | null = null;
 
   spool.load();
@@ -143,78 +106,10 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
     indexAt = at;
   }
 
-  function ensureStream(file: SessionFile): StreamState {
-    const existing = state.streams[file.sessionId];
-    if (existing !== undefined) {
-      existing.path = file.path;
-      return existing;
-    }
-    let inode = 0;
-    let size = 0;
-    try {
-      const stat = statSync(file.path);
-      inode = stat.ino;
-      size = stat.size;
-    } catch {
-      // 文件刚被删/轮转,按空流登记
-    }
-    const created: StreamState = {
-      sessionId: file.sessionId,
-      path: file.path,
-      project: null,
-      status: "unattributed",
-      inode,
-      offset: config.backfill === "all" ? 0 : size,
-      epoch: 0,
-      ackedSeq: 0,
-      lastSeq: 0,
-      lastError: null,
-      updatedAt: now(),
-    };
-    state.streams[file.sessionId] = created;
-    return created;
-  }
-
-  function appendEvents(stream: StreamState, lines: { text: string; startOffset: number }[]): void {
-    for (const line of lines) {
-      const events = mapLine(line.text, now());
-      const spoolable =
-        stream.status === "ok" ||
-        stream.status === "ambiguous" ||
-        stream.status === "unregistered";
-      if (!spoolable) {
-        continue;
-      }
-      for (let i = 0; i < events.length; i += 1) {
-        const event = events[i];
-        if (event === undefined) {
-          continue;
-        }
-        const seq = line.startOffset * SEQ_PER_LINE + i + 1;
-        if (seq <= stream.lastSeq) {
-          continue;
-        }
-        spool.append({
-          stream_id: streamIdFor(stream.sessionId, stream.epoch),
-          session_id: stream.sessionId,
-          project: stream.status === "ok" ? stream.project : null,
-          seq,
-          inode: stream.inode,
-          offset: line.startOffset,
-          kind: event.kind,
-          occurred_at: event.occurredAt,
-          payload: event.payload,
-        });
-        stream.lastSeq = seq;
-      }
-    }
-  }
-
   async function scanOnce(): Promise<void> {
     refreshIndex();
-    const files = listSessionFiles(config.claudeDir);
-    for (const file of files) {
-      const stream = ensureStream(file);
+    for (const file of listSessionFiles(config.claudeDir)) {
+      const stream = ensureStream(file, state, config, now);
       const classified = classifyStream(index, file.sessionId, registered);
       if (classified.status !== stream.status || classified.project !== stream.project) {
         stream.status = classified.status;
@@ -250,7 +145,7 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
       }
       stream.inode = result.inode;
       if (result.lines.length > 0) {
-        appendEvents(stream, result.lines);
+        appendEvents(stream, result.lines, spool, now);
       }
       stream.offset = result.offset;
       stream.updatedAt = now();
@@ -340,52 +235,6 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
     }
   }
 
-  function unattributedCount(): number {
-    let count = 0;
-    for (const stream of Object.values(state.streams)) {
-      if (stream.status === "ambiguous" || stream.status === "unregistered") {
-        count += 1;
-      }
-    }
-    return count;
-  }
-
-  function streamSummaries(): Record<string, unknown>[] {
-    return sortedStreams(state)
-      .filter((stream) => spool.pending(streamIdFor(stream.sessionId, stream.epoch)).length > 0)
-      .slice(0, 100)
-      .map((stream) => ({
-        stream_id: streamIdFor(stream.sessionId, stream.epoch),
-        project: stream.project,
-        pending: spool.pending(streamIdFor(stream.sessionId, stream.epoch)).length,
-        last_error: stream.lastError,
-      }));
-  }
-
-  async function heartbeatOnce(): Promise<void> {
-    try {
-      const response = await client.postHeartbeat({
-        uptime: Math.round((now() - startedAt) / 1000),
-        pending_bytes: spool.pendingBytes(),
-        unattributed_streams: unattributedCount(),
-        cpu: Math.round(loadavg()[0]! * 100) / 100,
-        mem: Math.round((1 - freemem() / totalmem()) * 100) / 100,
-        last_error: logger.lastError(),
-        streams: streamSummaries(),
-      });
-      const next = new Set(response.projects);
-      if (next.size > 0) {
-        registered.clear();
-        for (const project of next) {
-          registered.add(project);
-        }
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      logger.warn("心跳失败", { error: message });
-    }
-  }
-
   async function runOnce(): Promise<void> {
     await scanOnce();
     await pushAll();
@@ -420,12 +269,24 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
       clearInterval(heartbeatTimer);
       heartbeatTimer = null;
     }
+    if (discoveryTimer !== null) {
+      clearInterval(discoveryTimer);
+      discoveryTimer = null;
+    }
+    if (configSyncTimer !== null) {
+      clearInterval(configSyncTimer);
+      configSyncTimer = null;
+    }
     saveState(config.stateDir, state);
+    lock?.release();
+    lock = null;
     logger.info("采集器已停止", { streams: Object.keys(state.streams).length });
     stopping?.();
   }
 
   async function start(): Promise<void> {
+    // 每机单 aw-node:拿不到锁直接失败退出,launchd 不会误拉起第二份副作用
+    lock = acquireLock(config.stateDir);
     logger.info("采集器启动", {
       collectorId: config.collectorId,
       ingestUrl: config.ingestUrl,
@@ -456,10 +317,18 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
     process.once("SIGTERM", () => onSignal("SIGTERM"));
     process.once("SIGINT", () => onSignal("SIGINT"));
 
-    await heartbeatOnce();
+    await heartbeat.once();
     heartbeatTimer = setInterval(() => {
-      void heartbeatOnce();
+      void heartbeat.once();
     }, config.heartbeatMs);
+    await discovery.once();
+    discoveryTimer = setInterval(() => {
+      void discovery.once();
+    }, config.discoveryMs);
+    await configSync.once();
+    configSyncTimer = setInterval(() => {
+      void configSync.once();
+    }, config.configSyncMs);
     void loop();
     await stopped;
   }
