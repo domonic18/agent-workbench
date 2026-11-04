@@ -9,7 +9,7 @@
   - 事实源在控制台 PostgreSQL（work_item / work_trigger / worker_inbox / task / a2a_message / capability / agent_run）；WorkItem 的 Mandate 与 Task/Run 分离，Assignment/Input/Handback 不冒充 A2A；**不使用飞书黑板，不做投影**
   - 控制台容器内监听 `0.0.0.0:8787`，宿主机仅通过 `127.0.0.1:8787` 发布，不自己处理 TLS；提供 `/healthz`；经 frp 以 `aw.example.com` 暴露
   - frpc 两条独立规则：`aw.example.com → 8787`（http）、`tp.example.com:8443 → 443`（tcp，给 Teleport proxy；443 已被 frps 的 HTTPS vhost 占用），互不复用
-  - 跨机：每台运行 Agent 的机器只跑一个 `aw-node`（采集 + Claude Code 调度），launchd 常驻，采集模块只经 `/api/ingest` 单向推送；WorkBuddy 用官方 automations 轮询，首版 Run/对话/Token 显示「未接入 / —」；Teleport node agent 装目标机
+  - 跨机：每台运行 Agent 的机器只跑一个 `aw-node`（采集 + Claude Code 调度），launchd 常驻，采集模块只经 `/api/ingest` 单向推送；无 aw-node 的外部运行时（WorkBuddy/Codex/DeepSeek harness）拿 Agent Bearer 直接打 `/mcp`、用官方 automations 轮询，首版 Run/对话/Token 显示「未接入 / —」；**判别依据是 Agent 是否绑定机器（`agent.machine_id` 为空），不是运行时名称**；Teleport node agent 装目标机
   - 授权：SSH / 数据库访问走 Teleport CE + tbot 的 15 分钟短时证书，不自研证书签发；身份按 Agent 建 bot、任务以 trait `aw_task_id` 携带，证书扩展用 `external.*` 插值（`internal.*` 不插值）；Teleport CE 为 AGPL-3.0，独立容器运行，只经 API 调用
   - **三平面**：展示面（浏览器 B/S，不做任何约束判定）/ 控制面（策略、判定、审计、确定性 Router）/ 执行面（每台机一个 `aw-node`）。控制台经同一 HTTP 服务提供远程 Streamable HTTP MCP，只含 `task / a2a / kb / work` 控制工具，以 Agent Bearer 鉴权并由服务端校验归属，**不引入 run_token**；**本机第三方 MCP、Claude Code 原生工具与终端直跑均不在项目管控边界内**（2026-11-03 裁决）；一期不做 OS 级沙箱、托盘与进程急停
   - 不重写 Agent 运行时（Claude Code / cc-connect 是资产）；Source Agent 只整理事实，业务路由只查 Thread owner 与 Git 版本化 RouteRule，未知或冲突交人，**一期不做在线 Slow Router**
