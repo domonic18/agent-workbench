@@ -1,3 +1,4 @@
+import type { DeliveredAgentConfig } from "../../shared/aw-node-wire.js";
 import { newPrefixedId } from "../../shared/ids.js";
 import type { Db } from "../../store/database.js";
 import {
@@ -15,6 +16,8 @@ import {
 } from "../../store/repositories/identity.js";
 import { hashSecret, newSecret } from "../security/secrets.js";
 import { BootstrapError } from "./errors.js";
+
+export type { DeliveredAgentConfig } from "../../shared/aw-node-wire.js";
 
 /** key 是 Git 项目注册表引用的稳定键:小写字母数字与连字符,不以连字符开头/结尾 */
 export const KEY_PATTERN = /^[a-z0-9][a-z0-9-]{1,62}$/;
@@ -136,17 +139,6 @@ export async function confirmAgents(
     }
     return confirmed;
   });
-}
-
-export interface DeliveredAgentConfig {
-  agent_id: string;
-  key: string;
-  project: string;
-  config_version: number;
-  /** true=本次轮换并携带明文密钥(明文仅出现在本响应);false=已生效,不含明文 */
-  rotated: boolean;
-  secret?: string;
-  mcp: { endpoint: string };
 }
 
 function mcpOf(agent: AgentRecord): { endpoint: string } {

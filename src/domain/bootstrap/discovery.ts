@@ -1,3 +1,7 @@
+import type {
+  DiscoveryProjectReport,
+  DiscoveryReport,
+} from "../../shared/aw-node-wire.js";
 import type { Db } from "../../store/database.js";
 import {
   listActiveAgentProjects,
@@ -6,17 +10,8 @@ import {
 } from "../../store/repositories/identity.js";
 import { BootstrapError } from "./errors.js";
 
-export interface DiscoveryProjectMeta {
-  name: string;
-  cwd?: string | undefined;
-  /** 透传 aw-node 读到的本机元数据,控制台只预填不解释 */
-  agents?: unknown[] | undefined;
-  channels?: unknown[] | undefined;
-}
-
-export interface DiscoveryReport {
-  projects: DiscoveryProjectMeta[];
-}
+export type { DiscoveryReport } from "../../shared/aw-node-wire.js";
+export type DiscoveryProjectMeta = DiscoveryProjectReport;
 
 /** 上报整包覆盖:发现结果反映 aw-node 最新一次扫描,不做增量合并 */
 export async function saveDiscoveryReport(
