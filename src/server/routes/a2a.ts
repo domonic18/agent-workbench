@@ -8,12 +8,7 @@ import type { Db } from "../../store/database.js";
 import type { AgentRecord } from "../../store/repositories/identity.js";
 import { requireAgentAuth } from "../middleware/agent-auth.js";
 import { requireIdempotencyKey } from "../middleware/session.js";
-import {
-  buildAcceptBulletin,
-  buildClosureBulletin,
-  buildHandoffBulletin,
-  enqueueCollabBulletin,
-} from "../notification/collab.js";
+import { announceAck, announceHandoff } from "../../domain/collab/announce.js";
 
 export interface A2aRoutesOptions {
   db: Db;
@@ -118,16 +113,15 @@ export function registerA2aRoutes(app: FastifyInstance, options: A2aRoutesOption
           ...(rawReplyTo === undefined ? {} : { replyToMsgId: rawReplyTo }),
         });
         // ① 交接播报:控制台经发件箱直发协作群,不返回 notify 给 proxy(2026-11-02 裁决)
-        if (options.collabChatId !== undefined) {
-          const notice = await service.handoffNotice(result.msgId);
-          if (notice !== null) {
-            await enqueueCollabBulletin(
-              db,
-              buildHandoffBulletin(notice, options.collabChatId),
-              options.now?.(),
-            );
-          }
-        }
+        await announceHandoff(
+          {
+            db,
+            ...(options.collabChatId === undefined ? {} : { chatId: options.collabChatId }),
+            ...(options.now === undefined ? {} : { now: options.now }),
+          },
+          service,
+          result.msgId,
+        );
         return reply.code(201).send({
           msg_id: result.msgId,
           thread_id: result.threadId,
@@ -201,26 +195,17 @@ export function registerA2aRoutes(app: FastifyInstance, options: A2aRoutesOption
     try {
       const autoClosed = await service.ack(agent.id, msgId, taskId === undefined ? {} : { taskId });
       // ② 接单播报 + ④ 验收播报:控制台直发,入队与业务同库,不影响 ack 判定语义
-      if (options.collabChatId !== undefined) {
-        const accept = await service.acceptNotice(msgId, taskId);
-        if (accept !== null) {
-          await enqueueCollabBulletin(
-            db,
-            buildAcceptBulletin(accept, options.collabChatId),
-            options.now?.(),
-          );
-        }
-        for (const closed of autoClosed) {
-          await enqueueCollabBulletin(
-            db,
-            buildClosureBulletin(
-              { taskId: closed.id, title: closed.title },
-              options.collabChatId,
-            ),
-            options.now?.(),
-          );
-        }
-      }
+      await announceAck(
+        {
+          db,
+          ...(options.collabChatId === undefined ? {} : { chatId: options.collabChatId }),
+          ...(options.now === undefined ? {} : { now: options.now }),
+        },
+        service,
+        msgId,
+        taskId,
+        autoClosed,
+      );
       return { ok: true };
     } catch (error) {
       if (error instanceof A2aError) {

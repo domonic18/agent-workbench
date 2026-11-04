@@ -3,7 +3,7 @@ import type {
   ClosureNotice,
   CompletionNotice,
   HandoffNotice,
-} from "../../domain/collab/notice.js";
+} from "./notice.js";
 import { enqueuePush } from "../../reliability/outbox.js";
 import type { Db } from "../../store/database.js";
 

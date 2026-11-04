@@ -7,11 +7,7 @@ import type { Db } from "../../store/database.js";
 import type { AgentRecord } from "../../store/repositories/identity.js";
 import { requireAgentAuth } from "../middleware/agent-auth.js";
 import { requireIdempotencyKey } from "../middleware/session.js";
-import {
-  buildClosureBulletin,
-  buildCompletionBulletin,
-  enqueueCollabBulletin,
-} from "../notification/collab.js";
+import { announceTaskUpdate } from "../../domain/collab/announce.js";
 import { sendError, toTaskDto } from "./task-dto.js";
 
 const createSchema = z.object({
@@ -97,25 +93,16 @@ export function registerTaskRoutes(app: FastifyInstance, options: TaskRoutesOpti
           assignee: agent.id,
         });
         // ③ 完成播报 + ④ 验收播报:控制台经发件箱直发,不返回 notify 给 proxy(2026-11-02 裁决)
-        if (options.collabChatId !== undefined) {
-          if (task.status === "done") {
-            const notice = await service.completionNotice(task.id);
-            if (notice !== null) {
-              await enqueueCollabBulletin(
-                db,
-                buildCompletionBulletin(notice, options.collabChatId),
-                options.now?.(),
-              );
-            }
-          }
-          for (const closed of autoClosed) {
-            await enqueueCollabBulletin(
-              db,
-              buildClosureBulletin({ taskId: closed.id, title: closed.title }, options.collabChatId),
-              options.now?.(),
-            );
-          }
-        }
+        await announceTaskUpdate(
+          {
+            db,
+            ...(options.collabChatId === undefined ? {} : { chatId: options.collabChatId }),
+            ...(options.now === undefined ? {} : { now: options.now }),
+          },
+          service,
+          task,
+          autoClosed,
+        );
         return { task: toTaskDto(task) };
       } catch (error) {
         if (error instanceof TaskError) {

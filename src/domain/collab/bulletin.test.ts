@@ -4,7 +4,7 @@ import type {
   ClosureNotice,
   CompletionNotice,
   HandoffNotice,
-} from "../../domain/collab/notice.js";
+} from "./notice.js";
 import { openDatabase } from "../../store/database.js";
 import { findOutboxByKey } from "../../store/repositories/outbox.js";
 import {
@@ -13,7 +13,7 @@ import {
   buildCompletionBulletin,
   buildHandoffBulletin,
   enqueueCollabBulletin,
-} from "./collab.js";
+} from "./bulletin.js";
 
 const HANDOFF: HandoffNotice = {
   msgId: "msg_1",
