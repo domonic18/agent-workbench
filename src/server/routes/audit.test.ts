@@ -67,8 +67,8 @@ describe("audit 路由", () => {
   });
 
   it("列出缺口并可按 kind 过滤", async () => {
-    insertGap(db, gap({ dedupKey: "missing_session:1", kind: "missing_session", detectedAt: 1000 }));
-    insertGap(
+    await insertGap(db, gap({ dedupKey: "missing_session:1", kind: "missing_session", detectedAt: 1000 }));
+    await insertGap(
       db,
       gap({ dedupKey: "orphan_session:s9", kind: "orphan_session", ticketId: "tkt_9", detectedAt: 2000 }),
     );
@@ -102,9 +102,9 @@ describe("audit 路由", () => {
   });
 
   it("keyset 分页逐页取完", async () => {
-    insertGap(db, gap({ dedupKey: "g1", detectedAt: 1000 }));
-    insertGap(db, gap({ dedupKey: "g2", detectedAt: 2000 }));
-    insertGap(db, gap({ dedupKey: "g3", detectedAt: 3000 }));
+    await insertGap(db, gap({ dedupKey: "g1", detectedAt: 1000 }));
+    await insertGap(db, gap({ dedupKey: "g2", detectedAt: 2000 }));
+    await insertGap(db, gap({ dedupKey: "g3", detectedAt: 3000 }));
 
     const first = await app.inject({
       method: "GET",
