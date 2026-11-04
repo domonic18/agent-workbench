@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { openDatabase, type Db } from "../store/database.js";
-import { ensureConsoleCredential, verifyConsolePassword } from "./credential.js";
+import {
+  ensureConsoleCredential,
+  hasConsoleCredential,
+  verifyConsolePassword,
+} from "./credential.js";
 
 async function freshDb(): Promise<Db> {
   return openDatabase();
@@ -35,10 +39,12 @@ describe("console credential", () => {
     await db.close();
   });
 
-  it("缺种子或种子过短时拒绝启动", async () => {
+  it("缺种子不抛错(bootstrap mode);种子过短仍拒绝启动", async () => {
     const db = await freshDb();
-    await expect(ensureConsoleCredential(db)).rejects.toThrow(/CONSOLE_INIT_PASSWORD/);
+    expect(await ensureConsoleCredential(db)).toEqual({ created: false });
+    expect(await hasConsoleCredential(db)).toBe(false);
     await expect(ensureConsoleCredential(db, "12345")).rejects.toThrow(/至少 6 位/);
+    expect(await hasConsoleCredential(db)).toBe(false);
     await db.close();
   });
 
