@@ -22,14 +22,15 @@ export interface NewA2aThread {
   createdAt: number;
 }
 
-export async function insertThread(db: Db, row: NewA2aThread): Promise<void>{
+export async function insertThread(db: Db, row: NewA2aThread): Promise<void> {
   await db.run(
     `INSERT INTO a2a_thread
        (id, initiator_task_id, initiator_agent, responder_agent, created_at)
-     VALUES (?, ?, ?, ?, ?)`,  row);
+     VALUES (?, ?, ?, ?, ?)`,
+    row.id, row.initiatorTaskId, row.initiatorAgent, row.responderAgent, row.createdAt);
 }
 
-export async function findThreadById(db: Db, id: string): Promise<A2aThreadRecord | undefined>{
+export async function findThreadById(db: Db, id: string): Promise<A2aThreadRecord | undefined> {
   return await db.get(`SELECT ${THREAD_COLUMNS} FROM a2a_thread WHERE id = ?`, id) as
     | A2aThreadRecord
     | undefined;
@@ -38,7 +39,7 @@ export async function findThreadById(db: Db, id: string): Promise<A2aThreadRecor
 export async function findThreadByInitiator(
   db: Db,
   initiatorTaskId: string,
-  responderAgent: string): Promise<A2aThreadRecord | undefined>{
+  responderAgent: string): Promise<A2aThreadRecord | undefined> {
   return await db.get(
       `SELECT ${THREAD_COLUMNS} FROM a2a_thread
        WHERE initiator_task_id = ? AND responder_agent = ?`,  initiatorTaskId, responderAgent) as A2aThreadRecord | undefined;
@@ -91,29 +92,28 @@ export interface NewA2aMessage {
   createdAt: number;
 }
 
-export async function insertMessage(db: Db, row: NewA2aMessage): Promise<void>{
-  await db.run(
-    `INSERT INTO a2a_message
+export function insertMessage(db: Db, row: NewA2aMessage): Promise<void>{
+  await await db.run(`INSERT INTO a2a_message
        (id, thread_id, task_id, round, reply_to_msg_id, from_agent, to_agent, intent,
         summary, expect, deadline_at, refs_json, auth_ticket, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?)`,  row);
+        ?, ?, ?, ?, ?, ?)`, row.id, row.threadId, row.taskId, row.round, row.replyToMsgId, row.fromAgent, row.toAgent, row.intent, row.summary, row.expect, row.deadlineAt, row.refsJson, row.authTicket, row.createdAt);
 }
 
-export async function findMessageById(db: Db, id: string): Promise<A2aMessageRecord | undefined>{
+export function findMessageById(db: Db, id: string): Promise<A2aMessageRecord | undefined>{
   return await db.get(`SELECT ${MESSAGE_COLUMNS} FROM a2a_message WHERE id = ?`, id) as
     | A2aMessageRecord
     | undefined;
 }
 
-export async function maxRound(db: Db, threadId: string): Promise<number>{
+export function maxRound(db: Db, threadId: string): Promise<number>{
   const row = await db.get("SELECT COALESCE(MAX(round), 0) AS round FROM a2a_message WHERE thread_id = ?", threadId) as { round: number };
   return row.round;
 }
 
-export async function markAck(db: Db, id: string, now: number): Promise<boolean>{
+export function markAck(db: Db, id: string, now: number): Promise<boolean>{
   return (
-    (await db.run("UPDATE a2a_message SET ack_at = ? WHERE id = ? AND ack_at IS NULL", { id, now })).changes === 1
+    (await db.run("UPDATE a2a_message SET ack_at = @now WHERE id = @id AND ack_at IS NULL", { id, now })).changes === 1
   );
 }
 
@@ -144,14 +144,13 @@ const DEAD_LETTER_COLUMNS = `
   task_id AS taskId, reason, payload_json AS payloadJson, created_at AS createdAt
 `;
 
-export async function insertDeadLetter(db: Db, row: NewA2aDeadLetter): Promise<void>{
-  await db.run(
-    `INSERT INTO a2a_dead_letter
+export function insertDeadLetter(db: Db, row: NewA2aDeadLetter): Promise<void>{
+  await await db.run(`INSERT INTO a2a_dead_letter
        (id, msg_id, from_agent, to_agent, task_id, reason, payload_json, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,  row);
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, row.id, row.msgId, row.fromAgent, row.toAgent, row.taskId, row.reason, row.payloadJson, row.createdAt);
 }
 
-export async function findDeadLetterByMsgId(db: Db, msgId: string): Promise<A2aDeadLetterRecord | undefined>{
+export function findDeadLetterByMsgId(db: Db, msgId: string): Promise<A2aDeadLetterRecord | undefined>{
   return await db.get(`SELECT ${DEAD_LETTER_COLUMNS} FROM a2a_dead_letter WHERE msg_id = ? LIMIT 1`, msgId) as A2aDeadLetterRecord | undefined;
 }
 
@@ -159,16 +158,16 @@ export async function findDeadLetterByMsgId(db: Db, msgId: string): Promise<A2aD
  * 死信巡检候选(01 §9):deadline 已过、仍未 ACK、出箱尚未终结的消息。
  * notify 无 deadline,天然不在结果内。
  */
-export async function listExpiredUnacked(db: Db, now: number, limit: number): Promise<A2aMessageRecord[]>{
+export function listExpiredUnacked(db: Db, now: number, limit: number): Promise<A2aMessageRecord[]>{
   return await db.all(
       `SELECT ${MESSAGE_COLUMNS} FROM a2a_message
-       WHERE deadline_at IS NOT NULL AND deadline_at <= ? AND ack_at IS NULL
+       WHERE deadline_at IS NOT NULL AND deadline_at <= @now AND ack_at IS NULL
          AND EXISTS (
            SELECT 1 FROM outbox o
            WHERE o.msg_id = a2a_message.id AND o.channel = 'pull'
              AND o.status IN ('pending', 'claimed', 'sending', 'retry_wait')
          )
-       ORDER BY deadline_at ASC, id ASC LIMIT ?`,  { now, limit }) as A2aMessageRecord[];
+       ORDER BY deadline_at ASC, id ASC LIMIT @limit`,  { now, limit }) as A2aMessageRecord[];
 }
 
 export interface InboxQuery {
@@ -183,12 +182,12 @@ export interface InboxQuery {
  * 只返回 `to` 为本人、未 ACK、且出箱行待领取/待重试的消息。
  * 被拉走但未 ACK 的行在租约过期后由 reconcileStaleLeases 回 retry_wait,重新可见。
  */
-export async function listInbox(db: Db, agentId: string, query: InboxQuery): Promise<A2aMessageRecord[]>{
+export function listInbox(db: Db, agentId: string, query: InboxQuery): Promise<A2aMessageRecord[]>{
   const params: Record<string, unknown> = { agentId, now: query.now, limit: query.limit };
   let cursor = "";
   if (query.after !== undefined) {
     cursor =
-      "AND (m.created_at > ? OR (m.created_at = ? AND m.id > ?))";
+      "AND (m.created_at > @afterCreatedAt OR (m.created_at = @afterCreatedAt AND m.id > @afterId))";
     params.afterCreatedAt = query.after.createdAt;
     params.afterId = query.after.id;
   }
@@ -197,28 +196,28 @@ export async function listInbox(db: Db, agentId: string, query: InboxQuery): Pro
        WHERE id IN (
          SELECT m.id FROM a2a_message m
          JOIN outbox o ON o.msg_id = m.id AND o.channel = 'pull'
-         WHERE m.to_agent = ? AND m.ack_at IS NULL
-           AND o.status IN ('pending', 'retry_wait') AND o.available_at <= ?
+         WHERE m.to_agent = @agentId AND m.ack_at IS NULL
+           AND o.status IN ('pending', 'retry_wait') AND o.available_at <= @now
            ${cursor}
        )
-       ORDER BY created_at ASC, id ASC LIMIT ?`,  params) as A2aMessageRecord[];
+       ORDER BY created_at ASC, id ASC LIMIT @limit`,  params) as A2aMessageRecord[];
 }
 
 /**
  * 任务相关的线程(01 §4):它发起的、它以消息 task_id 参与的,
  * 或它是某条 ACK 交接出的下游任务(handoff 事件记 upstream_msg_id)。
  */
-export async function listThreadsForTask(db: Db, taskId: string): Promise<A2aThreadRecord[]>{
+export function listThreadsForTask(db: Db, taskId: string): Promise<A2aThreadRecord[]>{
   return await db.all(
       `SELECT ${THREAD_COLUMNS} FROM a2a_thread t
-       WHERE t.initiator_task_id = ?
+       WHERE t.initiator_task_id = @taskId
          OR EXISTS (
-           SELECT 1 FROM a2a_message m WHERE m.thread_id = t.id AND m.task_id = ?
+           SELECT 1 FROM a2a_message m WHERE m.thread_id = t.id AND m.task_id = @taskId
          )
          OR EXISTS (
            SELECT 1 FROM task_event e
            JOIN a2a_message hm ON hm.id = json_extract(e.payload_json, '$.upstream_msg_id')
-           WHERE e.task_id = ?
+           WHERE e.task_id = @taskId
              AND e.kind = 'handoff'
              AND json_extract(e.payload_json, '$.relation') = 'a2a'
              AND hm.thread_id = t.id
@@ -233,7 +232,7 @@ export interface A2aThreadMessageRecord extends A2aMessageRecord {
   deliveryError: string | null;
 }
 
-export async function listMessagesByThreadIds(
+export function listMessagesByThreadIds(
   db: Db,
   threadIds: readonly string[]): Promise<A2aThreadMessageRecord[]>{
   if (threadIds.length === 0) {

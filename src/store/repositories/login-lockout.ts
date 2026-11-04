@@ -11,7 +11,7 @@ const COLUMNS = `
   source, failures, locked_until AS lockedUntil, updated_at AS updatedAt
 `;
 
-export async function findLoginFailure(db: Db, source: string): Promise<LoginFailureRecord | undefined>{
+export function findLoginFailure(db: Db, source: string): Promise<LoginFailureRecord | undefined>{
   return await db.get(`SELECT ${COLUMNS} FROM login_failure WHERE source = ?`, source) as
     | LoginFailureRecord
     | undefined;

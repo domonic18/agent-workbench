@@ -21,7 +21,7 @@ export function createSession(
 }
 
 /** 只返回未过期会话;过期判定以库中 expires_at 为准 */
-export async function findActiveSession(db: Db, id: string, now: number): Promise<SessionRecord | undefined>{
+export function findActiveSession(db: Db, id: string, now: number): Promise<SessionRecord | undefined>{
   return await db.get(`SELECT ${COLUMNS} FROM session WHERE id = ? AND expires_at > ?`, id, now) as SessionRecord | undefined;
 }
 
