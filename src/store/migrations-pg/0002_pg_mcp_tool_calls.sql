@@ -3,3 +3,8 @@
 -- 采集回填的调用仍带 run_id 与 task_id,行为不变。
 ALTER TABLE tool_call_log ALTER COLUMN run_id DROP NOT NULL;
 ALTER TABLE tool_call_log ALTER COLUMN task_id DROP NOT NULL;
+-- 审批通道移除(M3.8-3 闸门收敛),verdict 收敛为 allow/deny;
+-- 0001 已发布不可改写,此处收敛约束,新库与旧库最终一致。
+ALTER TABLE tool_call_log DROP CONSTRAINT tool_call_log_verdict_check;
+ALTER TABLE tool_call_log
+  ADD CONSTRAINT tool_call_log_verdict_check CHECK (verdict IN ('allow', 'deny'));
