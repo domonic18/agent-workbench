@@ -19,7 +19,7 @@ describe("runMigrations", () => {
   it("空库执行建表并记账", async () => {
     const db = await createTestDatabase(resolveTestAdminUrl());
 
-    expect(await runMigrations(db)).toBe(6);
+    expect(await runMigrations(db)).toBe(7);
     expect(await tableNames(db)).toEqual(
       expect.arrayContaining([
         "task",
@@ -46,6 +46,12 @@ describe("runMigrations", () => {
         "login_failure",
         "idempotency_record",
         "scope_revision",
+        "work_item",
+        "work_item_event",
+        "work_trigger",
+        "work_thread",
+        "thread_subscription",
+        "worker_inbox",
         "knowledge_entry",
         "knowledge_chunk",
         "knowledge_vec",
@@ -61,6 +67,7 @@ describe("runMigrations", () => {
       { version: 4, name: "bootstrap_delivery" },
       { version: 5, name: "bootstrap_assembly" },
       { version: 6, name: "machine_less_agent" },
+      { version: 7, name: "work_coordination" },
     ]);
     await db.close();
   });

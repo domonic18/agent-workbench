@@ -20,7 +20,7 @@ export const TASK_STAGES = [
 ] as const;
 export type TaskStage = (typeof TASK_STAGES)[number];
 
-export const TASK_ORIGINS = ["feishu", "a2a"] as const;
+export const TASK_ORIGINS = ["feishu", "a2a", "work_item"] as const;
 export type TaskOrigin = (typeof TASK_ORIGINS)[number];
 
 export const TASK_EVENT_KINDS = [
@@ -46,6 +46,47 @@ export const TASK_LIMITS = {
 
 export const A2A_INTENTS = ["request", "reply", "notify", "escalate"] as const;
 export type A2AIntent = (typeof A2A_INTENTS)[number];
+
+/** 工作事项(arch/02 §3.9):Mandate 快照创建时定型;status 是生命周期,stage 是当前环节 */
+export const WORK_ITEM_STATUSES = ["open", "done", "cancelled"] as const;
+export type WorkItemStatus = (typeof WORK_ITEM_STATUSES)[number];
+
+export const WORK_ITEM_STAGES = [
+  "intake",
+  "align",
+  "execute",
+  "review",
+  "verify",
+  "release",
+] as const;
+export type WorkItemStage = (typeof WORK_ITEM_STAGES)[number];
+
+/** attention 回答「当前是否需要人、为何需要」,不复制 Task/Run 状态 */
+export const WORK_ITEM_ATTENTIONS = ["none", "person", "blocked", "acceptance", "stalled"] as const;
+export type WorkItemAttention = (typeof WORK_ITEM_ATTENTIONS)[number];
+
+/** 触发事实的唯一确定性处置;同一事件重放返回首次处置,不改写 */
+export const WORK_TRIGGER_DISPOSITIONS = [
+  "received",
+  "continued",
+  "routed",
+  "needs_person",
+  "ignored",
+] as const;
+export type WorkTriggerDisposition = (typeof WORK_TRIGGER_DISPOSITIONS)[number];
+
+/** 控制面到 Worker 的派工与续接输入;与 A2A 信封、WorkItem 完成状态互不复用 */
+export const WORKER_INBOX_KINDS = ["assignment", "input"] as const;
+export type WorkerInboxKind = (typeof WORKER_INBOX_KINDS)[number];
+
+export const WORKER_INBOX_STATUSES = [
+  "pending",
+  "claimed",
+  "acked",
+  "handed_back",
+  "failed",
+] as const;
+export type WorkerInboxStatus = (typeof WORKER_INBOX_STATUSES)[number];
 
 /** 线程状态不落库(02 §3.3),读取时按消息与投递记录现算 */
 export const A2A_THREAD_STATUSES = ["open", "awaiting_reply", "completed", "expired"] as const;
