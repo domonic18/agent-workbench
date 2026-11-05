@@ -28,6 +28,7 @@ import { startIngestReceiptCleaner } from "./jobs/ingest-receipt.js";
 import { startOutboxReclaimer } from "./jobs/outbox-reclaim.js";
 import { startCapabilityReconciler } from "./jobs/reconcile.js";
 import { startOutboxSender, type OutboxSender } from "./jobs/send-worker.js";
+import { startWorkInboxReclaimer } from "./jobs/work-reclaim.js";
 
 // 启动顺序(01 §2):env → 单实例锁 → 打开库 → 迁移与口令初始化 → 注册路由 → 监听。
 // 锁先于开库:第二个进程不能在第一个进程的库上跑迁移。
@@ -103,6 +104,9 @@ const reconciler = startCapabilityReconciler(service, app.log);
 // 租约回收独立于 push worker:未配置飞书时 pull 通道的过期租约同样要回收
 const outboxReclaimer = startOutboxReclaimer(db, app.log);
 
+// worker_inbox 过期租约回收(01 §10):只改状态不建行,重投不重复建 Task
+const workInboxReclaimer = startWorkInboxReclaimer(db, app.log);
+
 // 死信巡检(01 §9):复用路由的 A2A 实例,回执落库后能直接唤醒发起方的长轮询
 const deadLetters = startDeadLetterSweeper(db, app.log, {
   wake: (agentId) => a2a.wake(agentId),
@@ -150,6 +154,7 @@ function shutdown(): void {
   shuttingDown = true;
   reconciler.stop();
   outboxReclaimer.stop();
+  workInboxReclaimer.stop();
   auditReconciler?.stop();
   deadLetters.stop();
   ingestReceipts.stop();
