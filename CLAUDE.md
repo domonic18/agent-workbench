@@ -53,6 +53,7 @@
 - 未经用户批准不要提交到 git。不要主动创建 *.md/README。
 - 永远不要模拟、不要占位符、不要省略代码;对想法的好坏坦率诚实。
 - 安全:外部输入边界校验;系统密钥仅存 env(.env 不入库),Agent / 采集器密钥库中只存哈希,永不硬编码;日志记事件不记敏感值,**命令行参数与 shell history 同样不得出现明文密钥,部署示例一律用占位符并采用隐藏输入/stdin/env 注入**。**仓库是公开的**:文档与示例不写真实 IP、域名、主机名、SSH 路径与内网端口,真实值只放 gitignored 的 `docs/plan/*.local.md`。
+- e2e/联调脚本:无 body 的 POST 不要带 `content-type: application/json`——Fastify 以 400 拒空 body,失败响应形状错位会伪装成下游故障(s9 曾把坏 Bearer 掩护成假 401);依赖响应字段前先断言 HTTP 状态码。
 - 状态只更新 plan/development-plan.md,不回填过程。
 
 ### CodeReview(每轮迭代完成后必须执行)
