@@ -25,6 +25,8 @@ export interface BatchRequest {
 
 export interface BatchResponse {
   acked_seq: number;
+  /** 被服务端跳过(内容存不下)的坏项数;大于 0 表示有事件没入库 */
+  rejected?: number;
 }
 
 export class ConsoleHttpError extends Error {
@@ -127,7 +129,13 @@ export function createConsoleClient(options: ConsoleClientOptions): ConsoleClien
       if (typeof acked !== "number" || !Number.isInteger(acked) || acked < 0) {
         throw new Error("控制台响应缺少有效的 acked_seq");
       }
-      return { acked_seq: acked };
+      const rejected = typeof body === "object" && body !== null
+        ? (body as Record<string, unknown>).rejected
+        : undefined;
+      return {
+        acked_seq: acked,
+        rejected: typeof rejected === "number" ? rejected : 0,
+      };
     },
 
     async postHeartbeat(payload) {

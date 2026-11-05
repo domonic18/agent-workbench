@@ -72,7 +72,7 @@ describe("ingest 路由", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ acked_seq: 2 });
+    expect(response.json()).toEqual({ acked_seq: 2, rejected: 0 });
     const run = (await findRunningRunForStream(fixture.db, fixture.agentId, "claude-session:s1"))!;
     expect(await listTimelineEventsByRun(fixture.db, run.id)).toHaveLength(2);
   });
@@ -88,7 +88,7 @@ describe("ingest 路由", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ acked_seq: 2_148_526_901 });
+    expect(response.json()).toEqual({ acked_seq: 2_148_526_901, rejected: 0 });
     expect(
       await hasIngestReceipt(fixture.db, {
         collectorId: "m1",
@@ -166,7 +166,7 @@ describe("ingest 路由", () => {
     ]);
   });
 
-  it("部分成功返回 200 与已提交的最大 seq", async () => {
+  it("坏项被跳过时返回 200、越过坏项的 seq 与被拒计数", async () => {
     const response = await app.inject({
       method: "POST",
       url: "/api/ingest",
@@ -181,14 +181,14 @@ describe("ingest 路由", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ acked_seq: 1 });
+    expect(response.json()).toEqual({ acked_seq: 3, rejected: 1 });
     expect(
       await hasIngestReceipt(fixture.db, {
         collectorId: "m1",
         streamId: "claude-session:s1",
         seq: 3,
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("心跳推进机器存活时间并回带已登记项目", async () => {

@@ -141,7 +141,13 @@ export function registerIngestRoutes(app: FastifyInstance, options: IngestRoutes
           "采集入库在首个失败项处停止",
         );
       }
-      return reply.code(200).send({ acked_seq: result.ackedSeq });
+      if (result.rejected > 0) {
+        request.log.warn(
+          { collectorId: machine.id, streamId: body.stream_id, rejected: result.rejected },
+          "采集入库跳过存不下的坏项",
+        );
+      }
+      return reply.code(200).send({ acked_seq: result.ackedSeq, rejected: result.rejected });
     } catch (error) {
       if (error instanceof IngestError) {
         return sendError(reply, error);

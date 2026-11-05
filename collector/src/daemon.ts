@@ -225,6 +225,12 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
         }
       }
       logger.debug("批次已确认", { streamId, acked: response.acked_seq, size: batch.length });
+      if ((response.rejected ?? 0) > 0) {
+        logger.warn("批次内坏项被服务端跳过,未入库", {
+          streamId,
+          rejected: response.rejected ?? 0,
+        });
+      }
     } catch (error) {
       const previous = backoff.get(streamId)?.attempt ?? 0;
       const attempt = previous + 1;
