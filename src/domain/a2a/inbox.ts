@@ -1,6 +1,6 @@
 import { parseJsonStringArray } from "../../store/json.js";
+import type { A2aInboxItem } from "../../shared/aw-node-wire.js";
 import type { A2aMessageRecord } from "../../store/repositories/a2a.js";
-import type { A2aInboxItem } from "./types.js";
 
 export function toInboxItem(row: A2aMessageRecord): A2aInboxItem {
   return {

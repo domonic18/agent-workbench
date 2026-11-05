@@ -34,10 +34,10 @@ import type { AcceptNotice, CollabAgentRef, HandoffNotice } from "../collab/noti
 import { closeAncestorsIfComplete } from "../task/auto-close.js";
 import { A2aError } from "./errors.js";
 import { toInboxItem } from "./inbox.js";
+import type { A2aInboxItem, A2aInboxResult } from "../../shared/aw-node-wire.js";
 import type {
   A2aAckInput,
-  A2aInboxItem,
-  A2aInboxResult,
+  A2aInboxQuery,
   A2aSendInput,
   A2aSendResult,
   A2aService,
@@ -220,6 +220,7 @@ export function createA2aService(deps: A2aServiceDeps): A2aService {
   async function takeVisible(
     agentId: string,
     after: { createdAt: number; id: string } | undefined,
+    claim: boolean,
   ): Promise<A2aInboxResult> {
     const at = now();
     const rows = await listInbox(db, agentId, {
@@ -230,9 +231,11 @@ export function createA2aService(deps: A2aServiceDeps): A2aService {
     const leaseUntil = at + OUTBOX_TIMEOUTS.leaseMs;
     const items: A2aInboxItem[] = [];
     for (const row of rows) {
-      // 领取失败说明已被另一次拉取拿走;本条跳过,等租约回收后重新可见
-      if ((await claimPullByMsgId(db, row.id, at, leaseUntil)) === undefined) {
-        continue;
+      if (claim) {
+        // 领取失败说明已被另一次拉取拿走;本条跳过,等租约回收后重新可见
+        if ((await claimPullByMsgId(db, row.id, at, leaseUntil)) === undefined) {
+          continue;
+        }
       }
       items.push(toInboxItem(row));
     }
@@ -246,23 +249,24 @@ export function createA2aService(deps: A2aServiceDeps): A2aService {
     };
   }
 
-  async function inbox(
-    agentId: string,
-    opts: { cursor?: string; waitMs?: number } = {},
-  ): Promise<A2aInboxResult> {
+  async function inbox(agentId: string, opts: A2aInboxQuery = {}): Promise<A2aInboxResult> {
     const after = opts.cursor === undefined ? undefined : parseKeysetCursor(opts.cursor);
     if (opts.cursor !== undefined && after === undefined) {
       throw new A2aError("VALIDATION_FAILED", "cursor 格式应为 <createdAt>:<id>");
     }
+    // peek 只看不领:调度器预检用,不占租约也不等唤醒,消息仍留给 Agent 自己的会话领取
+    if (opts.peek === true) {
+      return await takeVisible(agentId, after, false);
+    }
     const requested = opts.waitMs ?? defaultWaitMs;
     const waitMs = Number.isFinite(requested) ? Math.min(Math.max(requested, 0), A2A_INBOX.maxWaitMs) : defaultWaitMs;
 
-    const first = await takeVisible(agentId, after);
+    const first = await takeVisible(agentId, after, true);
     if (first.items.length > 0 || waitMs === 0) {
       return first;
     }
     await waitForWake(agentId, waitMs);
-    return await takeVisible(agentId, after);
+    return await takeVisible(agentId, after, true);
   }
 
   async function ack(agentId: string, msgId: string, input: A2aAckInput = {}): Promise<TaskRecord[]> {

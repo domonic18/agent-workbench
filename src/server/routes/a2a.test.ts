@@ -258,6 +258,37 @@ describe("a2a 路由", () => {
     expect((second.json() as { items: unknown[] }).items).toEqual([]);
   });
 
+  it("peek 只看不领,消息仍留给下一次正常拉取;非法 peek 422", async () => {
+    await app.inject({
+      method: "POST",
+      url: "/api/a2a/messages",
+      headers: { ...auth("agt_a"), "idempotency-key": `k-${++keySeq}` },
+      payload: messageBody(),
+    });
+
+    const peeked = await app.inject({
+      method: "GET",
+      url: "/api/a2a/inbox?peek=1",
+      headers: auth("agt_b"),
+    });
+    expect(peeked.statusCode).toBe(200);
+    expect((peeked.json() as { items: unknown[] }).items).toHaveLength(1);
+
+    const claimed = await app.inject({
+      method: "GET",
+      url: "/api/a2a/inbox?wait=0",
+      headers: auth("agt_b"),
+    });
+    expect((claimed.json() as { items: unknown[] }).items).toHaveLength(1);
+
+    const bad = await app.inject({
+      method: "GET",
+      url: "/api/a2a/inbox?peek=yes",
+      headers: auth("agt_b"),
+    });
+    expect(bad.statusCode).toBe(422);
+  });
+
   it("ACK request 必带 task_id,成功后写 parent_task_id", async () => {
     const sent = await app.inject({
       method: "POST",

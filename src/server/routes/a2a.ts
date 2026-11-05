@@ -171,10 +171,20 @@ export function registerA2aRoutes(app: FastifyInstance, options: A2aRoutesOption
       }
     }
 
+    // peek 只看不领:aw-node 调度器预检信箱用,不占用消息租约
+    let peek: boolean | undefined;
+    if (query.peek !== undefined) {
+      if (query.peek !== "1" && query.peek !== "true") {
+        return validationFailed(reply, "peek 只能是 1 或 true");
+      }
+      peek = true;
+    }
+
     try {
       return await service.inbox(agent.id, {
         ...(cursor === undefined ? {} : { cursor }),
         ...(waitMs === undefined ? {} : { waitMs }),
+        ...(peek === undefined ? {} : { peek }),
       });
     } catch (error) {
       if (error instanceof A2aError) {

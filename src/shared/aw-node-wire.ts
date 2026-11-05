@@ -2,6 +2,7 @@
  * 控制台 ↔ aw-node 的线上协议类型（snake_case）。
  * 服务端路由/域与 collector 共用同一份,禁止两侧各维护一份。
  */
+import type { A2AIntent } from "./constants.js";
 
 /** POST /api/aw-node/enroll 请求体 */
 export interface EnrollRequestBody {
@@ -58,4 +59,28 @@ export interface ConfigAckResponse {
   ok: boolean;
   config_status: string;
   acked: string[];
+}
+
+/** GET /api/a2a/inbox 响应中的单条消息 */
+export interface A2aInboxItem {
+  msg_id: string;
+  thread_id: string;
+  task_id: string;
+  round: number;
+  reply_to: string | null;
+  from: string;
+  to: string;
+  intent: A2AIntent;
+  summary: string;
+  expect: string;
+  deadline: string | null;
+  refs: string[];
+  auth: { ticket_id: string } | null;
+  created_at: number;
+}
+
+/** GET /api/a2a/inbox 响应 */
+export interface A2aInboxResult {
+  items: A2aInboxItem[];
+  nextCursor: string | null;
 }

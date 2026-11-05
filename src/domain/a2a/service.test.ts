@@ -257,6 +257,29 @@ describe("a2a inbox", () => {
       code: "VALIDATION_FAILED",
     });
   });
+
+  it("peek 只看不领:消息仍可被 Agent 自己的会话领取", async () => {
+    const { db, service } = await prepare();
+    await service.send(sendInput());
+
+    const peeked = await service.inbox("agt_b", { peek: true });
+    expect(peeked.items.map((item) => item.msg_id)).toEqual(["msg_1"]);
+    expect((await findOutboxByKey(db, "idem-1"))?.status).toBe("pending");
+
+    const claimed = await service.inbox("agt_b", { waitMs: 0 });
+    expect(claimed.items.map((item) => item.msg_id)).toEqual(["msg_1"]);
+    expect((await findOutboxByKey(db, "idem-1"))?.status).toBe("claimed");
+    await db.close();
+  });
+
+  it("peek 看不到已被别的会话领走的消息", async () => {
+    const { service } = await prepare();
+    await service.send(sendInput());
+    await service.inbox("agt_b", { waitMs: 0 });
+
+    const peeked = await service.inbox("agt_b", { peek: true });
+    expect(peeked.items).toEqual([]);
+  });
 });
 
 describe("a2a ack", () => {
