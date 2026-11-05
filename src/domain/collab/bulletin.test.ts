@@ -41,57 +41,94 @@ const COMPLETION: CompletionNotice = {
 
 const CLOSURE: ClosureNotice = { taskId: "tsk_up", title: "接口契约联调" };
 
-describe("协作群播报渲染(无 @,控制台直发)", () => {
-  it("① 交接播报:发起方 → 收件方,uuid 取消息 id", () => {
-    expect(buildHandoffBulletin(HANDOFF, "oc_group")).toEqual({
-      chatId: "oc_group",
-      text: "〔交接〕Agent A → Agent B:需要一份接口契约 · 任务 tsk_up",
-      uuid: "msg_1",
-      taskId: "tsk_up",
-    });
+function cardText(card: Record<string, unknown>): {
+  title: string;
+  template: string;
+  elements: string[];
+} {
+  const header = card.header as { title: { content: string }; template: string };
+  const body = card.body as { elements: { tag: string; content?: string }[] };
+  return {
+    title: header.title.content,
+    template: header.template,
+    elements: body.elements.filter((e) => e.tag === "markdown").map((e) => e.content ?? ""),
+  };
+}
+
+describe("协作群播报卡片(无 @,控制台直发)", () => {
+  it("① 交接卡片:发起方 → 收件方,uuid 取消息 id", () => {
+    const bulletin = buildHandoffBulletin(HANDOFF, "oc_group");
+    expect(bulletin.uuid).toBe("msg_1");
+    expect(bulletin.taskId).toBe("tsk_up");
+    const view = cardText(bulletin.card);
+    expect(cardText(bulletin.card).title).toBe("〔交接〕Agent A → Agent B");
+    expect(view.template).toBe("blue");
+    expect(view.elements[0]).toBe("**事项**:需要一份接口契约");
+    expect(view.elements[1]).toContain("任务 `tsk_up`");
+    expect(bulletin.card.schema).toBe("2.0");
   });
 
-  it("② 接单播报:承接方 + 任务标题,uuid 区别于交接", () => {
-    expect(buildAcceptBulletin(ACCEPT, "oc_group")).toEqual({
-      chatId: "oc_group",
-      text: "〔接单〕Agent B 已接单「整理接口契约」 · 任务 tsk_down",
-      uuid: "a2a:ack:msg_1",
-      taskId: "tsk_down",
-    });
+  it("② 接单卡片:承接方 + 任务标题,uuid 区别于交接", () => {
+    const bulletin = buildAcceptBulletin(ACCEPT, "oc_group");
+    expect(bulletin.uuid).toBe("a2a:ack:msg_1");
+    const view = cardText(bulletin.card);
+    expect(view.title).toBe("〔接单〕Agent B 已接单");
+    expect(view.template).toBe("turquoise");
+    expect(view.elements[0]).toBe("**任务**:整理接口契约");
   });
 
-  it("③ 完成播报:完成方 + 结论已同步给发起方,uuid 按任务固定", () => {
-    expect(buildCompletionBulletin(COMPLETION, "oc_group")).toEqual({
-      chatId: "oc_group",
-      text: "〔完成〕Agent B 已完成「整理接口契约」,结论已同步给 Agent A · 任务 tsk_down",
-      uuid: "task_done:tsk_down",
-      taskId: "tsk_down",
-    });
+  it("③ 完成卡片:完成方 + 结论已同步给发起方,uuid 按任务固定", () => {
+    const bulletin = buildCompletionBulletin(COMPLETION, "oc_group");
+    expect(bulletin.uuid).toBe("task_done:tsk_down");
+    const view = cardText(bulletin.card);
+    expect(view.title).toBe("〔完成〕Agent B 已完成");
+    expect(view.template).toBe("green");
+    expect(view.elements[0]).toBe(
+      "**任务**:整理接口契约\n**结论**:已同步给 Agent A",
+    );
   });
 
-  it("④ 验收播报:根任务闭环,uuid 按任务固定", () => {
-    expect(buildClosureBulletin(CLOSURE, "oc_group")).toEqual({
-      chatId: "oc_group",
-      text: "〔验收〕任务「接口契约联调」已闭环 · 任务 tsk_up",
-      uuid: "task_closed:tsk_up",
-      taskId: "tsk_up",
-    });
+  it("④ 验收卡片:根任务闭环,uuid 按任务固定", () => {
+    const bulletin = buildClosureBulletin(CLOSURE, "oc_group");
+    expect(bulletin.uuid).toBe("task_closed:tsk_up");
+    const view = cardText(bulletin.card);
+    expect(view.title).toBe("〔验收〕任务已闭环");
+    expect(view.template).toBe("indigo");
+    expect(view.elements[0]).toBe("**任务**:接口契约联调");
+  });
+
+  it("动态内容打断 markdown 语法,防任务标题注入链接或富文本", () => {
+    const hostile = buildAcceptBulletin(
+      { ...ACCEPT, title: "修复 [钓鱼链接](https://evil.example) **加粗**`代码`\n换行注入" },
+      "oc_group",
+    );
+    const body = cardText(hostile.card).elements[0]!;
+    expect(body).not.toContain("[钓鱼链接](https://evil.example)");
+    expect(body).not.toContain("**加粗**");
+    expect(body).not.toContain("\n换行注入");
+    expect(body).toContain("钓鱼链接");
+    expect(body).toContain("evil.example");
   });
 });
 
 describe("enqueueCollabBulletin", () => {
-  it("按 collab:{uuid} 幂等入发件箱,同 uuid 只保留首条", async () => {
+  it("按 collab:{uuid} 幂等入发件箱,载荷为卡片不是文本", async () => {
     const db = await openDatabase();
     const bulletin = buildHandoffBulletin(HANDOFF, "oc_group");
     await enqueueCollabBulletin(db, bulletin, 1_000);
     await enqueueCollabBulletin(db, bulletin, 2_000);
     const row = await findOutboxByKey(db, "collab:msg_1");
     expect(row?.kind).toBe("collab_bulletin");
-    expect(JSON.parse(row?.payloadJson ?? "{}")).toEqual({
-      chatId: "oc_group",
-      text: bulletin.text,
-      uuid: "msg_1",
-    });
+    const payload = JSON.parse(row?.payloadJson ?? "{}") as {
+      chatId: string;
+      card: Record<string, unknown>;
+      text?: string;
+      uuid: string;
+    };
+    expect(payload.chatId).toBe("oc_group");
+    expect(payload.card.schema).toBe("2.0");
+    expect(payload.text).toBeUndefined();
+    expect(payload.uuid).toBe("msg_1");
     await db.close();
   });
 });

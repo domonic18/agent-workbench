@@ -10,7 +10,7 @@ import type { Db } from "../../store/database.js";
 /** 协作群播报载荷:uuid 透传飞书做幂等去重 */
 export interface CollabBulletin {
   chatId: string;
-  text: string;
+  card: Record<string, unknown>;
   uuid: string;
   taskId: string;
 }
@@ -18,13 +18,48 @@ export interface CollabBulletin {
 /**
  * 协作群四条状态播报:控制台以自身应用经发件箱直发,无 @ 不唤醒任何 bot(2026-11-02 裁决)。
  * 群只承载「交接 / 接单 / 完成 / 验收」,交互细节一律走 a2a 与任务字段。
+ * 2026-11-05 起以卡片(schema 2.0)渲染替代纯文本,发送侧按 payload.card 分发 interactive。
  */
+
+/** 动态内容打断 markdown 语法(链接/加粗/代码块),防任务标题在群里注入富文本;换行压成空格防拆行 */
+function mdText(value: string): string {
+  return value.replace(/[\r\n]+/g, " ").replace(/([*_`[\]])/g, "\\$1");
+}
+
+interface BulletinView {
+  title: string;
+  template: string;
+  body: string;
+  footnote: string;
+}
+
+function bulletinCard(view: BulletinView): Record<string, unknown> {
+  return {
+    schema: "2.0",
+    header: {
+      title: { tag: "plain_text", content: view.title },
+      template: view.template,
+    },
+    body: {
+      elements: [
+        { tag: "markdown", content: view.body },
+        { tag: "hr" },
+        { tag: "markdown", content: view.footnote },
+      ],
+    },
+  };
+}
 
 /** ① 交接:A 发起 request/escalate;uuid 取消息 id 防重复投递 */
 export function buildHandoffBulletin(notice: HandoffNotice, chatId: string): CollabBulletin {
   return {
     chatId,
-    text: `〔交接〕${notice.from.displayName} → ${notice.to.displayName}:${notice.summary} · 任务 ${notice.taskId}`,
+    card: bulletinCard({
+      title: `〔交接〕${notice.from.displayName} → ${notice.to.displayName}`,
+      template: "blue",
+      body: `**事项**:${mdText(notice.summary)}`,
+      footnote: `任务 \`${notice.taskId}\` · 线程 \`${notice.threadId}\``,
+    }),
     uuid: notice.msgId,
     taskId: notice.taskId,
   };
@@ -34,7 +69,12 @@ export function buildHandoffBulletin(notice: HandoffNotice, chatId: string): Col
 export function buildAcceptBulletin(notice: AcceptNotice, chatId: string): CollabBulletin {
   return {
     chatId,
-    text: `〔接单〕${notice.to.displayName} 已接单「${notice.title}」 · 任务 ${notice.taskId}`,
+    card: bulletinCard({
+      title: `〔接单〕${notice.to.displayName} 已接单`,
+      template: "turquoise",
+      body: `**任务**:${mdText(notice.title)}`,
+      footnote: `任务 \`${notice.taskId}\` · 消息 \`${notice.msgId}\``,
+    }),
     uuid: `a2a:ack:${notice.msgId}`,
     taskId: notice.taskId,
   };
@@ -44,7 +84,12 @@ export function buildAcceptBulletin(notice: AcceptNotice, chatId: string): Colla
 export function buildCompletionBulletin(notice: CompletionNotice, chatId: string): CollabBulletin {
   return {
     chatId,
-    text: `〔完成〕${notice.from.displayName} 已完成「${notice.title}」,结论已同步给 ${notice.to.displayName} · 任务 ${notice.taskId}`,
+    card: bulletinCard({
+      title: `〔完成〕${notice.from.displayName} 已完成`,
+      template: "green",
+      body: `**任务**:${mdText(notice.title)}\n**结论**:已同步给 ${notice.to.displayName}`,
+      footnote: `任务 \`${notice.taskId}\``,
+    }),
     uuid: `task_done:${notice.taskId}`,
     taskId: notice.taskId,
   };
@@ -54,7 +99,12 @@ export function buildCompletionBulletin(notice: CompletionNotice, chatId: string
 export function buildClosureBulletin(notice: ClosureNotice, chatId: string): CollabBulletin {
   return {
     chatId,
-    text: `〔验收〕任务「${notice.title}」已闭环 · 任务 ${notice.taskId}`,
+    card: bulletinCard({
+      title: "〔验收〕任务已闭环",
+      template: "indigo",
+      body: `**任务**:${mdText(notice.title)}`,
+      footnote: `任务 \`${notice.taskId}\``,
+    }),
     uuid: `task_closed:${notice.taskId}`,
     taskId: notice.taskId,
   };
@@ -71,7 +121,7 @@ export async function enqueueCollabBulletin(
     kind: "collab_bulletin",
     taskId: bulletin.taskId,
     chatId: bulletin.chatId,
-    text: bulletin.text,
+    card: bulletin.card,
     uuid: bulletin.uuid,
     ...(now === undefined ? {} : { now }),
   });
