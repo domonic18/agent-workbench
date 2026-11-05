@@ -75,10 +75,14 @@ export const ROUTE_RULES: readonly RouteRule[] = [
 ];
 
 /**
- * 项目注册表首版为空:首个业务项目随 M3.9-2 真实 Bug 闭环登记,
- * WorkBuddy 试点条目随联测登记。未登记项目的未归属事件确定性 needs_person。
+ * 项目注册表:未登记项目的未归属事件确定性 needs_person,不猜目标。
+ * workbuddy-pilot 是 M3.9-1 联测的试点项目——目标 Agent 注册时自带
+ * key="workbuddy-pilot"(机器无关 Agent 的稳定键由注册方显式给出);
+ * 未部署该 Agent 的环境启动时只产生引用告警,不影响其余项目派工。
  */
-export const PROJECT_REGISTRY: ProjectRegistry = {};
+export const PROJECT_REGISTRY: ProjectRegistry = {
+  "workbuddy-pilot": { primary: "workbuddy-pilot" },
+};
 
 function stableStringify(value: unknown): string {
   if (Array.isArray(value)) {
@@ -172,11 +176,14 @@ export async function validatePolicy(
   if (assembly !== undefined) {
     const primary = await findAgentById(deps.db, assembly.primaryAgentId);
     const assemblyKey = primary?.key ?? assembly.primaryAgentId;
-    for (const [project, roles] of Object.entries(policy.registry)) {
-      const primaryKey = roles["primary"];
+    // 只有 bootstrap 主责所在项目才要求 registry 与装配一致;
+    // 其他项目(如试点项目)的主责本就可以是别的 Agent
+    const assemblyProject = primary?.project;
+    if (assemblyProject !== undefined) {
+      const primaryKey = policy.registry[assemblyProject]?.["primary"];
       if (primaryKey !== undefined && primaryKey !== assemblyKey) {
         warnings.push(
-          `项目 ${project} 的 primary 指向 ${primaryKey},与 bootstrap 主责 ${assemblyKey} 不一致`,
+          `项目 ${assemblyProject} 的 primary 指向 ${primaryKey},与 bootstrap 主责 ${assemblyKey} 不一致`,
         );
       }
     }

@@ -158,7 +158,7 @@ describe("validatePolicy 引用校验(告警不阻断)", () => {
     expect(inactive.warnings.join("\n")).toContain("已停用");
   });
 
-  it("primary 与 bootstrap 主责不一致告警,一致则无告警", async () => {
+  it("primary 与 bootstrap 主责不一致告警,一致则无告警;他项目主责不算漂移", async () => {
     const { db, agentKey, agentId } = await seededAgent("aligned");
     dbs.push(db);
     await insertAssembly(db, {
@@ -169,22 +169,36 @@ describe("validatePolicy 引用校验(告警不阻断)", () => {
 
     const mismatch = await validatePolicy(
       { db },
-      policyWith([rule({})], { proj: { primary: "another-agent" } }),
+      policyWith([rule({})], { aligned: { primary: "another-agent" } }),
     );
     expect(mismatch.warnings.join("\n")).toContain("不一致");
 
     const aligned = await validatePolicy(
       { db },
-      policyWith([rule({})], { proj: { primary: agentKey } }),
+      policyWith([rule({})], { aligned: { primary: agentKey } }),
     );
     expect(aligned.warnings).toHaveLength(0);
+
+    // 非装配项目的 primary 是另一 Agent,不算与 bootstrap 漂移
+    const otherProject = await validatePolicy(
+      { db },
+      policyWith([rule({})], { pilot: { primary: agentKey } }),
+    );
+    expect(otherProject.warnings).toHaveLength(0);
   });
 
-  it("默认策略(空注册表)校验通过且返回版本", async () => {
-    const { db } = await seededAgent("default-policy");
+  it("默认策略校验返回版本;试点 key 未注册只告警,注册后告警消失", async () => {
+    const bare = await openDatabase();
+    dbs.push(bare);
+    const warned = await validatePolicy({ db: bare });
+    expect(warned.warnings.join("\n")).toContain("workbuddy-pilot");
+    expect(warned.warnings.join("\n")).toContain("尚未注册");
+    expect(warned.version).toMatch(/^[0-9a-f]{12}$/);
+
+    // confirmAgents 按项目名派生 key,恰好对上试点条目
+    const { db } = await seededAgent("workbuddy-pilot");
     dbs.push(db);
-    const result = await validatePolicy({ db });
-    expect(result.warnings).toHaveLength(0);
-    expect(result.version).toMatch(/^[0-9a-f]{12}$/);
+    const seeded = await validatePolicy({ db });
+    expect(seeded.warnings).toHaveLength(0);
   });
 });
