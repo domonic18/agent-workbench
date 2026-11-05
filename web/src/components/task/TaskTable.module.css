@@ -1,0 +1,203 @@
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.table {
+  width: 100%;
+  min-width: 1042px;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.table th,
+.table td {
+  padding: 0 12px;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--line-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.table th {
+  height: 36px;
+  border-bottom-color: var(--border);
+  background: var(--header-bg);
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.table td {
+  height: 42px;
+}
+
+.table th:nth-child(1) {
+  width: 322px;
+}
+
+.table th:nth-child(2) {
+  width: 86px;
+}
+
+.table th:nth-child(3) {
+  width: 176px;
+}
+
+.table th:nth-child(4) {
+  width: 78px;
+}
+
+.table th:nth-child(5) {
+  width: 64px;
+}
+
+.table th:nth-child(6) {
+  width: 82px;
+}
+
+.table th:nth-child(7) {
+  width: 76px;
+}
+
+.table th:nth-child(8) {
+  width: 70px;
+}
+
+.table th:nth-child(9) {
+  width: 88px;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.row {
+  cursor: pointer;
+}
+
+.row:hover {
+  background: var(--surface-2);
+}
+
+.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.primary {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.rowLink {
+  display: block;
+  color: var(--text);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rowLink:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.subline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 10.5px;
+  color: var(--subtle);
+}
+
+.origin::before {
+  content: "· ";
+}
+
+.cards {
+  display: none;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.cardLink {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 44px;
+  padding: 14px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.cardLink:active {
+  background: var(--accent-soft);
+}
+
+.cardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cardTitle {
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.cardMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.cardMetaLabel {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.mono {
+  composes: mono from "./task-shared.module.css";
+}
+
+.muted {
+  composes: muted from "./task-shared.module.css";
+}
+
+.output {
+  composes: output from "./task-shared.module.css";
+}
+
+.outputCode {
+  composes: outputCode from "./task-shared.module.css";
+}
+
+@media (max-width: 767px) {
+  .tableWrap {
+    display: none;
+  }
+
+  .cards {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+}

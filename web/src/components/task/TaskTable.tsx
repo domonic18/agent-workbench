@@ -8,7 +8,7 @@ import {
 } from "../../shared/format.js";
 import { TASK_ORIGIN_LABEL, TASK_STAGE_LABEL, TASK_STATUS_LABEL, TASK_STATUS_TONE } from "../../shared/labels.js";
 import { StatusBadge } from "../data/StatusBadge.js";
-import styles from "./task-list.module.css";
+import styles from "./TaskTable.module.css";
 
 export interface TaskTableProps {
   tasks: readonly TaskDto[];

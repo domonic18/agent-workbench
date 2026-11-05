@@ -2,7 +2,7 @@ import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { readTaskFilters, TASK_STATUSES } from "../../api/tasks.js";
 import { TASK_STATUS_LABEL } from "../../shared/labels.js";
-import styles from "./task-list.module.css";
+import styles from "./TaskFilters.module.css";
 
 /** 筛选条件只存 URL query,刷新与回退后保持一致(03 §3) */
 export function TaskFiltersForm({ statusSlot }: { statusSlot?: ReactNode }) {
