@@ -14,7 +14,7 @@ async function main(): Promise<void> {
     register();
   }
   const { createDb } = await import("../../store/database.js");
-  const { createEmbeddingClient } = await import("./embedding.js");
+  const { createEmbeddingClient } = await import("../../adapters/embedding/openai.js");
   const { rebuildKnowledgeIndex } = await import("./indexer.js");
 
   const data = workerData as RebuildWorkerData;

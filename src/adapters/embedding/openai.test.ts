@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { KNOWLEDGE_INDEX } from "../../shared/constants.js";
-import { createEmbeddingClient } from "./embedding.js";
+import { createEmbeddingClient } from "./openai.js";
 
 function vector(dimensions: number = KNOWLEDGE_INDEX.dimensions): number[] {
   return Array.from({ length: dimensions }, () => 0.5);

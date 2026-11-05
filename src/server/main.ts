@@ -11,7 +11,7 @@ import { createA2aService } from "../domain/a2a/service.js";
 import { issueOneTimeToken } from "../domain/bootstrap/one-time-token.js";
 import { createAuditReconciler } from "../domain/capability/audit-reconcile.js";
 import { createCapabilityService } from "../domain/capability/service.js";
-import { createEmbeddingClient } from "../domain/knowledge/embedding.js";
+import { createEmbeddingClient } from "../adapters/embedding/openai.js";
 import { createKnowledgeEntryService } from "../domain/knowledge/entry-service.js";
 import { createKnowledgeIndexService } from "../domain/knowledge/index-service.js";
 import { createKnowledgeRebuilder } from "../domain/knowledge/rebuild.js";
