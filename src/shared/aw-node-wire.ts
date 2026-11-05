@@ -24,6 +24,9 @@ export interface DiscoveryProjectReport {
   cwd?: string | undefined;
   agents?: unknown[] | undefined;
   channels?: unknown[] | undefined;
+  /** 飞书 bot 名与 open_id 由 aw-node 用本机应用凭据经 bot/v3/info 取得,非敏感展示字段 */
+  feishu_bot_name?: string | undefined;
+  feishu_bot_open_id?: string | undefined;
 }
 
 /** POST /api/aw-node/discovery 请求体 */
@@ -47,6 +50,8 @@ export interface DeliveredAgentConfig {
 export interface PullConfigResponse {
   config_status: string;
   agents: DeliveredAgentConfig[];
+  /** 控制台请求刷新 bot 名:aw-node 收到后清空缓存并立即重取上报 */
+  refresh_bot_names?: boolean;
 }
 
 /** POST /api/aw-node/config/ack 请求体 */

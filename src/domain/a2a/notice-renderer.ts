@@ -1,14 +1,11 @@
-import { findAgentById, type AgentRecord } from "../../store/repositories/identity.js";
+import { findAgentById } from "../../store/repositories/identity.js";
 import { findTaskById } from "../../store/repositories/task.js";
 import {
   findMessageById,
   type A2aMessageRecord,
 } from "../../store/repositories/a2a.js";
-import type { AcceptNotice, CollabAgentRef, HandoffNotice } from "../collab/notice.js";
-
-export function agentRef(agent: AgentRecord): CollabAgentRef {
-  return { id: agent.id, displayName: agent.displayName };
-}
+import { agentRef } from "../collab/agent-ref.js";
+import type { AcceptNotice, HandoffNotice } from "../collab/notice.js";
 
 function isRequestLike(message: A2aMessageRecord): boolean {
   return message.intent === "request" || message.intent === "escalate";

@@ -80,6 +80,7 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
     cwdByProject: discovery.cwdByProject,
     logger,
     now,
+    onRefreshBotNames: () => discovery.refreshBotNames(),
   });
   const heartbeat = createHeartbeatCycle({
     client,

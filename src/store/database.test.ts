@@ -6,7 +6,7 @@ describe("openDatabase", () => {
     const db = await openDatabase();
 
     expect(await db.get("SELECT 1 AS ok")).toEqual({ ok: 1 });
-    expect(await db.get("SELECT COUNT(*) AS n FROM schema_migration")).toEqual({ n: 8 });
+    expect(await db.get("SELECT COUNT(*) AS n FROM schema_migration")).toEqual({ n: 10 });
     await db.close();
   });
 

@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -19,7 +19,7 @@ describe("runMigrations", () => {
   it("空库执行建表并记账", async () => {
     const db = await createTestDatabase(resolveTestAdminUrl());
 
-    expect(await runMigrations(db)).toBe(8);
+    expect(await runMigrations(db)).toBe(10);
     expect(await tableNames(db)).toEqual(
       expect.arrayContaining([
         "task",
@@ -69,6 +69,8 @@ describe("runMigrations", () => {
       { version: 6, name: "machine_less_agent" },
       { version: 7, name: "work_coordination" },
       { version: 8, name: "widen_ingest_counters" },
+      { version: 9, name: "agent_display_name" },
+      { version: 10, name: "bot_name_refresh" },
     ]);
     await db.close();
   });
@@ -135,6 +137,44 @@ describe("runMigrations", () => {
     await expect(runMigrations(db, dir)).rejects.toThrow();
     expect(await tableNames(db)).not.toContain("ok_table");
     expect(await db.get("SELECT COUNT(*) AS n FROM schema_migration")).toEqual({ n: 0 });
+    await db.close();
+  });
+
+  it("0009 把路径形 display_name 回填为项目名,非路径保留", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "aw-migrations-"));
+    const sourceDir = defaultMigrationsDir();
+    // 先应用 0001~0008,插入坏数据后再单独跑 0009
+    for (const version of [1, 2, 3, 4, 5, 6, 7, 8]) {
+      const file = readdirSync(sourceDir).find((name) => name.startsWith(`${String(version).padStart(4, "0")}_`));
+      if (file === undefined) {
+        throw new Error(`缺少迁移 ${version}`);
+      }
+      writeFileSync(join(dir, file), readFileSync(join(sourceDir, file), "utf8"));
+    }
+
+    const db = await createTestDatabase(resolveTestAdminUrl());
+    await runMigrations(db, dir);
+
+    await db.run(
+      "INSERT INTO machine (id, hostname, os, collector_version, collector_secret_hash, status, created_at) VALUES ('m1', 'h', 'darwin', '1', 'h', 'active', 0)",
+    );
+    await db.run(AGENT_INSERT, "agt_path", "m1", "claude_code", "bug-triage", "/Users/x/Workspace/bug-triage", "h");
+    await db.run(AGENT_INSERT, "agt_name", "m1", "claude_code", "agent-sims", "测试专家", "h");
+
+    const file = readdirSync(sourceDir).find((name) => name.startsWith("0009_"));
+    if (file === undefined) {
+      throw new Error("缺少迁移 0009");
+    }
+    writeFileSync(join(dir, file), readFileSync(join(sourceDir, file), "utf8"));
+    expect(await runMigrations(db, dir)).toBe(1);
+
+    const rows = (await db.all(
+      "SELECT project, display_name AS name FROM agent ORDER BY id",
+    )) as Array<{ project: string; name: string }>;
+    expect(rows).toEqual([
+      { project: "agent-sims", name: "测试专家" },
+      { project: "bug-triage", name: "bug-triage" },
+    ]);
     await db.close();
   });
 });

@@ -13,6 +13,7 @@ export interface MachineRecord {
   discoveryJson: string | null;
   discoveryReceivedAt: number | null;
   configStatus: MachineConfigStatus;
+  botRefreshRequestedAt: number | null;
 }
 
 export type MachineConfigStatus = "pending" | "delivered" | "effective";
@@ -22,7 +23,7 @@ const MACHINE_COLUMNS = `
   collector_secret_hash AS "collectorSecretHash", last_seen_at AS "lastSeenAt",
   status, created_at AS "createdAt",
   discovery_json AS "discoveryJson", discovery_received_at AS "discoveryReceivedAt",
-  config_status AS "configStatus"
+  config_status AS "configStatus", bot_refresh_requested_at AS "botRefreshRequestedAt"
 `;
 
 export interface NewMachine {
@@ -104,6 +105,28 @@ export async function updateMachineConfigStatus(
   );
 }
 
+/** 控制台发起「刷新 bot 名」:记录请求时刻,待 /api/aw-node/config 拉取时下发并消费 */
+export async function requestMachineBotRefresh(db: Db, id: string, now: number): Promise<boolean> {
+  return (
+    (
+      await db.run("UPDATE machine SET bot_refresh_requested_at = ? WHERE id = ?", now, id)
+    ).changes === 1
+  );
+}
+
+/** 下发刷新信号后清空标记;返回是否有过待消费的刷新请求 */
+export async function consumeMachineBotRefresh(db: Db, id: string): Promise<boolean> {
+  const row = (await db.get(
+    "SELECT bot_refresh_requested_at AS at FROM machine WHERE id = ?",
+    id,
+  )) as { at: number | null } | undefined;
+  if (row === undefined || row.at === null) {
+    return false;
+  }
+  await db.run("UPDATE machine SET bot_refresh_requested_at = NULL WHERE id = ?", id);
+  return true;
+}
+
 export interface MachineListQuery {
   limit: number;
   /** keyset 游标:上一页最后一行的 (createdAt, id) */
@@ -170,6 +193,8 @@ export interface NewAgent {
   mcpConfigJson?: string | null;
   bootstrapStatus?: AgentBootstrapStatus;
   feishuAppId: string | null;
+  feishuBotOpenId?: string | null;
+  feishuBotName?: string | null;
   allowedTargetsJson: string;
   createdAt: number;
 }
@@ -177,11 +202,13 @@ export interface NewAgent {
 export async function insertAgent(db: Db, row: NewAgent): Promise<void> {
   await db.run(
     `INSERT INTO agent
-       (id, machine_id, runtime, project, display_name, secret_hash, feishu_app_id, status,
+       (id, machine_id, runtime, project, display_name, secret_hash, feishu_app_id,
+        feishu_bot_open_id, feishu_bot_name, status,
         allowed_targets_json, key, mcp_config_json, bootstrap_status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)`,
     row.id, row.machineId, row.runtime, row.project, row.displayName, row.secretHash,
-    row.feishuAppId, row.allowedTargetsJson, row.key ?? null, row.mcpConfigJson ?? null,
+    row.feishuAppId, row.feishuBotOpenId ?? null, row.feishuBotName ?? null,
+    row.allowedTargetsJson, row.key ?? null, row.mcpConfigJson ?? null,
     row.bootstrapStatus ?? "registered", row.createdAt, row.createdAt,
   );
 }
@@ -280,6 +307,30 @@ export async function updateAgentFeishuBot(
                feishu_app_id = COALESCE(?, feishu_app_id), updated_at = ?
          WHERE id = ?`,
         openId, name, appId, now, id,
+      )
+    ).changes === 1
+  );
+}
+
+/**
+ * 发现上报回写 bot 名:aw-node 用本机凭据现取到的展示名随发现结果进来,
+ * 按 (machine_id, project) 落到该机已登记 Agent。手动刷新与 7 天缓存到期都走这里。
+ */
+export async function updateAgentFeishuBotByProject(
+  db: Db,
+  machineId: string,
+  project: string,
+  openId: string,
+  name: string,
+  now: number,
+): Promise<boolean> {
+  return (
+    (
+      await db.run(
+        `UPDATE agent
+           SET feishu_bot_name = ?, feishu_bot_open_id = ?, updated_at = ?
+         WHERE machine_id = ? AND project = ? AND status = 'active'`,
+        name, openId, now, machineId, project,
       )
     ).changes === 1
   );

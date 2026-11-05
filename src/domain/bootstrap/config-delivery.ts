@@ -1,4 +1,7 @@
-import type { DeliveredAgentConfig } from "../../shared/aw-node-wire.js";
+import type {
+  DeliveredAgentConfig,
+  PullConfigResponse,
+} from "../../shared/aw-node-wire.js";
 import { newPrefixedId } from "../../shared/ids.js";
 import type { Db } from "../../store/database.js";
 import {
@@ -9,12 +12,15 @@ import {
   insertAgent,
   listAgentsByMachine,
   markAgentConfigAck,
+  consumeMachineBotRefresh,
+  requestMachineBotRefresh,
   rotateAgentDeliverySecret,
   updateMachineConfigStatus,
   type AgentRecord,
   type MachineConfigStatus,
 } from "../../store/repositories/identity.js";
 import { hashSecret, newSecret } from "../security/secrets.js";
+import { feishuBotsFromDiscovery } from "./discovery.js";
 import { BootstrapError } from "./errors.js";
 
 export type { DeliveredAgentConfig } from "../../shared/aw-node-wire.js";
@@ -82,6 +88,7 @@ export async function confirmAgents(
   }
 
   const newAgentId = deps.newAgentId ?? (() => newPrefixedId("agt"));
+  const bots = feishuBotsFromDiscovery(machine.discoveryJson);
   return deps.db.transaction(async (tx) => {
     const seenProjects = new Set<string>();
     const seenKeys = new Set<string>();
@@ -117,6 +124,7 @@ export async function confirmAgents(
       }
 
       const id = newAgentId();
+      const bot = bots.get(project);
       await insertAgent(tx, {
         id,
         machineId: input.machineId,
@@ -128,6 +136,8 @@ export async function confirmAgents(
         mcpConfigJson: JSON.stringify({ endpoint: "/mcp", agent_id: id, key }),
         bootstrapStatus: "confirmed",
         feishuAppId: null,
+        feishuBotName: bot?.name ?? null,
+        feishuBotOpenId: bot !== undefined && bot.openId !== "" ? bot.openId : null,
         allowedTargetsJson: "[]",
         createdAt: deps.now(),
       });
@@ -158,6 +168,19 @@ function mcpOf(agent: AgentRecord): { endpoint: string } {
 }
 
 /**
+ * 控制台发起「刷新 bot 名」:记录请求时刻,aw-node 下次拉配置时下发 refresh_bot_names
+ * 并清空标记。幂等——重复点击只是重置时刻,不累积。
+ */
+export async function requestBotNameRefresh(
+  deps: ConfigDeliveryDeps,
+  machineId: string,
+): Promise<void> {
+  if (!(await requestMachineBotRefresh(deps.db, machineId, deps.now()))) {
+    throw new BootstrapError("NOT_FOUND", `机器 ${machineId} 未注册`);
+  }
+}
+
+/**
  * ACK 前的配置拉取:未回执的 confirmed Agent 每次都轮换密钥并推进版本,
  * 旧明文立即失效——响应丢失后重试安全,拿到的永远是最新有效密钥。
  * 已回执的 Agent 不再轮换、不再返回明文。
@@ -165,7 +188,7 @@ function mcpOf(agent: AgentRecord): { endpoint: string } {
 export async function pullMachineConfig(
   deps: ConfigDeliveryDeps,
   input: { machineId: string },
-): Promise<{ config_status: MachineConfigStatus; agents: DeliveredAgentConfig[] }> {
+): Promise<PullConfigResponse> {
   const machine = await findMachineById(deps.db, input.machineId);
   if (machine === undefined) {
     throw new BootstrapError("NOT_FOUND", `机器 ${input.machineId} 未注册`);
@@ -173,6 +196,7 @@ export async function pullMachineConfig(
   const generateSecret = deps.newSecret ?? newSecret;
 
   return deps.db.transaction(async (tx) => {
+    const refreshBotNames = await consumeMachineBotRefresh(tx, input.machineId);
     const agents = (await listAgentsByMachine(tx, input.machineId)).filter(
       (agent) => agent.status === "active" && agent.bootstrapStatus === "confirmed",
     );
@@ -214,7 +238,7 @@ export async function pullMachineConfig(
     if (rotatedAny) {
       await updateMachineConfigStatus(tx, input.machineId, status);
     }
-    return { config_status: status, agents: delivered };
+    return { config_status: status, agents: delivered, refresh_bot_names: refreshBotNames };
   });
 }
 

@@ -20,6 +20,7 @@ export interface AgentCardsProps {
   agents: readonly OverviewAgent[];
   now?: number;
   onManageKey?: (agent: OverviewAgent) => void;
+  onRefreshBotName?: (agent: OverviewAgent) => void;
 }
 
 const TONE_CLASS: Record<Tone, string> = {
@@ -75,7 +76,7 @@ function sortAgents(agents: readonly OverviewAgent[]): OverviewAgent[] {
   });
 }
 
-export function AgentCards({ agents, now, onManageKey }: AgentCardsProps) {
+export function AgentCards({ agents, now, onManageKey, onRefreshBotName }: AgentCardsProps) {
   return (
     <ul className={styles.grid} aria-label="Agent 卡片">
       {sortAgents(agents).map((agent) => {
@@ -156,6 +157,16 @@ export function AgentCards({ agents, now, onManageKey }: AgentCardsProps) {
                   aria-label={`管理 ${agent.displayName} 的密钥`}
                 >
                   密钥
+                </button>
+              )}
+              {onRefreshBotName === undefined || agent.machineId === null ? null : (
+                <button
+                  type="button"
+                  className={styles.keyButton}
+                  onClick={() => onRefreshBotName(agent)}
+                  aria-label={`刷新 ${agent.displayName} 的飞书 bot 名`}
+                >
+                  刷新 bot 名
                 </button>
               )}
             </div>

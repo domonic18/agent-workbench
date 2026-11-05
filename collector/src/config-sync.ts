@@ -156,6 +156,8 @@ export interface SyncSummary {
   applied: number;
   skippedProjects: string[];
   acked: boolean;
+  /** 控制台请求刷新 bot 名:调用方据此清缓存并立即重取上报 */
+  refreshBotNames: boolean;
 }
 
 /**
@@ -222,5 +224,6 @@ export async function syncConfigOnce(deps: ConfigSyncDeps): Promise<SyncSummary>
     applied,
     skippedProjects,
     acked,
+    refreshBotNames: pulled.refresh_bot_names === true,
   };
 }

@@ -6,7 +6,7 @@ import {
 } from "../../shared/constants.js";
 import { newPrefixedId } from "../../shared/ids.js";
 import type { Db } from "../../store/database.js";
-import { findAgentById, type AgentRecord } from "../../store/repositories/identity.js";
+import { findAgentById } from "../../store/repositories/identity.js";
 import {
   bindRunTaskIfEmpty,
   findLatestUnboundRunningRunByAgent,
@@ -22,7 +22,8 @@ import {
   findWorkItemById,
 } from "../../store/repositories/work-item.js";
 import { hasActiveAssignment } from "../../store/repositories/work-inbox.js";
-import type { CollabAgentRef, CompletionNotice } from "../collab/notice.js";
+import { agentRef } from "../collab/agent-ref.js";
+import type { CompletionNotice } from "../collab/notice.js";
 import { closeAncestorsIfComplete } from "./auto-close.js";
 import { TaskError } from "./errors.js";
 import {
@@ -287,10 +288,6 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
       throw new Error(`任务更新后读不到记录: ${task.id}`);
     }
     return { task: updated, autoClosed };
-  }
-
-  function agentRef(agent: AgentRecord): CollabAgentRef {
-    return { id: agent.id, displayName: agent.displayName };
   }
 
   async function completionNotice(taskId: string): Promise<CompletionNotice | null> {

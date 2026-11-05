@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 import { freemem, loadavg, totalmem } from "node:os";
-import { scanDiscovery } from "./discovery.js";
+import { scanDiscoveryState } from "./discovery.js";
+import {
+  createCachedFeishuBotResolver,
+  type CachedFeishuBotResolver,
+} from "./feishu-bot.js";
 import { syncConfigOnce, type ConfigSyncDeps } from "./config-sync.js";
 import type { ConsoleClient } from "./http.js";
 import { createLogger, type Logger } from "./log.js";
@@ -12,22 +16,43 @@ export interface DiscoveryCycleDeps {
   configs: string[];
   client: ConsoleClient;
   logger?: Logger;
+  /** bot 身份解析器;测试可注入假实现,缺省用带缓存的飞书实现 */
+  resolver?: CachedFeishuBotResolver;
 }
 
 export interface DiscoveryCycle {
   /** 本机扫描:内容有变化才上报,顺带刷新项目→cwd 映射(04 §8) */
   once(): Promise<void>;
+  /** 清空 bot 名缓存并立即重取上报,供控制台「刷新 bot 名」触发 */
+  refreshBotNames(): Promise<void>;
   /** 项目名 → 工作目录,供配置同步与预填 */
   cwdByProject: ReadonlyMap<string, string>;
 }
 
 export function createDiscoveryCycle(deps: DiscoveryCycleDeps): DiscoveryCycle {
   const logger = deps.logger ?? createLogger();
+  const resolver = deps.resolver ?? createCachedFeishuBotResolver();
   const cwdByProject = new Map<string, string>();
   let discoveryHash: string | null = null;
 
   async function once(): Promise<void> {
-    const report = scanDiscovery(deps.configs);
+    const { report, feishuCredentials } = scanDiscoveryState(deps.configs);
+    // 飞书 bot 名只作为展示字段补充,取不到就保留项目名,不阻断发现上报
+    await Promise.all(
+      report.projects.map(async (project) => {
+        const cred = feishuCredentials.get(project.name);
+        if (cred === undefined) {
+          return;
+        }
+        const identity = await resolver.resolve(cred.appId, cred.appSecret, project.name);
+        if (identity === undefined) {
+          logger.warn("飞书 bot 名获取失败,保留项目名", { project: project.name });
+          return;
+        }
+        project.feishu_bot_name = identity.name;
+        project.feishu_bot_open_id = identity.openId;
+      }),
+    );
     cwdByProject.clear();
     for (const project of report.projects) {
       if (project.cwd !== undefined) {
@@ -48,7 +73,13 @@ export function createDiscoveryCycle(deps: DiscoveryCycleDeps): DiscoveryCycle {
     }
   }
 
-  return { once, cwdByProject };
+  async function refreshBotNames(): Promise<void> {
+    resolver.invalidateAll();
+    discoveryHash = null;
+    await once();
+  }
+
+  return { once, refreshBotNames, cwdByProject };
 }
 
 export interface ConfigSyncCycleDeps {
@@ -60,6 +91,8 @@ export interface ConfigSyncCycleDeps {
   cwdByProject: ReadonlyMap<string, string>;
   logger?: Logger;
   now?: () => number;
+  /** 拉取响应携带刷新 bot 名信号时回调,daemon 接到 discovery 的 refreshBotNames */
+  onRefreshBotNames?: () => Promise<void> | void;
 }
 
 export interface ConfigSyncCycle {
@@ -83,7 +116,11 @@ export function createConfigSyncCycle(deps: ConfigSyncCycleDeps): ConfigSyncCycl
       syncDeps.now = deps.now;
     }
     try {
-      await syncConfigOnce(syncDeps);
+      const summary = await syncConfigOnce(syncDeps);
+      if (summary.refreshBotNames && deps.onRefreshBotNames !== undefined) {
+        logger.info("控制台请求刷新 bot 名,立即重取");
+        await deps.onRefreshBotNames();
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       logger.warn("配置同步失败,下轮重试", { error: message });

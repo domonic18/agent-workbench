@@ -45,11 +45,7 @@ export function StepProjects({ step }: { step: number }) {
     try {
       await confirmAgents(
         machineId,
-        picked.map((project) =>
-          project.cwd === undefined
-            ? { project: project.name }
-            : { project: project.name, displayName: project.cwd },
-        ),
+        picked.map((project) => ({ project: project.name })),
       );
       setConfirmed(true);
     } catch (caught) {
@@ -81,6 +77,9 @@ export function StepProjects({ step }: { step: number }) {
                 />
                 <span>
                   {project.name}
+                  {project.feishuBotName === undefined ? null : (
+                    <span className={styles.hint}> · {project.feishuBotName}</span>
+                  )}
                   {project.cwd === undefined ? null : <span className={styles.hint}> · {project.cwd}</span>}
                 </span>
               </label>

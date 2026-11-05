@@ -120,6 +120,51 @@ describe("POST /api/aw-node/discovery", () => {
     await f.app.close();
   });
 
+  it("发现上报的飞书 bot 名经确认落进 agent.feishu_bot_name", async () => {
+    const f = await deliveryApp();
+    const report = {
+      projects: [
+        {
+          name: "bug-triage",
+          cwd: "/Users/x/bug-triage",
+          feishu_bot_name: "测试专家",
+          feishu_bot_open_id: "ou_bot",
+        },
+      ],
+    };
+    const post = await f.app.inject({
+      method: "POST",
+      url: "/api/aw-node/discovery",
+      headers: { ...machineAuth(f), "idempotency-key": "disc-bot" },
+      payload: report,
+    });
+    expect(post.statusCode).toBe(200);
+
+    const view = await f.app.inject({
+      method: "GET",
+      url: "/api/bootstrap/discovery",
+      headers: { cookie: f.cookie },
+    });
+    const body = view.json() as {
+      machines: Array<{ projects: Array<{ name: string; feishuBotName?: string }> }>;
+    };
+    expect(body.machines[0]!.projects[0]).toMatchObject({
+      name: "bug-triage",
+      feishuBotName: "测试专家",
+    });
+
+    expect((await confirm(f, [{ project: "bug-triage" }], undefined, "bot-key")).statusCode).toBe(201);
+    const agent = (await f.db.get(
+      'SELECT display_name AS name, feishu_bot_name AS "botName", feishu_bot_open_id AS "openId" FROM agent WHERE project = ?',
+      "bug-triage",
+    )) as { name: string; botName: string | null; openId: string | null };
+    expect(agent.name).toBe("bug-triage");
+    expect(agent.botName).toBe("测试专家");
+    expect(agent.openId).toBe("ou_bot");
+    await f.db.close();
+    await f.app.close();
+  });
+
   it("反例:无 Bearer / 错密钥 401,缺幂等键 422;空项目列表如实落库", async () => {
     const f = await deliveryApp();
     const report = { projects: [{ name: "proj-a" }] };
@@ -183,6 +228,95 @@ describe("POST /api/bootstrap/agents 反例", () => {
       payload: { machineId: f.machineId, agents: [{ project: "proj-e" }] },
     });
     expect(noSession.statusCode).toBe(401);
+    await f.db.close();
+    await f.app.close();
+  });
+});
+
+describe("bot 名手动刷新链路", () => {
+  it("控制台设标记 → config 拉取下发并消费 → 发现上报回写 agent 表", async () => {
+    const f = await deliveryApp();
+    const discover = (name: string, key: string) =>
+      f.app.inject({
+        method: "POST",
+        url: "/api/aw-node/discovery",
+        headers: { ...machineAuth(f), "idempotency-key": key },
+        payload: {
+          projects: [
+            { name: "bug-triage", cwd: "/w/bt", feishu_bot_name: name, feishu_bot_open_id: "ou_bot" },
+          ],
+        },
+      });
+    expect((await discover("旧名", "r-old")).statusCode).toBe(200);
+    expect((await confirm(f, [{ project: "bug-triage" }], undefined, "r-confirm")).statusCode).toBe(201);
+
+    // 控制台发起刷新:幂等,重复点击只是重置时刻
+    const refresh = await f.app.inject({
+      method: "POST",
+      url: "/api/bootstrap/refresh-bot-names",
+      headers: { cookie: f.cookie, ...WRITE_HEADERS, "idempotency-key": "r-refresh" },
+      payload: { machineId: f.machineId },
+    });
+    expect(refresh.statusCode).toBe(202);
+
+    // aw-node 下次拉配置:响应携带 refresh_bot_names,标记即消费
+    const pull = await f.app.inject({
+      method: "POST",
+      url: "/api/aw-node/config",
+      headers: machineAuth(f),
+    });
+    expect(pull.statusCode).toBe(200);
+    expect(pull.json()).toMatchObject({ refresh_bot_names: true });
+    const pullAgain = await f.app.inject({
+      method: "POST",
+      url: "/api/aw-node/config",
+      headers: machineAuth(f),
+    });
+    expect(pullAgain.json()).toMatchObject({ refresh_bot_names: false });
+
+    // aw-node 重取后上报新 bot 名,发现回写把 agent 表更新为新名
+    expect((await discover("新名", "r-new")).statusCode).toBe(200);
+    const agent = (await f.db.get(
+      'SELECT feishu_bot_name AS "botName" FROM agent WHERE project = ?',
+      "bug-triage",
+    )) as { botName: string | null };
+    expect(agent.botName).toBe("新名");
+    await f.db.close();
+    await f.app.close();
+  });
+
+  it("反例:未知机器 404,缺 machineId 422,无会话 401", async () => {
+    const f = await deliveryApp();
+    expect(
+      (
+        await f.app.inject({
+          method: "POST",
+          url: "/api/bootstrap/refresh-bot-names",
+          headers: { cookie: f.cookie, ...WRITE_HEADERS, "idempotency-key": "e1" },
+          payload: { machineId: "m-missing" },
+        })
+      ).statusCode,
+    ).toBe(404);
+    expect(
+      (
+        await f.app.inject({
+          method: "POST",
+          url: "/api/bootstrap/refresh-bot-names",
+          headers: { cookie: f.cookie, ...WRITE_HEADERS, "idempotency-key": "e2" },
+          payload: {},
+        })
+      ).statusCode,
+    ).toBe(422);
+    expect(
+      (
+        await f.app.inject({
+          method: "POST",
+          url: "/api/bootstrap/refresh-bot-names",
+          headers: { ...WRITE_HEADERS, "idempotency-key": "e3" },
+          payload: { machineId: f.machineId },
+        })
+      ).statusCode,
+    ).toBe(401);
     await f.db.close();
     await f.app.close();
   });

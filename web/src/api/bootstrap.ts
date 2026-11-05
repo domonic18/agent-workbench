@@ -41,6 +41,7 @@ export interface DiscoveryProjectView {
   name: string;
   cwd?: string | undefined;
   confirmed: boolean;
+  feishuBotName?: string | undefined;
 }
 
 export interface DiscoveryMachineView {
@@ -98,6 +99,15 @@ export function confirmAgents(
   return api.post(
     "/api/bootstrap/agents",
     { machineId, agents },
+    { idempotencyKey: newIdempotencyKey() },
+  );
+}
+
+/** 请求 aw-node 刷新该机的飞书 bot 名;异步生效(下轮配置拉取后),返回 202 */
+export function refreshBotNames(machineId: string): Promise<unknown> {
+  return api.post(
+    "/api/bootstrap/refresh-bot-names",
+    { machineId },
     { idempotencyKey: newIdempotencyKey() },
   );
 }

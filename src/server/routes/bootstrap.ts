@@ -9,7 +9,11 @@ import {
   consumeOneTimeToken,
   issueOneTimeToken,
 } from "../../domain/bootstrap/one-time-token.js";
-import { confirmAgents, KEY_PATTERN } from "../../domain/bootstrap/config-delivery.js";
+import {
+  confirmAgents,
+  requestBotNameRefresh,
+  KEY_PATTERN,
+} from "../../domain/bootstrap/config-delivery.js";
 import { listDiscoveryForConsole } from "../../domain/bootstrap/discovery.js";
 import { BootstrapError } from "../../domain/bootstrap/errors.js";
 import { ONE_TIME_TOKEN } from "../../shared/constants.js";
@@ -149,6 +153,27 @@ export function registerBootstrapRoutes(app: FastifyInstance, options: Bootstrap
           { machineId: parsed.data.machineId, entries: parsed.data.agents },
         );
         return reply.code(201).send({ agents: created });
+      } catch (error) {
+        if (error instanceof BootstrapError) {
+          return domainError(reply, error);
+        }
+        throw error;
+      }
+    },
+  );
+
+  app.post(
+    "/api/bootstrap/refresh-bot-names",
+    { preHandler: [requireSession(db, now), requireCsrf(), requireIdempotencyKey()] },
+    async (request, reply) => {
+      const body = (request.body ?? {}) as { machineId?: unknown };
+      const machineId = typeof body.machineId === "string" ? body.machineId : "";
+      if (machineId === "") {
+        return invalid(reply, "machineId 必填");
+      }
+      try {
+        await requestBotNameRefresh({ db, now }, machineId);
+        return reply.code(202).send({ ok: true });
       } catch (error) {
         if (error instanceof BootstrapError) {
           return domainError(reply, error);

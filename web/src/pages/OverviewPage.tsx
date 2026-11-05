@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { ApiError } from "../api/client.js";
+import { refreshBotNames } from "../api/bootstrap.js";
 import { fetchOverview } from "../api/overview.js";
 import { useRealtimeStream } from "../api/stream.js";
 import type { OverviewAgent } from "../api/types.js";
@@ -44,6 +45,8 @@ export function OverviewPage() {
   const realtime = useRealtimeStream(OVERVIEW_SCOPES);
   const [registerDialog, setRegisterDialog] = useState<"agent" | "machine" | null>(null);
   const [rotateAgent, setRotateAgent] = useState<OverviewAgent | null>(null);
+  const [refreshingBot, setRefreshingBot] = useState<string | null>(null);
+  const [refreshNotice, setRefreshNotice] = useState<string | null>(null);
   const { data, isPending, isError, error, refetch } = useQuery({
     queryKey: ["overview"],
     queryFn: fetchOverview,
@@ -57,6 +60,22 @@ export function OverviewPage() {
   const offline =
     (data?.metrics.heartbeatTimeouts ?? 0) +
     agents.filter((agent) => agent.heartbeat === "offline").length;
+
+  async function handleRefreshBotName(agent: OverviewAgent): Promise<void> {
+    if (agent.machineId === null || refreshingBot !== null) {
+      return;
+    }
+    setRefreshingBot(agent.machineId);
+    setRefreshNotice(null);
+    try {
+      await refreshBotNames(agent.machineId);
+      setRefreshNotice(`已请求刷新 ${agent.displayName} 的飞书 bot 名,约 1 分钟内生效`);
+    } catch (caught) {
+      setRefreshNotice(caught instanceof ApiError ? caught.message : "刷新请求失败");
+    } finally {
+      setRefreshingBot(null);
+    }
+  }
 
   return (
     <div className={styles.page}>
@@ -127,13 +146,18 @@ export function OverviewPage() {
                 </button>
               </div>
             </div>
+            {refreshNotice === null ? null : <p className={styles.hint}>{refreshNotice}</p>}
             {agents.length === 0 ? (
               <EmptyState
                 title="采集器未上报"
                 description="没有在线 Agent 的上报数据。请确认采集器已启动，并完成机器登记。"
               />
             ) : (
-              <AgentCards agents={agents} onManageKey={setRotateAgent} />
+              <AgentCards
+                agents={agents}
+                onManageKey={setRotateAgent}
+                onRefreshBotName={(agent) => void handleRefreshBotName(agent)}
+              />
             )}
           </section>
 

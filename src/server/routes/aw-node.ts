@@ -50,6 +50,8 @@ const discoverySchema = z.object({
         cwd: z.string().max(1024).optional(),
         agents: z.array(z.unknown()).max(100).optional(),
         channels: z.array(z.unknown()).max(100).optional(),
+        feishu_bot_name: z.string().max(128).optional(),
+        feishu_bot_open_id: z.string().max(128).optional(),
       }),
     )
     .max(200),

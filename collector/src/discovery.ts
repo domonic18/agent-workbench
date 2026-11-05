@@ -27,10 +27,21 @@ interface CcConnectAgent {
   providers?: Array<{ models?: Array<Record<string, unknown>> }>;
 }
 
+interface CcConnectPlatform {
+  type?: unknown;
+  options?: { app_id?: unknown; app_secret?: unknown };
+}
+
 interface CcConnectProject {
   name?: unknown;
   agent?: CcConnectAgent;
-  platforms?: Array<{ type?: unknown }>;
+  platforms?: CcConnectPlatform[];
+}
+
+/** 飞书应用凭据:仅本机用于取 bot 名,永不进入发现上报 */
+export interface FeishuBotCredentials {
+  appId: string;
+  appSecret: string;
 }
 
 /** 从单个已解析项目提取白名单字段;无名字段不完整则跳过 */
@@ -62,10 +73,34 @@ export function projectToReport(project: CcConnectProject): DiscoveryProjectRepo
   };
 }
 
+/** 从单个项目提取飞书应用凭据(仅本地用);无完整凭据返回 undefined */
+export function feishuCredentialsOf(project: CcConnectProject): FeishuBotCredentials | undefined {
+  for (const platform of project.platforms ?? []) {
+    if (platform.type !== "feishu") {
+      continue;
+    }
+    const appId = platform.options?.app_id;
+    const appSecret = platform.options?.app_secret;
+    if (typeof appId === "string" && appId !== "" && typeof appSecret === "string" && appSecret !== "") {
+      return { appId, appSecret };
+    }
+  }
+  return undefined;
+}
+
 /** 逐个解析候选配置,按项目名合并(brew 装机配置与用户目录配置可能同时存在) */
 export function scanDiscovery(configPaths?: string[]): DiscoveryReport {
+  return scanDiscoveryState(configPaths).report;
+}
+
+/** 扫描结果:发现上报 + 本地飞书凭据映射(凭据不随 report 序列化) */
+export function scanDiscoveryState(configPaths?: string[]): {
+  report: DiscoveryReport;
+  feishuCredentials: Map<string, FeishuBotCredentials>;
+} {
   const paths = resolveConfigPaths(configPaths);
   const merged = new Map<string, DiscoveryProjectReport>();
+  const credentials = new Map<string, FeishuBotCredentials>();
   for (const path of paths) {
     if (!existsSync(path)) {
       continue;
@@ -85,6 +120,10 @@ export function scanDiscovery(configPaths?: string[]): DiscoveryReport {
       if (report === null) {
         continue;
       }
+      const cred = feishuCredentialsOf(raw as CcConnectProject);
+      if (cred !== undefined && !credentials.has(report.name)) {
+        credentials.set(report.name, cred);
+      }
       const existing = merged.get(report.name);
       // 合并时保留信息更全的一条(带 cwd 的优先)
       const fuller =
@@ -94,5 +133,8 @@ export function scanDiscovery(configPaths?: string[]): DiscoveryReport {
       merged.set(report.name, fuller);
     }
   }
-  return { projects: [...merged.values()].sort((a, b) => a.name.localeCompare(b.name)) };
+  return {
+    report: { projects: [...merged.values()].sort((a, b) => a.name.localeCompare(b.name)) },
+    feishuCredentials: credentials,
+  };
 }

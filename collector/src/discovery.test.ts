@@ -4,9 +4,11 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   DEFAULT_CONFIG_CANDIDATES,
+  feishuCredentialsOf,
   projectToReport,
   resolveConfigPaths,
   scanDiscovery,
+  scanDiscoveryState,
 } from "./discovery.js";
 
 const dirs: string[] = [];
@@ -122,5 +124,31 @@ describe("scanDiscovery", () => {
     expect(resolveConfigPaths()).toEqual(DEFAULT_CONFIG_CANDIDATES);
     expect(resolveConfigPaths([])).toEqual(DEFAULT_CONFIG_CANDIDATES);
     expect(resolveConfigPaths(["/custom/config.toml"])).toEqual(["/custom/config.toml"]);
+  });
+
+  it("feishuCredentialsOf 提取应用凭据,但凭据不随 report 序列化", () => {
+    const cred = feishuCredentialsOf({
+      name: "bug-triage",
+      platforms: [{ type: "feishu", options: { app_id: "cli_xxx", app_secret: "must_not_leak" } }],
+    });
+    expect(cred).toEqual({ appId: "cli_xxx", appSecret: "must_not_leak" });
+    expect(feishuCredentialsOf({ name: "p", platforms: [{ type: "other" }] })).toBeUndefined();
+    expect(feishuCredentialsOf({ name: "p", platforms: [{ type: "feishu" }] })).toBeUndefined();
+  });
+
+  it("scanDiscoveryState 返回 report 与本地凭据映射,凭据不进 report", () => {
+    const dir = newDir();
+    const path = join(dir, "config.toml");
+    writeFileSync(path, SAMPLE);
+    const { report, feishuCredentials } = scanDiscoveryState([path]);
+    expect(report.projects[0]).toEqual({
+      name: "bug-triage",
+      cwd: "/Users/x/Workspace/bug-triage",
+      agents: [{ type: "claudecode" }],
+      channels: [{ type: "feishu" }],
+    });
+    expect(feishuCredentials.get("bug-triage")).toEqual({ appId: "cli_xxx", appSecret: "must_not_leak" });
+    expect(JSON.stringify(report)).not.toContain("must_not_leak");
+    expect(JSON.stringify(report)).not.toContain("cli_xxx");
   });
 });
