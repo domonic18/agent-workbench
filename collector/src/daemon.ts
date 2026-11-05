@@ -12,11 +12,11 @@ import {
 import {
   createConsoleClient,
   type ConsoleClient,
-  type OutgoingEvent,
 } from "./http.js";
 import { createDispatchCycle, resolveClaudePath, type DispatchCycle } from "./dispatch.js";
 import { createLogger, type Logger } from "./log.js";
 import { acquireLock, type SingleInstanceLock } from "./lock.js";
+import { createPusher, type Pusher } from "./push.js";
 import { appendEvents, ensureStream } from "./scan.js";
 import { classifyStream, listSessionFiles } from "./sessions.js";
 import { Spool } from "./spool.js";
@@ -28,11 +28,6 @@ import {
 import { readNewLines } from "./tailer.js";
 
 const ATTRIBUTION_TTL_MS = 60_000;
-
-interface Backoff {
-  attempt: number;
-  nextAt: number;
-}
 
 export interface DaemonDeps {
   config: CollectorConfig;
@@ -65,8 +60,17 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
   const spool = new Spool(join(config.stateDir, "spool"), config.spoolMaxBytes);
   const state: PersistedState = loadState(config.stateDir);
   const registered = new Set(config.registeredProjects);
-  const backoff = new Map<string, Backoff>();
   const startedAt = now();
+  const pusher: Pusher = createPusher({
+    spool,
+    state,
+    client,
+    batchMax: config.batchMax,
+    collectorId: config.collectorId,
+    logger,
+    now,
+    isRunning: () => running,
+  });
   const discovery = createDiscoveryCycle({ configs: config.ccConnectConfigs, client, logger });
   const configSync = createConfigSyncCycle({
     client,
@@ -175,92 +179,9 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
     saveState(config.stateDir, state);
   }
 
-  function projectForStream(streamId: string): string | null {
-    for (const entry of spool.pending(streamId)) {
-      const stream = state.streams[entry.session_id];
-      if (stream !== undefined) {
-        return stream.status === "ok" ? stream.project : null;
-      }
-      return entry.project;
-    }
-    return null;
-  }
-
-  async function pushStream(streamId: string): Promise<void> {
-    const at = now();
-    const wait = backoff.get(streamId);
-    if (wait !== undefined && wait.nextAt > at) {
-      return;
-    }
-    const project = projectForStream(streamId);
-    if (project === null) {
-      return;
-    }
-    const entries = spool.head(streamId, config.batchMax);
-    if (entries.length === 0) {
-      return;
-    }
-    const batch: OutgoingEvent[] = entries.map((entry) => ({
-      seq: entry.seq,
-      inode: entry.inode,
-      offset: entry.offset,
-      kind: entry.kind,
-      occurred_at: entry.occurred_at,
-      payload: entry.payload,
-    }));
-    try {
-      const response = await client.postBatch({
-        collector_id: config.collectorId,
-        agent_project: project,
-        stream_id: streamId,
-        batch,
-        sent_at: now(),
-      });
-      spool.ack(streamId, response.acked_seq);
-      backoff.delete(streamId);
-      for (const entry of entries) {
-        const stream = state.streams[entry.session_id];
-        if (stream !== undefined && response.acked_seq >= entry.seq) {
-          stream.ackedSeq = Math.max(stream.ackedSeq, entry.seq);
-          stream.lastError = null;
-        }
-      }
-      logger.debug("批次已确认", { streamId, acked: response.acked_seq, size: batch.length });
-      if ((response.rejected ?? 0) > 0) {
-        logger.warn("批次内坏项被服务端跳过,未入库", {
-          streamId,
-          rejected: response.rejected ?? 0,
-        });
-      }
-    } catch (error) {
-      const previous = backoff.get(streamId)?.attempt ?? 0;
-      const attempt = previous + 1;
-      const base = Math.min(60_000, 1_000 * 2 ** (attempt - 1));
-      const delay = Math.round(base * (0.8 + Math.random() * 0.4));
-      backoff.set(streamId, { attempt, nextAt: now() + delay });
-      const message = error instanceof Error ? error.message : String(error);
-      for (const entry of entries) {
-        const stream = state.streams[entry.session_id];
-        if (stream !== undefined) {
-          stream.lastError = message;
-        }
-      }
-      logger.warn("批次推送失败,退避重试", { streamId, attempt, delay, error: message });
-    }
-  }
-
-  async function pushAll(): Promise<void> {
-    for (const streamId of spool.streams()) {
-      if (!running) {
-        return;
-      }
-      await pushStream(streamId);
-    }
-  }
-
   async function runOnce(): Promise<void> {
     await scanOnce();
-    await pushAll();
+    await pusher.pushAll();
     saveState(config.stateDir, state);
   }
 
