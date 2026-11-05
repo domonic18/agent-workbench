@@ -42,6 +42,7 @@ function textOf(value: unknown, field: string): string {
 }
 
 const discoverySchema = z.object({
+  // 允许空列表:执行机没装 cc-connect 时如实上报「扫描为空」,否则会每轮 422 死循环
   projects: z
     .array(
       z.object({
@@ -51,7 +52,6 @@ const discoverySchema = z.object({
         channels: z.array(z.unknown()).max(100).optional(),
       }),
     )
-    .min(1)
     .max(200),
 });
 

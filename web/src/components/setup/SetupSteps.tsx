@@ -225,10 +225,13 @@ export function StepProjects({ step }: { step: number }) {
           </div>
         ))
       )}
+      {machines.length > 0 && picked.length === 0 ? (
+        <p className={styles.hint}>执行机尚未上报可确认的项目,请确认目标机已配置 cc-connect。</p>
+      ) : null}
       <button
         className={styles.button}
         onClick={() => void confirm()}
-        disabled={pending || machines.length === 0}
+        disabled={pending || picked.length === 0}
       >
         {pending ? "确认中…" : confirmed ? "已确认,等待配置下发" : "确认项目与主责 Agent"}
       </button>

@@ -2,7 +2,12 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { projectToReport, scanDiscovery } from "./discovery.js";
+import {
+  DEFAULT_CONFIG_CANDIDATES,
+  projectToReport,
+  resolveConfigPaths,
+  scanDiscovery,
+} from "./discovery.js";
 
 const dirs: string[] = [];
 
@@ -111,5 +116,11 @@ describe("scanDiscovery", () => {
     const path = join(dir, "broken.toml");
     writeFileSync(path, "not [ valid toml");
     expect(scanDiscovery([path]).projects).toEqual([]);
+  });
+
+  it("空数组与 undefined 同义回退默认候选路径(loadConfig 未设 AW_CC_CONNECT_CONFIG 时给出空数组)", () => {
+    expect(resolveConfigPaths()).toEqual(DEFAULT_CONFIG_CANDIDATES);
+    expect(resolveConfigPaths([])).toEqual(DEFAULT_CONFIG_CANDIDATES);
+    expect(resolveConfigPaths(["/custom/config.toml"])).toEqual(["/custom/config.toml"]);
   });
 });

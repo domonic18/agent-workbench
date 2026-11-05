@@ -9,10 +9,17 @@ import type { DiscoveryProjectReport, DiscoveryReport } from "../../src/shared/a
  * 白名单提取——app_id/app_secret/env 等敏感字段永不进入上报。
  */
 
-const DEFAULT_CONFIG_CANDIDATES = [
+export const DEFAULT_CONFIG_CANDIDATES = [
   join(homedir(), ".cc-connect", "config.toml"),
   "/opt/homebrew/etc/cc-connect/config.toml",
 ];
+
+/** 空列表与 undefined 同义回退默认候选——loadConfig 未设 AW_CC_CONNECT_CONFIG 时给出空数组 */
+export function resolveConfigPaths(configPaths?: string[]): string[] {
+  return configPaths === undefined || configPaths.length === 0
+    ? DEFAULT_CONFIG_CANDIDATES
+    : configPaths;
+}
 
 interface CcConnectAgent {
   type?: unknown;
@@ -57,7 +64,7 @@ export function projectToReport(project: CcConnectProject): DiscoveryProjectRepo
 
 /** 逐个解析候选配置,按项目名合并(brew 装机配置与用户目录配置可能同时存在) */
 export function scanDiscovery(configPaths?: string[]): DiscoveryReport {
-  const paths = configPaths ?? DEFAULT_CONFIG_CANDIDATES;
+  const paths = resolveConfigPaths(configPaths);
   const merged = new Map<string, DiscoveryProjectReport>();
   for (const path of paths) {
     if (!existsSync(path)) {

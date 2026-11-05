@@ -120,7 +120,7 @@ describe("POST /api/aw-node/discovery", () => {
     await f.app.close();
   });
 
-  it("反例:无 Bearer / 错密钥 401,缺幂等键 422,空项目列表 422", async () => {
+  it("反例:无 Bearer / 错密钥 401,缺幂等键 422;空项目列表如实落库", async () => {
     const f = await deliveryApp();
     const report = { projects: [{ name: "proj-a" }] };
     const post = (headers: Record<string, string>) =>
@@ -136,6 +136,7 @@ describe("POST /api/aw-node/discovery", () => {
       ).statusCode,
     ).toBe(401);
     expect((await post(machineAuth(f))).statusCode).toBe(422);
+    // 执行机没装 cc-connect:如实上报空扫描,控制台据此区分「未上报」与「上报为空」
     expect(
       (
         await f.app.inject({
@@ -145,7 +146,7 @@ describe("POST /api/aw-node/discovery", () => {
           payload: { projects: [] },
         })
       ).statusCode,
-    ).toBe(422);
+    ).toBe(200);
     await f.db.close();
     await f.app.close();
   });
