@@ -27,6 +27,8 @@ const envSchema = z.object({
   FEISHU_APPROVAL_CHAT_ID: z.string().optional(),
   // Agent 协作通知群;留空则 a2a_send / task_update 不返回 notify,群通知整体关闭
   FEISHU_COLLAB_CHAT_ID: z.string().optional(),
+  // GitHub Webhook 验签密钥(X-Hub-Signature-256);留空不注册 /api/webhooks/github
+  GITHUB_WEBHOOK_SECRET: z.string().optional(),
   // 授权签发(05 §4):只经 tctl 写入 bot traits,真实证书由 tbot 持有
   TELEPORT_TCTL_PATH: z.string().min(1).default("tctl"),
   TELEPORT_IDENTITY_FILE: z.string().optional(),
@@ -63,6 +65,7 @@ export interface Config {
   consoleInitPassword: string | undefined;
   allowedHosts: string[];
   feishu: FeishuConfig | undefined;
+  githubWebhookSecret: string | undefined;
   teleport: TeleportConfig;
 }
 
@@ -157,6 +160,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       parsed.data.PORT,
     ),
     feishu: parseFeishu(parsed.data),
+    githubWebhookSecret: optionalText(parsed.data.GITHUB_WEBHOOK_SECRET),
     teleport: {
       tctlPath: parsed.data.TELEPORT_TCTL_PATH,
       identityFile: optionalText(parsed.data.TELEPORT_IDENTITY_FILE),

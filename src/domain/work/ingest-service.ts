@@ -45,6 +45,7 @@ export function createIngestService(deps: IngestDeps) {
     newItemId: deps.newItemId ?? (() => newPrefixedId("wim")),
     newEventId: deps.newEventId ?? (() => newPrefixedId("wev")),
     newInboxId: deps.newInboxId ?? (() => newPrefixedId("wib")),
+    newThreadId: deps.newThreadId ?? (() => newPrefixedId("wth")),
     newSubscriptionId: deps.newSubscriptionId ?? (() => newPrefixedId("wsb")),
   };
   const newThreadId = deps.newThreadId ?? (() => newPrefixedId("wth"));

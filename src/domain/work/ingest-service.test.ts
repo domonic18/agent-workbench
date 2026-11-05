@@ -283,3 +283,154 @@ describe("Thread owner 直通", () => {
     await db.close();
   });
 });
+
+const ISSUE_URL = "https://github.com/octocat/demo/issues/12";
+const PR_API_URL = "https://api.github.com/repos/octocat/demo/pulls/12";
+
+function githubRequest(overrides: Partial<WorkRequest> = {}): WorkRequest {
+  return {
+    source: "github",
+    sourceEventId: "gh-1",
+    kind: "pr.opened",
+    occurredAt: 2_000,
+    actor: { login: "worker-bot" },
+    threadRefs: [{ source: "bug", externalKind: "issue", externalKey: ISSUE_URL }],
+    payload: {
+      pr_number: 12,
+      pr_url: "https://github.com/octocat/demo/pull/12",
+      pr_api_url: PR_API_URL,
+      head_sha: "abc123",
+      title: "fix: 登录页 500",
+    },
+    refs: ["https://github.com/octocat/demo/pull/12"],
+    ...overrides,
+  };
+}
+
+describe("github 证据分支", () => {
+  it("pr.opened 命中 bug 线程:落 pr_linked 事件与 PR 线程订阅,不投 worker_inbox", async () => {
+    const { db, service } = await prepare();
+    await service.ingest(
+      request({ threadRefs: [{ source: "bug", externalKind: "issue", externalKey: ISSUE_URL }] }),
+    );
+
+    const pr = await service.ingest(githubRequest());
+    expect(pr.replayed).toBe(false);
+    expect(pr.trigger).toMatchObject({
+      disposition: "continued",
+      reasonCode: null,
+      workItemId: "wim_1",
+      targetAgentId: null,
+    });
+
+    // 只有最初的 assignment,证据不产生新投递
+    expect(await db.get("SELECT COUNT(*) AS n FROM worker_inbox")).toEqual({ n: 1 });
+    const events = await listWorkItemEvents(db, "wim_1");
+    expect(events.map((event) => event.kind)).toEqual(["routed", "assigned", "pr_linked"]);
+    expect(JSON.parse(events[2]?.payloadJson ?? "{}")).toMatchObject({
+      pr_api_url: PR_API_URL,
+      head_sha: "abc123",
+    });
+
+    const prThread = await findWorkThreadByKey(db, "github", "pull_request", PR_API_URL);
+    expect(prThread).toMatchObject({ project: "demo", status: "active" });
+    const prOwner = prThread
+      ? await findActiveOwnerSubscription(db, prThread.id)
+      : undefined;
+    expect(prOwner).toMatchObject({ workItemId: "wim_1", mode: "owner" });
+    await db.close();
+  });
+
+  it("pr.synchronized 同一 PR 幂等续链;check.completed 沿 PR 线程回流落 ci_result", async () => {
+    const { db, service } = await prepare();
+    await service.ingest(
+      request({ threadRefs: [{ source: "bug", externalKind: "issue", externalKey: ISSUE_URL }] }),
+    );
+    await service.ingest(githubRequest());
+
+    const synced = await service.ingest(
+      githubRequest({
+        sourceEventId: "gh-2",
+        kind: "pr.synchronized",
+        payload: {
+          pr_number: 12,
+          pr_url: "https://github.com/octocat/demo/pull/12",
+          pr_api_url: PR_API_URL,
+          head_sha: "def456",
+          title: "fix: 登录页 500",
+        },
+      }),
+    );
+    expect(synced.trigger).toMatchObject({ disposition: "continued", workItemId: "wim_1" });
+    const prThread = await findWorkThreadByKey(db, "github", "pull_request", PR_API_URL);
+    const subs =
+      prThread === undefined
+        ? []
+        : await db.all(
+            "SELECT id FROM thread_subscription WHERE work_thread_id = ? AND revoked_at IS NULL",
+            prThread.id,
+          );
+    expect(subs).toHaveLength(1);
+
+    const ci = await service.ingest(
+      githubRequest({
+        sourceEventId: "gh-3",
+        kind: "check.completed",
+        threadRefs: [{ source: "github", externalKind: "pull_request", externalKey: PR_API_URL }],
+        payload: {
+          head_sha: "def456",
+          conclusion: "success",
+          check_suite_url: "https://api.github.com/repos/octocat/demo/check-suites/99",
+          pr_api_urls: [PR_API_URL],
+        },
+        refs: ["https://api.github.com/repos/octocat/demo/check-suites/99"],
+      }),
+    );
+    expect(ci.trigger).toMatchObject({ disposition: "continued", workItemId: "wim_1" });
+    const events = await listWorkItemEvents(db, "wim_1");
+    expect(events.map((event) => event.kind)).toEqual([
+      "routed",
+      "assigned",
+      "pr_linked",
+      "pr_linked",
+      "ci_result",
+    ]);
+    expect(JSON.parse(events[4]?.payloadJson ?? "{}")).toMatchObject({
+      conclusion: "success",
+      head_sha: "def456",
+    });
+    expect(await db.get("SELECT COUNT(*) AS n FROM worker_inbox")).toEqual({ n: 1 });
+    await db.close();
+  });
+
+  it("无 Fixes 的 PR 无线程可归:no_route_rule 落库即止,不建事项不投递", async () => {
+    const { db, service } = await prepare();
+    const result = await service.ingest(githubRequest({ threadRefs: [] }));
+
+    expect(result.trigger).toMatchObject({
+      disposition: "needs_person",
+      reasonCode: "no_route_rule",
+      workItemId: null,
+    });
+    expect(result.workItem).toBeUndefined();
+    expect(await db.get("SELECT COUNT(*) AS n FROM work_item")).toEqual({ n: 0 });
+    expect(await db.get("SELECT COUNT(*) AS n FROM worker_inbox")).toEqual({ n: 0 });
+    expect(await db.get("SELECT COUNT(*) AS n FROM work_thread")).toEqual({ n: 0 });
+    await db.close();
+  });
+
+  it("同一 delivery 重推幂等:返回首次处置,事件不重复", async () => {
+    const { db, service } = await prepare();
+    await service.ingest(
+      request({ threadRefs: [{ source: "bug", externalKind: "issue", externalKey: ISSUE_URL }] }),
+    );
+    await service.ingest(githubRequest());
+
+    const replay = await service.ingest(githubRequest());
+    expect(replay.replayed).toBe(true);
+    expect(replay.trigger.disposition).toBe("continued");
+    const events = await listWorkItemEvents(db, "wim_1");
+    expect(events.filter((event) => event.kind === "pr_linked")).toHaveLength(1);
+    await db.close();
+  });
+});

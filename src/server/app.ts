@@ -29,6 +29,7 @@ import { registerStreamRoutes } from "./routes/stream.js";
 import { registerTaskA2aRoutes } from "./routes/task-a2a.js";
 import { registerTaskReadRoutes } from "./routes/task-read.js";
 import { registerTaskRoutes } from "./routes/task.js";
+import { registerWebhookGithubRoutes } from "./routes/webhook-github.js";
 import { registerWorkRoutes } from "./routes/work.js";
 
 // dist/server 与 src/server 到仓库根同为两级,容器内亦然
@@ -57,6 +58,8 @@ export interface BuildAppOptions {
   knowledgeEntries?: KnowledgeEntryService;
   /** 飞书配置存在且带 approvalChatId 时,申请落库后推送审批卡片 */
   feishu?: FeishuConfig;
+  /** GitHub Webhook 验签密钥;注入才注册 /api/webhooks/github */
+  githubWebhookSecret?: string;
   /** 知识目录(kb_write 的 Markdown 真相源);注入才注册远程 MCP `/mcp` */
   knowledgeDir?: string;
   /** 执行面安装脚本路径;存在时按 /artifacts/install.sh 匿名直读(新机器一键安装的取件口) */
@@ -110,6 +113,9 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     registerWorkRoutes(app, { db, ...timing });
     registerStreamRoutes(app, { db, ...timing });
     registerIngestRoutes(app, { db, ...timing });
+    if (options.githubWebhookSecret !== undefined) {
+      registerWebhookGithubRoutes(app, { db, ...timing, webhookSecret: options.githubWebhookSecret });
+    }
     if (options.knowledgeRebuilder !== undefined) {
       registerKnowledgeRoutes(app, {
         db,

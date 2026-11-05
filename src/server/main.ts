@@ -93,6 +93,9 @@ const app = buildApp({
   installScriptPath: fileURLToPath(new URL("../../scripts/install-aw-node.sh", import.meta.url)),
   webRoot: fileURLToPath(new URL("../../dist/web", import.meta.url)),
   ...(config.feishu === undefined ? {} : { feishu: config.feishu }),
+  ...(config.githubWebhookSecret === undefined
+    ? {}
+    : { githubWebhookSecret: config.githubWebhookSecret }),
 });
 
 // Git 版本化策略校验(01 §9.2):结构错误 fail-fast;引用缺失只告警,派工时再校验

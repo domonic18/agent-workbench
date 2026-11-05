@@ -1,12 +1,19 @@
 import type { Db } from "../../store/database.js";
 import { findAgentByKey } from "../../store/repositories/identity.js";
 import { TASK_LIMITS } from "../../shared/constants.js";
-import { appendWorkItemEvent, insertWorkItem } from "../../store/repositories/work-item.js";
+import {
+  appendWorkItemEvent,
+  findWorkItemById,
+  insertWorkItem,
+} from "../../store/repositories/work-item.js";
 import { findActiveAssignee, insertWorkerInboxIfNew } from "../../store/repositories/work-inbox.js";
 import {
   findActiveOwnerSubscription,
+  findWorkThreadByKey,
   insertSubscriptionIfNew,
+  insertWorkThreadIfNew,
   revokeSubscription,
+  touchWorkThreadTrigger,
 } from "../../store/repositories/work-thread.js";
 import type { RouteOutcome } from "../routing/router.js";
 import type { WorkPolicy } from "../routing/policy.js";
@@ -20,6 +27,7 @@ export interface DispatchDeps {
   newItemId: () => string;
   newEventId: () => string;
   newInboxId: () => string;
+  newThreadId: () => string;
   newSubscriptionId: () => string;
 }
 
@@ -42,13 +50,20 @@ function titleOf(req: WorkRequest, workKind: string): string {
 /**
  * Thread owner 直通(arch/01 §9.2 ③):Input 投给事项的当前承接者。
  * 无活跃承接者(assignment 尚未领取或已退回)时确定性交人,不猜目标。
+ * github 来源走证据分支:pr/check 只是进展事实,不构成给 worker 的新工作。
  */
 export async function dispatchOwnerContinue(
   db: Db,
   ctx: DispatchContext,
-  deps: Pick<DispatchDeps, "newEventId" | "newInboxId">,
+  deps: Pick<
+    DispatchDeps,
+    "policy" | "newEventId" | "newInboxId" | "newThreadId" | "newSubscriptionId"
+  >,
   outcome: OwnerContinueOutcome,
 ): Promise<DispatchOutcome> {
+  if (ctx.request.source === "github") {
+    return dispatchGithubEvidence(db, ctx, deps, outcome);
+  }
   const assignee = await findActiveAssignee(db, outcome.workItemId);
   if (assignee === undefined) {
     return {
@@ -97,6 +112,76 @@ export async function dispatchOwnerContinue(
       targetAgentId: assignee,
     },
     newInboxIds,
+  };
+}
+
+/**
+ * github 证据分支(M3.9-2,arch/01 §9.2 ③的窄化):pr/check 事件命中
+ * owner 事项时只落证据事件,不投 worker_inbox——CI 波动不该反复唤醒
+ * worker。PR 线程 {github|pull_request|<api url>} 首次出现即建 owner 订阅,
+ * 让不带 PR 正文的 check_suite 也能沿该线程回流到同一事项。
+ */
+async function dispatchGithubEvidence(
+  db: Db,
+  ctx: DispatchContext,
+  deps: Pick<DispatchDeps, "policy" | "newEventId" | "newThreadId" | "newSubscriptionId">,
+  outcome: OwnerContinueOutcome,
+): Promise<DispatchOutcome> {
+  const kind = ctx.request.kind;
+  const prApiUrl =
+    typeof ctx.request.payload["pr_api_url"] === "string"
+      ? ctx.request.payload["pr_api_url"]
+      : undefined;
+
+  if (prApiUrl !== undefined && kind !== "check.completed") {
+    const item = await findWorkItemById(db, outcome.workItemId);
+    if (item !== undefined) {
+      await insertWorkThreadIfNew(db, {
+        id: deps.newThreadId(),
+        source: "github",
+        externalKind: "pull_request",
+        externalKey: prApiUrl,
+        project: item.project,
+        createdAt: ctx.at,
+      });
+      const thread = await findWorkThreadByKey(db, "github", "pull_request", prApiUrl);
+      if (thread !== undefined) {
+        await touchWorkThreadTrigger(db, thread.id, ctx.at);
+        // 已有 owner(PR 后续 synchronize 重放)时幂等跳过;证据不换绑 owner
+        await insertSubscriptionIfNew(db, {
+          id: deps.newSubscriptionId(),
+          workThreadId: thread.id,
+          workItemId: outcome.workItemId,
+          mode: "owner",
+          createdBy: "router",
+          policyVersion: deps.policy.version,
+          createdAt: ctx.at,
+        });
+      }
+    }
+  }
+
+  const eventKind =
+    kind === "pr.closed" ? "pr_closed" : kind === "check.completed" ? "ci_result" : "pr_linked";
+  await appendWorkItemEvent(db, {
+    id: deps.newEventId(),
+    workItemId: outcome.workItemId,
+    kind: eventKind,
+    triggerId: ctx.triggerId,
+    evidenceRefsJson: ctx.refsJson,
+    payloadJson: JSON.stringify(ctx.request.payload),
+    occurredAt: ctx.at,
+  });
+  return {
+    resolved: {
+      disposition: "continued",
+      reasonCode: null,
+      ruleId: null,
+      ruleVersion: null,
+      workItemId: outcome.workItemId,
+      targetAgentId: null,
+    },
+    newInboxIds: [],
   };
 }
 
