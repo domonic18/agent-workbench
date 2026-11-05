@@ -41,6 +41,10 @@ jobs:
           TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           set -eu
+          case "$TAG" in
+            collector-v*) ;;
+            *) echo "tag 必须是 collector-v<版本> 形式,收到 $TAG" >&2; exit 1 ;;
+          esac
           pkg_version=$(node -p "require('./collector/package.json').version")
           tag_version="${TAG#collector-v}"
           if [ "$pkg_version" != "$tag_version" ]; then
