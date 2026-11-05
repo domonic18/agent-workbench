@@ -29,6 +29,7 @@ import { registerStreamRoutes } from "./routes/stream.js";
 import { registerTaskA2aRoutes } from "./routes/task-a2a.js";
 import { registerTaskReadRoutes } from "./routes/task-read.js";
 import { registerTaskRoutes } from "./routes/task.js";
+import { registerWorkRoutes } from "./routes/work.js";
 
 // dist/server 与 src/server 到仓库根同为两级,容器内亦然
 function readVersion(): string {
@@ -106,6 +107,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     registerTaskRoutes(app, { db, ...timing, ...collab });
     registerTaskReadRoutes(app, { db, ...timing });
     registerTaskA2aRoutes(app, { db, ...timing });
+    registerWorkRoutes(app, { db, ...timing });
     registerStreamRoutes(app, { db, ...timing });
     registerIngestRoutes(app, { db, ...timing });
     if (options.knowledgeRebuilder !== undefined) {
