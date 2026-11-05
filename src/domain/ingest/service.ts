@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { INGEST_TOKEN_USAGE_KIND } from "../../shared/constants.js";
+import { INGEST_REJECTED_KIND, INGEST_TOKEN_USAGE_KIND } from "../../shared/constants.js";
 import type { Db } from "../../store/database.js";
 import { findAgentByMachineProject } from "../../store/repositories/identity.js";
 import { hasIngestReceipt, insertIngestReceipt } from "../../store/repositories/ingest-receipt.js";
@@ -28,6 +28,8 @@ export interface IngestBatchResult {
   ackedSeq: number;
   processed: number;
   skipped: number;
+  /** 被拒(内容存不下)并跳过的项数;这些项已留痕,不算丢事件 */
+  rejected: number;
   /** 首个失败项;批次在此停止,后续不再写入 */
   failed: { seq: number; message: string } | null;
 }
@@ -135,6 +137,29 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** 单批最多跳过的坏项数;超过说明是系统性故障,整批停下等重试,不静默丢数据 */
+const MAX_REJECTED_PER_BATCH = 5;
+
+function pgErrorCode(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null || !("code" in error)) {
+    return undefined;
+  }
+  const code = (error as { code?: unknown }).code;
+  return typeof code === "string" ? code : undefined;
+}
+
+/**
+ * 毒丸错误:内容本身不合法(业务校验失败、PG 数据类错误)。
+ * 这类错误重试多少次结果都一样,继续挡住整条流只会让后面的事件永远收不上来。
+ */
+function isPoisonError(error: unknown): boolean {
+  if (error instanceof IngestError) {
+    return true;
+  }
+  const code = pgErrorCode(error);
+  return code !== undefined && (code.startsWith("22") || code.startsWith("23"));
+}
+
 export function createIngestService(deps: IngestServiceDeps): IngestService {
   const { db } = deps;
   const now = deps.now ?? Date.now;
@@ -151,6 +176,7 @@ export function createIngestService(deps: IngestServiceDeps): IngestService {
     let ackedSeq = 0;
     let processed = 0;
     let skipped = 0;
+    let rejected = 0;
 
     for (const item of input.items) {
       const key = {
@@ -206,19 +232,46 @@ export function createIngestService(deps: IngestServiceDeps): IngestService {
           await insertIngestReceipt(tx, { ...key, receivedAt: now() });
         });
       } catch (error) {
-        return {
-          ackedSeq,
-          processed,
-          skipped,
-          failed: { seq: item.seq, message: errorMessage(error) },
-        };
+        const message = errorMessage(error);
+        // 瞬时错误(连接、死锁):整批停下,采集器重试,事件不丢
+        if (!isPoisonError(error) || rejected >= MAX_REJECTED_PER_BATCH) {
+          return {
+            ackedSeq,
+            processed,
+            skipped,
+            rejected,
+            failed: { seq: item.seq, message },
+          };
+        }
+        // 毒丸项:内容本身存不下,跳过并留痕,不让一条坏事件堵死整条流
+        await db.transaction(async (tx) => {
+          const txRunService = deps.runService ?? createRunService({ db: tx });
+          await txRunService.recordEvent({
+            agentId: agent.id,
+            machine: input.collectorId,
+            project: input.agentProject,
+            streamId: input.streamId,
+            kind: INGEST_REJECTED_KIND,
+            occurredAt: item.occurredAt,
+            ord: item.seq,
+            turnId: null,
+            blockId: null,
+            blockRev: 1,
+            offset: null,
+            payload: { kind: item.kind, seq: item.seq, error: message },
+          });
+          await insertIngestReceipt(tx, { ...key, receivedAt: now() });
+        });
+        rejected += 1;
+        ackedSeq = item.seq;
+        continue;
       }
 
       processed += 1;
       ackedSeq = item.seq;
     }
 
-    return { ackedSeq, processed, skipped, failed: null };
+    return { ackedSeq, processed, skipped, rejected, failed: null };
   }
 
   return { ingestBatch };

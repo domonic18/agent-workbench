@@ -338,6 +338,9 @@ export const INGEST = {
 /** token 用量事件类型:采集器按此 kind 上报四维用量(02 §3.6) */
 export const INGEST_TOKEN_USAGE_KIND = "token_usage";
 
+/** 坏项留痕事件类型:内容存不下被跳过的采集项,原 kind 与失败原因记在 payload */
+export const INGEST_REJECTED_KIND = "ingest_rejected";
+
 /** summary / expect 长度上限:信封是索引而非正文,长内容走 refs 指向的知识条目 */
 export const ENVELOPE_LIMITS = {
   summary: 200,

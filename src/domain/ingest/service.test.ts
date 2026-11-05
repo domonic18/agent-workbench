@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { INGEST_REJECTED_KIND } from "../../shared/constants.js";
 import { createIdentityService } from "../identity/service.js";
 import { createRunService, type RunService } from "../run/service.js";
 import { openDatabase, type Db } from "../../store/database.js";
@@ -67,7 +68,7 @@ describe("采集入库", () => {
 
     const result = await service.ingestBatch(batch([1, 2]));
 
-    expect(result).toEqual({ ackedSeq: 2, processed: 2, skipped: 0, failed: null });
+    expect(result).toEqual({ ackedSeq: 2, processed: 2, skipped: 0, rejected: 0, failed: null });
     const run = await findRunningRunForStream(db, agentId, "claude-session:s1");
     expect(run).toBeDefined();
     const events = await listTimelineEventsByRun(db, run!.id);
@@ -84,7 +85,7 @@ describe("采集入库", () => {
 
     const replay = await service.ingestBatch(batch([1, 2]));
 
-    expect(replay).toEqual({ ackedSeq: 2, processed: 0, skipped: 2, failed: null });
+    expect(replay).toEqual({ ackedSeq: 2, processed: 0, skipped: 2, rejected: 0, failed: null });
     const run = await findRunningRunForStream(db, agentId, "claude-session:s1");
     expect(await listTimelineEventsByRun(db, run!.id)).toHaveLength(2);
     await db.close();
@@ -105,7 +106,7 @@ describe("采集入库", () => {
       batch([], { items: [tokenItem(2, TOKEN_PAYLOAD)] }),
     );
 
-    expect(result).toEqual({ ackedSeq: 2, processed: 1, skipped: 0, failed: null });
+    expect(result).toEqual({ ackedSeq: 2, processed: 1, skipped: 0, rejected: 0, failed: null });
     expect(await listTokenUsageByRun(db, run.id)).toMatchObject([
       { sequence: 2, source: "assistant_message", taskId: "tsk_a", inputTokens: 10 },
     ]);
@@ -123,7 +124,7 @@ describe("采集入库", () => {
     await db.close();
   });
 
-  it("首个失败项处停止,此前已提交的事件保留且回执到位", async () => {
+  it("毒丸项被跳过并留痕,批次继续,不因一条坏项堵死整条流", async () => {
     const { db, service, agentId } = await prepare();
     const result = await service.ingestBatch(
       batch([], {
@@ -135,29 +136,69 @@ describe("采集入库", () => {
       }),
     );
 
-    expect(result.ackedSeq).toBe(1);
-    expect(result.processed).toBe(1);
-    expect(result.failed).toMatchObject({ seq: 2 });
+    expect(result.ackedSeq).toBe(3);
+    expect(result.processed).toBe(2);
+    expect(result.rejected).toBe(1);
+    expect(result.failed).toBeNull();
     const run = (await findRunningRunForStream(db, agentId, "claude-session:s1"))!;
-    expect(await listTimelineEventsByRun(db, run.id)).toHaveLength(1);
+    const events = await listTimelineEventsByRun(db, run.id);
+    expect(events.filter((event) => event.kind === INGEST_REJECTED_KIND)).toMatchObject([
+      { payloadJson: expect.stringContaining("token_usage") },
+    ]);
     expect(
       await hasIngestReceipt(db, { collectorId: "m1", streamId: "claude-session:s1", seq: 2 }),
-    ).toBe(false);
+    ).toBe(true);
+    await db.close();
+  });
+
+  it("瞬时错误整批停下等重试,不跳过也不丢事件", async () => {
+    const db = await openDatabase();
+    const identity = createIdentityService({ db });
+    await identity.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
+    await identity.registerAgent({ machineId: "m1", project: "pa", displayName: "A" });
+    const service = createIngestService({
+      db,
+      runService: {
+        recordEvent: async () => {
+          throw new Error("connection terminated unexpectedly");
+        },
+        endStream: async () => null,
+        bindTask: async () => false,
+      },
+    });
+
+    const result = await service.ingestBatch(batch([1, 2]));
+
+    expect(result.ackedSeq).toBe(0);
+    expect(result.processed).toBe(0);
+    expect(result.rejected).toBe(0);
+    expect(result.failed).toMatchObject({ seq: 1 });
     expect(
-      await hasIngestReceipt(db, { collectorId: "m1", streamId: "claude-session:s1", seq: 3 }),
+      await hasIngestReceipt(db, { collectorId: "m1", streamId: "claude-session:s1", seq: 1 }),
     ).toBe(false);
     await db.close();
   });
 
-  it("失败项的写入整体回滚,不留半条 run 或时间线", async () => {
+  it("payload 含 NUL 与孤立代理项时清洗后入库,不触发 jsonb 拒收", async () => {
     const { db, service, agentId } = await prepare();
     const result = await service.ingestBatch(
-      batch([], { items: [tokenItem(1, { model: "claude-sonnet-4-6" })] }),
+      batch([], {
+        items: [
+          {
+            seq: 1,
+            kind: "tool_result",
+            occurredAt: 1_001,
+            payload: { preview: "a\u0000b\ud800c", ord: 1 },
+          },
+        ],
+      }),
     );
 
-    expect(result.processed).toBe(0);
-    expect(result.ackedSeq).toBe(0);
-    expect(await findRunningRunForStream(db, agentId, "claude-session:s1")).toBeUndefined();
+    expect(result).toEqual({ ackedSeq: 1, processed: 1, skipped: 0, rejected: 0, failed: null });
+    const run = (await findRunningRunForStream(db, agentId, "claude-session:s1"))!;
+    const events = await listTimelineEventsByRun(db, run.id);
+    expect(events[0]?.payloadJson).not.toContain("\\u0000");
+    expect(events[0]?.payloadJson).toContain("\uFFFD");
     await db.close();
   });
 });

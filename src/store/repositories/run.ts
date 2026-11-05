@@ -1,5 +1,6 @@
 import type { RunStatus } from "../../shared/constants.js";
 import type { Db } from "../database.js";
+import { toJsonbText } from "../json.js";
 
 export interface AgentRunRecord {
   id: string;
@@ -153,7 +154,7 @@ export async function insertTimelineEvent(db: Db, event: NewTimelineEvent): Prom
        (id, run_id, turn_id, block_id, ord, block_rev, "offset", kind, payload_json, occurred_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     event.id, event.runId, event.turnId, event.blockId, event.ord, event.blockRev,
-    event.offset, event.kind, JSON.stringify(event.payload ?? {}), event.occurredAt,
+    event.offset, event.kind, toJsonbText(event.payload), event.occurredAt,
   );
 }
 
