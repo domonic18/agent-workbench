@@ -6,6 +6,12 @@ export const COLLECTOR_VERSION = "0.2.2";
 
 export type BackfillMode = "none" | "all";
 
+/** 不在 cc-connect 配置里的本机项目(AW_EXTRA_PROJECTS),如 worker 靶子仓库 */
+export interface ExtraProject {
+  name: string;
+  cwd: string;
+}
+
 export interface CollectorConfig {
   /** 控制台 ingest 完整地址,如 https://aw.example.com/api/ingest */
   ingestUrl: string;
@@ -21,6 +27,8 @@ export interface CollectorConfig {
   ccConnectConfigs: string[];
   /** 受管 MCP 写入的 Claude Code 配置文件 */
   claudeJsonPath: string;
+  /** AW_EXTRA_PROJECTS 声明的额外项目;并入发现上报(带 cwd) */
+  extraProjects: ExtraProject[];
   pollMs: number;
   heartbeatMs: number;
   discoveryMs: number;
@@ -88,6 +96,28 @@ function parseList(raw: string | undefined): string[] {
     .filter((item) => item !== "");
 }
 
+/** AW_EXTRA_PROJECTS:"name=/abs/cwd" 逗号分隔;格式非法直接报错,不静默丢弃 */
+export function parseExtraProjects(raw: string | undefined): ExtraProject[] {
+  if (raw === undefined || raw.trim() === "") {
+    return [];
+  }
+  const extra: ExtraProject[] = [];
+  for (const item of raw.split(",")) {
+    const entry = item.trim();
+    if (entry === "") {
+      continue;
+    }
+    const eq = entry.indexOf("=");
+    const name = eq > 0 ? entry.slice(0, eq).trim() : "";
+    const cwd = eq > 0 && eq < entry.length - 1 ? entry.slice(eq + 1).trim() : "";
+    if (name === "" || !cwd.startsWith("/")) {
+      throw new Error(`AW_EXTRA_PROJECTS 条目必须是 name=/绝对路径,收到 ${entry}`);
+    }
+    extra.push({ name, cwd });
+  }
+  return extra;
+}
+
 /** 接收 base url 或完整 ingest url,统一成完整 ingest 地址 */
 export function normalizeIngestUrl(raw: string): { ingestUrl: string; baseUrl: string } {
   const trimmed = raw.trim().replace(/\/+$/, "");
@@ -131,6 +161,7 @@ export function loadConfig(options: LoadConfigOptions = {}): CollectorConfig {
     ccConnectDir: env.AW_CC_CONNECT_DIR ?? join(homedir(), ".cc-connect"),
     ccConnectConfigs: parseList(env.AW_CC_CONNECT_CONFIG),
     claudeJsonPath: env.AW_CLAUDE_JSON ?? join(homedir(), ".claude.json"),
+    extraProjects: parseExtraProjects(env.AW_EXTRA_PROJECTS),
     pollMs: readInt(env, "AW_POLL_MS", 1_000, 100, 10 * 60 * 1_000),
     heartbeatMs: readInt(env, "AW_HEARTBEAT_MS", 60_000, 5_000, 60 * 60 * 1_000),
     discoveryMs: readInt(env, "AW_DISCOVERY_MS", 5 * 60_1_000, 30_000, 60 * 60_1_000),

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { freemem, loadavg, totalmem } from "node:os";
-import { scanDiscoveryState } from "./discovery.js";
+import type { ExtraProject } from "./config.js";
+import { mergeExtraProjects, scanDiscoveryState } from "./discovery.js";
 import {
   createCachedFeishuBotResolver,
   type CachedFeishuBotResolver,
@@ -14,6 +15,8 @@ import { sortedStreams, streamIdFor, type PersistedState } from "./state.js";
 export interface DiscoveryCycleDeps {
   /** cc-connect 配置文件列表(空走默认候选路径) */
   configs: string[];
+  /** AW_EXTRA_PROJECTS 声明的额外项目,并入上报与 cwdByProject */
+  extraProjects?: readonly ExtraProject[];
   client: ConsoleClient;
   logger?: Logger;
   /** bot 身份解析器;测试可注入假实现,缺省用带缓存的飞书实现 */
@@ -36,7 +39,9 @@ export function createDiscoveryCycle(deps: DiscoveryCycleDeps): DiscoveryCycle {
   let discoveryHash: string | null = null;
 
   async function once(): Promise<void> {
-    const { report, feishuCredentials } = scanDiscoveryState(deps.configs);
+    const scanned = scanDiscoveryState(deps.configs);
+    const report = mergeExtraProjects(scanned.report, deps.extraProjects ?? []);
+    const feishuCredentials = scanned.feishuCredentials;
     // 飞书 bot 名只作为展示字段补充,取不到就保留项目名,不阻断发现上报
     await Promise.all(
       report.projects.map(async (project) => {

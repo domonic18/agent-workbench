@@ -9,7 +9,7 @@ import {
   type CollectorConfig,
 } from "./config.js";
 import { loadConfigSyncState } from "./config-sync.js";
-import { scanDiscovery } from "./discovery.js";
+import { mergeExtraProjects, scanDiscovery } from "./discovery.js";
 import { createDaemon } from "./daemon.js";
 import { classifyStream, listSessionFiles } from "./sessions.js";
 import {
@@ -219,7 +219,7 @@ async function doctor(): Promise<number> {
     }
   }
 
-  const discovery = scanDiscovery(config.ccConnectConfigs);
+  const discovery = mergeExtraProjects(scanDiscovery(config.ccConnectConfigs), config.extraProjects);
   const known = discovery.projects.map((project) =>
     project.cwd === undefined ? project.name : `${project.name}(${project.cwd})`,
   );

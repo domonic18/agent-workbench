@@ -187,17 +187,25 @@ describe("validatePolicy 引用校验(告警不阻断)", () => {
     expect(otherProject.warnings).toHaveLength(0);
   });
 
-  it("默认策略校验返回版本;试点 key 未注册只告警,注册后告警消失", async () => {
+  it("默认策略校验返回版本;注册表 key 未注册只告警,注册后告警消失", async () => {
     const bare = await openDatabase();
     dbs.push(bare);
     const warned = await validatePolicy({ db: bare });
     expect(warned.warnings.join("\n")).toContain("workbuddy-pilot");
+    expect(warned.warnings.join("\n")).toContain("acore-portal");
     expect(warned.warnings.join("\n")).toContain("尚未注册");
     expect(warned.version).toMatch(/^[0-9a-f]{12}$/);
 
-    // confirmAgents 按项目名派生 key,恰好对上试点条目
+    // confirmAgents 按项目名派生 key,恰好对上注册表两个条目
     const { db } = await seededAgent("workbuddy-pilot");
     dbs.push(db);
+    await confirmAgents(
+      { db, now: () => Date.now() },
+      {
+        machineId: "m-policy-workbuddy-pilot",
+        entries: [{ project: "acore-portal", displayName: "acore-portal" }],
+      },
+    );
     const seeded = await validatePolicy({ db });
     expect(seeded.warnings).toHaveLength(0);
   });

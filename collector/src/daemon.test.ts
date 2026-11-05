@@ -65,6 +65,7 @@ function configOf(stateDir: string, claudeDir: string, ccConnectDir: string): Co
     // 测试不读真机 cc-connect 配置;发现扫描指向不存在的路径返回空报告
     ccConnectConfigs: [join(stateDir, "cc-connect-none.toml")],
     claudeJsonPath: join(stateDir, "claude.json"),
+    extraProjects: [],
     pollMs: 1_000,
     heartbeatMs: 60_000,
     discoveryMs: 300_000,

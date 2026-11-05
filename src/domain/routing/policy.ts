@@ -78,10 +78,13 @@ export const ROUTE_RULES: readonly RouteRule[] = [
  * 项目注册表:未登记项目的未归属事件确定性 needs_person,不猜目标。
  * workbuddy-pilot 是 M3.9-1 联测的试点项目——目标 Agent 注册时自带
  * key="workbuddy-pilot"(机器无关 Agent 的稳定键由注册方显式给出);
- * 未部署该 Agent 的环境启动时只产生引用告警,不影响其余项目派工。
+ * acore-portal 是 M3.9-2 真实 Bug 闭环的靶子项目——机器绑定 Agent 由
+ * /setup 派生 key(默认即项目名),真机确认后与本表一致。
+ * 未部署对应 Agent 的环境启动时只产生引用告警,不影响其余项目派工。
  */
 export const PROJECT_REGISTRY: ProjectRegistry = {
   "workbuddy-pilot": { primary: "workbuddy-pilot" },
+  "acore-portal": { primary: "acore-portal" },
 };
 
 function stableStringify(value: unknown): string {

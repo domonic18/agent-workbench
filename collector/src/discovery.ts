@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { parse as parseToml } from "smol-toml";
+import type { ExtraProject } from "./config.js";
 import type { DiscoveryProjectReport, DiscoveryReport } from "../../src/shared/aw-node-wire.js";
 
 /**
@@ -136,5 +137,32 @@ export function scanDiscoveryState(configPaths?: string[]): {
   return {
     report: { projects: [...merged.values()].sort((a, b) => a.name.localeCompare(b.name)) },
     feishuCredentials: credentials,
+  };
+}
+
+/**
+ * 把 AW_EXTRA_PROJECTS 声明的项目并入发现上报:新项目只带 name+cwd,
+ * 不伪造 agents/channels/bot 名;同名已存在时仅补缺失的 cwd,cc-connect 事实优先。
+ */
+export function mergeExtraProjects(
+  report: DiscoveryReport,
+  extra: readonly ExtraProject[],
+): DiscoveryReport {
+  if (extra.length === 0) {
+    return report;
+  }
+  const byName = new Map(report.projects.map((project) => [project.name, project]));
+  for (const item of extra) {
+    const existing = byName.get(item.name);
+    if (existing === undefined) {
+      byName.set(item.name, { name: item.name, cwd: item.cwd });
+      continue;
+    }
+    if (existing.cwd === undefined) {
+      existing.cwd = item.cwd;
+    }
+  }
+  return {
+    projects: [...byName.values()].sort((a, b) => a.name.localeCompare(b.name)),
   };
 }

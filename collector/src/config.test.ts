@@ -1,7 +1,13 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { COLLECTOR_VERSION, loadConfig, normalizeIngestUrl, parseBackfill } from "./config.js";
+import {
+  COLLECTOR_VERSION,
+  loadConfig,
+  normalizeIngestUrl,
+  parseBackfill,
+  parseExtraProjects,
+} from "./config.js";
 
 describe("采集器配置", () => {
   it("版本号与 collector/package.json 一致,避免发布产物自报旧版本", () => {
@@ -96,5 +102,23 @@ describe("采集器配置", () => {
     expect(() =>
       loadConfig({ env: { ...base, AW_SESSION_TIMEOUT_MS: "1000" } }),
     ).toThrow(/AW_SESSION_TIMEOUT_MS/);
+  });
+
+  it("AW_EXTRA_PROJECTS:逗号分隔 name=/绝对路径,未设置默认空", () => {
+    expect(parseExtraProjects(undefined)).toEqual([]);
+    expect(parseExtraProjects("  ")).toEqual([]);
+    expect(
+      parseExtraProjects(" acore-portal=/Users/x/Code/acore-portal , second=/w/s ,"),
+    ).toEqual([
+      { name: "acore-portal", cwd: "/Users/x/Code/acore-portal" },
+      { name: "second", cwd: "/w/s" },
+    ]);
+  });
+
+  it("AW_EXTRA_PROJECTS 格式非法直接报错,不静默丢弃", () => {
+    expect(() => parseExtraProjects("no-equal-sign")).toThrow(/AW_EXTRA_PROJECTS/);
+    expect(() => parseExtraProjects("p=relative/path")).toThrow(/AW_EXTRA_PROJECTS/);
+    expect(() => parseExtraProjects("=/abs")).toThrow(/AW_EXTRA_PROJECTS/);
+    expect(() => parseExtraProjects("p=")).toThrow(/AW_EXTRA_PROJECTS/);
   });
 });

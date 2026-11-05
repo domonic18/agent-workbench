@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   DEFAULT_CONFIG_CANDIDATES,
   feishuCredentialsOf,
+  mergeExtraProjects,
   projectToReport,
   resolveConfigPaths,
   scanDiscovery,
@@ -150,5 +151,35 @@ describe("scanDiscovery", () => {
     expect(feishuCredentials.get("bug-triage")).toEqual({ appId: "cli_xxx", appSecret: "must_not_leak" });
     expect(JSON.stringify(report)).not.toContain("must_not_leak");
     expect(JSON.stringify(report)).not.toContain("cli_xxx");
+  });
+});
+
+describe("mergeExtraProjects", () => {
+  it("新项目只带 name+cwd,不伪造 agents/channels/bot 名;结果按名排序", () => {
+    const report = { projects: [{ name: "bug-triage", cwd: "/w/bt", agents: [{}], channels: [] }] };
+    const merged = mergeExtraProjects(report, [
+      { name: "acore-portal", cwd: "/Users/x/Code/acore-portal" },
+    ]);
+    expect(merged.projects).toEqual([
+      { name: "acore-portal", cwd: "/Users/x/Code/acore-portal" },
+      { name: "bug-triage", cwd: "/w/bt", agents: [{}], channels: [] },
+    ]);
+  });
+
+  it("同名项目仅补缺失 cwd,cc-connect 已有 cwd 优先", () => {
+    const withCwd = { projects: [{ name: "p1", cwd: "/from/cc", agents: [{}], channels: [] }] };
+    expect(mergeExtraProjects(withCwd, [{ name: "p1", cwd: "/from/extra" }]).projects[0]).toMatchObject({
+      cwd: "/from/cc",
+    });
+    const noCwd = { projects: [{ name: "p1", agents: [{}], channels: [] }] };
+    expect(mergeExtraProjects(noCwd, [{ name: "p1", cwd: "/from/extra" }]).projects[0]).toMatchObject({
+      cwd: "/from/extra",
+      agents: [{}],
+    });
+  });
+
+  it("空列表返回原报告,不复制", () => {
+    const report = { projects: [] };
+    expect(mergeExtraProjects(report, [])).toBe(report);
   });
 });

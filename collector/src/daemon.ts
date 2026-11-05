@@ -71,7 +71,12 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
     now,
     isRunning: () => running,
   });
-  const discovery = createDiscoveryCycle({ configs: config.ccConnectConfigs, client, logger });
+  const discovery = createDiscoveryCycle({
+    configs: config.ccConnectConfigs,
+    extraProjects: config.extraProjects,
+    client,
+    logger,
+  });
   const configSync = createConfigSyncCycle({
     client,
     stateDir: config.stateDir,
