@@ -181,25 +181,17 @@ describe("POST /api/bootstrap/admin", () => {
 });
 
 describe("GET /api/bootstrap/status", () => {
-  it("初始化前须携带可用 bootstrap token(只读不消费)", async () => {
+  it("初始化前匿名可读,只暴露 awaiting_admin 相位(SPA 据此路由进 /setup)", async () => {
     const fixture = await bareApp();
-    expect(
-      (await fixture.app.inject({ method: "GET", url: "/api/bootstrap/status" })).statusCode,
-    ).toBe(401);
+    const status = await fixture.app.inject({ method: "GET", url: "/api/bootstrap/status" });
+    expect(status.statusCode).toBe(200);
+    expect(status.json()).toMatchObject({ phase: "awaiting_admin", machines: 0, agents: 0 });
 
+    // 匿名轮询不影响设置管理员
     const { token } = await issueOneTimeToken(fixture.db, {
       purpose: "bootstrap_admin",
       ttlMs: ONE_TIME_TOKEN.adminTtlMs,
     });
-    const ok = await fixture.app.inject({
-      method: "GET",
-      url: "/api/bootstrap/status",
-      headers: { authorization: `Bearer ${token}` },
-    });
-    expect(ok.statusCode).toBe(200);
-    expect(ok.json().phase).toBe("awaiting_admin");
-
-    // 轮询不消费:同 token 仍能设置管理员
     const admin = await fixture.app.inject({
       method: "POST",
       url: "/api/bootstrap/admin",

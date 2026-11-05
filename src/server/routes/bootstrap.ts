@@ -9,7 +9,6 @@ import { findAssembly } from "../../store/repositories/assembly.js";
 import {
   consumeOneTimeToken,
   issueOneTimeToken,
-  peekOneTimeToken,
 } from "../../domain/bootstrap/one-time-token.js";
 import { confirmAgents, KEY_PATTERN } from "../../domain/bootstrap/config-delivery.js";
 import { listDiscoveryForConsole } from "../../domain/bootstrap/discovery.js";
@@ -48,14 +47,6 @@ export interface BootstrapRoutesOptions {
 interface AdminBody {
   token?: unknown;
   password?: unknown;
-}
-
-function bearerToken(header: unknown): string | undefined {
-  if (typeof header !== "string") {
-    return undefined;
-  }
-  const match = /^Bearer\s+(\S+)$/i.exec(header.trim());
-  return match?.[1];
 }
 
 /** 初始化阶段:/setup 据此决定强制路由(01 §2);装配完成才算 ready(03 §4.0) */
@@ -133,24 +124,15 @@ export function registerBootstrapRoutes(app: FastifyInstance, options: Bootstrap
 
   app.get("/api/bootstrap/status", async (request, reply) => {
     if (!(await hasConsoleCredential(db))) {
-      // 分段鉴权:初始化前凭一次性 bootstrap_admin token(只读校验,不消费)
-      const token = bearerToken(request.headers.authorization);
-      if (token === undefined) {
-        return reply.code(401).send({
-          error: { code: "UNAUTHORIZED", message: "未初始化,需携带 bootstrap token" },
-        });
-      }
-      const { usable } = await peekOneTimeToken(db, {
-        purpose: "bootstrap_admin",
-        token,
-        now,
-      });
-      if (!usable) {
-        return reply.code(401).send({
-          error: { code: "UNAUTHORIZED", message: "bootstrap token 无效或已失效" },
-        });
-      }
-      return { phase: "awaiting_admin", machines: 0, agents: 0, next: "输入 bootstrap token 并设置管理员口令" };
+      // 初始化前匿名可读:只暴露 awaiting_admin 相位,不含业务数据。
+      // SPA 必须先拿到相位才能把用户路由进 /setup;若此处返回 401,
+      // 前端会把任何 401 统一弹回登录页,形成初始化死循环。
+      return {
+        phase: "awaiting_admin",
+        machines: 0,
+        agents: 0,
+        next: "输入 bootstrap token 并设置管理员口令",
+      };
     }
     const guard = requireSession(db, now)(request, reply);
     const rejected = await guard;

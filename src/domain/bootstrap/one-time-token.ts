@@ -46,22 +46,6 @@ export async function issueOneTimeToken(db: Db, input: IssueTokenInput): Promise
   return { token, expiresAt };
 }
 
-/** 只读校验(不消费):/setup 轮询 status 用 */
-export async function peekOneTimeToken(
-  db: Db,
-  input: ConsumeTokenInput,
-): Promise<{ usable: boolean }> {
-  const row = (await db.get(
-    'SELECT consumed_at AS "consumedAt", expires_at AS "expiresAt" FROM one_time_token WHERE token_hash = ? AND purpose = ?',
-    hashToken(input.token), input.purpose,
-  )) as { consumedAt: number | null; expiresAt: number } | undefined;
-  if (row === undefined) {
-    return { usable: false };
-  }
-  const now = (input.now ?? Date.now)();
-  return { usable: row.consumedAt === null && row.expiresAt > now };
-}
-
 /**
  * 原子消费:UPDATE ... WHERE consumed_at IS NULL AND expires_at > now,
  * changes = 1 才算赢得令牌,并发双花只有一个成功。

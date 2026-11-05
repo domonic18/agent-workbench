@@ -4,7 +4,6 @@ import {
   consumeOneTimeToken,
   issueOneTimeToken,
   mintTokenValue,
-  peekOneTimeToken,
 } from "./one-time-token.js";
 
 const clock = 1_000_000;
@@ -69,26 +68,6 @@ describe("one-time token", () => {
     expect(
       await consumeOneTimeToken(db, { purpose: "bootstrap_admin", token, now: () => clock }),
     ).toEqual({ ok: false, reason: "invalid" });
-    await db.close();
-  });
-
-  it("peek 只读不消费:可用→消费后不可用", async () => {
-    const db = await dbFixture();
-    const { token } = await issueOneTimeToken(db, {
-      purpose: "bootstrap_admin",
-      ttlMs: 60_000,
-      now: () => clock,
-    });
-    expect(await peekOneTimeToken(db, { purpose: "bootstrap_admin", token, now: () => clock })).toEqual({
-      usable: true,
-    });
-    expect(
-      (await db.get("SELECT consumed_at AS c FROM one_time_token")) as { c: number | null },
-    ).toEqual({ c: null });
-    await consumeOneTimeToken(db, { purpose: "bootstrap_admin", token, now: () => clock });
-    expect(await peekOneTimeToken(db, { purpose: "bootstrap_admin", token, now: () => clock })).toEqual({
-      usable: false,
-    });
     await db.close();
   });
 });
