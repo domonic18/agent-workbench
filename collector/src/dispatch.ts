@@ -60,18 +60,26 @@ export interface DispatchCycle {
 }
 
 /** claude 候选目录:launchd 环境 PATH 极简,需按固定候选顺序兜底 */
-const CLAUDE_CANDIDATES = ["/opt/homebrew/bin/claude", "/usr/local/bin/claude", "~/.local/bin/claude"];
+export const CLAUDE_CANDIDATE_DIRS = ["/opt/homebrew/bin", "/usr/local/bin", "~/.local/bin"];
 
 /**
  * 解析 claude 可执行文件:显式 env → 当前 PATH → 常见安装目录。
  * 解析不到返回 undefined(调度不挂载,采集不受影响)。
  */
-export function resolveClaudePath(envHint: string | null, pathEnv?: string): string | undefined {
+export function resolveClaudePath(
+  envHint: string | null,
+  pathEnv?: string,
+  candidateDirs: readonly string[] = CLAUDE_CANDIDATE_DIRS,
+): string | undefined {
   if (envHint !== null) {
     return existsSync(envHint) ? envHint : undefined;
   }
   const entries = (pathEnv ?? process.env.PATH ?? "").split(delimiter).filter((item) => item !== "");
-  for (const dir of [...entries, ...CLAUDE_CANDIDATES.map((item) => item.replace(/^~(?=\/)/, homedir()))]) {
+  const dirs = [
+    ...entries,
+    ...candidateDirs.map((item) => item.replace(/^~(?=\/)/, homedir())),
+  ];
+  for (const dir of dirs) {
     const candidate = join(dir, "claude");
     if (existsSync(candidate)) {
       return candidate;

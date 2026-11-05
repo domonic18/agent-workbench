@@ -109,8 +109,15 @@ describe("resolveClaudePath", () => {
     expect(resolveClaudePath(null, dir)).toBe(fake);
   });
 
+  it("PATH 没有时按候选目录兜底(launchd 环境 PATH 极简)", () => {
+    const dir = newDir();
+    const fake = join(dir, "claude");
+    writeFileSync(fake, "#!/bin/sh\n");
+    expect(resolveClaudePath(null, "/no/such/dir", [dir])).toBe(fake);
+  });
+
   it("找不到时返回 undefined", () => {
-    expect(resolveClaudePath(null, "/no/such/dir")).toBeUndefined();
+    expect(resolveClaudePath(null, "/no/such/dir", ["/no/such/dir"])).toBeUndefined();
   });
 });
 
