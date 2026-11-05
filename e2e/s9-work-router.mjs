@@ -33,8 +33,10 @@ function assert(cond, label, detail) {
 }
 
 async function api(path, { method = "GET", cookie, body, key } = {}) {
-  const headers = { "content-type": "application/json" };
+  // content-type 只在有 body 时带:无 body 的 POST(如 rotate)带 json 头会被 Fastify 400
+  const headers = {};
   if (cookie !== undefined) headers.cookie = cookie;
+  if (body !== undefined) headers["content-type"] = "application/json";
   if (method !== "GET") headers["x-requested-with"] = "fetch";
   if (key !== undefined) headers["idempotency-key"] = key;
   const res = await fetch(`${base}${path}`, {
@@ -76,7 +78,7 @@ let pilot = await api("/api/agents", {
 });
 let wbToken;
 if (pilot.status === 201) {
-  wbToken = pilot.body.secret;
+  wbToken = `${pilot.body.agent.id}.${pilot.body.secret}`;
   ok("注册试点 Agent", `id=${pilot.body.agent.id} key=${pilot.body.agent.key}`);
 } else if (pilot.status === 409) {
   const list = await api(`/api/agents?limit=200`, { cookie });
@@ -90,7 +92,11 @@ if (pilot.status === 201) {
     cookie,
     key: `s9-rot-${runId}`,
   });
-  wbToken = rotated.body.secret;
+  if (rotated.status !== 200 || typeof rotated.body?.secret !== "string") {
+    fail("复用试点 Agent", `轮换失败 status=${rotated.status} ${JSON.stringify(rotated.body)}`);
+    process.exit(1);
+  }
+  wbToken = `${found.id}.${rotated.body.secret}`;
   ok("复用试点 Agent(轮换密钥)", `id=${found.id}`);
 } else {
   fail("注册试点 Agent", `status=${pilot.status} ${JSON.stringify(pilot.body)}`);
@@ -108,7 +114,7 @@ if (outsider.status !== 201) {
   fail("注册外部 Agent", `status=${outsider.status}`);
   process.exit(1);
 }
-const outToken = outsider.body.secret;
+const outToken = `${outsider.body.agent.id}.${outsider.body.secret}`;
 
 function trigger(eventId, extra = {}) {
   return api("/api/work/triggers", {
@@ -140,13 +146,16 @@ assert(
 );
 const workItemId = t1.body.workItem.id;
 
-// ⑤ Agent Bearer 连 /mcp:tools/list 11 工具
+// ⑤ Agent Bearer 连 /mcp:tools/list 11 工具(SDK connect() 不返回 client,须自己持有)
 function mcpClient(token, name) {
-  return new Client({ name, version: "0.0.1" }).connect(
-    new StreamableHTTPClientTransport(new URL(`${base}/mcp`), {
-      requestInit: { headers: { authorization: `Bearer ${token}` } },
-    }),
-  );
+  const client = new Client({ name, version: "0.0.1" });
+  return client
+    .connect(
+      new StreamableHTTPClientTransport(new URL(`${base}/mcp`), {
+        requestInit: { headers: { authorization: `Bearer ${token}` } },
+      }),
+    )
+    .then(() => client);
 }
 const wb = await mcpClient(wbToken, "s9-workbuddy");
 const tools = (await wb.listTools()).tools.map((t) => t.name);
@@ -209,7 +218,7 @@ ok("work_ack 绑定承接任务", `task=${created.task.id}`);
 const replay = await trigger("t1");
 assert(
   replay.body?.replayed === true && replay.body.inboxIds.length === 0 &&
-    replay.body.trigger.work_item_id === workItemId,
+    replay.body.trigger.workItemId === workItemId,
   "重复触发不重复建",
   `replayed=${replay.body?.replayed}`,
 );
