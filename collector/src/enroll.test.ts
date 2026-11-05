@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import { afterEach, describe, expect, it } from "vitest";
+import { COLLECTOR_VERSION } from "./config.js";
 import {
   credentialsPath,
   enrollMachine,
@@ -102,7 +103,7 @@ describe("enrollMachine", () => {
       token: "ott-once",
       hostname: "mini",
       os: "darwin",
-      collector_version: "0.1.0",
+      collector_version: COLLECTOR_VERSION,
     });
   });
 

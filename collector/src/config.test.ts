@@ -1,7 +1,16 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { loadConfig, normalizeIngestUrl, parseBackfill } from "./config.js";
+import { COLLECTOR_VERSION, loadConfig, normalizeIngestUrl, parseBackfill } from "./config.js";
 
 describe("采集器配置", () => {
+  it("版本号与 collector/package.json 一致,避免发布产物自报旧版本", () => {
+    const pkg = JSON.parse(
+      readFileSync(fileURLToPath(new URL("../package.json", import.meta.url)), "utf8"),
+    ) as { version: string };
+    expect(COLLECTOR_VERSION).toBe(pkg.version);
+  });
+
   it("接受 base url 或完整 ingest url", () => {
     expect(normalizeIngestUrl("https://aw.example.com")).toEqual({
       ingestUrl: "https://aw.example.com/api/ingest",
