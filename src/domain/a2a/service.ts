@@ -24,16 +24,16 @@ import {
 } from "../../store/repositories/outbox.js";
 import {
   appendTaskEvent,
-  findTaskById,
   findTaskParent,
   findTaskSummary,
   setTaskParentIfEmpty,
   type TaskRecord,
 } from "../../store/repositories/task.js";
-import type { AcceptNotice, CollabAgentRef, HandoffNotice } from "../collab/notice.js";
 import { closeAncestorsIfComplete } from "../task/auto-close.js";
+import type { AcceptNotice, HandoffNotice } from "../collab/notice.js";
 import { A2aError } from "./errors.js";
 import { toInboxItem } from "./inbox.js";
+import { createAcceptNotice, createHandoffNotice } from "./notice-renderer.js";
 import type { A2aInboxItem, A2aInboxResult } from "../../shared/aw-node-wire.js";
 import type {
   A2aAckInput,
@@ -328,60 +328,13 @@ export function createA2aService(deps: A2aServiceDeps): A2aService {
     });
   }
 
-  function agentRef(agent: AgentRecord): CollabAgentRef {
-    return { id: agent.id, displayName: agent.displayName };
-  }
-
   async function handoffNotice(msgId: string): Promise<HandoffNotice | null> {
-    const message = await findMessageById(db, msgId);
-    if (
-      message === undefined ||
-      (message.intent !== "request" && message.intent !== "escalate")
-    ) {
-      return null;
-    }
-    const from = await findAgentById(db, message.fromAgent);
-    const to = await findAgentById(db, message.toAgent);
-    if (from === undefined || to === undefined) {
-      return null;
-    }
-    return {
-      msgId: message.id,
-      taskId: message.taskId,
-      summary: message.summary,
-      from: agentRef(from),
-      to: agentRef(to),
-    };
+    return createHandoffNotice(db, msgId);
   }
 
   /** 接单播报的渲染元数据;非 request/escalate、未 ack 或参与方缺失时返回 null */
   async function acceptNotice(msgId: string, childTaskId?: string): Promise<AcceptNotice | null> {
-    const message = await findMessageById(db, msgId);
-    if (
-      message === undefined ||
-      message.ackAt === null ||
-      (message.intent !== "request" && message.intent !== "escalate")
-    ) {
-      return null;
-    }
-    const from = await findAgentById(db, message.fromAgent);
-    const to = await findAgentById(db, message.toAgent);
-    if (from === undefined || to === undefined) {
-      return null;
-    }
-    const root = await findTaskById(db, message.taskId);
-    if (root === undefined) {
-      return null;
-    }
-    // 标题优先取承接方自建的下游任务,回退发起方根任务
-    const child = childTaskId === undefined ? undefined : await findTaskById(db, childTaskId);
-    return {
-      msgId: message.id,
-      taskId: child?.id ?? message.taskId,
-      title: child?.title ?? root.title,
-      from: agentRef(from),
-      to: agentRef(to),
-    };
+    return createAcceptNotice(db, msgId, childTaskId);
   }
 
   return { send, inbox, ack, handoffNotice, acceptNotice, wake };
