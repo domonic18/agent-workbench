@@ -25,7 +25,7 @@ usage() {
   --projects <a,b>      本机已登记项目,逗号分隔(会写入 launchd)
   --state-dir <path>    本地状态目录,默认 ~/.aw-node
   --backfill            首次安装时回读历史会话(默认从文件末尾开始)
-  --version <tag>       指定 Release 版本,默认 latest
+  --version <tag>       指定 Release 版本(如 0.2.1),默认 latest
   --claude-dir <path>   覆盖 Claude 数据目录
   --cc-connect-dir <p>  覆盖 cc-connect 数据目录
   --yes                 不询问确认(自动化/Agent 代跑)
@@ -70,6 +70,10 @@ esac
 if [ "$VERSION" = "latest" ]; then
   BASE="https://github.com/$REPO/releases/latest/download"
 else
+  case "$VERSION" in
+    collector-v*) ;;
+    *) VERSION="collector-v$VERSION" ;;
+  esac
   BASE="https://github.com/$REPO/releases/download/$VERSION"
 fi
 ASSET="aw-node-macos-$ARCH"

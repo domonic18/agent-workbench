@@ -36,6 +36,19 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: 校验 tag 版本与 package.json 一致
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          set -eu
+          pkg_version=$(node -p "require('./collector/package.json').version")
+          tag_version="${TAG#collector-v}"
+          if [ "$pkg_version" != "$tag_version" ]; then
+            echo "版本不一致: tag $TAG 对应 $tag_version,collector/package.json 是 $pkg_version" >&2
+            exit 1
+          fi
+          echo "版本一致: $pkg_version"
+
       - name: Build macOS binaries
         run: pnpm --filter @aw/collector run package
 
