@@ -44,6 +44,8 @@ export interface DispatchDeps {
   claudeJsonPath: string;
   /** 会话超时;超时先 SIGTERM,再 SIGKILL */
   sessionTimeoutMs: number;
+  /** HTTP 请求超时(含收件箱探视);与采集共用同一配置 */
+  requestTimeoutMs: number;
   model: string | null;
   /** claude 可执行文件;解析不到时调度不挂载 */
   claudePath: string | undefined;
@@ -168,7 +170,8 @@ function spawnClaudeSession(options: SessionOptions): SessionHandle {
 
 export function createDispatchCycle(deps: DispatchDeps): DispatchCycle {
   const logger = deps.logger ?? createLogger();
-  const peek = deps.peekInbox ?? ((bearer: string) => fetchPendingCount(deps.baseUrl, bearer, 30_000));
+  const peek =
+    deps.peekInbox ?? ((bearer: string) => fetchPendingCount(deps.baseUrl, bearer, deps.requestTimeoutMs));
   const startSession = deps.spawnSession ?? spawnClaudeSession;
   /** 同一 Agent 同时只允许一个会话 */
   const busy = new Set<string>();
@@ -178,34 +181,40 @@ export function createDispatchCycle(deps: DispatchDeps): DispatchCycle {
     if (busy.has(agentId)) {
       return;
     }
-    const pending = await peek(bearer);
-    if (pending === 0) {
-      return;
-    }
-    if (!existsSync(cwd)) {
-      logger.warn("Agent 工作目录不存在,跳过调度", { agent: agentId });
-      return;
-    }
+    /** 占位必须在首个 await 前完成,否则重叠轮次可能穿透 busy 检查为同一 Agent 起多个会话 */
     busy.add(agentId);
-    logger.info("收件箱有待处理消息,起会话", { agent: agentId, pending });
-    const session: SessionOptions = {
-      agentId,
-      cwd,
-      claudePath: deps.claudePath ?? "claude",
-      model: deps.model,
-      timeoutMs: deps.sessionTimeoutMs,
-      onExit: (result) => {
-        busy.delete(agentId);
-        running.delete(agentId);
-        logger.info("会话结束", { agent: agentId, code: result.code, signal: result.signal });
-      },
-    };
+    let sessionStarted = false;
     try {
+      const pending = await peek(bearer);
+      if (pending === 0) {
+        return;
+      }
+      if (!existsSync(cwd)) {
+        logger.warn("Agent 工作目录不存在,跳过调度", { agent: agentId });
+        return;
+      }
+      logger.info("收件箱有待处理消息,起会话", { agent: agentId, pending });
+      const session: SessionOptions = {
+        agentId,
+        cwd,
+        claudePath: deps.claudePath ?? "claude",
+        model: deps.model,
+        timeoutMs: deps.sessionTimeoutMs,
+        onExit: (result) => {
+          busy.delete(agentId);
+          running.delete(agentId);
+          logger.info("会话结束", { agent: agentId, code: result.code, signal: result.signal });
+        },
+      };
       running.set(agentId, startSession(session));
+      sessionStarted = true;
     } catch (error) {
-      busy.delete(agentId);
       const message = error instanceof Error ? error.message : String(error);
-      logger.error("会话启动失败", { agent: agentId, error: message });
+      logger.warn("调度检查失败", { agent: agentId, error: message });
+    } finally {
+      if (!sessionStarted) {
+        busy.delete(agentId);
+      }
     }
   }
 

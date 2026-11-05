@@ -71,6 +71,7 @@ function cycleFor(
     stateDir: h.stateDir,
     claudeJsonPath: h.claudeJsonPath,
     sessionTimeoutMs: 60_000,
+    requestTimeoutMs: 30_000,
     model: null,
     claudePath: "/opt/homebrew/bin/claude",
     logger: createLogger({ level: "error" }),
@@ -218,5 +219,48 @@ describe("dispatch 调度循环", () => {
     });
     await expect(cycle.once()).resolves.toBeUndefined();
     expect(h.sessions).toHaveLength(0);
+  });
+
+  it("并发 once 不会为同一 Agent 起两个会话", async () => {
+    const h = harness({ secret: "sec-a" });
+    h.pending.set("agt_a.sec-a", 1);
+    let release = () => {};
+    const cycle = cycleFor(h, {
+      async peekInbox(bearer) {
+        h.peeked.push(bearer);
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return h.pending.get(bearer) ?? 0;
+      },
+    });
+
+    const p1 = cycle.once();
+    const p2 = cycle.once();
+    expect(h.sessions).toHaveLength(0);
+    release();
+    await Promise.all([p1, p2]);
+
+    expect(h.sessions).toHaveLength(1);
+  });
+
+  it("探视失败释放占位,下轮可再试", async () => {
+    const h = harness({ secret: "sec-a" });
+    h.pending.set("agt_a.sec-a", 1);
+    let calls = 0;
+    const cycle = cycleFor(h, {
+      async peekInbox(bearer) {
+        calls += 1;
+        if (calls === 1) {
+          throw new Error("HTTP 500");
+        }
+        return h.pending.get(bearer) ?? 0;
+      },
+    });
+
+    await cycle.once();
+    await cycle.once();
+
+    expect(h.sessions).toHaveLength(1);
   });
 });

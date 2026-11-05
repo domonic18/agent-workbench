@@ -95,6 +95,7 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
           stateDir: config.stateDir,
           claudeJsonPath: config.claudeJsonPath,
           sessionTimeoutMs: config.sessionTimeoutMs,
+          requestTimeoutMs: config.requestTimeoutMs,
           model: config.dispatchModel,
           claudePath,
           logger,
