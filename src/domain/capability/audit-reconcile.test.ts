@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SessionStartEvent, TeleportAuditAdapter } from "../../adapters/teleport/audit.js";
+import type { SessionStartEvent, TeleportAuditPort } from "./ports.js";
 import { openDatabase, type Db } from "../../store/database.js";
 import { listGaps } from "../../store/repositories/audit-reconcile.js";
 import { insertToolCallLog } from "../../store/repositories/tool-call-log.js";
@@ -43,7 +43,7 @@ async function seedCall(db: Db, capabilityId: string, taskId = "T-1"): Promise<v
   });
 }
 
-function adapter(events: SessionStartEvent[]): TeleportAuditAdapter {
+function adapter(events: SessionStartEvent[]): TeleportAuditPort {
   return { listSessionStarts: async () => events };
 }
 

@@ -1,23 +1,10 @@
+import type { SessionStartEvent, TeleportAuditPort } from "../../domain/capability/ports.js";
 import { readFile } from "node:fs/promises";
 
-/** Teleport 审计中的一次会话建立(05 §7:归因只读 user_traits,不读证书扩展) */
-export interface SessionStartEvent {
-  sid: string;
-  user: string;
-  login: string;
-  serverHostname: string;
-  /** user_traits.aw_task_id[0];缺失为 null */
-  taskId: string | null;
-  /** user_traits.aw_ticket_id[0];缺失为 null */
-  ticketId: string | null;
-  /** epoch ms(由事件 time 解析) */
-  time: number;
-}
+/** 兼容旧导出;新代码应使用 domain/capability/ports 的 TeleportAuditPort */
+export type TeleportAuditAdapter = TeleportAuditPort;
 
-export interface TeleportAuditAdapter {
-  /** 读 Teleport events.log,返回全部 session.start;文件不可读即抛错,不返回空列表 */
-  listSessionStarts(): Promise<SessionStartEvent[]>;
-}
+export type { SessionStartEvent };
 
 export interface TeleportAuditConfig {
   auditLogPath: string;
@@ -89,7 +76,7 @@ function parseLine(line: string): SessionStartEvent | undefined {
 export function createTeleportAuditAdapter(
   config: TeleportAuditConfig,
   deps: { readFile?: (path: string) => Promise<string> } = {},
-): TeleportAuditAdapter {
+): TeleportAuditPort {
   const read = deps.readFile ?? ((path: string) => readFile(path, "utf8"));
   return {
     async listSessionStarts() {

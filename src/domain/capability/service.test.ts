@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { TaskTraits, TeleportAdapter } from "../../adapters/teleport/tctl.js";
+import type { CapabilityTeleportPort, TaskTraits } from "./ports.js";
 import { openDatabase, type Db } from "../../store/database.js";
 import { findCapability } from "../../store/repositories/capability.js";
 import { CapabilityError } from "./errors.js";
@@ -16,7 +16,7 @@ async function prepare(): Promise<Db> {
   return db;
 }
 
-function fakeTeleport(fail = false): { calls: TaskTraits[]; adapter: TeleportAdapter } {
+function fakeTeleport(fail = false): { calls: TaskTraits[]; adapter: CapabilityTeleportPort } {
   const calls: TaskTraits[] = [];
   return {
     calls,
@@ -241,7 +241,7 @@ describe("capability 服务", () => {
     const db = await prepare();
     let clock = 1_000;
     let release: (() => void) | undefined;
-    const pendingTeleport: TeleportAdapter = {
+    const pendingTeleport: CapabilityTeleportPort = {
       applyTaskTraits: () =>
         new Promise<void>((resolve) => {
           release = resolve;

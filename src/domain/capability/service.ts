@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import type { TeleportAdapter } from "../../adapters/teleport/tctl.js";
+import type { CapabilityTeleportPort } from "./ports.js";
 import { CAPABILITY_TIMEOUTS, type CapabilityAction } from "../../shared/constants.js";
 import type { Db } from "../../store/database.js";
 import { findTaskSummary } from "../../store/repositories/task.js";
@@ -35,7 +35,7 @@ export interface CapabilityDecision {
 
 export interface CapabilityServiceDeps {
   db: Db;
-  teleport: TeleportAdapter;
+  teleport: CapabilityTeleportPort;
   now?: () => number;
   newId?: () => string;
   newTicketId?: () => string;

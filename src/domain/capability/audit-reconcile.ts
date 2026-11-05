@@ -1,7 +1,4 @@
-import type {
-  SessionStartEvent,
-  TeleportAuditAdapter,
-} from "../../adapters/teleport/audit.js";
+import type { SessionStartEvent, TeleportAuditPort } from "./ports.js";
 import type { Db } from "../../store/database.js";
 import {
   findToolCallsWithCapability,
@@ -28,7 +25,7 @@ export interface AuditReconciler {
 
 export interface AuditReconcilerDeps {
   db: Db;
-  teleportAudit: TeleportAuditAdapter;
+  teleportAudit: TeleportAuditPort;
   now?: () => number;
 }
 
