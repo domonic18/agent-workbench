@@ -254,7 +254,27 @@ export type ToolVerdict = (typeof TOOL_VERDICTS)[number];
  */
 export const TOOL_GATE = {
   l0: ["kb.search", "a2a.inbox"],
-  l1: ["task.create", "task.update", "a2a.send", "a2a.ack", "kb.write"],
+  l1: [
+    "task.create",
+    "task.update",
+    "a2a.send",
+    "a2a.ack",
+    "kb.write",
+    "work.read",
+    "work.inbox",
+    "work.ack",
+    "work.handback",
+  ],
+} as const;
+
+/** worker_inbox 租约与轮询(01 §10):租约覆盖 read→task_create→ack 链路,过期只改状态不建行 */
+export const WORK_INBOX = {
+  leaseMs: 10 * 60_000,
+  maxWaitMs: 30_000,
+  /** 服务端租约回收巡检间隔 */
+  pollMs: 2_000,
+  /** Agent 长轮询无行时的内部探测间隔 */
+  probeMs: 1_000,
 } as const;
 
 /** 列表接口的统一分页边界:默认 50 条,单页最多 200 条 */

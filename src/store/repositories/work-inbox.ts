@@ -158,6 +158,7 @@ export async function reclaimExpiredInbox(db: Db, now: number): Promise<number> 
         SET status = 'pending', lease_token = lease_token + 1, lease_until = NULL, updated_at = ?
       WHERE status = 'claimed' AND lease_until IS NOT NULL AND lease_until <= ?`,
     now,
+    now,
   );
   return result.changes;
 }
@@ -177,6 +178,38 @@ export async function findActiveAssignee(
     workItemId,
   )) as { targetAgentId: string } | undefined;
   return row?.targetAgentId;
+}
+
+/** Agent 是否持有该事项的有效 assignment(claimed/acked):建关联任务的前置(arch/02 §3.1) */
+export async function hasActiveAssignment(
+  db: Db,
+  workItemId: string,
+  agentId: string,
+): Promise<boolean> {
+  const row = await db.get(
+    `SELECT 1 FROM worker_inbox
+      WHERE work_item_id = ? AND target_agent_id = ? AND kind = 'assignment'
+        AND status IN ('claimed', 'acked') LIMIT 1`,
+    workItemId,
+    agentId,
+  );
+  return row !== undefined;
+}
+
+/** work_read 的读权限:inbox 有指向该 Agent 的未退回行(知道 ID 不等于有权读) */
+export async function hasOpenInboxForAgent(
+  db: Db,
+  workItemId: string,
+  agentId: string,
+): Promise<boolean> {
+  const row = await db.get(
+    `SELECT 1 FROM worker_inbox
+      WHERE work_item_id = ? AND target_agent_id = ? AND status IN ('pending', 'claimed', 'acked')
+      LIMIT 1`,
+    workItemId,
+    agentId,
+  );
+  return row !== undefined;
 }
 
 export async function listInboxForWorkItem(
