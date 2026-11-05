@@ -39,8 +39,10 @@ export function registerMcpRoutes(app: FastifyInstance, options: McpRoutesOption
   const now = options.now ?? Date.now;
   const tasks = createTaskService({ db, now });
   const a2a = options.a2a ?? createA2aService({ db, now });
-  const workers = createWorkerService({ db, now });
-  const ingest = createIngestService({ db, now }).ingest;
+  const collab =
+    options.collabChatId === undefined ? {} : { collabChatId: options.collabChatId };
+  const workers = createWorkerService({ db, now, ...collab });
+  const ingest = createIngestService({ db, now, ...collab }).ingest;
   const tools = createConsoleTools({
     db,
     tasks,

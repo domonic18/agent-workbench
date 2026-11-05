@@ -22,6 +22,8 @@ export type AssignOutcome = Extract<RouteOutcome, { decision: "assign" }>;
 
 export interface DispatchDeps {
   policy: WorkPolicy;
+  /** 控制台协作群;工作事项状态卡片的目标群,未配置时不入队 */
+  collabChatId?: string;
   newItemId: () => string;
   newEventId: () => string;
   newInboxId: () => string;
@@ -55,7 +57,7 @@ export async function dispatchOwnerContinue(
   ctx: DispatchContext,
   deps: Pick<
     DispatchDeps,
-    "policy" | "newEventId" | "newInboxId" | "newThreadId" | "newSubscriptionId"
+    "policy" | "collabChatId" | "newEventId" | "newInboxId" | "newThreadId" | "newSubscriptionId"
   >,
   outcome: OwnerContinueOutcome,
 ): Promise<DispatchOutcome> {

@@ -2,22 +2,29 @@ import { describe, expect, it } from "vitest";
 import { openDatabase, type Db } from "../../store/database.js";
 import { insertAgent, type NewAgent } from "../../store/repositories/identity.js";
 import { findOutboxByKey } from "../../store/repositories/outbox.js";
+import {
+  ackInbox,
+  claimPendingForAgent,
+  type WorkerInboxRecord,
+} from "../../store/repositories/work-inbox.js";
 import type { WorkPolicy } from "../routing/policy.js";
 import type { WorkRequest } from "./contract.js";
 import { createIngestService } from "./ingest-service.js";
 import { notifyWorkEvent, type WorkNotifyKind } from "./notify.js";
 
 const AGENT_KEY = "wb-primary";
+const AGENT_ID = "agt_w";
+const ASSIGNEE_NAME = "acore-portal";
 const ISSUE_KEY = "https://github.com/octocat/demo/issues/12";
-const CHAT_ID = "oc_chat_777";
+const CHAT_ID = "oc_collab_777";
 
 function workAgent(): NewAgent {
   return {
-    id: "agt_w",
+    id: AGENT_ID,
     machineId: null,
     runtime: "workbuddy",
     project: "demo",
-    displayName: "Worker",
+    displayName: ASSIGNEE_NAME,
     secretHash: null,
     feishuAppId: null,
     allowedTargetsJson: "[]",
@@ -42,7 +49,7 @@ function testPolicy(): WorkPolicy {
   };
 }
 
-function request(threadKey: string | undefined): WorkRequest {
+function request(threadRefs = true): WorkRequest {
   return {
     source: "bug",
     sourceEventId: "evt-1",
@@ -50,11 +57,10 @@ function request(threadKey: string | undefined): WorkRequest {
     occurredAt: 1_000,
     actor: { agent_id: "agt_bug" },
     project: "demo",
-    threadRefs: [{ source: "bug", externalKind: "issue", externalKey: ISSUE_KEY }],
-    payload: {
-      title: "登录页 500",
-      ...(threadKey === undefined ? {} : { thread_key: threadKey }),
-    },
+    threadRefs: threadRefs
+      ? [{ source: "bug", externalKind: "issue", externalKey: ISSUE_KEY }]
+      : [],
+    payload: { title: "登录页 500" },
     refs: [],
   };
 }
@@ -64,7 +70,7 @@ interface Fixture {
   workItemId: string;
 }
 
-async function prepare(threadKey: string | undefined): Promise<Fixture> {
+async function prepare(withIssueRef = true): Promise<Fixture> {
   const db = await openDatabase();
   await insertAgent(db, workAgent());
   const counters = new Map<string, number>();
@@ -84,7 +90,7 @@ async function prepare(threadKey: string | undefined): Promise<Fixture> {
     newThreadId: next("wth"),
     newSubscriptionId: next("wsb"),
   });
-  const submitted = await service.ingest(request(threadKey));
+  const submitted = await service.ingest(request(withIssueRef));
   const workItemId = submitted.workItem?.id;
   if (workItemId === undefined) {
     throw new Error("建单失败");
@@ -92,24 +98,60 @@ async function prepare(threadKey: string | undefined): Promise<Fixture> {
   return { db, workItemId };
 }
 
+/** 把 assignment 领到 acked,让通知能解析出接单的机器人 */
+async function acceptAssignment(fixture: Fixture): Promise<void> {
+  const claimed: WorkerInboxRecord[] = await claimPendingForAgent(
+    fixture.db,
+    AGENT_ID,
+    6_000,
+    6_000 + 60_000,
+  );
+  const row = claimed[0];
+  if (row === undefined) {
+    throw new Error("没有待领的 assignment");
+  }
+  await ackInbox(fixture.db, row.id, row.leaseToken, null, 6_000);
+}
+
+interface CardView {
+  title: string;
+  template: string;
+  body: string;
+}
+
 interface OutboxPayload {
   chatId: string;
-  text: string;
-  uuid: string;
+  card?: { header?: { title?: { content?: string }; template?: string }; body?: { elements?: Array<{ content?: string }> } };
+  uuid?: string;
+}
+
+function readCard(payload: OutboxPayload | undefined): CardView {
+  if (payload?.card === undefined) {
+    throw new Error("payload 无 card");
+  }
+  const header = payload.card.header;
+  const body = payload.card.body?.elements?.[0]?.content ?? "";
+  return {
+    title: header?.title?.content ?? "",
+    template: header?.template ?? "",
+    body,
+  };
 }
 
 async function notifyOne(
   fixture: Fixture,
   eventId: string,
   kind: WorkNotifyKind,
-  extra: { reason?: string; prUrl?: string } = {},
+  extra: { reason?: string | undefined; prUrl?: string | undefined; chatId?: string | undefined } = {},
 ): Promise<OutboxPayload | undefined> {
   await notifyWorkEvent(fixture.db, {
     workItemId: fixture.workItemId,
     eventId,
     kind,
-    now: 6_000,
-    ...extra,
+    chatId: extra.chatId === undefined ? CHAT_ID : extra.chatId,
+    now: 7_000,
+    ...(extra.reason === undefined ? {} : { reason: extra.reason }),
+    ...(extra.prUrl === undefined ? {} : { prUrl: extra.prUrl }),
   });
   const row = await findOutboxByKey(fixture.db, `work-notify:${eventId}`);
   if (row === undefined) {
@@ -126,131 +168,131 @@ async function countOutbox(fixture: Fixture): Promise<number> {
 }
 
 describe("工作事项通知线 notifyWorkEvent", () => {
-  it("task_bound:出队正确 chatId 与文案(含 issue 编号与标题)", async () => {
-    const fixture = await prepare(`${CHAT_ID}:om_msg_888`);
+  it("task_bound:卡片标题带接单机器人名与事项标题,正文带缺陷编号", async () => {
+    const fixture = await prepare();
+    await acceptAssignment(fixture);
     const payload = await notifyOne(fixture, "wev_n1", "task_bound");
-    expect(payload).toMatchObject({ chatId: CHAT_ID, uuid: "wev_n1" });
-    expect(payload?.text).toContain("Bug #12");
-    expect(payload?.text).toContain("「登录页 500」");
-    expect(payload?.text).toContain("已被 worker 接单");
+    expect(payload?.chatId).toBe(CHAT_ID);
+    expect(payload?.uuid).toBe("wev_n1");
+    const card = readCard(payload);
+    expect(card.title).toContain(ASSIGNEE_NAME);
+    expect(card.title).toContain("已接单");
+    expect(card.template).toBe("turquoise");
+    expect(card.body).toContain("Bug #12");
+    expect(card.body).toContain("登录页 500");
+    expect(card.body).toContain("开始修复");
+    expect(card.body).not.toContain("worker");
     await fixture.db.close();
   });
 
-  it("pr_linked:带 PR 链接", async () => {
-    const fixture = await prepare(`${CHAT_ID}:om_msg_888`);
-    const payload = await notifyOne(fixture, "wev_n2", "pr_linked", { prUrl: "https://github.com/o/d/pull/96" });
-    expect(payload?.text).toContain("修复已提交 PR（CI 运行中）：https://github.com/o/d/pull/96");
+  it("pr_linked:正文带 PR 链接", async () => {
+    const fixture = await prepare();
+    await acceptAssignment(fixture);
+    const payload = await notifyOne(fixture, "wev_n2", "pr_linked", {
+      prUrl: "https://github.com/o/d/pull/96",
+    });
+    const card = readCard(payload);
+    expect(card.template).toBe("blue");
+    expect(card.body).toContain("https://github.com/o/d/pull/96");
+    expect(card.body).toContain("CI 运行中");
     await fixture.db.close();
   });
 
-  it("pr_linked:prUrl 缺失时文案省略链接", async () => {
-    const fixture = await prepare(`${CHAT_ID}:om_msg_888`);
+  it("pr_linked:prUrl 缺失时正文省略 PR 段", async () => {
+    const fixture = await prepare();
+    await acceptAssignment(fixture);
     const payload = await notifyOne(fixture, "wev_n3", "pr_linked");
-    expect(payload?.text).toContain("修复已提交 PR，CI 运行中");
-    expect(payload?.text).not.toContain("http");
+    const card = readCard(payload);
+    expect(card.body).not.toContain("http");
+    expect(card.body).not.toContain("**PR**");
     await fixture.db.close();
   });
 
   it("ci_failed:提示停留修复阶段与退回口令", async () => {
-    const fixture = await prepare(`${CHAT_ID}:om_msg_888`);
+    const fixture = await prepare();
+    await acceptAssignment(fixture);
     const payload = await notifyOne(fixture, "wev_n4", "ci_failed");
-    expect(payload?.text).toContain("PR CI 未通过");
-    expect(payload?.text).toContain("『#12 退回：理由』");
+    const card = readCard(payload);
+    expect(card.template).toBe("red");
+    expect(card.body).toContain("CI 未通过");
     await fixture.db.close();
   });
 
-  it("acceptance_ready:含 PR 链接与接受/退回口令", async () => {
-    const fixture = await prepare(`${CHAT_ID}:om_msg_888`);
-    const payload = await notifyOne(fixture, "wev_n5", "acceptance_ready", { prUrl: "https://github.com/o/d/pull/96" });
-    expect(payload?.text).toContain("CI 全绿，待验收（PR：https://github.com/o/d/pull/96）");
-    expect(payload?.text).toContain("『#12 接受』");
-    expect(payload?.text).toContain("『#12 退回：理由』");
+  it("acceptance_ready:正文含接受/退回口令", async () => {
+    const fixture = await prepare();
+    await acceptAssignment(fixture);
+    const payload = await notifyOne(fixture, "wev_n5", "acceptance_ready", {
+      prUrl: "https://github.com/o/d/pull/96",
+    });
+    const card = readCard(payload);
+    expect(card.template).toBe("green");
+    expect(card.body).toContain("https://github.com/o/d/pull/96");
+    expect(card.body).toContain("#12 接受");
+    expect(card.body).toContain("#12 退回：理由");
     await fixture.db.close();
   });
 
-  it("acceptance_ready:prUrl 缺省时不出现 PR 段", async () => {
-    const fixture = await prepare(`${CHAT_ID}:om_msg_888`);
-    const payload = await notifyOne(fixture, "wev_n6", "acceptance_ready");
-    expect(payload?.text).toContain("CI 全绿，待验收。");
-    expect(payload?.text).not.toContain("（PR：");
-    await fixture.db.close();
-  });
-
-  it("returned:文案含退回理由;缺省时提示未注明原因", async () => {
-    const fixture = await prepare(`${CHAT_ID}:om_msg_888`);
-    const withReason = await notifyOne(fixture, "wev_n7", "returned", { reason: "复现路径不对" });
-    expect(withReason?.text).toContain("已退回返工：复现路径不对");
-    const noReason = await notifyOne(fixture, "wev_n8", "returned");
-    expect(noReason?.text).toContain("已退回返工：未注明原因");
+  it("returned:正文含退回理由;缺省时提示未注明原因", async () => {
+    const fixture = await prepare();
+    await acceptAssignment(fixture);
+    const withReason = readCard(
+      await notifyOne(fixture, "wev_n6", "returned", { reason: "复现路径不对" }),
+    );
+    expect(withReason.template).toBe("orange");
+    expect(withReason.body).toContain("复现路径不对");
+    const noReason = readCard(await notifyOne(fixture, "wev_n7", "returned"));
+    expect(noReason.body).toContain("未注明原因");
     await fixture.db.close();
   });
 
   it("同一 eventId 重入幂等:outbox 只留一条", async () => {
-    const fixture = await prepare(`${CHAT_ID}:om_msg_888`);
-    await notifyOne(fixture, "wev_n9", "task_bound");
-    await notifyWorkEvent(fixture.db, { workItemId: fixture.workItemId, eventId: "wev_n9", kind: "task_bound", now: 7_000 });
+    const fixture = await prepare();
+    await acceptAssignment(fixture);
+    await notifyOne(fixture, "wev_n8", "task_bound");
+    await notifyWorkEvent(fixture.db, {
+      workItemId: fixture.workItemId,
+      eventId: "wev_n8",
+      kind: "task_bound",
+      chatId: CHAT_ID,
+      now: 8_000,
+    });
     expect(await countOutbox(fixture)).toBe(1);
     await fixture.db.close();
   });
 
-  it("thread_key 缺失 / no-thread: / 无冒号:均静默跳过不出队", async () => {
-    for (const threadKey of [undefined, "no-thread:manual", "garbage"]) {
-      const fixture = await prepare(threadKey);
-      const payload = await notifyOne(fixture, `wev_skip_${String(threadKey)}`, "task_bound");
-      expect(payload).toBeUndefined();
-      expect(await countOutbox(fixture)).toBe(0);
-      await fixture.db.close();
-    }
-  });
-
-  it("thread_key 只给 chat_id(无 message_id):照常定位到群", async () => {
-    const fixture = await prepare(CHAT_ID);
-    const payload = await notifyOne(fixture, "wev_chat_only", "task_bound");
-    expect(payload?.chatId).toBe(CHAT_ID);
+  it("协作群未配置:静默跳过不出队", async () => {
+    const fixture = await prepare();
+    await acceptAssignment(fixture);
+    await notifyWorkEvent(fixture.db, {
+      workItemId: fixture.workItemId,
+      eventId: "wev_n9",
+      kind: "task_bound",
+      chatId: undefined,
+    });
+    expect(await findOutboxByKey(fixture.db, "work-notify:wev_n9")).toBeUndefined();
+    expect(await countOutbox(fixture)).toBe(0);
     await fixture.db.close();
   });
 
-  it("issue 引用缺失:文案退化无编号,口令不带 #", async () => {
-    const db = await openDatabase();
-    await insertAgent(db, workAgent());
-    const counters = new Map<string, number>();
-    const next = (prefix: string) => () => {
-      const seq = (counters.get(prefix) ?? 0) + 1;
-      counters.set(prefix, seq);
-      return `${prefix}_${seq}`;
-    };
-    const service = createIngestService({
-      db,
-      now: () => 5_000,
-      policy: testPolicy(),
-      newTriggerId: next("wtg"),
-      newItemId: next("wim"),
-      newEventId: next("wev"),
-      newInboxId: next("wib"),
-      newThreadId: next("wth"),
-      newSubscriptionId: next("wsb"),
-    });
-    const submitted = await service.ingest({
-      ...request(`${CHAT_ID}:om_msg_888`),
-      threadRefs: [],
-    });
-    const workItemId = submitted.workItem?.id;
-    if (workItemId === undefined) {
-      throw new Error("建单失败");
-    }
-    await notifyWorkEvent(db, { workItemId, eventId: "wev_noissue", kind: "acceptance_ready", now: 6_000 });
-    const row = await findOutboxByKey(db, "work-notify:wev_noissue");
-    const payload = JSON.parse(row?.payloadJson ?? "{}") as OutboxPayload;
-    expect(payload.chatId).toBe(CHAT_ID);
-    expect(payload.text).not.toContain("Bug #");
-    expect(payload.text).toContain("『接受』");
-    expect(payload.text).toContain("『退回：理由』");
-    await db.close();
+  it("issue 引用缺失:正文退化无编号,口令不带 #", async () => {
+    const fixture = await prepare(false);
+    await acceptAssignment(fixture);
+    const payload = await notifyOne(fixture, "wev_n10", "acceptance_ready");
+    const card = readCard(payload);
+    expect(card.body).not.toContain("Bug #");
+    expect(card.body).toContain("『接受』");
+    expect(card.body).toContain("『退回：理由』");
+    await fixture.db.close();
   });
 
   it("事项不存在:静默跳过", async () => {
-    const fixture = await prepare(`${CHAT_ID}:om_msg_888`);
-    await notifyWorkEvent(fixture.db, { workItemId: "wim_missing", eventId: "wev_ghost", kind: "task_bound" });
+    const fixture = await prepare();
+    await notifyWorkEvent(fixture.db, {
+      workItemId: "wim_missing",
+      eventId: "wev_ghost",
+      kind: "task_bound",
+      chatId: CHAT_ID,
+    });
     expect(await findOutboxByKey(fixture.db, "work-notify:wev_ghost")).toBeUndefined();
     await fixture.db.close();
   });

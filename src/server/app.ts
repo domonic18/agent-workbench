@@ -110,11 +110,16 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     registerTaskRoutes(app, { db, ...timing, ...collab });
     registerTaskReadRoutes(app, { db, ...timing });
     registerTaskA2aRoutes(app, { db, ...timing });
-    registerWorkRoutes(app, { db, ...timing });
+    registerWorkRoutes(app, { db, ...timing, ...collab });
     registerStreamRoutes(app, { db, ...timing });
     registerIngestRoutes(app, { db, ...timing });
     if (options.githubWebhookSecret !== undefined) {
-      registerWebhookGithubRoutes(app, { db, ...timing, webhookSecret: options.githubWebhookSecret });
+      registerWebhookGithubRoutes(app, {
+        db,
+        ...timing,
+        ...collab,
+        webhookSecret: options.githubWebhookSecret,
+      });
     }
     if (options.knowledgeRebuilder !== undefined) {
       registerKnowledgeRoutes(app, {

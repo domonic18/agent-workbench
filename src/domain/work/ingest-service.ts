@@ -22,6 +22,8 @@ export interface IngestDeps {
   db: Db;
   now: () => number;
   policy?: WorkPolicy;
+  /** 控制台协作群;工作事项状态卡片发到这里,未配置时不入队 */
+  collabChatId?: string;
   newTriggerId?: () => string;
   newItemId?: () => string;
   newEventId?: () => string;
@@ -42,6 +44,7 @@ export function createIngestService(deps: IngestDeps) {
   const newTriggerId = deps.newTriggerId ?? (() => newPrefixedId("wtg"));
   const dispatchDeps: DispatchDeps = {
     policy,
+    ...(deps.collabChatId === undefined ? {} : { collabChatId: deps.collabChatId }),
     newItemId: deps.newItemId ?? (() => newPrefixedId("wim")),
     newEventId: deps.newEventId ?? (() => newPrefixedId("wev")),
     newInboxId: deps.newInboxId ?? (() => newPrefixedId("wib")),

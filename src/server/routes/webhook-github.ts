@@ -15,6 +15,8 @@ export interface WebhookGithubOptions {
   db: Db;
   webhookSecret: string;
   now?: () => number;
+  /** 协作播报群;工作事项状态卡片发到这里,留空则不入队 */
+  collabChatId?: string;
 }
 
 type RawBodyRequest = FastifyRequest & { rawBody?: Buffer };
@@ -43,7 +45,11 @@ export function registerWebhookGithubRoutes(
   app: FastifyInstance,
   options: WebhookGithubOptions,
 ): void {
-  const ingest = createIngestService({ db: options.db, now: options.now ?? Date.now }).ingest;
+  const ingest = createIngestService({
+    db: options.db,
+    now: options.now ?? Date.now,
+    ...(options.collabChatId === undefined ? {} : { collabChatId: options.collabChatId }),
+  }).ingest;
 
   app.register(async (scope) => {
     scope.addContentTypeParser(

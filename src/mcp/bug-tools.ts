@@ -26,7 +26,8 @@ export function createBugTools(deps: ConsoleToolDeps): ConsoleTool[] {
       gateName: "work.report",
       description:
         "上报 Bug 建工作事项:按 issue_ref(仓库内 issue URL)幂等,同一 issue 重复上报返回首次处置;" +
-        "thread_key 是原反馈群定位(`chat_id:message_id`,取不到原消息 id 时只给 chat_id),供追溯与裁决定位。",
+        "thread_key 是原反馈渠道 chat_id(私聊或群都可,取不到原消息 id 时只给 chat_id),供事项归属与追溯;" +
+        "状态卡片统一发到控制台协作群,不依赖 thread_key。",
       inputSchema: {
         type: "object",
         properties: {
@@ -36,7 +37,7 @@ export function createBugTools(deps: ConsoleToolDeps): ConsoleTool[] {
           issue_ref: { type: "string", description: "issue 完整 URL" },
           thread_key: {
             type: "string",
-            description: "原反馈群 chat_id,带原消息 id 时为 `chat_id:message_id`",
+            description: "原反馈渠道 chat_id,带原消息 id 时为 `chat_id:message_id`",
           },
         },
         required: ["project", "title", "issue_ref", "thread_key"],

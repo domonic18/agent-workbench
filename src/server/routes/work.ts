@@ -52,6 +52,8 @@ export interface WorkRoutesOptions {
   db: Db;
   now?: () => number;
   read?: WorkReadService;
+  /** 协作播报群;工作事项状态卡片发到这里,留空则不入队 */
+  collabChatId?: string;
 }
 
 /** 列表条目只带投影列,Mandate 与关联数据走详情 */
@@ -98,9 +100,11 @@ const ENUM_FILTERS: ReadonlyArray<{ key: string; allowed: readonly string[] }> =
 export function registerWorkRoutes(app: FastifyInstance, options: WorkRoutesOptions): void {
   const db = options.db;
   const now = options.now ?? Date.now;
-  const ingest = createIngestService({ db, now }).ingest;
+  const collab =
+    options.collabChatId === undefined ? {} : { collabChatId: options.collabChatId };
+  const ingest = createIngestService({ db, now, ...collab }).ingest;
   const read = options.read ?? createWorkReadService({ db });
-  const workers = createWorkerService({ db, now });
+  const workers = createWorkerService({ db, now, ...collab });
   const writeGuards = [requireSession(db, now), requireCsrf(), requireIdempotencyKey()];
   const agentAuth = requireAgentAuth(db);
 

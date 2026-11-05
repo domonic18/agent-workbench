@@ -52,7 +52,10 @@ function textOf(payload: Record<string, unknown>, key: string): string | undefin
 export async function dispatchGithubEvidence(
   db: Db,
   ctx: DispatchContext,
-  deps: Pick<DispatchDeps, "policy" | "newEventId" | "newThreadId" | "newSubscriptionId">,
+  deps: Pick<
+    DispatchDeps,
+    "policy" | "newEventId" | "newThreadId" | "newSubscriptionId" | "collabChatId"
+  >,
   outcome: OwnerContinueOutcome,
 ): Promise<DispatchOutcome> {
   const kind = ctx.request.kind;
@@ -179,6 +182,7 @@ export async function dispatchGithubEvidence(
       workItemId: outcome.workItemId,
       eventId,
       kind: appendedKind,
+      chatId: deps.collabChatId,
       prUrl,
       now: ctx.at,
     });

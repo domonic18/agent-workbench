@@ -1,17 +1,19 @@
 import { enqueuePush } from "../../reliability/outbox.js";
 import type { Db } from "../../store/database.js";
+import { findAgentById } from "../../store/repositories/identity.js";
 import { findWorkItemById } from "../../store/repositories/work-item.js";
+import { findActiveAssignee } from "../../store/repositories/work-inbox.js";
 import { findWorkTriggerById } from "../../store/repositories/work-trigger.js";
+import { mdText, statusCard } from "../collab/card.js";
 
 /**
  * 工作事项状态通知线(M3.9-2 通知补刀,arch/01 §9.4 状态可见性):
- * 事项到达关键节点时按 origin 触发的 thread_key 回溯原反馈群,经发件箱
- * 推一条文本——用户看得见进度,acceptance_ready 直接写明裁决口令。
- * 只覆盖 bug 来源(唯一带 thread_key 的来源);解析不出 chat 即静默跳过,
- * 不抛错不阻塞业务事务。与事件 append 同事务入队,幂等键挂 eventId。
+ * 事项到达关键节点时,控制台以自身应用把状态卡片发到协作群(与协作播报同一体系),
+ * 用户在反馈渠道(私聊/群)提交与裁决,控制台在群里留下唯一的状态投影。
+ * 卡片形态与协作播报共用 domain/collab/card.ts;群未配置时不入队。
  */
 
-/** 进群的通知事件;其余事件(routed/assigned/accepted/input/ci_result/pr_closed)只留库 */
+/** 进群通知的状态事件;其余事件(routed/assigned/accepted/input/ci_result/pr_closed)只留库 */
 export type WorkNotifyKind =
   | "task_bound"
   | "pr_linked"
@@ -23,6 +25,8 @@ export interface NotifyWorkEventInput {
   workItemId: string;
   eventId: string;
   kind: WorkNotifyKind;
+  /** 目标群(控制台协作群);未配置时不入队,与协作播报同口径 */
+  chatId: string | undefined;
   /** returned 的退回理由 */
   reason?: string | undefined;
   /** PR 链接;evidence 分支从事件 payload 直传,缺失则文案省略 */
@@ -30,26 +34,8 @@ export interface NotifyWorkEventInput {
   now?: number | undefined;
 }
 
-interface OriginInfo {
-  chatId: string;
-  issueNo: string | null;
-}
-
-/**
- * thread_key 形如 `chat_id:message_id`;cc-connect 拿不到原消息 id 时只给 chat_id,
- * 也接受纯 chat_id——控制台只用 chat_id 定位群,message_id 仅作根消息追溯。
- * `no-thread:*` 与非 chat_id 形态视为无定位。
- */
-function parseChatId(threadKey: string): string | null {
-  if (threadKey.startsWith("no-thread:")) {
-    return null;
-  }
-  const idx = threadKey.indexOf(":");
-  const chatId = idx <= 0 ? threadKey : threadKey.slice(0, idx);
-  return chatId.startsWith("oc_") ? chatId : null;
-}
-
-async function resolveOrigin(db: Db, originTriggerId: string | null): Promise<OriginInfo | null> {
+/** 事项的 issue 编号:origin 触发的 threadRefs 里 issue 引用 URL 的尾段 */
+async function resolveIssueNo(db: Db, originTriggerId: string | null): Promise<string | null> {
   if (originTriggerId === null) {
     return null;
   }
@@ -57,92 +43,120 @@ async function resolveOrigin(db: Db, originTriggerId: string | null): Promise<Or
   if (trigger === undefined) {
     return null;
   }
-  const payload = JSON.parse(trigger.payloadJson) as { thread_key?: unknown };
-  const chatId = typeof payload.thread_key === "string" ? parseChatId(payload.thread_key) : null;
-  if (chatId === null) {
-    return null;
-  }
   const refs = JSON.parse(trigger.threadRefsJson) as ReadonlyArray<{
     externalKind?: unknown;
     externalKey?: unknown;
   }>;
-  let issueNo: string | null = null;
   for (const ref of refs) {
     if (ref.externalKind !== "issue" || typeof ref.externalKey !== "string") {
       continue;
     }
     const tail = ref.externalKey.split("/").pop() ?? "";
     if (tail !== "") {
-      issueNo = tail;
-      break;
+      return tail;
     }
   }
-  return { chatId, issueNo };
+  return null;
 }
 
-/** 纯文本消息无富文本渲染,只需压掉换行防拆行 */
-function flat(value: string): string {
-  return value.replace(/[\r\n]+/g, " ");
+/** 接单机器人名:事项当前承接者 agent 的登记名;未接单时留空 */
+async function resolveAssigneeName(db: Db, workItemId: string): Promise<string> {
+  const agentId = await findActiveAssignee(db, workItemId);
+  if (agentId === undefined) {
+    return "";
+  }
+  const agent = await findAgentById(db, agentId);
+  return agent?.displayName ?? "";
 }
 
-function returnHint(issueNo: string | null): string {
-  return issueNo === null
-    ? "回复『退回：理由』返工"
-    : `回复『#${issueNo} 退回：理由』返工`;
+interface CardSpec {
+  title: string;
+  template: string;
+  body: string;
 }
 
-function verdictHint(issueNo: string | null): string {
-  return issueNo === null
-    ? `回复『接受』收口，或${returnHint(issueNo)}`
-    : `回复『#${issueNo} 接受』收口，或${returnHint(issueNo)}`;
+/** 裁决口令:issue 编号齐全时带号,否则裸口令 */
+function verdictLine(issueNo: string | null): string {
+  const accept = issueNo === null ? "『接受』" : `『#${issueNo} 接受』`;
+  const returned = issueNo === null ? "『退回：理由』" : `『#${issueNo} 退回：理由』`;
+  return `在反馈渠道回复 ${accept} 收口,或 ${returned} 返工`;
 }
 
-function buildText(
+function buildCard(
   kind: WorkNotifyKind,
   title: string,
   issueNo: string | null,
+  assignee: string,
   reason: string | undefined,
   prUrl: string | undefined,
-): string {
-  const bug = issueNo === null ? "" : `Bug #${issueNo} `;
+): CardSpec {
+  // 卡片头是纯文本(不解析 markdown),正文是 markdown:同一名字两种转义
+  const whoRaw = assignee === "" ? "接单机器人" : assignee;
+  const who = mdText(whoRaw);
+  const item = `**事项**:${mdText(title)}`;
+  const bug = issueNo === null ? "" : `**缺陷**:Bug #${issueNo}\n`;
+  const pr = prUrl === undefined ? "" : `**PR**:${mdText(prUrl)}\n`;
   switch (kind) {
     case "task_bound":
-      return `📦 ${bug}「${flat(title)}」已被 worker 接单，开始修复`;
+      return {
+        title: `〔接单〕${whoRaw} 已接单`,
+        template: "turquoise",
+        body: `${item}\n${bug}**状态**:开始修复`,
+      };
     case "pr_linked":
-      return prUrl === undefined
-        ? `🔧 ${bug}修复已提交 PR，CI 运行中`
-        : `🔧 ${bug}修复已提交 PR（CI 运行中）：${prUrl}`;
+      return {
+        title: `〔提 PR〕${whoRaw} 已提交修复`,
+        template: "blue",
+        body: `${item}\n${bug}${pr}**状态**:CI 运行中`,
+      };
     case "ci_failed":
-      return `❌ ${bug}PR CI 未通过，事项停留修复阶段；修复重推后自动重判，也可${returnHint(issueNo)}`;
+      return {
+        title: `〔CI 未通过〕${mdText(title)}`,
+        template: "red",
+        body: `${item}\n${bug}${pr}**状态**:CI 未通过,事项停留在修复阶段;修复重推后自动重判`,
+      };
     case "acceptance_ready":
-      return `✅ ${bug}「${flat(title)}」CI 全绿，待验收${
-        prUrl === undefined ? "" : `（PR：${prUrl}）`
-      }。${verdictHint(issueNo)}`;
+      return {
+        title: `〔待验收〕${mdText(title)}`,
+        template: "green",
+        body: `${item}\n${bug}${pr}**验收**:${verdictLine(issueNo)}`,
+      };
     case "returned":
-      return `↩️ ${bug}已退回返工：${flat(reason ?? "未注明原因")}；worker 将重新修复`;
+      return {
+        title: `〔退回返工〕${mdText(title)}`,
+        template: "orange",
+        body: `${item}\n${bug}**理由**:${mdText(reason ?? "未注明原因")}\n**状态**:已退回,${who} 将重新修复`,
+      };
   }
 }
 
 /**
  * 通知入队入口:各事件 append 站点在业务事务内调用。
- * chat 解析失败(无 origin/无 thread_key/格式异常)静默 return——通知是
- * 副通道,不产生「因群不可达而事项写不进」的反向耦合。
+ * 群未配置时静默不入队——通知是副通道,不产生「因群不可达而事项写不进」的反向耦合。
  */
 export async function notifyWorkEvent(db: Db, input: NotifyWorkEventInput): Promise<void> {
+  if (input.chatId === undefined) {
+    return;
+  }
   const item = await findWorkItemById(db, input.workItemId);
   if (item === undefined) {
     return;
   }
-  const origin = await resolveOrigin(db, item.originTriggerId);
-  if (origin === null) {
-    return;
-  }
-  const text = buildText(input.kind, item.title, origin.issueNo, input.reason, input.prUrl);
+  const issueNo = await resolveIssueNo(db, item.originTriggerId);
+  const assignee = await resolveAssigneeName(db, input.workItemId);
+  const spec = buildCard(
+    input.kind,
+    item.title,
+    issueNo,
+    assignee,
+    input.reason,
+    input.prUrl,
+  );
   await enqueuePush(db, {
     idempotencyKey: `work-notify:${input.eventId}`,
     kind: "work_notify",
-    chatId: origin.chatId,
-    text,
+    chatId: input.chatId,
+    card: statusCard(spec),
     uuid: input.eventId,
     ...(input.now === undefined ? {} : { now: input.now }),
   });

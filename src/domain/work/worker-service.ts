@@ -44,6 +44,8 @@ export interface WorkerServiceDeps {
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
   newEventId?: () => string;
+  /** 控制台协作群;事项状态卡片发到这里,未配置时不入队 */
+  collabChatId?: string | undefined;
 }
 
 export function createWorkerService(deps: WorkerServiceDeps): WorkerService {
@@ -169,6 +171,7 @@ export function createWorkerService(deps: WorkerServiceDeps): WorkerService {
           workItemId: row.workItemId,
           eventId,
           kind: "task_bound",
+          chatId: deps.collabChatId,
           now: now(),
         });
       }

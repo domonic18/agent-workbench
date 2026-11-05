@@ -85,7 +85,7 @@ export async function deliverInputToAssignee(
 export async function dispatchBugDecision(
   db: Db,
   ctx: DispatchContext,
-  deps: Pick<DispatchDeps, "newEventId" | "newInboxId">,
+  deps: Pick<DispatchDeps, "newEventId" | "newInboxId" | "collabChatId">,
   outcome: OwnerContinueOutcome,
 ): Promise<DispatchOutcome> {
   const item = await findWorkItemById(db, outcome.workItemId);
@@ -148,6 +148,7 @@ export async function dispatchBugDecision(
     workItemId: outcome.workItemId,
     eventId,
     kind: "returned",
+    chatId: deps.collabChatId,
     reason,
     now: ctx.at,
   });
