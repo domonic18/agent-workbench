@@ -20,7 +20,7 @@
 
 **⚠️ 执行任何任务前,先读本文件;涉及哪一层,再读 docs/ 对应 arch 文档(按需,勿全量加载)。**
 
-- `src/` 服务端源码(server / domain / reliability / store / adapters / mcp / config / shared);技术选型定稿后各一级目录建专属 CLAUDE.md,在该目录工作前先读;`src/mcp/` 是控制台远程 MCP 协议层,判定仍取 `src/domain/capability/`，不含执行机 proxy
+- `src/` 服务端源码(server / application / domain / reliability / store / adapters / mcp / config / shared);技术选型定稿后各一级目录建专属 CLAUDE.md,在该目录工作前先读;`src/mcp/` 是控制台远程 MCP 协议层,判定仍取 `src/domain/capability/`，不含执行机 proxy
 - `web/` React SPA 源码(pages / components / api / stores / shared),产物 `dist/` 由后端同源托管
 - `collector/` aw-node 采集模块源码；与调度模块共同构建每机单一 aw-node 产物，与 `src/shared` 共享协议类型
 - `scripts/` 运维与工具脚本(备份等)

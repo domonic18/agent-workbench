@@ -2,10 +2,9 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
   completeBootstrap,
-  DEFAULT_BUG_FIX,
   runPreflight,
 } from "../../domain/bootstrap/assembly.js";
-import { findAssembly } from "../../store/repositories/assembly.js";
+import { createBootstrapStatusService } from "../../domain/bootstrap/status.js";
 import {
   consumeOneTimeToken,
   issueOneTimeToken,
@@ -49,36 +48,10 @@ interface AdminBody {
   password?: unknown;
 }
 
-/** 初始化阶段:/setup 据此决定强制路由(01 §2);装配完成才算 ready(03 §4.0) */
-async function phaseOf(
-  db: Db,
-  machines: number,
-  agents: number,
-): Promise<"awaiting_machine" | "awaiting_agents" | "awaiting_completion" | "ready"> {
-  if (machines === 0) {
-    return "awaiting_machine";
-  }
-  if (agents === 0) {
-    return "awaiting_agents";
-  }
-  return (await findAssembly(db)) === undefined ? "awaiting_completion" : "ready";
-}
-
-function nextHint(phase: string): string {
-  if (phase === "awaiting_machine") {
-    return "添加执行机:签发 enroll token 并在目标机执行安装命令";
-  }
-  if (phase === "awaiting_agents") {
-    return "确认项目与主责 Agent";
-  }
-  return phase === "awaiting_completion"
-    ? "核对默认 bug_fix 装配摘要,完成第 4 步初始化"
-    : "初始化完成";
-}
-
 export function registerBootstrapRoutes(app: FastifyInstance, options: BootstrapRoutesOptions): void {
   const db = options.db;
   const now = options.now ?? Date.now;
+  const statusService = createBootstrapStatusService({ db });
 
   app.post("/api/bootstrap/admin", async (request, reply) => {
     const body = (request.body ?? {}) as AdminBody;
@@ -139,30 +112,7 @@ export function registerBootstrapRoutes(app: FastifyInstance, options: Bootstrap
     if (rejected !== undefined) {
       return rejected;
     }
-    const machines = (
-      (await db.get("SELECT COUNT(*)::int AS n FROM machine")) as { n: number }
-    ).n;
-    const agents = (
-      (await db.get("SELECT COUNT(*)::int AS n FROM agent")) as { n: number }
-    ).n;
-    const phase = await phaseOf(db, machines, agents);
-    const assembly = await findAssembly(db);
-    return {
-      phase,
-      machines,
-      agents,
-      assembly:
-        assembly === undefined
-          ? null
-          : {
-              primaryAgentId: assembly.primaryAgentId,
-              workKind: assembly.workKind,
-              assembledAt: assembly.assembledAt,
-            },
-      // 默认 bug_fix 摘要:/setup 第 4 步在确认前就要展示,装配定义随源码版本化
-      definition: DEFAULT_BUG_FIX,
-      next: nextHint(phase),
-    };
+    return statusService.getStatus();
   });
 
   app.post(

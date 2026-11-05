@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyReply } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
   AUDIT_GAP_KINDS,
@@ -13,10 +13,7 @@ import {
   listGaps,
   type AuditGapRecord,
 } from "../../store/repositories/audit-reconcile.js";
-import { findCapability } from "../../store/repositories/capability.js";
-import type { AgentRecord } from "../../store/repositories/identity.js";
-import { findTaskById, type TaskRecord } from "../../store/repositories/task.js";
-import { insertToolCallLog } from "../../store/repositories/tool-call-log.js";
+import { createAuditService, type ToolCallPayload } from "../../domain/audit/service.js";
 import { requireAgentAuth } from "../middleware/agent-auth.js";
 import { requireSession } from "../middleware/session.js";
 
@@ -79,39 +76,15 @@ function parseCursor(cursor: string): { detectedAt: number; id: number } | undef
   return { detectedAt, id };
 }
 
-function forbidden(reply: FastifyReply, message: string): FastifyReply {
-  return reply.code(403).send({ error: { code: "FORBIDDEN", message } });
-}
-
-/** 审计行必须落在调用方自己的任务上;否则等同伪造他人审计 */
-async function ownedTask(
-  reply: FastifyReply,
-  db: Db,
-  taskId: string,
-  agentId: string,
-): Promise<TaskRecord | undefined> {
-  const task = await findTaskById(db, taskId);
-  if (task === undefined) {
-    void reply.code(404).send({ error: { code: "NOT_FOUND", message: `任务 ${taskId} 不存在` } });
-    return undefined;
-  }
-  if (task.assignee !== agentId) {
-    void forbidden(reply, `任务 ${taskId} 不属于当前 Agent`);
-    return undefined;
-  }
-  return task;
-}
-
 export function registerAuditRoutes(app: FastifyInstance, options: AuditRoutesOptions): void {
   const db = options.db;
-  const now = options.now ?? Date.now;
-  const session = requireSession(db, now);
+  const auditService = createAuditService({ db });
 
   app.post(
     "/api/audit/tool-calls",
     { preHandler: requireAgentAuth(db) },
     async (request, reply) => {
-      const agent = request.agent as AgentRecord;
+      const agent = request.agent!;
       const parsed = toolCallSchema.safeParse(request.body ?? {});
       if (!parsed.success) {
         return reply.code(422).send({
@@ -125,29 +98,30 @@ export function registerAuditRoutes(app: FastifyInstance, options: AuditRoutesOp
           },
         });
       }
-      const task = await ownedTask(reply, db, parsed.data.taskId, agent.id);
-      if (task === undefined) {
-        return reply;
+      const data = parsed.data;
+      const payload: ToolCallPayload = {
+        runId: data.runId,
+        taskId: data.taskId,
+        tool: data.tool,
+        argsHash: data.argsHash,
+        level: data.level,
+        verdict: data.verdict,
+        reason: data.reason ?? null,
+        capabilityId: data.capabilityId ?? null,
+        durationMs: data.durationMs ?? null,
+        occurredAt: data.occurredAt,
+      };
+      const result = await auditService.recordToolCall(agent.id, payload);
+      if (!result.ok) {
+        return reply.code(result.code === "NOT_FOUND" ? 404 : 403).send({
+          error: { code: result.code, message: result.message },
+        });
       }
-      const capabilityId = parsed.data.capabilityId ?? null;
-      if (
-        capabilityId !== null &&
-        (await findCapability(db, capabilityId))?.taskId !== task.id
-      ) {
-        return forbidden(reply, `授权 ${capabilityId} 不属于任务 ${task.id}`);
-      }
-      await insertToolCallLog(db, {
-        ...parsed.data,
-        reason: parsed.data.reason ?? null,
-        capabilityId,
-        durationMs: parsed.data.durationMs ?? null,
-        agentId: agent.id,
-      });
       return reply.code(201).send({ ok: true });
     },
   );
 
-  app.get("/api/audit/gaps", { preHandler: session }, async (request, reply) => {
+  app.get("/api/audit/gaps", { preHandler: requireSession(db, options.now ?? Date.now) }, async (request, reply) => {
     const query = request.query as Record<string, unknown>;
     const kind = typeof query.kind === "string" ? query.kind : undefined;
     if (kind !== undefined && !AUDIT_GAP_KINDS.includes(kind as AuditGapKind)) {
