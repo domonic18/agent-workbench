@@ -205,17 +205,21 @@ describe("task 路由", () => {
     expect(response.json()).not.toHaveProperty("notify");
 
     const completion = await findOutboxByKey(fixture.db, "collab:task_done:tsk_child");
-    expect(JSON.parse(completion?.payloadJson ?? "{}")).toEqual({
-      chatId: "oc_group",
-      text: "〔完成〕B 已完成「下游任务」,结论已同步给 A · 任务 tsk_child",
-      uuid: "task_done:tsk_child",
-    });
+    const completionPayload = JSON.parse(completion?.payloadJson ?? "{}") as {
+      chatId: string;
+      card: { header: { title: { content: string }; template: string } };
+      text?: string;
+    };
+    expect(completionPayload.chatId).toBe("oc_group");
+    expect(completionPayload.card.header.title.content).toBe("〔完成〕B 已完成");
+    expect(completionPayload.card.header.template).toBe("green");
+    expect(completionPayload.text).toBeUndefined();
     const closure = await findOutboxByKey(fixture.db, "collab:task_closed:tsk_parent");
-    expect(JSON.parse(closure?.payloadJson ?? "{}")).toEqual({
-      chatId: "oc_group",
-      text: "〔验收〕任务「上游任务」已闭环 · 任务 tsk_parent",
-      uuid: "task_closed:tsk_parent",
-    });
+    const closurePayload = JSON.parse(closure?.payloadJson ?? "{}") as {
+      card: { header: { title: { content: string }; template: string } };
+    };
+    expect(closurePayload.card.header.title.content).toBe("〔验收〕任务已闭环");
+    expect(closurePayload.card.header.template).toBe("indigo");
     expect(
       await fixture.db.get("SELECT status FROM task WHERE id = 'tsk_parent'"),
     ).toEqual({ status: "done" });

@@ -158,11 +158,17 @@ describe("a2a 路由", () => {
     expect(body).not.toHaveProperty("notify");
     const row = await findOutboxByKey(fixture.db, `collab:${body.msg_id}`);
     expect(row?.kind).toBe("collab_bulletin");
-    expect(JSON.parse(row?.payloadJson ?? "{}")).toEqual({
-      chatId: "oc_group",
-      text: "〔交接〕Agent A → Agent B:需要一份接口契约 · 任务 tsk_a",
-      uuid: body.msg_id,
-    });
+    const payload = JSON.parse(row?.payloadJson ?? "{}") as {
+      chatId: string;
+      card: { header: { title: { content: string }; template: string } };
+      text?: string;
+      uuid: string;
+    };
+    expect(payload.chatId).toBe("oc_group");
+    expect(payload.card.header.title.content).toBe("〔交接〕Agent A → Agent B");
+    expect(payload.card.header.template).toBe("blue");
+    expect(payload.text).toBeUndefined();
+    expect(payload.uuid).toBe(body.msg_id);
   });
 
   it("reply 不触发交接通知", async () => {
