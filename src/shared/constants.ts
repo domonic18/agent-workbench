@@ -264,6 +264,8 @@ export const TOOL_GATE = {
     "work.inbox",
     "work.ack",
     "work.handback",
+    "work.report",
+    "work.decide",
   ],
 } as const;
 

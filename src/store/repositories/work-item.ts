@@ -209,6 +209,7 @@ export interface WorkItemProjectionPatch {
   acceptanceRef?: string;
   nextAction: string | null;
   updatedAt: number;
+  endedAt?: number;
 }
 
 /** 末态投影:事件写入的同一事务内更新,读路径不扫事件(arch/02 §3.9) */
@@ -226,6 +227,7 @@ export async function updateWorkItemProjection(db: Db, patch: WorkItemProjection
   set("attention", patch.attention);
   set("validation_json", patch.validationJson);
   set("acceptance_ref", patch.acceptanceRef);
+  set("ended_at", patch.endedAt);
   sets.push("next_action = ?", "updated_at = ?");
   params.push(patch.nextAction, patch.updatedAt, patch.id);
   return (

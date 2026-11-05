@@ -91,6 +91,16 @@ export async function findWorkTriggerBySourceEvent(
   )) as WorkTriggerRecord | undefined;
 }
 
+/** 按内部 id 回读(origin 触发归属核验用) */
+export async function findWorkTriggerById(
+  db: Db,
+  id: string,
+): Promise<WorkTriggerRecord | undefined> {
+  return (await db.get(`SELECT ${FULL_COLUMNS} FROM work_trigger WHERE id = ?`, id)) as
+    | WorkTriggerRecord
+    | undefined;
+}
+
 export interface TriggerDispositionPatch {
   id: string;
   disposition: WorkTriggerDisposition;

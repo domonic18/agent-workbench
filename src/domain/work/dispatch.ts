@@ -5,7 +5,7 @@ import {
   appendWorkItemEvent,
   insertWorkItem,
 } from "../../store/repositories/work-item.js";
-import { findActiveAssignee, insertWorkerInboxIfNew } from "../../store/repositories/work-inbox.js";
+import { insertWorkerInboxIfNew } from "../../store/repositories/work-inbox.js";
 import {
   findActiveOwnerSubscription,
   insertSubscriptionIfNew,
@@ -13,6 +13,7 @@ import {
 } from "../../store/repositories/work-thread.js";
 import type { RouteOutcome } from "../routing/router.js";
 import type { WorkPolicy } from "../routing/policy.js";
+import { dispatchBugDecision, deliverInputToAssignee } from "./decision.js";
 import { dispatchGithubEvidence } from "./evidence.js";
 import type { DispatchContext, ResolvedDisposition, WorkRequest } from "./contract.js";
 
@@ -47,7 +48,7 @@ function titleOf(req: WorkRequest, workKind: string): string {
 /**
  * Thread owner 直通(arch/01 §9.2 ③):Input 投给事项的当前承接者。
  * 无活跃承接者(assignment 尚未领取或已退回)时确定性交人,不猜目标。
- * github 来源走证据分支:pr/check 只是进展事实,不构成给 worker 的新工作。
+ * github 来源走证据分支;bug.accepted/returned 走人工裁决分支。
  */
 export async function dispatchOwnerContinue(
   db: Db,
@@ -61,55 +62,13 @@ export async function dispatchOwnerContinue(
   if (ctx.request.source === "github") {
     return dispatchGithubEvidence(db, ctx, deps, outcome);
   }
-  const assignee = await findActiveAssignee(db, outcome.workItemId);
-  if (assignee === undefined) {
-    return {
-      resolved: {
-        disposition: "needs_person",
-        reasonCode: "owner_unassigned",
-        ruleId: null,
-        ruleVersion: null,
-        workItemId: outcome.workItemId,
-        targetAgentId: null,
-      },
-      newInboxIds: [],
-    };
+  if (
+    ctx.request.source === "bug" &&
+    (ctx.request.kind === "accepted" || ctx.request.kind === "returned")
+  ) {
+    return dispatchBugDecision(db, ctx, deps, outcome);
   }
-  const inboxId = deps.newInboxId();
-  const created = await insertWorkerInboxIfNew(db, {
-    id: inboxId,
-    kind: "input",
-    workItemId: outcome.workItemId,
-    triggerId: ctx.triggerId,
-    targetAgentId: assignee,
-    idempotencyKey: `input:${ctx.triggerId}`,
-    payloadJson: ctx.threadRefsJson,
-    createdAt: ctx.at,
-  });
-  const newInboxIds: string[] = [];
-  if (created) {
-    newInboxIds.push(inboxId);
-    await appendWorkItemEvent(db, {
-      id: deps.newEventId(),
-      workItemId: outcome.workItemId,
-      kind: "input",
-      triggerId: ctx.triggerId,
-      evidenceRefsJson: ctx.refsJson,
-      payloadJson: ctx.threadRefsJson,
-      occurredAt: ctx.at,
-    });
-  }
-  return {
-    resolved: {
-      disposition: "continued",
-      reasonCode: null,
-      ruleId: null,
-      ruleVersion: null,
-      workItemId: outcome.workItemId,
-      targetAgentId: assignee,
-    },
-    newInboxIds,
-  };
+  return deliverInputToAssignee(db, ctx, deps, outcome.workItemId);
 }
 
 /**

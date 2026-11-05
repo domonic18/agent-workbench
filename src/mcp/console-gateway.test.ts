@@ -7,6 +7,7 @@ import type { UsageState } from "../domain/capability/gate.js";
 import { createA2aService } from "../domain/a2a/service.js";
 import { createIdentityService } from "../domain/identity/service.js";
 import { createTaskService } from "../domain/task/service.js";
+import { createIngestService } from "../domain/work/ingest-service.js";
 import { createWorkerService } from "../domain/work/worker-service.js";
 import { openDatabase, type Db } from "../store/database.js";
 import type { AgentRecord } from "../store/repositories/identity.js";
@@ -45,7 +46,16 @@ async function setup(usage?: UsageState): Promise<Fixture> {
   const workers = createWorkerService({ db, now: () => 0, sleep: async () => {} });
   const gateway = createConsoleGateway({
     db,
-    tools: createConsoleTools({ db, tasks, a2a, workers, knowledgeDir, announce: { db } }),
+    tools: createConsoleTools({
+      db,
+      tasks,
+      a2a,
+      workers,
+      ingest: createIngestService({ db, now: () => 0 }).ingest,
+      now: () => 0,
+      knowledgeDir,
+      announce: { db },
+    }),
     now: () => 0,
     ...(usage === undefined ? {} : { usage }),
   });
@@ -78,6 +88,8 @@ describe("console gateway", () => {
       "work_read",
       "work_ack",
       "work_handback",
+      "work_report",
+      "work_decide",
     ]);
     await db.close();
   });
