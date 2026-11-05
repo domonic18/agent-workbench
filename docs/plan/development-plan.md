@@ -85,7 +85,17 @@
 
 - 目标: R3 指标与 token 用量上限、周报自动生成、飞书网页应用嵌入免登
 - 验收标准: 周报自动出且无需人工修数;可采集数据对应的任一数字可下钻到会话记录，WorkBuddy 未采集项显示「未接入 / —」而不伪造;飞书内打开免登录
-- 状态: 未开始
+- 状态: **进行中**。M4-1 用量上限与硬停已闭。
+
+**M4-1 用量上限与硬停(2026-11-06)**:
+① 迁移 `0011_usage_limit`——`agent_id` 主键外键级联删除，`daily_token_limit BIGINT CHECK >=0`、`warn_percent INTEGER CHECK 0~100`、`hard_stop BOOLEAN DEFAULT true`、`is_active BOOLEAN DEFAULT true`、`updated_at BIGINT`；`usage_limit` 无行或 `is_active=false` 时 Agent 无限量，激活后读失败按 `unavailable` fail-closed；`hard_stop=false` 只计量不拦截，`warn_percent` 本期只存不告警。
+② 仓储 `src/store/repositories/usage-limit.ts`(单条 find/批量 findByAgentIds/upsert/delete)与 `token-usage.ts` 新增 `sumAgentTokensSince(db, agentId, since)`(四维之和)。
+③ 用量状态解析 `src/domain/usage/state.ts`——`createUsageResolver({ now })`，本地日零点复用 `src/shared/time.ts`(由 `overview/service.ts` 迁出避免跨层引用)，返回 `unlimited | metered(带 hardStop) | unavailable`。
+④ MCP 硬停：`src/application/mcp-tool-service.ts` 改静态 `usage` 为 `resolveUsage(agentId)` 回调(与 `UsageResolver` 同形)；`src/server/routes/mcp.ts` 与 `src/mcp/console-gateway.ts` 透传；`src/server/app.ts` 统一创建 `UsageResolver` 注入。
+⑤ 派工硬停：`src/domain/work/dispatch.ts` 在 `findAgentByKey` 后、建 WorkItem 前调用 `resolveUsage`；已用尽返回 `needs_person` / `target_token_exhausted`(新 `RouteReason`)，不建 item/inbox；`src/domain/work/ingest-service.ts`、`src/server/routes/work.ts`、`src/server/routes/webhook-github.ts` 透传 resolver。
+⑥ 配置 API：`src/domain/identity/service.ts` 新增 `setUsageLimit`，`src/server/routes/identity.ts` 新增 `PUT /api/agents/:id/usage-limit`(CSRF+幂等键)，`AgentDto` 暴露当前 `usageLimit`；缺省 `warnPercent=80`、`hardStop=true`、`isActive=true`；`GET /api/agents` 批量查上限，避免 N+1。
+⑦ 测试：`migrator.test.ts` 迁移计数 10→11 并断言 `usage_limit` 表；`database.test.ts` 迁移计数同步；`usage-limit.test.ts` 5 例(upsert/find/批量 find/delete/级联删除)；`state.test.ts` 7 例(无限制/未激活/正常/达上限/硬停关闭/跨天/读失败)；`gate.test.ts` 补 `hardStop=false` 放行；`console-gateway.test.ts` 新增 resolveUsage 调用断言、metered 达上限 deny、unavailable deny；`ingest-service.test.ts` 新增 target_token_exhausted 不建事项；`identity.test.ts` 新增 PUT usage-limit 200/404/422/401。
+⑧ `make check` 全绿:服务端+collector 124 文件 795 测试 + web 22 文件 85 测试 + tsc + eslint。
 
 ## 任务拆分
 
@@ -228,3 +238,4 @@ P1 项(飞书长连接与回调穿 frp、SSE 穿 frp、launchd 用户域、长�
 | 2026-11-03 | **确认端到端首次使用需求并纳入 M3.8**：新增 `/setup` 四步引导、一次性 enroll token、cc-connect 自动发现与预填、默认 bug_fix 装配和分项预检；M3.8-2 负责控制台初始化，M3.8-3 负责执行机加入、项目装配、远程 MCP 与自动化验收 | 首次使用从「照文档手工配置」改为「必要授权 + 一次安装 + 一次确认」，避免初始化成为真实 Bug 闭环前的认知障碍 |
 | 2026-11-03 | **补齐首次初始化安全闭环**：无凭据仅开放 bootstrap mode，一次性 bootstrap token 初始化管理员；enroll 独立鉴权；aw-node 上报 cc-connect 发现并自动下载配置与 ACK；`one_time_token` 记录哈希/TTL/消费状态；过期/重放不签发密钥，预检失败不就绪且不创建空 Assignment；enroll-token 与安装自检从后置池归入 M3.8-3 | 修复首次启动、跨机发现与配置落地、token 安全及验收反例缺口，确保 S9 不只是 happy path |
 | 2026-11-06 | **M3.9 关闭(真实 Bug 接受/退回 E2E)**：acore-portal issue #101 由 bug-triage 机器人报告，控制台派工给 acore-portal Agent，worker 修复并提 PR #102；首次提交 `5894696` 触发真实 CI 失败(`ci_failed`)，协作群退回后同一 WorkItem `wim_a628634521d645a7` 进入返工态，worker 补 `tests/unit/sitemap.test.ts` 后当前 HEAD 全绿，最终原 Bug 机器人接受并关闭 issue；S9 同步关闭 | 完整覆盖需求§6 强制的真实 CI 失败与原 Bug 机器人退回反例，证明 WorkItem 生命周期、Git RouteRule 派工、GitHub webhook 证据链、协作群状态投影可协同运转；M3.9 目标与验收标准全部达成，可进入 M4 |
+| 2026-11-06 | **M4-1 关闭(用量上限与硬停)**：迁移 `0011_usage_limit` 建 `usage_limit` 表；新增 `src/domain/usage/state.ts` resolver、`src/store/repositories/usage-limit.ts` 与 `PUT /api/agents/:id/usage-limit`；`/mcp` 自有控制工具调用与 `dispatchAssign` 双重前置硬停，耗尽/读失败均 fail-closed；单测覆盖 resolver、console-gateway deny、work dispatch `target_token_exhausted`、identity API 与迁移；`make check` 全绿 | 为 M4 产出量化与预算控制提供可配置日 token 上限，控制台职责边界内工具调用与新派工必须先过用量闸门 |
