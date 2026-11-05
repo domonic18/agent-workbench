@@ -35,16 +35,18 @@ interface OriginInfo {
   issueNo: string | null;
 }
 
-/** thread_key 形如 `chat_id:message_id`;no-thread:* 或无冒号视为无定位 */
+/**
+ * thread_key 形如 `chat_id:message_id`;cc-connect 拿不到原消息 id 时只给 chat_id,
+ * 也接受纯 chat_id——控制台只用 chat_id 定位群,message_id 仅作根消息追溯。
+ * `no-thread:*` 与非 chat_id 形态视为无定位。
+ */
 function parseChatId(threadKey: string): string | null {
   if (threadKey.startsWith("no-thread:")) {
     return null;
   }
   const idx = threadKey.indexOf(":");
-  if (idx <= 0) {
-    return null;
-  }
-  return threadKey.slice(0, idx);
+  const chatId = idx <= 0 ? threadKey : threadKey.slice(0, idx);
+  return chatId.startsWith("oc_") ? chatId : null;
 }
 
 async function resolveOrigin(db: Db, originTriggerId: string | null): Promise<OriginInfo | null> {

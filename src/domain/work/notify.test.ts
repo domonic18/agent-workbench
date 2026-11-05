@@ -203,6 +203,13 @@ describe("工作事项通知线 notifyWorkEvent", () => {
     }
   });
 
+  it("thread_key 只给 chat_id(无 message_id):照常定位到群", async () => {
+    const fixture = await prepare(CHAT_ID);
+    const payload = await notifyOne(fixture, "wev_chat_only", "task_bound");
+    expect(payload?.chatId).toBe(CHAT_ID);
+    await fixture.db.close();
+  });
+
   it("issue 引用缺失:文案退化无编号,口令不带 #", async () => {
     const db = await openDatabase();
     await insertAgent(db, workAgent());
