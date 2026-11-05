@@ -21,7 +21,7 @@ interface Fixture {
   knowledgeDir: string;
 }
 
-async function setup(usage?: UsageState): Promise<Fixture> {
+async function setup(resolveUsage?: (agentId: string) => Promise<UsageState>): Promise<Fixture> {
   const db = await openDatabase();
   const ids = ["agt_a", "agt_b", "agt_c"];
   let seq = 0;
@@ -57,7 +57,7 @@ async function setup(usage?: UsageState): Promise<Fixture> {
       announce: { db },
     }),
     now: () => 0,
-    ...(usage === undefined ? {} : { usage }),
+    ...(resolveUsage === undefined ? {} : { resolveUsage }),
   });
   return { db, agent: agentA.agent, gateway, knowledgeDir };
 }
@@ -167,12 +167,23 @@ describe("console gateway", () => {
     await db.close();
   });
 
+  it("resolveUsage 被调用并传入当前 Agent id", async () => {
+    const { db, agent, gateway } = await setup(async (called) => {
+      expect(called).toBe(agent.id);
+      return { kind: "unlimited" };
+    });
+    const result = await gateway.callTool(agent, "kb_search", { search: "部署" });
+    expect(result.isError).toBeUndefined();
+    await db.close();
+  });
+
   it("用量超限时即使 L0 也拒绝,审计 verdict 为 deny", async () => {
-    const { db, agent, gateway } = await setup({
+    const { db, agent, gateway } = await setup(async () => ({
       kind: "metered",
       usedTokens: 100,
       dailyLimit: 100,
-    });
+      hardStop: true,
+    }));
     const result = await gateway.callTool(agent, "kb_search", { search: "部署" });
 
     expect(result.isError).toBe(true);
@@ -180,6 +191,18 @@ describe("console gateway", () => {
     expect(
       await db.get("SELECT verdict FROM tool_call_log WHERE tool = 'kb.search'"),
     ).toEqual({ verdict: "deny" });
+    await db.close();
+  });
+
+  it("用量 unavailable 时按拒绝处理", async () => {
+    const { db, agent, gateway } = await setup(async () => ({
+      kind: "unavailable",
+      reason: "db down",
+    }));
+    const result = await gateway.callTool(agent, "kb_search", { search: "部署" });
+
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain("读取失败");
     await db.close();
   });
 

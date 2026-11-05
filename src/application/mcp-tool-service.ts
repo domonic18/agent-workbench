@@ -19,8 +19,8 @@ export interface McpToolService {
 export interface McpToolServiceDeps {
   db: Db;
   tools: readonly ConsoleTool[];
-  /** M4-1 接账本前一律 unlimited,判定入口与顺序先固定 */
-  usage?: UsageState;
+  /** M4-1 实时解析 Agent 用量状态;缺省无限量 */
+  resolveUsage?: (agentId: string) => Promise<UsageState>;
   now?: () => number;
   log?: ConsoleLogger;
 }
@@ -31,7 +31,7 @@ export interface McpToolServiceDeps {
  */
 export function createMcpToolService(deps: McpToolServiceDeps): McpToolService {
   const { db, tools } = deps;
-  const usage = deps.usage ?? { kind: "unlimited" as const };
+  const resolveUsage = deps.resolveUsage ?? (async () => ({ kind: "unlimited" as const }));
   const now = deps.now ?? Date.now;
 
   return {
@@ -48,6 +48,7 @@ export function createMcpToolService(deps: McpToolServiceDeps): McpToolService {
         return errorResult(`未知工具「${name}」`);
       }
 
+      const usage = await resolveUsage(agent.id);
       const ctx: RunContext = {
         runId: null,
         agentId: agent.id,

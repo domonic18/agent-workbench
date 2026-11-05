@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { createA2aService } from "../../domain/a2a/service.js";
 import type { A2aService } from "../../domain/a2a/types.js";
 import { createTaskService } from "../../domain/task/service.js";
+import { createUsageResolver } from "../../domain/usage/state.js";
 import { createIngestService } from "../../domain/work/ingest-service.js";
 import { createWorkerService } from "../../domain/work/worker-service.js";
 import { createConsoleGateway } from "../../mcp/console-gateway.js";
@@ -57,7 +58,14 @@ export function registerMcpRoutes(app: FastifyInstance, options: McpRoutesOption
       now,
     },
   });
-  const gateway = createConsoleGateway({ db, tools, now, log: app.log });
+  const usageResolver = createUsageResolver({ now });
+  const gateway = createConsoleGateway({
+    db,
+    tools,
+    now,
+    log: app.log,
+    resolveUsage: (agentId: string) => usageResolver.resolve(db, agentId),
+  });
   const auth = requireAgentAuth(db);
 
   app.post("/mcp", { preHandler: auth }, async (request, reply) => {
