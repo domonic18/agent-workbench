@@ -26,6 +26,7 @@ import {
   type ConsoleTool,
   type ConsoleToolDeps,
 } from "./console-shared.js";
+import { createWorkTools } from "./work-tools.js";
 
 const MAX_INBOX_WAIT_S = A2A_INBOX.maxWaitMs / 1000;
 const KB_SEARCH_LIMIT_MAX = 20;
@@ -46,13 +47,20 @@ function createTaskTools(deps: ConsoleToolDeps): ConsoleTool[] {
           deadlineAt: { type: "integer", description: "毫秒时间戳" },
           output: { type: "string", description: "kb_* 条目 id 或 http(s) 链接" },
           parentTaskId: { type: "string" },
+          work_item_id: {
+            type: "string",
+            description:
+              "承接的工作事项 id;传入时 origin 记为 work_item,须持有该事项的有效 assignment",
+          },
         },
         required: ["title", "assigner", "project"],
       },
       auditTaskId: () => null,
       execute: async (agent, args) => {
+        const workItemId = optionalText(args.work_item_id);
         const task = await deps.tasks.create({
           ...pick(args, ["title", "assigner", "project", "deadlineAt", "output", "parentTaskId"]),
+          ...(workItemId === undefined ? {} : { workItemId }),
           assignee: agent.id,
         } as TaskCreateInput);
         return textResult({ task });
@@ -316,9 +324,14 @@ function createKbTools(deps: ConsoleToolDeps): ConsoleTool[] {
   ];
 }
 
-/** 首版封闭集合(arch01 §5.2):7 个自有控制工具;启动即验闸门名登记,防枚举漂移 */
+/** 首版封闭集合(arch01 §5.2):11 个自有控制工具;启动即验闸门名登记,防枚举漂移 */
 export function createConsoleTools(deps: ConsoleToolDeps): ConsoleTool[] {
-  const tools = [...createTaskTools(deps), ...createA2aTools(deps), ...createKbTools(deps)];
+  const tools = [
+    ...createTaskTools(deps),
+    ...createA2aTools(deps),
+    ...createKbTools(deps),
+    ...createWorkTools(deps),
+  ];
   const known: readonly string[] = [...TOOL_GATE.l0, ...TOOL_GATE.l1];
   for (const tool of tools) {
     if (!known.includes(tool.gateName)) {

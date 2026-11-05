@@ -7,6 +7,7 @@ import type { UsageState } from "../domain/capability/gate.js";
 import { createA2aService } from "../domain/a2a/service.js";
 import { createIdentityService } from "../domain/identity/service.js";
 import { createTaskService } from "../domain/task/service.js";
+import { createWorkerService } from "../domain/work/worker-service.js";
 import { openDatabase, type Db } from "../store/database.js";
 import type { AgentRecord } from "../store/repositories/identity.js";
 import { createConsoleGateway } from "./console-gateway.js";
@@ -41,9 +42,10 @@ async function setup(usage?: UsageState): Promise<Fixture> {
   const knowledgeDir = mkdtempSync(join(tmpdir(), "aw-kb-"));
   const tasks = createTaskService({ db, now: () => 0 });
   const a2a = createA2aService({ db, now: () => 0, waitMs: 0 });
+  const workers = createWorkerService({ db, now: () => 0, sleep: async () => {} });
   const gateway = createConsoleGateway({
     db,
-    tools: createConsoleTools({ db, tasks, a2a, knowledgeDir, announce: { db } }),
+    tools: createConsoleTools({ db, tasks, a2a, workers, knowledgeDir, announce: { db } }),
     now: () => 0,
     ...(usage === undefined ? {} : { usage }),
   });
@@ -62,7 +64,7 @@ function parse(result: CallToolResult): Record<string, unknown> {
 const DEADLINE = "2026-12-01T12:00:00Z";
 
 describe("console gateway", () => {
-  it("listTools 暴露 7 个裸名控制工具", async () => {
+  it("listTools 暴露 11 个裸名控制工具", async () => {
     const { db, gateway } = await setup();
     expect(gateway.listTools().map((tool) => tool.name)).toEqual([
       "task_create",
@@ -72,6 +74,10 @@ describe("console gateway", () => {
       "a2a_ack",
       "kb_search",
       "kb_write",
+      "work_inbox",
+      "work_read",
+      "work_ack",
+      "work_handback",
     ]);
     await db.close();
   });

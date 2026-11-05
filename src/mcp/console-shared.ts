@@ -5,6 +5,8 @@ import type { AnnounceOptions } from "../domain/collab/announce.js";
 import { KnowledgeError } from "../domain/knowledge/entry-service.js";
 import { TaskError } from "../domain/task/errors.js";
 import type { TaskService } from "../domain/task/service.js";
+import { WorkError } from "../domain/work/errors.js";
+import type { WorkerService } from "../domain/work/worker-service.js";
 import type { Db } from "../store/database.js";
 import type { AgentRecord } from "../store/repositories/identity.js";
 
@@ -21,6 +23,8 @@ export interface ConsoleToolDeps {
   db: Db;
   tasks: TaskService;
   a2a: A2aService;
+  /** work 域承接服务:assignment/input 的领取、ACK 与退回 */
+  workers: WorkerService;
   /** kb_write 的 Markdown 真相源目录 */
   knowledgeDir: string;
   /** 协作播报;HTTP 路由与 /mcp 共用同一收敛点,群未配置时不入队 */
@@ -89,7 +93,10 @@ interface DomainFailure {
 
 function isDomainFailure(error: unknown): error is DomainFailure {
   return (
-    error instanceof TaskError || error instanceof A2aError || error instanceof KnowledgeError
+    error instanceof TaskError ||
+    error instanceof A2aError ||
+    error instanceof KnowledgeError ||
+    error instanceof WorkError
   );
 }
 

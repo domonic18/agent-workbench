@@ -162,6 +162,7 @@ export interface TaskRecord {
   stage: TaskStage;
   status: TaskStatus;
   origin: TaskOrigin;
+  workItemId: string | null;
   deadlineAt: number | null;
   output: string | null;
   startedAt: number | null;
@@ -174,7 +175,8 @@ export interface TaskRecord {
 const FULL_COLUMNS = `
   id, title, assigner, assignee, project, parent_task_id AS "parentTaskId",
   round, rework_count AS "reworkCount", stage, status, origin,
-  deadline_at AS "deadlineAt", output, started_at AS "startedAt", ended_at AS "endedAt",
+  work_item_id AS "workItemId", deadline_at AS "deadlineAt", output,
+  started_at AS "startedAt", ended_at AS "endedAt",
   total_tokens AS "totalTokens", created_at AS "createdAt", updated_at AS "updatedAt"
 `;
 
@@ -186,6 +188,8 @@ export interface NewTask {
   project: string;
   parentTaskId: string | null;
   origin: TaskOrigin;
+  /** 创建时关联工作事项;创建后不可改(arch/02 §3.9) */
+  workItemId?: string | null | undefined;
   deadlineAt: number | null;
   output: string | null;
   createdAt: number;
@@ -196,9 +200,9 @@ export async function insertTask(db: Db, task: NewTask): Promise<void> {
   await db.run(
     `INSERT INTO task
        (id, title, assigner, assignee, project, parent_task_id, round, rework_count,
-        stage, status, origin, deadline_at, output, started_at, ended_at, total_tokens,
-        created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, 1, 0, 'intake', 'pending', ?, ?, ?, NULL, NULL, 0, ?, ?)`,
+        stage, status, origin, work_item_id, deadline_at, output, started_at, ended_at,
+        total_tokens, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 1, 0, 'intake', 'pending', ?, ?, ?, ?, NULL, NULL, 0, ?, ?)`,
     task.id,
     task.title,
     task.assigner,
@@ -206,6 +210,7 @@ export async function insertTask(db: Db, task: NewTask): Promise<void> {
     task.project,
     task.parentTaskId,
     task.origin,
+    task.workItemId ?? null,
     task.deadlineAt,
     task.output,
     task.createdAt,

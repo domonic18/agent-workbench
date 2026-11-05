@@ -7,6 +7,8 @@ import {
   insertRun,
 } from "../../store/repositories/run.js";
 import { findTaskById } from "../../store/repositories/task.js";
+import { insertWorkItem } from "../../store/repositories/work-item.js";
+import { insertWorkerInboxIfNew } from "../../store/repositories/work-inbox.js";
 import { TaskError } from "./errors.js";
 import { createTaskService, type TaskCreateInput, type TaskService } from "./service.js";
 
@@ -370,6 +372,67 @@ describe("completionNotice", () => {
     expect(await service.completionNotice("tsk_same")).toBeNull();
     await db.run("UPDATE task SET status = 'done' WHERE id = 'tsk_orphan'");
     expect(await service.completionNotice("tsk_orphan")).toBeNull();
+    await db.close();
+  });
+});
+
+describe("task create 关联工作事项", () => {
+  async function seedWork(db: Db): Promise<void> {
+    await db.run(
+      "INSERT INTO machine (id, hostname, os, collector_version, collector_secret_hash, status, created_at) VALUES ('m1', 'h', 'linux', '1', 'h', 'active', 0) ON CONFLICT DO NOTHING",
+    );
+    await db.run(
+      `INSERT INTO agent (id, machine_id, project, display_name, secret_hash, status, allowed_targets_json, created_at, updated_at)
+       VALUES ('agt_a', 'm1', 'aw', 'agt_a', 'h', 'active', '[]', 0, 0) ON CONFLICT DO NOTHING`,
+    );
+    await insertWorkItem(db, {
+      id: "wim_1",
+      project: "aw",
+      kind: "bug_fix",
+      title: "登录页 500",
+      expectedResult: "修好",
+      scopeJson: "{}",
+      originTriggerId: null,
+      authorizationKind: "none",
+      authorizationRef: null,
+      policyVersion: "test",
+      createdAt: 1_000,
+    });
+    await insertWorkerInboxIfNew(db, {
+      id: "wib_1",
+      kind: "assignment",
+      workItemId: "wim_1",
+      triggerId: null,
+      targetAgentId: "agt_a",
+      idempotencyKey: "assign:wtg_1",
+      payloadJson: "{}",
+      createdAt: 1_000,
+    });
+    await db.run("UPDATE worker_inbox SET status = 'claimed' WHERE id = 'wib_1'");
+  }
+
+  it("持有有效 assignment 时建单:origin 推导为 work_item 并关联事项", async () => {
+    const { db, service } = await prepare();
+    await seedWork(db);
+
+    const task = await service.create(createInput({ workItemId: "wim_1" }));
+    expect(task.origin).toBe("work_item");
+    expect(task.workItemId).toBe("wim_1");
+    await db.close();
+  });
+
+  it("事项不存在、项目不一致、未持 assignment 分别拒绝", async () => {
+    const { db, service } = await prepare();
+    await seedWork(db);
+
+    await expectCode(() => service.create(createInput({ workItemId: "wim_missing" })), "NOT_FOUND");
+    // wim_1 项目为 aw,任务报 demo 项目
+    await expectCode(
+      () => service.create(createInput({ project: "demo", workItemId: "wim_1" })),
+      "VALIDATION_FAILED",
+    );
+    await db.run("UPDATE worker_inbox SET status = 'handed_back' WHERE id = 'wib_1'");
+    await expectCode(() => service.create(createInput({ workItemId: "wim_1" })), "FORBIDDEN");
     await db.close();
   });
 });

@@ -76,6 +76,7 @@ describe("task 写域", () => {
       stage: "intake",
       status: "pending",
       origin: "a2a",
+      workItemId: null,
       deadlineAt: 5_000,
       output: null,
       startedAt: null,

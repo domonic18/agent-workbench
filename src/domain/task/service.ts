@@ -18,9 +18,19 @@ import {
   updateTask,
   type TaskRecord,
 } from "../../store/repositories/task.js";
+import {
+  findWorkItemById,
+} from "../../store/repositories/work-item.js";
+import { hasActiveAssignment } from "../../store/repositories/work-inbox.js";
 import type { CollabAgentRef, CompletionNotice } from "../collab/notice.js";
 import { closeAncestorsIfComplete } from "./auto-close.js";
 import { TaskError } from "./errors.js";
+import {
+  eventsForStatusChange,
+  parseDeadline,
+  parseOutput,
+  requireText,
+} from "./parse.js";
 import {
   InvalidTransitionError,
   assertStageTransition,
@@ -28,9 +38,6 @@ import {
   isRework,
   nextReworkCount,
 } from "./state-machine.js";
-
-/** output 是索引而非正文:知识条目 id 或 http(s) 链接 */
-const OUTPUT_PATTERN = /^(kb_[A-Za-z0-9]+|https?:\/\/\S+)$/;
 
 export interface TaskCreateInput {
   title: string;
@@ -41,6 +48,8 @@ export interface TaskCreateInput {
   deadlineAt?: number | null | undefined;
   output?: string | null | undefined;
   parentTaskId?: string | null | undefined;
+  /** 由事项承接而来的任务:须持有该事项的有效 assignment,origin 由服务端推导为 work_item */
+  workItemId?: string | null | undefined;
 }
 
 export interface TaskUpdateInput {
@@ -69,57 +78,6 @@ export interface TaskServiceDeps {
   newEventId?: () => string;
 }
 
-function requireText(value: unknown, field: string, max: number): string {
-  if (typeof value !== "string") {
-    throw new TaskError("VALIDATION_FAILED", `${field} 必须是字符串`);
-  }
-  const trimmed = value.trim();
-  if (trimmed === "") {
-    throw new TaskError("VALIDATION_FAILED", `${field} 不能为空`);
-  }
-  if (trimmed.length > max) {
-    throw new TaskError("VALIDATION_FAILED", `${field} 超过 ${max} 字符`);
-  }
-  return trimmed;
-}
-
-function parseOutput(value: unknown): string | null {
-  if (value === undefined || value === null || value === "") {
-    return null;
-  }
-  const text = requireText(value, "output", TASK_LIMITS.output);
-  if (!OUTPUT_PATTERN.test(text)) {
-    throw new TaskError(
-      "VALIDATION_FAILED",
-      "output 须为知识条目 id(kb_*)或 http(s) 链接",
-    );
-  }
-  return text;
-}
-
-function parseDeadline(value: unknown): number | null {
-  if (value === undefined || value === null) {
-    return null;
-  }
-  if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
-    throw new TaskError("VALIDATION_FAILED", "deadlineAt 须为正整数毫秒时间戳");
-  }
-  return value;
-}
-
-function eventsForStatusChange(to: TaskStatus): "blocked" | "resumed" | "completed" | null {
-  if (to === "blocked") {
-    return "blocked";
-  }
-  if (to === "running") {
-    return "resumed";
-  }
-  if (to === "done") {
-    return "completed";
-  }
-  return null;
-}
-
 export function createTaskService(deps: TaskServiceDeps): TaskService {
   const { db } = deps;
   const now = deps.now ?? Date.now;
@@ -145,6 +103,24 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
     const output = parseOutput(input.output);
     const deadlineAt = parseDeadline(input.deadlineAt);
 
+    const workItemId =
+      input.workItemId === undefined || input.workItemId === null || input.workItemId === ""
+        ? null
+        : requireText(input.workItemId, "workItemId", TASK_LIMITS.assigner);
+    if (workItemId !== null) {
+      const item = await findWorkItemById(db, workItemId);
+      if (item === undefined) {
+        throw new TaskError("NOT_FOUND", `工作事项 ${workItemId} 不存在`);
+      }
+      if (item.project !== project) {
+        throw new TaskError("VALIDATION_FAILED", "任务项目与工作事项项目不一致");
+      }
+      if (!(await hasActiveAssignment(db, workItemId, assignee))) {
+        throw new TaskError("FORBIDDEN", "未持有该工作事项的有效 assignment,不能建关联任务");
+      }
+    }
+    const origin = workItemId === null ? "a2a" : "work_item";
+
     const parentTaskId =
       input.parentTaskId === undefined || input.parentTaskId === null || input.parentTaskId === ""
         ? null
@@ -169,7 +145,8 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
         assignee,
         project,
         parentTaskId,
-        origin: "a2a",
+        origin,
+        workItemId,
         deadlineAt,
         output,
         createdAt: at,
@@ -178,7 +155,7 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
         id: newEventId(),
         taskId: id,
         kind: "created",
-        payload: { origin: "a2a", assigner, project },
+        payload: { origin, assigner, project },
         occurredAt: at,
       });
       if (parentTaskId !== null) {
