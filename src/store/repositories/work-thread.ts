@@ -132,3 +132,29 @@ export async function revokeSubscription(db: Db, id: string, at: number): Promis
     ).changes === 1
   );
 }
+
+export interface WorkItemThreadLink {
+  subscriptionId: string;
+  threadId: string;
+  source: string;
+  externalKind: string;
+  externalKey: string;
+  mode: "owner" | "context";
+  createdAt: number;
+  revokedAt: number | null;
+}
+
+/** 事项详情的关联线索:订阅及其 Thread 身份,含已撤销行供换绑历史 */
+export async function listThreadLinksByWorkItem(
+  db: Db,
+  workItemId: string,
+): Promise<WorkItemThreadLink[]> {
+  return (await db.all(
+    `SELECT s.id AS "subscriptionId", t.id AS "threadId", t.source,
+            t.external_kind AS "externalKind", t.external_key AS "externalKey",
+            s.mode, s.created_at AS "createdAt", s.revoked_at AS "revokedAt"
+       FROM thread_subscription s JOIN work_thread t ON t.id = s.work_thread_id
+      WHERE s.work_item_id = ? ORDER BY s.created_at ASC, s.id ASC`,
+    workItemId,
+  )) as WorkItemThreadLink[];
+}

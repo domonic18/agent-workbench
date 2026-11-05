@@ -86,6 +86,55 @@ export async function findWorkItemById(db: Db, id: string): Promise<WorkItemReco
     | undefined;
 }
 
+export interface WorkItemListFilters {
+  project?: string;
+  kind?: string;
+  stage?: WorkItemStage;
+  attention?: WorkItemAttention;
+  status?: WorkItemStatus;
+  limit: number;
+  before?: { createdAt: number; id: string };
+}
+
+/** 列表按 created_at 倒序(新事项在前),游标与任务列表同格式 `<createdAt>:<id>` */
+export async function listWorkItems(
+  db: Db,
+  filters: WorkItemListFilters,
+): Promise<WorkItemRecord[]> {
+  const clauses: string[] = [];
+  const params: unknown[] = [];
+  if (filters.project !== undefined) {
+    clauses.push("project = ?");
+    params.push(filters.project);
+  }
+  if (filters.kind !== undefined) {
+    clauses.push("kind = ?");
+    params.push(filters.kind);
+  }
+  if (filters.stage !== undefined) {
+    clauses.push("stage = ?");
+    params.push(filters.stage);
+  }
+  if (filters.attention !== undefined) {
+    clauses.push("attention = ?");
+    params.push(filters.attention);
+  }
+  if (filters.status !== undefined) {
+    clauses.push("status = ?");
+    params.push(filters.status);
+  }
+  if (filters.before !== undefined) {
+    clauses.push("(created_at < ? OR (created_at = ? AND id < ?))");
+    params.push(filters.before.createdAt, filters.before.createdAt, filters.before.id);
+  }
+  const where = clauses.length === 0 ? "" : `WHERE ${clauses.join(" AND ")}`;
+  return (await db.all(
+    `SELECT ${FULL_COLUMNS} FROM work_item ${where} ORDER BY created_at DESC, id DESC LIMIT ?`,
+    ...params,
+    filters.limit,
+  )) as WorkItemRecord[];
+}
+
 export interface NewWorkItemEvent {
   id: string;
   workItemId: string;
@@ -130,15 +179,25 @@ export async function appendWorkItemEvent(db: Db, entry: NewWorkItemEvent): Prom
 export async function listWorkItemEvents(
   db: Db,
   workItemId: string,
+  page?: { afterSeq: number; limit: number },
 ): Promise<WorkItemEventRecord[]> {
-  const rows = (await db.all(
-    `SELECT id, work_item_id AS "workItemId", seq, kind, trigger_id AS "triggerId",
-            evidence_refs_json AS "evidenceRefsJson", payload_json AS "payloadJson",
-            occurred_at AS "occurredAt"
-       FROM work_item_event WHERE work_item_id = ? ORDER BY seq ASC`,
+  const columns = `
+    id, work_item_id AS "workItemId", seq, kind, trigger_id AS "triggerId",
+    evidence_refs_json AS "evidenceRefsJson", payload_json AS "payloadJson",
+    occurred_at AS "occurredAt"`;
+  if (page === undefined) {
+    return (await db.all(
+      `SELECT ${columns} FROM work_item_event WHERE work_item_id = ? ORDER BY seq ASC`,
+      workItemId,
+    )) as WorkItemEventRecord[];
+  }
+  return (await db.all(
+    `SELECT ${columns} FROM work_item_event
+      WHERE work_item_id = ? AND seq > ? ORDER BY seq ASC LIMIT ?`,
     workItemId,
+    page.afterSeq,
+    page.limit,
   )) as WorkItemEventRecord[];
-  return rows;
 }
 
 export interface WorkItemProjectionPatch {

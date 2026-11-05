@@ -2,8 +2,23 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { createIngestService } from "../../domain/work/ingest-service.js";
 import { WorkIngestError } from "../../domain/work/contract.js";
+import { createWorkReadService, type WorkReadService } from "../../domain/work/read.js";
+import { WorkError } from "../../domain/work/errors.js";
+import {
+  LIST_LIMITS,
+  WORK_ITEM_ATTENTIONS,
+  WORK_ITEM_STAGES,
+  WORK_ITEM_STATUSES,
+  type WorkItemAttention,
+  type WorkItemStage,
+  type WorkItemStatus,
+} from "../../shared/constants.js";
+import { parseJsonObject } from "../../shared/json.js";
 import type { Db } from "../../store/database.js";
+import type { WorkItemRecord } from "../../store/repositories/work-item.js";
 import { requireCsrf, requireIdempotencyKey, requireSession } from "../middleware/session.js";
+import { invalid } from "./http.js";
+import { parseKeysetCursor, parseLimit, parseSeq } from "./paging.js";
 
 /**
  * 归一化触发入口(arch/01 §9.1):一期是控制台会话的管理面/联调通道,
@@ -32,12 +47,55 @@ const triggerSchema = z.object({
 export interface WorkRoutesOptions {
   db: Db;
   now?: () => number;
+  read?: WorkReadService;
 }
+
+/** 列表条目只带投影列,Mandate 与关联数据走详情 */
+function toListItem(item: WorkItemRecord) {
+  return {
+    id: item.id,
+    project: item.project,
+    kind: item.kind,
+    title: item.title,
+    status: item.status,
+    stage: item.stage,
+    attention: item.attention,
+    nextAction: item.nextAction,
+    latestSummary: item.latestSummary,
+    lastProgressAt: item.lastProgressAt,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+  };
+}
+
+function toDetail(item: WorkItemRecord) {
+  return {
+    ...toListItem(item),
+    parentWorkItemId: item.parentWorkItemId,
+    expectedResult: item.expectedResult,
+    scope: parseJsonObject(item.scopeJson),
+    originTriggerId: item.originTriggerId,
+    authorization: { kind: item.authorizationKind, ref: item.authorizationRef },
+    policyVersion: item.policyVersion,
+    progressRevision: item.progressRevision,
+    output: item.output,
+    validation: parseJsonObject(item.validationJson ?? "{}"),
+    acceptanceRef: item.acceptanceRef,
+    endedAt: item.endedAt,
+  };
+}
+
+const ENUM_FILTERS: ReadonlyArray<{ key: string; allowed: readonly string[] }> = [
+  { key: "status", allowed: WORK_ITEM_STATUSES },
+  { key: "stage", allowed: WORK_ITEM_STAGES },
+  { key: "attention", allowed: WORK_ITEM_ATTENTIONS },
+];
 
 export function registerWorkRoutes(app: FastifyInstance, options: WorkRoutesOptions): void {
   const db = options.db;
   const now = options.now ?? Date.now;
   const ingest = createIngestService({ db, now }).ingest;
+  const read = options.read ?? createWorkReadService({ db });
   const writeGuards = [requireSession(db, now), requireCsrf(), requireIdempotencyKey()];
 
   app.post("/api/work/triggers", { preHandler: writeGuards }, async (request, reply) => {
@@ -69,4 +127,165 @@ export function registerWorkRoutes(app: FastifyInstance, options: WorkRoutesOpti
       throw error;
     }
   });
+
+  app.get("/api/work-items", { preHandler: requireSession(db, now) }, async (request, reply) => {
+    const query = request.query as Record<string, unknown>;
+
+    let status: WorkItemStatus | undefined;
+    let stage: WorkItemStage | undefined;
+    let attention: WorkItemAttention | undefined;
+    for (const { key, allowed } of ENUM_FILTERS) {
+      const raw = query[key];
+      if (raw === undefined) {
+        continue;
+      }
+      if (typeof raw !== "string" || !allowed.includes(raw)) {
+        return invalid(reply, `${key} 只接受 ${allowed.join(" / ")}`);
+      }
+      if (key === "status") {
+        status = raw as WorkItemStatus;
+      } else if (key === "stage") {
+        stage = raw as WorkItemStage;
+      } else {
+        attention = raw as WorkItemAttention;
+      }
+    }
+
+    let project: string | undefined;
+    if (query.project !== undefined) {
+      if (typeof query.project !== "string" || query.project.trim() === "") {
+        return invalid(reply, "project 必须是非空字符串");
+      }
+      project = query.project;
+    }
+
+    let kind: string | undefined;
+    if (query.kind !== undefined) {
+      if (typeof query.kind !== "string" || query.kind.trim() === "") {
+        return invalid(reply, "kind 必须是非空字符串");
+      }
+      kind = query.kind;
+    }
+
+    const limit = parseLimit(query.limit);
+    if (limit === undefined) {
+      return invalid(reply, `limit 必须为 1~${LIST_LIMITS.max} 的整数`);
+    }
+
+    let before: { createdAt: number; id: string } | undefined;
+    if (query.cursor !== undefined) {
+      const parsed =
+        typeof query.cursor === "string" ? parseKeysetCursor(query.cursor) : undefined;
+      before = parsed === undefined ? undefined : { createdAt: parsed.sort, id: parsed.id };
+      if (before === undefined) {
+        return invalid(reply, "cursor 格式应为 <createdAt>:<id>");
+      }
+    }
+
+    const result = await read.list({
+      limit,
+      ...(status === undefined ? {} : { status }),
+      ...(stage === undefined ? {} : { stage }),
+      ...(attention === undefined ? {} : { attention }),
+      ...(project === undefined ? {} : { project }),
+      ...(kind === undefined ? {} : { kind }),
+      ...(before === undefined ? {} : { before }),
+    });
+    const last = result.items.at(-1);
+    return {
+      items: result.items.map(toListItem),
+      nextCursor:
+        result.hasMore && last !== undefined ? `${last.createdAt}:${last.id}` : null,
+    };
+  });
+
+  app.get("/api/work-items/:id", { preHandler: requireSession(db, now) }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    try {
+      const result = await read.detail(id);
+      return {
+        workItem: toDetail(result.item),
+        tasks: result.tasks.map((task) => ({
+          id: task.id,
+          title: task.title,
+          assignee: task.assignee,
+          status: task.status,
+          origin: task.origin,
+          output: task.output,
+          createdAt: task.createdAt,
+        })),
+        runs: result.runs.map((run) => ({
+          id: run.id,
+          agentId: run.agentId,
+          status: run.status,
+          startedAt: run.startedAt,
+          endedAt: run.endedAt,
+        })),
+        inbox: result.inbox.map((row) => ({
+          id: row.id,
+          kind: row.kind,
+          targetAgentId: row.targetAgentId,
+          status: row.status,
+          taskId: row.taskId,
+          leaseUntil: row.leaseUntil,
+          reason: row.reason,
+          createdAt: row.createdAt,
+        })),
+        threads: result.threadLinks.map((link) => ({
+          subscriptionId: link.subscriptionId,
+          threadId: link.threadId,
+          source: link.source,
+          externalKind: link.externalKind,
+          externalKey: link.externalKey,
+          mode: link.mode,
+          revokedAt: link.revokedAt,
+        })),
+      };
+    } catch (error) {
+      if (error instanceof WorkError) {
+        return reply.code(error.status).send({ error: { code: error.code, message: error.message } });
+      }
+      throw error;
+    }
+  });
+
+  app.get(
+    "/api/work-items/:id/events",
+    { preHandler: requireSession(db, now) },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const query = request.query as Record<string, unknown>;
+
+      const afterSeq = parseSeq(query.cursor);
+      if (afterSeq === undefined) {
+        return invalid(reply, "cursor 必须是非负整数 seq");
+      }
+      const limit = parseLimit(query.limit);
+      if (limit === undefined) {
+        return invalid(reply, `limit 必须为 1~${LIST_LIMITS.max} 的整数`);
+      }
+
+      try {
+        const result = await read.events(id, { afterSeq, limit });
+        const last = result.items.at(-1);
+        return {
+          items: result.items.map((event) => ({
+            id: event.id,
+            seq: event.seq,
+            kind: event.kind,
+            triggerId: event.triggerId,
+            evidenceRefs: parseJsonObject(event.evidenceRefsJson),
+            payload: parseJsonObject(event.payloadJson),
+            occurredAt: event.occurredAt,
+          })),
+          nextCursor: result.hasMore && last !== undefined ? last.seq : null,
+        };
+      } catch (error) {
+        if (error instanceof WorkError) {
+          return reply.code(error.status).send({ error: { code: error.code, message: error.message } });
+        }
+        throw error;
+      }
+    },
+  );
 }

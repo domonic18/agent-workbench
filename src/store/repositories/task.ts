@@ -224,6 +224,13 @@ export async function findTaskById(db: Db, id: string): Promise<TaskRecord | und
     | undefined;
 }
 
+export async function listTasksByWorkItem(db: Db, workItemId: string): Promise<TaskRecord[]> {
+  return (await db.all(
+    `SELECT ${FULL_COLUMNS} FROM task WHERE work_item_id = ? ORDER BY created_at ASC, id ASC`,
+    workItemId,
+  )) as TaskRecord[];
+}
+
 export interface TaskUpdatePatch {
   id: string;
   fromStage: TaskStage;

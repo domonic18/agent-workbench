@@ -1,6 +1,7 @@
 import type { FastifyInstance, LightMyRequestResponse } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openDatabase, type Db } from "../../store/database.js";
+import { insertTask } from "../../store/repositories/task.js";
 import { buildApp } from "../app.js";
 import { ensureConsoleCredential } from "../credential.js";
 
@@ -170,5 +171,244 @@ describe("work 触发路由", () => {
     expect(
       (unregistered.json() as { trigger: { disposition: string; reasonCode: string } }).trigger,
     ).toMatchObject({ disposition: "needs_person", reasonCode: "no_project" });
+  });
+});
+
+describe("work 读侧路由", () => {
+  let db: Db;
+  let app: FastifyInstance;
+  let cookie: string;
+  let keySeq = 0;
+
+  function writeHeaders(key = `work-read-key-${++keySeq}`): Record<string, string> {
+    return { cookie, "x-requested-with": "fetch", "idempotency-key": key };
+  }
+
+  beforeEach(async () => {
+    db = await prepare();
+    app = buildApp({ logLevel: "silent", db, now: () => NOW });
+    const login = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { password: PASSWORD },
+    });
+    expect(login.statusCode).toBe(200);
+    cookie = cookieOf(login);
+    // 读侧断言 routed 前置:试点 Agent 必须已注册,否则触发走 needs_person
+    const register = await app.inject({
+      method: "POST",
+      url: "/api/agents",
+      headers: writeHeaders(),
+      payload: {
+        runtime: "workbuddy",
+        key: "workbuddy-pilot",
+        project: "workbuddy-pilot",
+        displayName: "Pilot Worker",
+      },
+    });
+    expect(register.statusCode).toBe(201);
+  });
+
+  afterEach(async () => {
+    await app.close();
+    await db.close();
+  });
+
+  /** 同 Thread 再触发会 owner 直通成 input 不建新事项,需要第二条事项时换 externalKey */
+  async function triggerWorkItem(sourceEventId: string, externalKey = "BUG-1"): Promise<string> {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/work/triggers",
+      headers: writeHeaders(),
+      payload: triggerBody({
+        sourceEventId,
+        threadRefs: [{ source: "bug", externalKind: "issue", externalKey }],
+      }),
+    });
+    expect(response.statusCode).toBe(200);
+    const body = response.json() as { workItem: { id: string } | null };
+    expect(body.workItem).not.toBeNull();
+    return body.workItem!.id;
+  }
+
+  it("未登录 401,非法枚举过滤 422", async () => {
+    expect(
+      (await app.inject({ method: "GET", url: "/api/work-items" })).statusCode,
+    ).toBe(401);
+
+    const bad = await app.inject({
+      method: "GET",
+      url: "/api/work-items?stage=whatever",
+      headers: { cookie },
+    });
+    expect(bad.statusCode).toBe(422);
+
+    const badCursor = await app.inject({
+      method: "GET",
+      url: "/api/work-items?cursor=broken",
+      headers: { cookie },
+    });
+    expect(badCursor.statusCode).toBe(422);
+  });
+
+  it("列表支持过滤与游标翻页", async () => {
+    const first = await triggerWorkItem("read-evt-1");
+    await triggerWorkItem("read-evt-2", "BUG-2");
+
+    const all = await app.inject({
+      method: "GET",
+      url: "/api/work-items",
+      headers: { cookie },
+    });
+    expect(all.statusCode).toBe(200);
+    const listBody = all.json() as {
+      items: { id: string; kind: string }[];
+      nextCursor: string | null;
+    };
+    expect(listBody.items).toHaveLength(2);
+    expect(listBody.items.every((item) => item.kind === "bug_fix")).toBe(true);
+    expect(listBody.nextCursor).toBeNull();
+
+    const paged = await app.inject({
+      method: "GET",
+      url: "/api/work-items?limit=1",
+      headers: { cookie },
+    });
+    const pageBody = paged.json() as { items: { id: string }[]; nextCursor: string };
+    expect(pageBody.items).toHaveLength(1);
+    expect(pageBody.nextCursor).not.toBeNull();
+
+    const next = await app.inject({
+      method: "GET",
+      url: `/api/work-items?limit=1&cursor=${encodeURIComponent(pageBody.nextCursor)}`,
+      headers: { cookie },
+    });
+    const nextBody = next.json() as { items: { id: string }[]; nextCursor: string | null };
+    expect(nextBody.items).toHaveLength(1);
+    expect(nextBody.items[0]!.id).not.toBe(pageBody.items[0]!.id);
+    expect(nextBody.nextCursor).toBeNull();
+
+    const filtered = await app.inject({
+      method: "GET",
+      url: "/api/work-items?attention=none&kind=bug_fix",
+      headers: { cookie },
+    });
+    expect(((filtered.json() as { items: unknown[] }).items)).toHaveLength(2);
+
+    const empty = await app.inject({
+      method: "GET",
+      url: "/api/work-items?kind=nonexistent",
+      headers: { cookie },
+    });
+    expect(((empty.json() as { items: unknown[] }).items)).toHaveLength(0);
+    expect(first).toBeTypeOf("string");
+  });
+
+  it("详情含 Mandate 快照、投递箱与 Thread 关联,未知事项 404", async () => {
+    const workItemId = await triggerWorkItem("read-evt-detail");
+
+    const detail = await app.inject({
+      method: "GET",
+      url: `/api/work-items/${workItemId}`,
+      headers: { cookie },
+    });
+    expect(detail.statusCode).toBe(200);
+    const body = detail.json() as {
+      workItem: {
+        expectedResult: string;
+        scope: unknown;
+        authorization: { kind: string };
+        policyVersion: string;
+      };
+      inbox: { kind: string; status: string }[];
+      threads: { source: string; externalKey: string; mode: string }[];
+      tasks: unknown[];
+      runs: unknown[];
+    };
+    expect(body.workItem.expectedResult).toBeTypeOf("string");
+    expect(body.workItem.scope).toBeTypeOf("object");
+    expect(body.workItem.authorization.kind).toBeTypeOf("string");
+    expect(body.workItem.policyVersion).toMatch(/^[0-9a-f]{12}$/);
+    expect(body.inbox).toHaveLength(1);
+    expect(body.inbox[0]).toMatchObject({ kind: "assignment", status: "pending" });
+    expect(body.threads[0]).toMatchObject({
+      source: "bug",
+      externalKey: "BUG-1",
+      mode: "owner",
+    });
+    expect(body.tasks).toEqual([]);
+    expect(body.runs).toEqual([]);
+
+    await insertTask(db, {
+      id: "task-read-1",
+      title: "试点任务",
+      assigner: "router",
+      assignee: "workbuddy-pilot",
+      project: "workbuddy-pilot",
+      parentTaskId: null,
+      origin: "work_item",
+      workItemId,
+      deadlineAt: null,
+      output: null,
+      createdAt: NOW,
+    });
+    const afterTask = await app.inject({
+      method: "GET",
+      url: `/api/work-items/${workItemId}`,
+      headers: { cookie },
+    });
+    const afterBody = afterTask.json() as { tasks: { id: string; origin: string }[] };
+    expect(afterBody.tasks).toEqual([
+      expect.objectContaining({ id: "task-read-1", origin: "work_item" }),
+    ]);
+
+    const missing = await app.inject({
+      method: "GET",
+      url: "/api/work-items/wim_missing",
+      headers: { cookie },
+    });
+    expect(missing.statusCode).toBe(404);
+  });
+
+  it("事件时间线支持 seq 游标增量", async () => {
+    const workItemId = await triggerWorkItem("read-evt-events");
+
+    const snapshot = await app.inject({
+      method: "GET",
+      url: `/api/work-items/${workItemId}/events`,
+      headers: { cookie },
+    });
+    expect(snapshot.statusCode).toBe(200);
+    const snapshotBody = snapshot.json() as {
+      items: { seq: number; kind: string; payload: unknown }[];
+      nextCursor: number | null;
+    };
+    expect(snapshotBody.items.length).toBeGreaterThan(0);
+    expect(snapshotBody.items[0]!.kind).toBe("routed");
+    expect(snapshotBody.nextCursor).toBeNull();
+
+    const firstPage = await app.inject({
+      method: "GET",
+      url: `/api/work-items/${workItemId}/events?limit=1`,
+      headers: { cookie },
+    });
+    const pageBody = firstPage.json() as {
+      items: { seq: number }[];
+      nextCursor: number | null;
+    };
+    expect(pageBody.items).toHaveLength(1);
+    expect(pageBody.nextCursor).toBe(pageBody.items[0]!.seq);
+
+    const incremental = await app.inject({
+      method: "GET",
+      url: `/api/work-items/${workItemId}/events?cursor=${pageBody.nextCursor}`,
+      headers: { cookie },
+    });
+    const incrementalBody = incremental.json() as { items: { seq: number }[]; nextCursor: number | null };
+    expect(incrementalBody.items).toHaveLength(
+      snapshotBody.items.length - pageBody.items.length,
+    );
+    expect(incrementalBody.items.every((e) => e.seq > pageBody.items[0]!.seq)).toBe(true);
+    expect(incrementalBody.nextCursor).toBeNull();
   });
 });

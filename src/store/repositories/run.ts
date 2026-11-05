@@ -45,6 +45,13 @@ export async function findRunById(db: Db, id: string): Promise<AgentRunRecord | 
     | undefined;
 }
 
+export async function listRunsByWorkItem(db: Db, workItemId: string): Promise<AgentRunRecord[]> {
+  return (await db.all(
+    `SELECT ${RUN_COLUMNS} FROM agent_run WHERE work_item_id = ? ORDER BY started_at ASC, id ASC`,
+    workItemId,
+  )) as AgentRunRecord[];
+}
+
 /** 部分唯一索引保证每个流至多一条 running,这里只取最新的一条 */
 export async function findRunningRunForStream(
   db: Db,
