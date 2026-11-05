@@ -1,16 +1,14 @@
 import type { Db } from "../../store/database.js";
 import { findAgentByKey } from "../../store/repositories/identity.js";
 import { TASK_LIMITS } from "../../shared/constants.js";
-import {
-  appendWorkItemEvent,
-  insertWorkItem,
-} from "../../store/repositories/work-item.js";
+import { appendWorkItemEvent, insertWorkItem } from "../../store/repositories/work-item.js";
 import { insertWorkerInboxIfNew } from "../../store/repositories/work-inbox.js";
 import {
   findActiveOwnerSubscription,
   insertSubscriptionIfNew,
   revokeSubscription,
 } from "../../store/repositories/work-thread.js";
+import type { UsageState } from "../capability/gate.js";
 import type { RouteOutcome } from "../routing/router.js";
 import type { WorkPolicy } from "../routing/policy.js";
 import { dispatchBugDecision, deliverInputToAssignee } from "./decision.js";
@@ -24,6 +22,8 @@ export interface DispatchDeps {
   policy: WorkPolicy;
   /** 控制台协作群;工作事项状态卡片的目标群,未配置时不入队 */
   collabChatId?: string;
+  /** M4-1 实时解析 Agent 用量状态;缺省无限量 */
+  resolveUsage?: (db: Db, agentId: string) => Promise<UsageState>;
   newItemId: () => string;
   newEventId: () => string;
   newInboxId: () => string;
@@ -45,6 +45,20 @@ function titleOf(req: WorkRequest, workKind: string): string {
     0,
     TASK_LIMITS.title,
   );
+}
+
+function tokenExhausted(outcome: AssignOutcome, policyVersion: string): DispatchOutcome {
+  return {
+    resolved: {
+      disposition: "needs_person",
+      reasonCode: "target_token_exhausted",
+      ruleId: outcome.rule.ruleId,
+      ruleVersion: policyVersion,
+      workItemId: null,
+      targetAgentId: null,
+    },
+    newInboxIds: [],
+  };
 }
 
 /**
@@ -96,6 +110,13 @@ export async function dispatchAssign(
       },
       newInboxIds: [],
     };
+  }
+
+  if (deps.resolveUsage !== undefined) {
+    const usage = await deps.resolveUsage(db, agent.id);
+    if (usage.kind === "unavailable" || (usage.kind === "metered" && usage.hardStop && usage.usedTokens >= usage.dailyLimit)) {
+      return tokenExhausted(outcome, deps.policy.version);
+    }
   }
 
   const definition = deps.policy.workKinds[outcome.rule.workKind];

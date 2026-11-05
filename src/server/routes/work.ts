@@ -18,6 +18,7 @@ import { parseJsonObject } from "../../shared/json.js";
 import type { Db } from "../../store/database.js";
 import type { AgentRecord } from "../../store/repositories/identity.js";
 import type { WorkItemRecord } from "../../store/repositories/work-item.js";
+import type { UsageResolver } from "../../domain/usage/state.js";
 import { requireAgentAuth } from "../middleware/agent-auth.js";
 import { requireCsrf, requireIdempotencyKey, requireSession } from "../middleware/session.js";
 import { invalid } from "./http.js";
@@ -54,6 +55,8 @@ export interface WorkRoutesOptions {
   read?: WorkReadService;
   /** 协作播报群;工作事项状态卡片发到这里,留空则不入队 */
   collabChatId?: string;
+  /** M4-1 实时解析 Agent 用量状态 */
+  usageResolver?: UsageResolver;
 }
 
 /** 列表条目只带投影列,Mandate 与关联数据走详情 */
@@ -102,7 +105,15 @@ export function registerWorkRoutes(app: FastifyInstance, options: WorkRoutesOpti
   const now = options.now ?? Date.now;
   const collab =
     options.collabChatId === undefined ? {} : { collabChatId: options.collabChatId };
-  const ingest = createIngestService({ db, now, ...collab }).ingest;
+  const usageResolver = options.usageResolver;
+  const ingest = createIngestService({
+    db,
+    now,
+    ...collab,
+    ...(usageResolver === undefined
+      ? {}
+      : { resolveUsage: (tx, agentId) => usageResolver.resolve(tx, agentId) }),
+  }).ingest;
   const read = options.read ?? createWorkReadService({ db });
   const workers = createWorkerService({ db, now, ...collab });
   const writeGuards = [requireSession(db, now), requireCsrf(), requireIdempotencyKey()];

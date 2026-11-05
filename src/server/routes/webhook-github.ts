@@ -4,6 +4,7 @@ import { githubWebhookToWorkRequest } from "../../adapters/github/webhook.js";
 import { WorkIngestError } from "../../domain/work/contract.js";
 import { createIngestService } from "../../domain/work/ingest-service.js";
 import type { Db } from "../../store/database.js";
+import type { UsageResolver } from "../../domain/usage/state.js";
 
 /**
  * GitHub Webhook 端点(arch/01 §9.1 可信 Source):HMAC 验签 → 归一化 →
@@ -17,6 +18,8 @@ export interface WebhookGithubOptions {
   now?: () => number;
   /** 协作播报群;工作事项状态卡片发到这里,留空则不入队 */
   collabChatId?: string;
+  /** M4-1 实时解析 Agent 用量状态 */
+  usageResolver?: UsageResolver;
 }
 
 type RawBodyRequest = FastifyRequest & { rawBody?: Buffer };
@@ -45,10 +48,14 @@ export function registerWebhookGithubRoutes(
   app: FastifyInstance,
   options: WebhookGithubOptions,
 ): void {
+  const usageResolver = options.usageResolver;
   const ingest = createIngestService({
     db: options.db,
     now: options.now ?? Date.now,
     ...(options.collabChatId === undefined ? {} : { collabChatId: options.collabChatId }),
+    ...(usageResolver === undefined
+      ? {}
+      : { resolveUsage: (tx, agentId) => usageResolver.resolve(tx, agentId) }),
   }).ingest;
 
   app.register(async (scope) => {

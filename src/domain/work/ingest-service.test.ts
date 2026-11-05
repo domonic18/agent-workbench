@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { openDatabase, type Db } from "../../store/database.js";
 import { insertAgent, type NewAgent } from "../../store/repositories/identity.js";
+import { insertTokenUsage } from "../../store/repositories/token-usage.js";
+import { insertRun } from "../../store/repositories/run.js";
+import { upsertUsageLimit } from "../../store/repositories/usage-limit.js";
 import {
   claimPendingForAgent,
   listInboxForWorkItem,
@@ -10,6 +13,7 @@ import {
   findActiveOwnerSubscription,
   findWorkThreadByKey,
 } from "../../store/repositories/work-thread.js";
+import { createUsageResolver } from "../usage/state.js";
 import type { WorkPolicy } from "../routing/policy.js";
 import { WorkIngestError, type WorkRequest } from "./contract.js";
 import { createIngestService } from "./ingest-service.js";
@@ -210,6 +214,63 @@ describe("ingest needs_person 分支", () => {
       reasonCode: "no_route_rule",
     });
     expect(result.workItem).toBeUndefined();
+    await db.close();
+  });
+
+  it("目标 Agent token 已用尽:target_token_exhausted,不建事项不投递", async () => {
+    const { db } = await prepare();
+    await upsertUsageLimit(db, {
+      agentId: "agt_w",
+      dailyTokenLimit: 100,
+      warnPercent: 80,
+      hardStop: true,
+      isActive: true,
+      updatedAt: 1,
+    });
+    await db.run(
+      "INSERT INTO machine (id, hostname, os, collector_version, collector_secret_hash, status, created_at) VALUES ('m1', 'h', 'linux', '1', 'hash', 'active', 0)",
+    );
+    await insertRun(db, {
+      id: "run_1",
+      agentId: "agt_w",
+      machine: "m1",
+      project: "demo",
+      streamId: "s1",
+      startedAt: 1,
+    });
+    await insertTokenUsage(db, {
+      id: "tu_1",
+      agentId: "agt_w",
+      taskId: null,
+      runId: "run_1",
+      provider: "anthropic",
+      model: "claude",
+      inputTokens: 100,
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      cacheCreationTokens: 0,
+      source: "transcript",
+      sequence: 1,
+      receiptHash: "h1",
+      occurredAt: 5_000,
+    });
+
+    const resolver = createUsageResolver({ now: () => 5_000 });
+    const serviceWithUsage = createIngestService({
+      db,
+      now: () => 5_000,
+      policy: testPolicy(),
+      resolveUsage: (tx, agentId) => resolver.resolve(tx, agentId),
+    });
+
+    const result = await serviceWithUsage.ingest(request());
+    expect(result.trigger).toMatchObject({
+      disposition: "needs_person",
+      reasonCode: "target_token_exhausted",
+    });
+    expect(result.workItem).toBeUndefined();
+    expect(await db.get("SELECT COUNT(*) AS n FROM work_item")).toEqual({ n: 0 });
+    expect(await db.get("SELECT COUNT(*) AS n FROM worker_inbox")).toEqual({ n: 0 });
     await db.close();
   });
 

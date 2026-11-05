@@ -40,7 +40,8 @@ export type RouteReason =
   | "owner_ambiguous"
   | "owner_closed"
   | "owner_unassigned"
-  | "target_unavailable";
+  | "target_unavailable"
+  | "target_token_exhausted";
 
 export type RouteOutcome =
   | { readonly decision: "owner_continue"; readonly workItemId: string; readonly threadKey: string }

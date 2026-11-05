@@ -7,6 +7,7 @@ import { createCapabilityService, type CapabilityService } from "../domain/capab
 import type { KnowledgeEntryService } from "../domain/knowledge/entry-service.js";
 import type { KnowledgeIndexService } from "../domain/knowledge/index-service.js";
 import type { KnowledgeRebuilder } from "../domain/knowledge/rebuild.js";
+import { createUsageResolver, type UsageResolver } from "../domain/usage/state.js";
 import { healthPayload, type DatabaseStatus } from "../shared/health.js";
 import type { Db } from "../store/database.js";
 import { requireAllowedHost } from "./middleware/host.js";
@@ -99,6 +100,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       options.feishu?.collabChatId === undefined
         ? {}
         : { collabChatId: options.feishu.collabChatId };
+    const usageResolver: UsageResolver = createUsageResolver(timing);
 
     registerAuthRoutes(app, { db, ...timing });
     registerAuditRoutes(app, { db, ...timing });
@@ -110,7 +112,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     registerTaskRoutes(app, { db, ...timing, ...collab });
     registerTaskReadRoutes(app, { db, ...timing });
     registerTaskA2aRoutes(app, { db, ...timing });
-    registerWorkRoutes(app, { db, ...timing, ...collab });
+    registerWorkRoutes(app, { db, ...timing, ...collab, usageResolver });
     registerStreamRoutes(app, { db, ...timing });
     registerIngestRoutes(app, { db, ...timing });
     if (options.githubWebhookSecret !== undefined) {
@@ -119,6 +121,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         ...timing,
         ...collab,
         webhookSecret: options.githubWebhookSecret,
+        usageResolver,
       });
     }
     if (options.knowledgeRebuilder !== undefined) {

@@ -14,6 +14,7 @@ import {
 } from "../../store/repositories/work-thread.js";
 import { buildWorkPolicy, type WorkPolicy } from "../routing/policy.js";
 import { routeTrigger, threadKeyOf, type OwnerView } from "../routing/router.js";
+import type { UsageState } from "../capability/gate.js";
 import type { DispatchContext, IngestResult, WorkRequest } from "./contract.js";
 import { WorkIngestError } from "./contract.js";
 import { dispatchAssign, dispatchOwnerContinue, type DispatchDeps, type DispatchOutcome } from "./dispatch.js";
@@ -24,6 +25,8 @@ export interface IngestDeps {
   policy?: WorkPolicy;
   /** 控制台协作群;工作事项状态卡片发到这里,未配置时不入队 */
   collabChatId?: string;
+  /** M4-1 实时解析 Agent 用量状态;缺省无限量 */
+  resolveUsage?: (db: Db, agentId: string) => Promise<UsageState>;
   newTriggerId?: () => string;
   newItemId?: () => string;
   newEventId?: () => string;
@@ -45,6 +48,7 @@ export function createIngestService(deps: IngestDeps) {
   const dispatchDeps: DispatchDeps = {
     policy,
     ...(deps.collabChatId === undefined ? {} : { collabChatId: deps.collabChatId }),
+    ...(deps.resolveUsage === undefined ? {} : { resolveUsage: deps.resolveUsage }),
     newItemId: deps.newItemId ?? (() => newPrefixedId("wim")),
     newEventId: deps.newEventId ?? (() => newPrefixedId("wev")),
     newInboxId: deps.newInboxId ?? (() => newPrefixedId("wib")),
