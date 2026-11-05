@@ -7,7 +7,6 @@ export interface CollabAgentRef {
 export interface HandoffNotice {
   msgId: string;
   taskId: string;
-  threadId: string;
   summary: string;
   from: CollabAgentRef;
   to: CollabAgentRef;

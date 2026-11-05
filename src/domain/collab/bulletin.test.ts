@@ -18,7 +18,6 @@ import {
 const HANDOFF: HandoffNotice = {
   msgId: "msg_1",
   taskId: "tsk_up",
-  threadId: "thr_1",
   summary: "需要一份接口契约",
   from: { id: "agt_a", displayName: "Agent A" },
   to: { id: "agt_b", displayName: "Agent B" },
@@ -56,7 +55,7 @@ function cardText(card: Record<string, unknown>): {
 }
 
 describe("协作群播报卡片(无 @,控制台直发)", () => {
-  it("① 交接卡片:发起方 → 收件方,uuid 取消息 id", () => {
+  it("① 交接卡片:发起方 → 收件方,uuid 取消息 id,不展示 ID 类字段", () => {
     const bulletin = buildHandoffBulletin(HANDOFF, "oc_group");
     expect(bulletin.uuid).toBe("msg_1");
     expect(bulletin.taskId).toBe("tsk_up");
@@ -64,8 +63,9 @@ describe("协作群播报卡片(无 @,控制台直发)", () => {
     expect(cardText(bulletin.card).title).toBe("〔交接〕Agent A → Agent B");
     expect(view.template).toBe("blue");
     expect(view.elements[0]).toBe("**事项**:需要一份接口契约");
-    expect(view.elements[1]).toContain("任务 `tsk_up`");
     expect(bulletin.card.schema).toBe("2.0");
+    expect(JSON.stringify(bulletin.card)).not.toContain("tsk_up");
+    expect(JSON.stringify(bulletin.card)).not.toContain("msg_1");
   });
 
   it("② 接单卡片:承接方 + 任务标题,uuid 区别于交接", () => {
@@ -75,6 +75,7 @@ describe("协作群播报卡片(无 @,控制台直发)", () => {
     expect(view.title).toBe("〔接单〕Agent B 已接单");
     expect(view.template).toBe("turquoise");
     expect(view.elements[0]).toBe("**任务**:整理接口契约");
+    expect(JSON.stringify(bulletin.card)).not.toContain("msg_1");
   });
 
   it("③ 完成卡片:完成方 + 结论已同步给发起方,uuid 按任务固定", () => {
@@ -95,6 +96,7 @@ describe("协作群播报卡片(无 @,控制台直发)", () => {
     expect(view.title).toBe("〔验收〕任务已闭环");
     expect(view.template).toBe("indigo");
     expect(view.elements[0]).toBe("**任务**:接口契约联调");
+    expect(JSON.stringify(bulletin.card)).not.toContain("tsk_up");
   });
 
   it("动态内容打断 markdown 语法,防任务标题注入链接或富文本", () => {

@@ -344,7 +344,6 @@ export function createA2aService(deps: A2aServiceDeps): A2aService {
     return {
       msgId: message.id,
       taskId: message.taskId,
-      threadId: message.threadId,
       summary: message.summary,
       from: agentRef(from),
       to: agentRef(to),

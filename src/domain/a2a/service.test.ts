@@ -331,7 +331,6 @@ describe("handoffNotice", () => {
     expect(await service.handoffNotice(msgId)).toEqual({
       msgId: "msg_1",
       taskId: "tsk_a",
-      threadId: "thr_1",
       summary: "需要一份接口契约",
       from: { id: "agt_a", displayName: "agt_a" },
       to: { id: "agt_b", displayName: "agt_b" },
