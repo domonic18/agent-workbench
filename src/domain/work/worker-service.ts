@@ -14,6 +14,7 @@ import {
   findInboxById,
   handbackInbox,
   hasOpenInboxForAgent,
+  listPendingForAgent,
   type WorkerInboxRecord,
 } from "../../store/repositories/work-inbox.js";
 import { WorkError } from "./errors.js";
@@ -26,8 +27,11 @@ export interface WorkerInboxView {
 export interface WorkerService {
   /** 读自己承接的事项与事件历史;读权限=inbox 有指向自己的未退回行(arch/01 §9.3) */
   read(agentId: string, workItemId: string): Promise<{ item: WorkItemRecord; events: WorkItemEventRecord[] }>;
-  /** 领取本 Agent 的待处理行;waitMs 内无行则长轮询,租约时长 WORK_INBOX.leaseMs */
-  inbox(agentId: string, opts: { waitMs?: number | undefined }): Promise<WorkerInboxView[]>;
+  /** 领取本 Agent 的待处理行;waitMs 内无行则长轮询,租约时长 WORK_INBOX.leaseMs;peek 只看不领不等待 */
+  inbox(
+    agentId: string,
+    opts: { waitMs?: number | undefined; peek?: boolean | undefined },
+  ): Promise<WorkerInboxView[]>;
   /** assignment 必带承接 task_id(归属+origin+事项一致均校验);input 仅消费 */
   ack(agentId: string, inboxId: string, taskId: string | null): Promise<void>;
   /** 单事件退回:只释放该 Trigger 归属,不退订 Thread;理由落事项事件 */
@@ -74,8 +78,20 @@ export function createWorkerService(deps: WorkerServiceDeps): WorkerService {
 
   async function inbox(
     agentId: string,
-    opts: { waitMs?: number | undefined },
+    opts: { waitMs?: number | undefined; peek?: boolean | undefined },
   ): Promise<WorkerInboxView[]> {
+    // peek 只看不领(照 a2a peek 先例):调度器预检不占租约,Agent 会话随后照常领取
+    if (opts.peek === true) {
+      const rows = await listPendingForAgent(db, agentId);
+      const views: WorkerInboxView[] = [];
+      for (const row of rows) {
+        const item = await findWorkItemById(db, row.workItemId);
+        if (item !== undefined) {
+          views.push({ inbox: row, workItem: item });
+        }
+      }
+      return views;
+    }
     const deadline = now() + (opts.waitMs ?? 0);
     for (;;) {
       const at = now();

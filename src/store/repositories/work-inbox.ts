@@ -101,6 +101,22 @@ export async function claimPendingForAgent(
   return claimed;
 }
 
+/**
+ * peek 只看不领:返回本 Agent 的全部 pending 行,不占租约不改变状态。
+ * aw-node 调度器预检用;Agent 正常领取走 claimPendingForAgent。
+ */
+export async function listPendingForAgent(
+  db: Db,
+  agentId: string,
+): Promise<WorkerInboxRecord[]> {
+  return (await db.all(
+    `SELECT ${FULL_COLUMNS} FROM worker_inbox
+      WHERE target_agent_id = ? AND status = 'pending'
+      ORDER BY created_at ASC, id ASC`,
+    agentId,
+  )) as WorkerInboxRecord[];
+}
+
 /** claimed → acked:Assignment ACK 携带承接 Task;Input 仅消费。CAS 失败=租约过期已重投 */
 export async function ackInbox(
   db: Db,

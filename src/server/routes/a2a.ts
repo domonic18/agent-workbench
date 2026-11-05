@@ -33,7 +33,7 @@ function validationFailed(reply: FastifyReply, message: string): FastifyReply {
 }
 
 /** `wait=25s` 或 `wait=250ms`;不带单位按秒,与 01 §5.1 的写法一致 */
-function parseWaitMs(text: string): number | undefined {
+export function parseWaitMs(text: string): number | undefined {
   const match = /^(\d+(?:\.\d+)?)(ms|s)?$/.exec(text.trim());
   if (match === null) {
     return undefined;

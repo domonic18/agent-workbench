@@ -23,9 +23,25 @@ export const DISPATCH_PROMPT = `这是一次由执行面调度器发起的协作
 /** 会话可用工具:读文件、查代码、跑命令,以及控制台 MCP(拉收件箱、建任务、回执) */
 export const ALLOWED_TOOLS = ["Read", "Grep", "Glob", "Bash", `mcp__${MCP_SERVER_NAME}`].join(",");
 
+/**
+ * 工作唤醒提示词(M3.9-2):work 收件箱有待领取派工时使用,变更需同步 docs/arch/04。
+ * 接受/验收是原 Bug 机器人的人工动作,不在本会话职责内;生产发布始终单独确认。
+ */
+export const WORK_DISPATCH_PROMPT = `这是一次由执行面调度器发起的工作唤醒:你的工作收件箱(work_inbox)存在待领取派工。这不是群通知;在没有完成下列步骤之前,禁止直接结束回合。
+按序完成:
+1) work_inbox 领取全部待处理行,记下 inbox_id 与 work_item_id;
+2) 逐件处理:work_read 读事项 Mandate 与事件历史;task_create(带 work_item_id)建你名下的承接任务并记下 task_id;work_ack(inbox_id=派工行, task_id=承接任务)确认承接;
+3) 执行本职工作:按 expected_result 修复缺陷本身,不超出 Mandate 范围,不顺手重构;
+4) 修复完成后:git checkout -b 语义化分支并提交修改;gh pr create 提 PR,PR body 第一行写 "Fixes #<N>"(issue 编号从 Mandate 与事项引用/事件 payload 中取,取不到就回查 bug 反馈原文,不许猜);
+5) task_update 按合法路径推进承接任务直至 done(pending→running→done,不允许跳级),output 写清 PR URL 与修复摘要;
+6) 确实超出能力或范围的,work_handback(inbox_id, reason)说明理由,不要硬修;不要用 work_handback 替代失败后的重试。
+过程与结论只写进任务字段与 PR 描述。全部步骤完成后,最终回复用一句话概述(处理件数、任务 id、PR URL 或退回理由)。`;
+
 export interface SessionOptions {
   agentId: string;
   cwd: string;
+  /** 本次会话提示词:a2a 唤醒用 DISPATCH_PROMPT,工作唤醒用 WORK_DISPATCH_PROMPT */
+  prompt: string;
   claudePath: string;
   model: string | null;
   timeoutMs: number;
@@ -50,8 +66,10 @@ export interface DispatchDeps {
   /** claude 可执行文件;解析不到时调度不挂载 */
   claudePath: string | undefined;
   logger?: Logger;
-  /** 探视收件箱待处理条数;默认走真实 HTTP */
+  /** 探视 a2a 收件箱待处理条数;默认走真实 HTTP */
   peekInbox?: (bearer: string) => Promise<number>;
+  /** 探视 work 收件箱待领取派工条数;默认走真实 HTTP */
+  peekWorkInbox?: (bearer: string) => Promise<number>;
   /** 起 headless 会话;默认 spawn claude CLI */
   spawnSession?: (options: SessionOptions) => SessionHandle;
 }
@@ -99,7 +117,7 @@ function childPath(claudePath: string): string {
   ].join(delimiter);
 }
 
-/** 探视收件箱待处理条数:只看不领,不占用消息租约 */
+/** 探视 a2a 收件箱待处理条数:只看不领,不占用消息租约 */
 async function fetchPendingCount(baseUrl: string, bearer: string, timeoutMs: number): Promise<number> {
   const response = await fetch(`${baseUrl}/api/a2a/inbox?wait=0&peek=1`, {
     headers: { authorization: `Bearer ${bearer}` },
@@ -112,13 +130,30 @@ async function fetchPendingCount(baseUrl: string, bearer: string, timeoutMs: num
   return Array.isArray(body.items) ? body.items.length : 0;
 }
 
+/** 探视 work 收件箱待领取派工条数:只看不领,不占行租约 */
+async function fetchWorkPendingCount(
+  baseUrl: string,
+  bearer: string,
+  timeoutMs: number,
+): Promise<number> {
+  const response = await fetch(`${baseUrl}/api/work/inbox?wait=0&peek=1`, {
+    headers: { authorization: `Bearer ${bearer}` },
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  if (!response.ok) {
+    throw new Error(`工作收件箱探视失败(HTTP ${response.status})`);
+  }
+  const body = (await response.json()) as { items?: unknown[] };
+  return Array.isArray(body.items) ? body.items.length : 0;
+}
+
 /** 默认会话实现:spawn claude CLI,超时先 SIGTERM 再 SIGKILL */
 function spawnClaudeSession(options: SessionOptions): SessionHandle {
   const child = spawn(
     options.claudePath,
     [
       "-p",
-      DISPATCH_PROMPT,
+      options.prompt,
       ...(options.model === null ? [] : ["--model", options.model]),
       "--allowedTools",
       ALLOWED_TOOLS,
@@ -172,6 +207,9 @@ export function createDispatchCycle(deps: DispatchDeps): DispatchCycle {
   const logger = deps.logger ?? createLogger();
   const peek =
     deps.peekInbox ?? ((bearer: string) => fetchPendingCount(deps.baseUrl, bearer, deps.requestTimeoutMs));
+  const peekWork =
+    deps.peekWorkInbox ??
+    ((bearer: string) => fetchWorkPendingCount(deps.baseUrl, bearer, deps.requestTimeoutMs));
   const startSession = deps.spawnSession ?? spawnClaudeSession;
   /** 同一 Agent 同时只允许一个会话 */
   const busy = new Set<string>();
@@ -185,18 +223,29 @@ export function createDispatchCycle(deps: DispatchDeps): DispatchCycle {
     busy.add(agentId);
     let sessionStarted = false;
     try {
+      // 双探视:a2a 待办优先(既有协作链不回归),无 a2a 才看 work 派工
       const pending = await peek(bearer);
-      if (pending === 0) {
+      let prompt: string | null = null;
+      if (pending > 0) {
+        prompt = DISPATCH_PROMPT;
+      } else {
+        const workPending = await peekWork(bearer);
+        if (workPending > 0) {
+          prompt = WORK_DISPATCH_PROMPT;
+        }
+      }
+      if (prompt === null) {
         return;
       }
       if (!existsSync(cwd)) {
         logger.warn("Agent 工作目录不存在,跳过调度", { agent: agentId });
         return;
       }
-      logger.info("收件箱有待处理消息,起会话", { agent: agentId, pending });
+      logger.info("收件箱有待处理消息,起会话", { agent: agentId, source: pending > 0 ? "a2a" : "work" });
       const session: SessionOptions = {
         agentId,
         cwd,
+        prompt,
         claudePath: deps.claudePath ?? "claude",
         model: deps.model,
         timeoutMs: deps.sessionTimeoutMs,

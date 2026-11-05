@@ -7,6 +7,7 @@ import {
   ALLOWED_TOOLS,
   createDispatchCycle,
   DISPATCH_PROMPT,
+  WORK_DISPATCH_PROMPT,
   resolveClaudePath,
   type SessionOptions,
 } from "./dispatch.js";
@@ -32,7 +33,9 @@ interface Harness {
   sessions: SessionOptions[];
   killed: string[];
   pending: Map<string, number>;
+  workPending: Map<string, number>;
   peeked: string[];
+  workPeeked: string[];
 }
 
 function harness(options: { cwd?: string; secret?: string | undefined } = {}): Harness {
@@ -58,7 +61,9 @@ function harness(options: { cwd?: string; secret?: string | undefined } = {}): H
     sessions: [],
     killed: [],
     pending: new Map(),
+    workPending: new Map(),
     peeked: [],
+    workPeeked: [],
   };
 }
 
@@ -78,6 +83,10 @@ function cycleFor(
     async peekInbox(bearer) {
       h.peeked.push(bearer);
       return h.pending.get(bearer) ?? 0;
+    },
+    async peekWorkInbox(bearer) {
+      h.workPeeked.push(bearer);
+      return h.workPending.get(bearer) ?? 0;
     },
     spawnSession(session) {
       h.sessions.push(session);
@@ -138,9 +147,63 @@ describe("dispatch 调度循环", () => {
 
     expect(h.sessions).toHaveLength(1);
     expect(h.sessions[0]!.cwd).toBe(h.stateDir);
+    expect(h.sessions[0]!.prompt).toBe(DISPATCH_PROMPT);
     expect(h.peeked).toEqual(["agt_a.sec-a"]);
+    // a2a 命中后不再探视 work(既有协作链优先,不多打一枪)
+    expect(h.workPeeked).toEqual([]);
     expect(ALLOWED_TOOLS).toContain(`mcp__${MCP_SERVER_NAME}`);
     expect(DISPATCH_PROMPT).toContain("a2a_inbox");
+  });
+
+  it("work 收件箱有待领取派工时以工作提示词起会话", async () => {
+    const h = harness({ secret: "sec-a" });
+    h.workPending.set("agt_a.sec-a", 1);
+    const cycle = cycleFor(h);
+    await cycle.once();
+
+    expect(h.sessions).toHaveLength(1);
+    expect(h.sessions[0]!.prompt).toBe(WORK_DISPATCH_PROMPT);
+    expect(h.peeked).toEqual(["agt_a.sec-a"]);
+    expect(h.workPeeked).toEqual(["agt_a.sec-a"]);
+  });
+
+  it("a2a 与 work 都有待办时优先既有 a2a 链", async () => {
+    const h = harness({ secret: "sec-a" });
+    h.pending.set("agt_a.sec-a", 1);
+    h.workPending.set("agt_a.sec-a", 3);
+    const cycle = cycleFor(h);
+    await cycle.once();
+
+    expect(h.sessions).toHaveLength(1);
+    expect(h.sessions[0]!.prompt).toBe(DISPATCH_PROMPT);
+  });
+
+  it("工作提示词覆盖承接链与 PR 关键动作", () => {
+    for (const token of [
+      "work_inbox",
+      "work_read",
+      "task_create",
+      "work_ack",
+      "Fixes #",
+      "gh pr create",
+      "task_update",
+      "work_handback",
+    ]) {
+      expect(WORK_DISPATCH_PROMPT).toContain(token);
+    }
+  });
+
+  it("a2a 探视失败时不吞掉 work 探视失败,单 Agent 失败仍隔离", async () => {
+    const h = harness({ secret: "sec-a" });
+    const cycle = cycleFor(h, {
+      async peekInbox() {
+        throw new Error("HTTP 500");
+      },
+    });
+    await expect(cycle.once()).resolves.toBeUndefined();
+    // a2a 抛错即短路,work 探视不执行,会话不起
+    expect(h.workPeeked).toEqual([]);
+    expect(h.sessions).toHaveLength(0);
   });
 
   it("busy 防重:会话未结束时不再起第二个", async () => {

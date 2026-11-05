@@ -99,6 +99,24 @@ async function expectCode(fn: () => Promise<unknown>, code: WorkError["code"]): 
 }
 
 describe("worker inbox 领取", () => {
+  it("peek 只看不领:返回 pending 行且状态不变,随后正常领取仍可命中", async () => {
+    const { db, workers } = await prepare();
+    await seedItem(db, "wim_1");
+    await seedInbox(db, { id: "wib_1", workItemId: "wim_1", kind: "assignment" });
+
+    const peeked = await workers.inbox("agt_w", { peek: true });
+    expect(peeked).toHaveLength(1);
+    expect(peeked[0]?.inbox).toMatchObject({ id: "wib_1", status: "pending", leaseUntil: null });
+    expect(peeked[0]?.workItem.title).toBe("事项 wim_1");
+    // 不占租约:行仍 pending,再次 peek 仍可见,正常领取照常 claim
+    expect(await workers.inbox("agt_w", { peek: true })).toHaveLength(1);
+    const claimed = await workers.inbox("agt_w", {});
+    expect(claimed[0]?.inbox).toMatchObject({ id: "wib_1", status: "claimed" });
+    // 已领取的行不再出现在 peek(peek 只看 pending)
+    expect(await workers.inbox("agt_w", { peek: true })).toEqual([]);
+    await db.close();
+  });
+
   it("领取即持租约,再领为空", async () => {
     const { db, workers } = await prepare();
     await seedItem(db, "wim_1");
