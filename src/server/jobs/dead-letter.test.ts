@@ -76,9 +76,11 @@ describe("startDeadLetterSweeper", () => {
       intervalMs: 60_000,
     });
 
-    // 巡检异步落库,给微任务一拍时间
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    // 等待首次巡检完成（异步落库）
+    await sweeper.initial;
     expect(await findDeadLetterByMsgId(db, "msg_1")).toMatchObject({ reason: "deadline_expired" });
+    expect(logs).toEqual([{ deadLettered: 1, senders: ["agt_a"] }]);
+    sweeper.stop();
     expect(logs).toEqual([{ deadLettered: 1, senders: ["agt_a"] }]);
     sweeper.stop();
     await db.close();

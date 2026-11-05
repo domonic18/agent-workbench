@@ -5,6 +5,8 @@ import type { JobLogger } from "./reconcile.js";
 
 export interface DeadLetterSweeper {
   stop(): void;
+  /** 首次巡检完成(无论成败)后 resolve,便于测试精确等待 */
+  initial: Promise<void>;
 }
 
 export interface DeadLetterSweeperOptions {
@@ -20,6 +22,11 @@ export function startDeadLetterSweeper(
   logger: JobLogger,
   options: DeadLetterSweeperOptions = {},
 ): DeadLetterSweeper {
+  let resolveInitial: (() => void) | undefined;
+  const initial = new Promise<void>((resolve) => {
+    resolveInitial = resolve;
+  });
+
   const sweep = (): void => {
     void sweepDeadLetters({
       db,
@@ -33,6 +40,9 @@ export function startDeadLetterSweeper(
       })
       .catch((error) => {
         logger.error({ err: error }, "A2A 死信巡检失败");
+      })
+      .finally(() => {
+        resolveInitial?.();
       });
   };
 
@@ -44,5 +54,6 @@ export function startDeadLetterSweeper(
     stop() {
       clearInterval(timer);
     },
+    initial,
   };
 }
