@@ -19,7 +19,7 @@ describe("runMigrations", () => {
   it("空库执行建表并记账", async () => {
     const db = await createTestDatabase(resolveTestAdminUrl());
 
-    expect(await runMigrations(db)).toBe(10);
+    expect(await runMigrations(db)).toBe(11);
     expect(await tableNames(db)).toEqual(
       expect.arrayContaining([
         "task",
@@ -42,6 +42,7 @@ describe("runMigrations", () => {
         "agent_run",
         "timeline_event",
         "token_usage",
+        "usage_limit",
         "ingest_receipt",
         "login_failure",
         "idempotency_record",
@@ -71,6 +72,7 @@ describe("runMigrations", () => {
       { version: 8, name: "widen_ingest_counters" },
       { version: 9, name: "agent_display_name" },
       { version: 10, name: "bot_name_refresh" },
+      { version: 11, name: "usage_limit" },
     ]);
     await db.close();
   });

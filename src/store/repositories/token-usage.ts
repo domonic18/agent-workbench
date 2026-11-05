@@ -102,6 +102,22 @@ export async function summarizeTaskTokens(db: Db, taskId: string): Promise<TaskT
   )) as TaskTokenSummary;
 }
 
+/** Agent 从某时刻起的四维用量之和;今日汇总与 overview.ts 同口径 */
+export async function sumAgentTokensSince(
+  db: Db,
+  agentId: string,
+  since: number,
+): Promise<number> {
+  const row = (await db.get(
+    `SELECT COALESCE(SUM(
+       input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens
+     ), 0) AS total FROM token_usage WHERE agent_id = ? AND occurred_at >= ?`,
+    agentId,
+    since,
+  )) as { total: number };
+  return row.total;
+}
+
 export async function setTaskTotalTokens(db: Db, taskId: string, total: number): Promise<boolean> {
   return (
     (await db.run("UPDATE task SET total_tokens = ? WHERE id = ?", total, taskId)).changes === 1
