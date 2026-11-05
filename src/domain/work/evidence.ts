@@ -13,6 +13,7 @@ import {
 } from "../../store/repositories/work-thread.js";
 import type { DispatchContext } from "./contract.js";
 import type { DispatchDeps, DispatchOutcome, OwnerContinueOutcome } from "./dispatch.js";
+import { notifyWorkEvent } from "./notify.js";
 
 /**
  * github 证据分支(M3.9-2,arch/01 §9.2 ③窄化 + §9.4 ④):pr/check 事件命中
@@ -154,15 +155,34 @@ export async function dispatchGithubEvidence(
     }
   }
 
+  const eventId = deps.newEventId();
+  const appendedKind = decidedKind ?? eventKind;
   await appendWorkItemEvent(db, {
-    id: deps.newEventId(),
+    id: eventId,
     workItemId: outcome.workItemId,
-    kind: decidedKind ?? eventKind,
+    kind: appendedKind,
     triggerId: ctx.triggerId,
     evidenceRefsJson: ctx.refsJson,
     payloadJson: JSON.stringify(payload),
     occurredAt: ctx.at,
   });
+  if (
+    appendedKind === "pr_linked" ||
+    appendedKind === "acceptance_ready" ||
+    appendedKind === "ci_failed"
+  ) {
+    // check.completed payload 不带 pr_url,待验收文案的 PR 链接从 validation 状态回读
+    const prUrl =
+      textOf(payload, "pr_url") ??
+      (item !== undefined ? (readValidation(item).prUrl ?? undefined) : undefined);
+    await notifyWorkEvent(db, {
+      workItemId: outcome.workItemId,
+      eventId,
+      kind: appendedKind,
+      prUrl,
+      now: ctx.at,
+    });
+  }
   return {
     resolved: {
       disposition: "continued",

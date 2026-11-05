@@ -18,6 +18,7 @@ import {
   type WorkerInboxRecord,
 } from "../../store/repositories/work-inbox.js";
 import { WorkError } from "./errors.js";
+import { notifyWorkEvent } from "./notify.js";
 
 export interface WorkerInboxView {
   readonly inbox: WorkerInboxRecord;
@@ -154,14 +155,21 @@ export function createWorkerService(deps: WorkerServiceDeps): WorkerService {
         throw new WorkError("CONFLICT", "ACK 未生效:租约已过期并被重投,请按新行重新处理");
       }
       if (row.kind === "assignment" && boundTaskId !== null) {
+        const eventId = newEventId();
         await appendWorkItemEvent(tx, {
-          id: newEventId(),
+          id: eventId,
           workItemId: row.workItemId,
           kind: "task_bound",
           triggerId: row.triggerId,
           evidenceRefsJson: "[]",
           payloadJson: JSON.stringify({ inbox_id: row.id, task_id: boundTaskId }),
           occurredAt: now(),
+        });
+        await notifyWorkEvent(tx, {
+          workItemId: row.workItemId,
+          eventId,
+          kind: "task_bound",
+          now: now(),
         });
       }
     });

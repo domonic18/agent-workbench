@@ -10,6 +10,7 @@ import {
 } from "../../store/repositories/work-inbox.js";
 import type { DispatchContext } from "./contract.js";
 import type { DispatchDeps, DispatchOutcome, OwnerContinueOutcome } from "./dispatch.js";
+import { notifyWorkEvent } from "./notify.js";
 
 /**
  * bug 机器人裁决分支(M3.9-2,arch/01 §9.2 ③窄化):人工在原反馈群对 bot 下
@@ -133,14 +134,22 @@ export async function dispatchBugDecision(
       updatedAt: ctx.at,
     });
   }
+  const eventId = deps.newEventId();
   await appendWorkItemEvent(db, {
-    id: deps.newEventId(),
+    id: eventId,
     workItemId: outcome.workItemId,
     kind: "returned",
     triggerId: ctx.triggerId,
     evidenceRefsJson: ctx.refsJson,
     payloadJson: JSON.stringify(ctx.request.payload),
     occurredAt: ctx.at,
+  });
+  await notifyWorkEvent(db, {
+    workItemId: outcome.workItemId,
+    eventId,
+    kind: "returned",
+    reason,
+    now: ctx.at,
   });
   return deliverInputToAssignee(db, ctx, deps, outcome.workItemId);
 }
