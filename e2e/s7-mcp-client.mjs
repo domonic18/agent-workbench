@@ -49,11 +49,15 @@ if (
     "a2a_ack",
     "kb_search",
     "kb_write",
+    "work_inbox",
+    "work_read",
+    "work_ack",
+    "work_handback",
   ])
 ) {
-  ok("tools/list 7 工具", names.join(","));
+  ok("tools/list 11 工具", names.join(","));
 } else {
-  fail("tools/list 7 工具", names.join(","));
+  fail("tools/list 11 工具", names.join(","));
 }
 
 // ③ tools/call task_create
