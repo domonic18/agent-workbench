@@ -69,6 +69,10 @@ function configOf(stateDir: string, claudeDir: string, ccConnectDir: string): Co
     heartbeatMs: 60_000,
     discoveryMs: 300_000,
     configSyncMs: 60_000,
+    dispatchMs: 0,
+    sessionTimeoutMs: 30 * 60_000,
+    dispatchModel: null,
+    dispatchClaude: null,
     batchMax: 500,
     backfill: "all",
     spoolMaxBytes: 512 * 1024 * 1024,
@@ -191,6 +195,38 @@ describe("采集循环", () => {
       status: "ok",
       project: "proj",
     });
+  });
+
+  it("调度默认关闭(AW_DISPATCH_MS=0)时不挂载", async () => {
+    const logs: string[] = [];
+    const daemon = createDaemon({
+      config,
+      client,
+      logger: createLogger({ level: "info", sink: (line) => logs.push(line) }),
+    });
+    const started = daemon.start();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    daemon.stop();
+    await started;
+
+    expect(logs.some((line) => line.includes("调度模块已挂载"))).toBe(false);
+  });
+
+  it("调度开启且 claude 路径可解析时挂载调度模块", async () => {
+    const claude = join(root, "claude-bin");
+    writeFileSync(claude, "#!/bin/sh\n");
+    const logs: string[] = [];
+    const daemon = createDaemon({
+      config: { ...config, dispatchMs: 60_000, dispatchClaude: claude },
+      client,
+      logger: createLogger({ level: "info", sink: (line) => logs.push(line) }),
+    });
+    const started = daemon.start();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    daemon.stop();
+    await started;
+
+    expect(logs.some((line) => line.includes("调度模块已挂载"))).toBe(true);
   });
 });
 

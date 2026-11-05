@@ -14,6 +14,7 @@ import {
   type ConsoleClient,
   type OutgoingEvent,
 } from "./http.js";
+import { createDispatchCycle, resolveClaudePath, type DispatchCycle } from "./dispatch.js";
 import { createLogger, type Logger } from "./log.js";
 import { acquireLock, type SingleInstanceLock } from "./lock.js";
 import { appendEvents, ensureStream } from "./scan.js";
@@ -85,6 +86,20 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
     logger,
     now,
   });
+  // 调度模块:AW_DISPATCH_MS=0 关闭;claude 路径解析不到也不挂载,采集不受影响
+  const claudePath = config.dispatchMs > 0 ? resolveClaudePath(config.dispatchClaude) : undefined;
+  const dispatch: DispatchCycle | null =
+    config.dispatchMs > 0 && claudePath !== undefined
+      ? createDispatchCycle({
+          baseUrl: config.baseUrl,
+          stateDir: config.stateDir,
+          claudeJsonPath: config.claudeJsonPath,
+          sessionTimeoutMs: config.sessionTimeoutMs,
+          model: config.dispatchModel,
+          claudePath,
+          logger,
+        })
+      : null;
   let lock: SingleInstanceLock | null = null;
   let index: AttributionIndex = loadAttributionIndex(config.ccConnectDir);
   let indexAt = 0;
@@ -93,6 +108,7 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   let discoveryTimer: ReturnType<typeof setInterval> | null = null;
   let configSyncTimer: ReturnType<typeof setInterval> | null = null;
+  let dispatchTimer: ReturnType<typeof setInterval> | null = null;
   let stopping: (() => void) | null = null;
 
   spool.load();
@@ -277,6 +293,11 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
       clearInterval(configSyncTimer);
       configSyncTimer = null;
     }
+    if (dispatchTimer !== null) {
+      clearInterval(dispatchTimer);
+      dispatchTimer = null;
+    }
+    dispatch?.stop();
     saveState(config.stateDir, state);
     lock?.release();
     lock = null;
@@ -293,6 +314,8 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
       stateDir: config.stateDir,
       backfill: config.backfill,
       cpus: cpus().length,
+      dispatch:
+        config.dispatchMs === 0 ? "off" : dispatch === null ? "claude 未找到,未挂载" : "on",
     });
     try {
       const projects = await client.getProjects();
@@ -329,6 +352,13 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
     configSyncTimer = setInterval(() => {
       void configSync.once();
     }, config.configSyncMs);
+    if (dispatch !== null) {
+      logger.info("调度模块已挂载", { claudePath, dispatchMs: config.dispatchMs });
+      void dispatch.once();
+      dispatchTimer = setInterval(() => {
+        void dispatch.once();
+      }, config.dispatchMs);
+    }
     void loop();
     await stopped;
   }
