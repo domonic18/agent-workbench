@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { login } from "../api/auth.js";
 import { ApiError } from "../api/client.js";
 import { bootstrapStatus } from "../api/bootstrap.js";
@@ -19,11 +19,13 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [needsSetup, setNeedsSetup] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setPending(true);
     setError(null);
+    setNeedsSetup(false);
     try {
       await login(password);
       // 初始化未完成则进入 /setup 引导,否则按 next 回目标页
@@ -38,6 +40,10 @@ export function LoginPage() {
       }
       navigate(target, { replace: true });
     } catch (caught) {
+      // 控制台未初始化时登录必然被拒:引导去 /setup,不给死胡同
+      if (caught instanceof ApiError && caught.code === "BOOTSTRAP_REQUIRED") {
+        setNeedsSetup(true);
+      }
       setError(caught instanceof ApiError ? caught.message : "登录失败,请稍后再试");
     } finally {
       setPending(false);
@@ -66,6 +72,11 @@ export function LoginPage() {
             {error}
           </p>
         )}
+        {needsSetup ? (
+          <Link className={styles.link} to="/setup">
+            前往 /setup 完成初始化 →
+          </Link>
+        ) : null}
         <button className={styles.submit} type="submit" disabled={pending}>
           {pending ? "登录中…" : "登录"}
         </button>
