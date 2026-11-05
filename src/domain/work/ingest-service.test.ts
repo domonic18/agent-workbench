@@ -377,8 +377,9 @@ describe("github 证据分支", () => {
         sourceEventId: "gh-3",
         kind: "check.completed",
         threadRefs: [{ source: "github", externalKind: "pull_request", externalKey: PR_API_URL }],
+        // head_sha 落后于 PR 当前 def456:走留痕分支,判定路径由「待验收判定」覆盖
         payload: {
-          head_sha: "def456",
+          head_sha: "abc123",
           conclusion: "success",
           check_suite_url: "https://api.github.com/repos/octocat/demo/check-suites/99",
           pr_api_urls: [PR_API_URL],
@@ -397,7 +398,7 @@ describe("github 证据分支", () => {
     ]);
     expect(JSON.parse(events[4]?.payloadJson ?? "{}")).toMatchObject({
       conclusion: "success",
-      head_sha: "def456",
+      head_sha: "abc123",
     });
     expect(await db.get("SELECT COUNT(*) AS n FROM worker_inbox")).toEqual({ n: 1 });
     await db.close();
@@ -431,6 +432,174 @@ describe("github 证据分支", () => {
     expect(replay.trigger.disposition).toBe("continued");
     const events = await listWorkItemEvents(db, "wim_1");
     expect(events.filter((event) => event.kind === "pr_linked")).toHaveLength(1);
+    await db.close();
+  });
+});
+
+function prPayload(headSha: string): Record<string, unknown> {
+  return {
+    pr_number: 12,
+    pr_url: "https://github.com/octocat/demo/pull/12",
+    pr_api_url: PR_API_URL,
+    head_sha: headSha,
+    title: "fix: 登录页 500",
+  };
+}
+
+function checkPayload(headSha: string, conclusion: string): Record<string, unknown> {
+  return {
+    head_sha: headSha,
+    conclusion,
+    check_suite_url: "https://api.github.com/repos/octocat/demo/check-suites/99",
+    pr_api_urls: [PR_API_URL],
+  };
+}
+
+describe("github 待验收判定", () => {
+  async function seedWithPr(
+    service: ReturnType<typeof createIngestService>,
+    headSha = "abc123",
+  ): Promise<void> {
+    await service.ingest(
+      request({ threadRefs: [{ source: "bug", externalKind: "issue", externalKey: ISSUE_URL }] }),
+    );
+    await service.ingest(githubRequest({ payload: prPayload(headSha) }));
+  }
+
+  it("当前 head SHA 的 suite 全绿:进 review+acceptance,落 acceptance_ready 与 validation", async () => {
+    const { db, service } = await prepare();
+    await seedWithPr(service, "abc123");
+
+    const ci = await service.ingest(
+      githubRequest({
+        sourceEventId: "gh-ci-green",
+        kind: "check.completed",
+        threadRefs: [{ source: "github", externalKind: "pull_request", externalKey: PR_API_URL }],
+        payload: checkPayload("abc123", "success"),
+      }),
+    );
+    expect(ci.trigger).toMatchObject({ disposition: "continued", workItemId: "wim_1" });
+
+    const item = await findWorkItemById(db, "wim_1");
+    expect(item).toMatchObject({
+      stage: "review",
+      attention: "acceptance",
+      status: "open",
+    });
+    expect(item?.nextAction).toContain("人工接受");
+    expect(JSON.parse(item?.validationJson ?? "{}")).toMatchObject({
+      prUrl: "https://github.com/octocat/demo/pull/12",
+      headSha: "abc123",
+      suiteConclusion: "success",
+    });
+    const events = await listWorkItemEvents(db, "wim_1");
+    expect(events.map((event) => event.kind)).toEqual([
+      "routed",
+      "assigned",
+      "pr_linked",
+      "acceptance_ready",
+    ]);
+    await db.close();
+  });
+
+  it("旧 SHA 的绿 suite 不进待验收:ci_result 留痕,validation 保持当前 head", async () => {
+    const { db, service } = await prepare();
+    await seedWithPr(service, "def456");
+
+    await service.ingest(
+      githubRequest({
+        sourceEventId: "gh-ci-stale",
+        kind: "check.completed",
+        threadRefs: [{ source: "github", externalKind: "pull_request", externalKey: PR_API_URL }],
+        payload: checkPayload("abc123", "success"),
+      }),
+    );
+
+    const item = await findWorkItemById(db, "wim_1");
+    expect(item?.attention).not.toBe("acceptance");
+    expect(item?.stage).toBe("intake");
+    expect(JSON.parse(item?.validationJson ?? "{}")).toMatchObject({
+      headSha: "def456",
+      suiteConclusion: null,
+    });
+    const events = await listWorkItemEvents(db, "wim_1");
+    expect(events.at(-1)?.kind).toBe("ci_result");
+    await db.close();
+  });
+
+  it("当前 SHA 的红 suite 不进待验收:ci_failed 留痕,attention 不变", async () => {
+    const { db, service } = await prepare();
+    await seedWithPr(service, "abc123");
+
+    await service.ingest(
+      githubRequest({
+        sourceEventId: "gh-ci-red",
+        kind: "check.completed",
+        threadRefs: [{ source: "github", externalKind: "pull_request", externalKey: PR_API_URL }],
+        payload: checkPayload("abc123", "failure"),
+      }),
+    );
+
+    const item = await findWorkItemById(db, "wim_1");
+    expect(item?.attention).not.toBe("acceptance");
+    expect(JSON.parse(item?.validationJson ?? "{}")).toMatchObject({
+      headSha: "abc123",
+      suiteConclusion: "failure",
+    });
+    const events = await listWorkItemEvents(db, "wim_1");
+    expect(events.at(-1)?.kind).toBe("ci_failed");
+    await db.close();
+  });
+
+  it("PR 关闭置 stalled:未合并与已合并都交人决定收口", async () => {
+    const { db, service } = await prepare();
+    await seedWithPr(service, "abc123");
+
+    await service.ingest(
+      githubRequest({
+        sourceEventId: "gh-pr-closed",
+        kind: "pr.closed",
+        payload: { ...prPayload("abc123"), merged: false },
+      }),
+    );
+
+    const item = await findWorkItemById(db, "wim_1");
+    expect(item?.attention).toBe("stalled");
+    expect(item?.status).toBe("open");
+    expect(item?.nextAction).toContain("PR 已关闭");
+    const events = await listWorkItemEvents(db, "wim_1");
+    expect(events.at(-1)?.kind).toBe("pr_closed");
+    await db.close();
+  });
+
+  it("待验收后 PR 新提交:重置 CI 结论并退出 acceptance 等新证据", async () => {
+    const { db, service } = await prepare();
+    await seedWithPr(service, "abc123");
+    await service.ingest(
+      githubRequest({
+        sourceEventId: "gh-ci-green-1",
+        kind: "check.completed",
+        threadRefs: [{ source: "github", externalKind: "pull_request", externalKey: PR_API_URL }],
+        payload: checkPayload("abc123", "success"),
+      }),
+    );
+    expect((await findWorkItemById(db, "wim_1"))?.attention).toBe("acceptance");
+
+    await service.ingest(
+      githubRequest({
+        sourceEventId: "gh-pr-sync",
+        kind: "pr.synchronized",
+        payload: prPayload("def456"),
+      }),
+    );
+
+    const item = await findWorkItemById(db, "wim_1");
+    expect(item?.attention).toBe("none");
+    expect(item?.stage).toBe("review");
+    expect(JSON.parse(item?.validationJson ?? "{}")).toMatchObject({
+      headSha: "def456",
+      suiteConclusion: null,
+    });
     await db.close();
   });
 });

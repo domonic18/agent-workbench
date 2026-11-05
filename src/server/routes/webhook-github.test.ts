@@ -217,7 +217,18 @@ describe("POST /api/webhooks/github", () => {
     const events = (
       await db.all("SELECT kind FROM work_item_event WHERE work_item_id = ? ORDER BY seq", workItemId)
     ).map((row) => (row as { kind: string }).kind);
-    expect(events).toEqual(["routed", "assigned", "pr_linked", "ci_result"]);
+    expect(events).toEqual(["routed", "assigned", "pr_linked", "acceptance_ready"]);
+
+    const detail = await app.inject({
+      method: "GET",
+      url: `/api/work-items/${workItemId}`,
+      headers: { cookie },
+    });
+    expect(detail.statusCode).toBe(200);
+    expect((detail.json() as { workItem: { stage: string; attention: string } }).workItem).toMatchObject({
+      stage: "review",
+      attention: "acceptance",
+    });
   });
 
   it("无 Fixes 的 PR 无订阅:needs_person 落库即止", async () => {

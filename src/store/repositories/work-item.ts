@@ -202,31 +202,33 @@ export async function listWorkItemEvents(
 
 export interface WorkItemProjectionPatch {
   id: string;
+  status?: WorkItemStatus;
   stage?: WorkItemStage;
   attention?: WorkItemAttention;
+  validationJson?: string;
+  acceptanceRef?: string;
   nextAction: string | null;
   updatedAt: number;
 }
 
 /** 末态投影:事件写入的同一事务内更新,读路径不扫事件(arch/02 §3.9) */
 export async function updateWorkItemProjection(db: Db, patch: WorkItemProjectionPatch): Promise<boolean> {
-  const stageClause = patch.stage === undefined ? "" : "stage = ?,";
-  const attentionClause = patch.attention === undefined ? "" : "attention = ?,";
+  const sets: string[] = [];
   const params: unknown[] = [];
-  if (patch.stage !== undefined) {
-    params.push(patch.stage);
-  }
-  if (patch.attention !== undefined) {
-    params.push(patch.attention);
-  }
+  const set = (column: string, value: unknown): void => {
+    if (value !== undefined) {
+      sets.push(`${column} = ?`);
+      params.push(value);
+    }
+  };
+  set("status", patch.status);
+  set("stage", patch.stage);
+  set("attention", patch.attention);
+  set("validation_json", patch.validationJson);
+  set("acceptance_ref", patch.acceptanceRef);
+  sets.push("next_action = ?", "updated_at = ?");
   params.push(patch.nextAction, patch.updatedAt, patch.id);
   return (
-    (
-      await db.run(
-        `UPDATE work_item SET ${stageClause} ${attentionClause} next_action = ?, updated_at = ?
-          WHERE id = ?`,
-        ...params,
-      )
-    ).changes === 1
+    (await db.run(`UPDATE work_item SET ${sets.join(", ")} WHERE id = ?`, ...params)).changes === 1
   );
 }
