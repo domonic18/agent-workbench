@@ -63,4 +63,38 @@ describe("采集器配置", () => {
       }),
     ).toThrow(/AW_BATCH_MAX/);
   });
+
+  it("调度参数:默认开启 30s 轮询,AW_DISPATCH_MS=0 关闭", () => {
+    const base = { AW_COLLECTOR_ID: "m1", AW_COLLECTOR_SECRET: "s" };
+    const defaults = loadConfig({ env: base });
+    expect(defaults.dispatchMs).toBe(30_000);
+    expect(defaults.sessionTimeoutMs).toBe(30 * 60_000);
+    expect(defaults.dispatchModel).toBeNull();
+    expect(defaults.dispatchClaude).toBeNull();
+
+    const off = loadConfig({ env: { ...base, AW_DISPATCH_MS: "0" } });
+    expect(off.dispatchMs).toBe(0);
+
+    const tuned = loadConfig({
+      env: {
+        ...base,
+        AW_DISPATCH_MS: "5000",
+        AW_SESSION_TIMEOUT_MS: "600000",
+        AW_DISPATCH_MODEL: "claude-sonnet-4-6",
+        AW_DISPATCH_CLAUDE: "/opt/homebrew/bin/claude",
+      },
+    });
+    expect(tuned.dispatchMs).toBe(5_000);
+    expect(tuned.sessionTimeoutMs).toBe(600_000);
+    expect(tuned.dispatchModel).toBe("claude-sonnet-4-6");
+    expect(tuned.dispatchClaude).toBe("/opt/homebrew/bin/claude");
+  });
+
+  it("调度数值越界报错", () => {
+    const base = { AW_COLLECTOR_ID: "m1", AW_COLLECTOR_SECRET: "s" };
+    expect(() => loadConfig({ env: { ...base, AW_DISPATCH_MS: "-1" } })).toThrow(/AW_DISPATCH_MS/);
+    expect(() =>
+      loadConfig({ env: { ...base, AW_SESSION_TIMEOUT_MS: "1000" } }),
+    ).toThrow(/AW_SESSION_TIMEOUT_MS/);
+  });
 });

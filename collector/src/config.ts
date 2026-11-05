@@ -25,6 +25,14 @@ export interface CollectorConfig {
   heartbeatMs: number;
   discoveryMs: number;
   configSyncMs: number;
+  /** 调度轮询间隔;0 表示关闭 A2A 自动唤醒 */
+  dispatchMs: number;
+  /** 单次 headless 会话超时;超时后 SIGTERM 再 SIGKILL */
+  sessionTimeoutMs: number;
+  /** 调度会话使用的模型名;空表示用 claude CLI 默认模型 */
+  dispatchModel: string | null;
+  /** claude 可执行文件路径;空表示自动探测 */
+  dispatchClaude: string | null;
   batchMax: number;
   backfill: BackfillMode;
   spoolMaxBytes: number;
@@ -57,6 +65,15 @@ function requireText(env: ConfigEnv, key: string): string {
   const raw = env[key];
   if (raw === undefined || raw.trim() === "") {
     throw new Error(`缺少环境变量 ${key}`);
+  }
+  return raw.trim();
+}
+
+/** 可选文本:未设置或空白返回 null,不做默认值 */
+function optionalText(env: ConfigEnv, key: string): string | null {
+  const raw = env[key];
+  if (raw === undefined || raw.trim() === "") {
+    return null;
   }
   return raw.trim();
 }
@@ -118,6 +135,10 @@ export function loadConfig(options: LoadConfigOptions = {}): CollectorConfig {
     heartbeatMs: readInt(env, "AW_HEARTBEAT_MS", 60_000, 5_000, 60 * 60 * 1_000),
     discoveryMs: readInt(env, "AW_DISCOVERY_MS", 5 * 60_1_000, 30_000, 60 * 60_1_000),
     configSyncMs: readInt(env, "AW_CONFIG_SYNC_MS", 60_000, 10_000, 60 * 60_1_000),
+    dispatchMs: readInt(env, "AW_DISPATCH_MS", 30_000, 0, 60 * 60_000),
+    sessionTimeoutMs: readInt(env, "AW_SESSION_TIMEOUT_MS", 30 * 60_000, 60_000, 24 * 60 * 60_000),
+    dispatchModel: optionalText(env, "AW_DISPATCH_MODEL"),
+    dispatchClaude: optionalText(env, "AW_DISPATCH_CLAUDE"),
     batchMax: readInt(env, "AW_BATCH_MAX", 500, 1, 500),
     backfill: parseBackfill(env.AW_BACKFILL),
     spoolMaxBytes: readInt(env, "AW_SPOOL_MAX_BYTES", 512 * 1024 * 1024, 1024 * 1024, 8 * 1024 * 1024 * 1024),

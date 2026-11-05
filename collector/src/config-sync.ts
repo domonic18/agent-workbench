@@ -21,6 +21,8 @@ export interface AppliedAgentState {
   project: string;
   key: string;
   cwd: string;
+  /** 本机落地的 Agent 明文密钥片段;仅存本机 0600 状态文件,不进日志与命令行 */
+  secret?: string;
 }
 
 export interface ConfigSyncState {
@@ -48,6 +50,52 @@ export function loadConfigSyncState(stateDir: string): ConfigSyncState {
 
 export function saveConfigSyncState(stateDir: string, state: ConfigSyncState): void {
   writeFileSync(join(stateDir, STATE_FILE), JSON.stringify(state, null, 2), { mode: 0o600 });
+}
+
+/**
+ * 从 claude.json 回填 Agent 明文密钥:早期落盘的状态文件没存 secret,
+ * 但受管 MCP 头里已是 `Bearer {agentId}.{secret}`。按 agent_id 前缀自校验,
+ * 只认本 Agent 那一条;文件损坏只记日志跳过(claude CLI 频繁改写该文件)。
+ * 回填后由调用方落盘(状态文件 0600,与 claude.json 同级敏感度)。
+ */
+export function backfillAgentSecrets(
+  state: ConfigSyncState,
+  claudeJsonPath: string,
+  logger: Logger,
+): number {
+  const missing = Object.entries(state.agents).filter(([, agent]) => agent.secret === undefined);
+  if (missing.length === 0 || !existsSync(claudeJsonPath)) {
+    return 0;
+  }
+  let doc: Record<string, unknown>;
+  try {
+    doc = JSON.parse(readFileSync(claudeJsonPath, "utf8")) as Record<string, unknown>;
+  } catch {
+    logger.warn("claude.json 解析失败,密钥回填跳过");
+    return 0;
+  }
+  const projects = (doc.projects ?? {}) as Record<string, Record<string, unknown>>;
+  let filled = 0;
+  for (const [agentId, agent] of missing) {
+    const project = (projects[agent.cwd] ?? {}) as Record<string, unknown>;
+    const servers = (project.mcpServers ?? {}) as Record<string, unknown>;
+    const server = (servers[MCP_SERVER_NAME] ?? {}) as Record<string, unknown>;
+    const headers = (server.headers ?? {}) as Record<string, unknown>;
+    const auth = headers.authorization;
+    if (typeof auth !== "string") {
+      continue;
+    }
+    const prefix = `Bearer ${agentId}.`;
+    if (!auth.startsWith(prefix)) {
+      continue;
+    }
+    agent.secret = auth.slice(prefix.length);
+    filled += 1;
+  }
+  if (filled > 0) {
+    logger.info("已从 claude.json 回填 Agent 密钥", { agents: filled });
+  }
+  return filled;
 }
 
 /**
@@ -144,6 +192,7 @@ export async function syncConfigOnce(deps: ConfigSyncDeps): Promise<SyncSummary>
       project: agent.project,
       key: agent.key,
       cwd,
+      secret: agent.secret,
     };
     acks.push({ agent_id: agent.agent_id, config_version: agent.config_version });
     applied += 1;

@@ -9,11 +9,14 @@ import type {
 } from "../../src/shared/aw-node-wire.js";
 import {
   applyManagedMcp,
+  backfillAgentSecrets,
   loadConfigSyncState,
   MCP_SERVER_NAME,
   syncConfigOnce,
+  type ConfigSyncState,
 } from "./config-sync.js";
 import type { ConsoleClient } from "./http.js";
+import { createLogger } from "./log.js";
 
 const dirs: string[] = [];
 
@@ -149,6 +152,84 @@ describe("applyManagedMcp", () => {
   });
 });
 
+describe("backfillAgentSecrets", () => {
+  const logger = createLogger({ level: "error" });
+
+  it("按 agent_id 前缀回填 claude.json 里的受管 MCP 密钥", () => {
+    const dir = newDir();
+    const path = join(dir, "claude.json");
+    writeFileSync(
+      path,
+      JSON.stringify({
+        projects: {
+          "/w/a": {
+            mcpServers: {
+              [MCP_SERVER_NAME]: { headers: { authorization: "Bearer agt_a.sec-a" } },
+            },
+          },
+        },
+      }),
+    );
+    const state: ConfigSyncState = {
+      agents: { agt_a: { version: 1, project: "p", key: "k", cwd: "/w/a" } },
+      lastSyncAt: null,
+    };
+
+    expect(backfillAgentSecrets(state, path, logger)).toBe(1);
+    expect(state.agents.agt_a?.secret).toBe("sec-a");
+  });
+
+  it("他人密钥不认:前缀不匹配时保持空缺", () => {
+    const dir = newDir();
+    const path = join(dir, "claude.json");
+    writeFileSync(
+      path,
+      JSON.stringify({
+        projects: {
+          "/w/a": {
+            mcpServers: {
+              [MCP_SERVER_NAME]: { headers: { authorization: "Bearer agt_b.sec-b" } },
+            },
+          },
+        },
+      }),
+    );
+    const state: ConfigSyncState = {
+      agents: { agt_a: { version: 1, project: "p", key: "k", cwd: "/w/a" } },
+      lastSyncAt: null,
+    };
+
+    expect(backfillAgentSecrets(state, path, logger)).toBe(0);
+    expect(state.agents.agt_a?.secret).toBeUndefined();
+  });
+
+  it("claude.json 损坏时容错跳过,不抛错", () => {
+    const dir = newDir();
+    const path = join(dir, "claude.json");
+    writeFileSync(path, "{broken");
+    const state: ConfigSyncState = {
+      agents: { agt_a: { version: 1, project: "p", key: "k", cwd: "/w/a" } },
+      lastSyncAt: null,
+    };
+
+    expect(backfillAgentSecrets(state, path, logger)).toBe(0);
+    expect(state.agents.agt_a?.secret).toBeUndefined();
+  });
+
+  it("已有密钥的 Agent 不重复回填", () => {
+    const dir = newDir();
+    const path = join(dir, "claude.json");
+    writeFileSync(path, "{}");
+    const state: ConfigSyncState = {
+      agents: { agt_a: { version: 1, project: "p", key: "k", cwd: "/w/a", secret: "keep" } },
+      lastSyncAt: null,
+    };
+
+    expect(backfillAgentSecrets(state, path, logger)).toBe(0);
+    expect(state.agents.agt_a?.secret).toBe("keep");
+  });
+});
+
 describe("syncConfigOnce", () => {
   it("轮换者写入并 ACK,已生效者跳过;状态与版本落 config-state", async () => {
     const dir = newDir();
@@ -184,7 +265,13 @@ describe("syncConfigOnce", () => {
     });
 
     const state = loadConfigSyncState(dir);
-    expect(state.agents.agt_a).toEqual({ version: 3, project: "proj-a", key: "p-a", cwd: "/w/a" });
+    expect(state.agents.agt_a).toEqual({
+      version: 3,
+      project: "proj-a",
+      key: "p-a",
+      cwd: "/w/a",
+      secret: "sec-a",
+    });
     expect(state.lastSyncAt).not.toBeNull();
   });
 
