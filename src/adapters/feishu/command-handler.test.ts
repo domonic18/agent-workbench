@@ -52,20 +52,27 @@ describe("createCommandHandler", () => {
     await db.close();
   });
 
-  it("非文本与未登记指令都回不支持且留审计", async () => {
+  it("聊天消息与非文本静默忽略:不回复不审计", async () => {
     const { db, handler, replies } = await prepare(async () => {});
 
     await handler(event({ messageType: "image", content: JSON.stringify({ image_key: "img" }) }));
     await handler(event({ eventId: "evt_2", content: JSON.stringify({ text: "你好" }) }));
+    await handler(event({ eventId: "evt_3", content: JSON.stringify({ text: "发" }) }));
 
-    expect(replies[0]).toContain("不支持");
-    expect(replies[1]).toContain("不支持该指令");
+    expect(replies).toEqual([]);
+    expect(await db.get("SELECT COUNT(*) AS n FROM feishu_command")).toEqual({ n: 0 });
+    await db.close();
+  });
+
+  it("未登记的斜杠指令回不支持且留审计", async () => {
+    const { db, handler, replies } = await prepare(async () => {});
+
+    await handler(event({ content: JSON.stringify({ text: "/foo bar" }) }));
+
+    expect(replies[0]).toContain("不支持该指令");
     expect(
       await db.all("SELECT command, outcome FROM feishu_command ORDER BY id"),
-    ).toEqual([
-      { command: null, outcome: "unsupported" },
-      { command: null, outcome: "unsupported" },
-    ]);
+    ).toEqual([{ command: null, outcome: "unsupported" }]);
     await db.close();
   });
 
