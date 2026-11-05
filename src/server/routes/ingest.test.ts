@@ -77,6 +77,27 @@ describe("ingest 路由", () => {
     expect(await listTimelineEventsByRun(fixture.db, run.id)).toHaveLength(2);
   });
 
+  it("超大 seq(>int4)成功落库——会话日志超 ~21.5MB 后偏移编码不越界", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/ingest",
+      headers: headers(),
+      payload: body({
+        batch: [{ seq: 2_148_526_901, kind: "turn", occurred_at: 1_001, payload: { ord: 1 } }],
+      }),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ acked_seq: 2_148_526_901 });
+    expect(
+      await hasIngestReceipt(fixture.db, {
+        collectorId: "m1",
+        streamId: "claude-session:s1",
+        seq: 2_148_526_901,
+      }),
+    ).toBe(true);
+  });
+
   it("无 Bearer 或密钥错误 401", async () => {
     const missing = await app.inject({ method: "POST", url: "/api/ingest", payload: body() });
     expect(missing.statusCode).toBe(401);

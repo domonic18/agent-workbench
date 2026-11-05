@@ -19,7 +19,7 @@ describe("runMigrations", () => {
   it("空库执行建表并记账", async () => {
     const db = await createTestDatabase(resolveTestAdminUrl());
 
-    expect(await runMigrations(db)).toBe(7);
+    expect(await runMigrations(db)).toBe(8);
     expect(await tableNames(db)).toEqual(
       expect.arrayContaining([
         "task",
@@ -68,6 +68,7 @@ describe("runMigrations", () => {
       { version: 5, name: "bootstrap_assembly" },
       { version: 6, name: "machine_less_agent" },
       { version: 7, name: "work_coordination" },
+      { version: 8, name: "widen_ingest_counters" },
     ]);
     await db.close();
   });
