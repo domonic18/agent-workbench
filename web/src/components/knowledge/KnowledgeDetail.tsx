@@ -19,6 +19,7 @@ import {
 } from "../../shared/labels.js";
 import { StatusBadge } from "../data/StatusBadge.js";
 import { KnowledgeEditForm, type KnowledgeEditValues } from "./KnowledgeEditForm.js";
+import markdownStyles from "./knowledge-markdown.module.css";
 import styles from "./knowledge-detail.module.css";
 
 export interface KnowledgeDetailProps {
@@ -264,7 +265,7 @@ export function KnowledgeDetail({ entryId, onClose }: KnowledgeDetailProps) {
                     ) : null}
                   </div>
 
-                  <div className={styles.markdown}>
+                  <div className={markdownStyles.markdown}>
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
                   </div>
                 </>
