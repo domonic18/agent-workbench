@@ -184,6 +184,81 @@ describe("identity 路由", () => {
     expect(unknown.statusCode).toBe(404);
   });
 
+  it("设置用量上限:200/404/422/401", async () => {
+    await app.inject({
+      method: "POST",
+      url: "/api/machines",
+      headers: writeHeaders(),
+      payload: { id: "m1", hostname: "h", os: "linux", collectorVersion: "1" },
+    });
+    const a = await registerAgent("m1", "a", "Agent A");
+    const url = `/api/agents/${a.agent.id}/usage-limit`;
+
+    const saved = await app.inject({
+      method: "PUT",
+      url,
+      headers: writeHeaders(),
+      payload: { dailyTokenLimit: 1000, warnPercent: 90, hardStop: true, isActive: true },
+    });
+    expect(saved.statusCode).toBe(200);
+    expect(saved.json()).toMatchObject({
+      agent: {
+        id: a.agent.id,
+        usageLimit: {
+          dailyTokenLimit: 1000,
+          warnPercent: 90,
+          hardStop: true,
+          isActive: true,
+        },
+      },
+    });
+
+    const missing = await app.inject({
+      method: "PUT",
+      url: "/api/agents/agt_missing/usage-limit",
+      headers: writeHeaders(),
+      payload: { dailyTokenLimit: 100 },
+    });
+    expect(missing.statusCode).toBe(404);
+
+    const negative = await app.inject({
+      method: "PUT",
+      url,
+      headers: writeHeaders(),
+      payload: { dailyTokenLimit: -1 },
+    });
+    expect(negative.statusCode).toBe(422);
+
+    const badPercent = await app.inject({
+      method: "PUT",
+      url,
+      headers: writeHeaders(),
+      payload: { dailyTokenLimit: 100, warnPercent: 101 },
+    });
+    expect(badPercent.statusCode).toBe(422);
+
+    const noKey = await app.inject({
+      method: "PUT",
+      url,
+      headers: { cookie, "x-requested-with": "fetch" },
+      payload: { dailyTokenLimit: 100 },
+    });
+    expect(noKey.statusCode).toBe(422);
+
+    // Agent 自己的 Bearer 无权改用量上限
+    const agentBearer = await app.inject({
+      method: "PUT",
+      url,
+      headers: {
+        authorization: `Bearer ${a.agent.id}.${a.secret}`,
+        "x-requested-with": "fetch",
+        "idempotency-key": "agent-key",
+      },
+      payload: { dailyTokenLimit: 100 },
+    });
+    expect(agentBearer.statusCode).toBe(401);
+  });
+
   it("保存委派白名单:仅控制台会话可写,自我与未知目标被拒", async () => {
     await app.inject({
       method: "POST",

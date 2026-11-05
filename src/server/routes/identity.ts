@@ -7,6 +7,7 @@ import { formatKeysetCursor, parseKeysetCursor } from "../../shared/cursor.js";
 import type { Db } from "../../store/database.js";
 import { parseJsonStringArray } from "../../store/json.js";
 import type { AgentRecord, MachineRecord } from "../../store/repositories/identity.js";
+import { findUsageLimitByAgentId, findUsageLimitsByAgentIds, type UsageLimitRecord } from "../../store/repositories/usage-limit.js";
 import { requireCsrf, requireIdempotencyKey, requireSession } from "../middleware/session.js";
 
 const machineCreateSchema = z.object({
@@ -31,6 +32,13 @@ const agentTargetsSchema = z.object({
   targets: z.array(z.string()),
 });
 
+const usageLimitSchema = z.object({
+  dailyTokenLimit: z.number().int().nonnegative(),
+  warnPercent: z.number().int().min(0).max(100).optional(),
+  hardStop: z.boolean().optional(),
+  isActive: z.boolean().optional(),
+});
+
 export interface IdentityRoutesOptions {
   db: Db;
   now?: () => number;
@@ -47,6 +55,14 @@ interface MachineDto {
   createdAt: number;
 }
 
+interface UsageLimitDto {
+  dailyTokenLimit: number;
+  warnPercent: number;
+  hardStop: boolean;
+  isActive: boolean;
+  updatedAt: number;
+}
+
 interface AgentDto {
   id: string;
   machineId: string | null;
@@ -60,6 +76,7 @@ interface AgentDto {
   allowedTargets: string[];
   createdAt: number;
   updatedAt: number;
+  usageLimit: UsageLimitDto | null;
 }
 
 function toMachineDto(row: MachineRecord): MachineDto {
@@ -74,7 +91,22 @@ function toMachineDto(row: MachineRecord): MachineDto {
   };
 }
 
-function toAgentDto(row: AgentRecord): AgentDto {
+function toUsageLimitDto(row: UsageLimitRecord): UsageLimitDto {
+  return {
+    dailyTokenLimit: row.dailyTokenLimit,
+    warnPercent: row.warnPercent,
+    hardStop: row.hardStop,
+    isActive: row.isActive,
+    updatedAt: row.updatedAt,
+  };
+}
+
+async function toAgentDto(
+  db: Db,
+  row: AgentRecord,
+  limit?: UsageLimitRecord | undefined,
+): Promise<AgentDto> {
+  const resolved = limit === undefined ? await findUsageLimitByAgentId(db, row.id) : limit;
   return {
     id: row.id,
     machineId: row.machineId,
@@ -87,6 +119,7 @@ function toAgentDto(row: AgentRecord): AgentDto {
     allowedTargets: parseJsonStringArray(row.allowedTargetsJson),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+    usageLimit: resolved === undefined ? null : toUsageLimitDto(resolved),
   };
 }
 
@@ -191,7 +224,7 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
     }
     try {
       const { agent, secret } = await service.registerAgent(parsed.data);
-      return reply.code(201).send({ agent: toAgentDto(agent), secret });
+      return reply.code(201).send({ agent: await toAgentDto(db, agent), secret });
     } catch (error) {
       if (error instanceof IdentityError) {
         return sendError(reply, error);
@@ -221,7 +254,24 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
     }
     try {
       const agent = await service.setAllowedTargets(id, parsed.data.targets);
-      return { agent: toAgentDto(agent) };
+      return { agent: await toAgentDto(db, agent) };
+    } catch (error) {
+      if (error instanceof IdentityError) {
+        return sendError(reply, error);
+      }
+      throw error;
+    }
+  });
+
+  app.put("/api/agents/:id/usage-limit", { preHandler: writeGuards }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const parsed = usageLimitSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return validationError(reply, parsed.error);
+    }
+    try {
+      const agent = await service.setUsageLimit(id, parsed.data);
+      return { agent: await toAgentDto(db, agent) };
     } catch (error) {
       if (error instanceof IdentityError) {
         return sendError(reply, error);
@@ -236,9 +286,13 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
       return reply;
     }
     const rows = await service.listAgents(query);
+    const limits = await findUsageLimitsByAgentIds(
+      db,
+      rows.map((row) => row.id),
+    );
     const last = rows.at(-1);
     return {
-      items: rows.map(toAgentDto),
+      items: await Promise.all(rows.map((row) => toAgentDto(db, row, limits.get(row.id)))),
       nextCursor:
         rows.length === query.limit && last !== undefined ? formatKeysetCursor(last) : null,
     };

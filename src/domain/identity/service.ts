@@ -18,6 +18,7 @@ import {
   type MachineListQuery,
   type MachineRecord,
 } from "../../store/repositories/identity.js";
+import { upsertUsageLimit } from "../../store/repositories/usage-limit.js";
 import { hashSecret, newSecret } from "../security/secrets.js";
 import { IdentityError } from "./errors.js";
 
@@ -44,6 +45,13 @@ export interface RegisterAgentInput {
   allowedTargets?: string[] | undefined;
 }
 
+export interface UsageLimitInput {
+  dailyTokenLimit: number;
+  warnPercent?: number | undefined;
+  hardStop?: boolean | undefined;
+  isActive?: boolean | undefined;
+}
+
 export interface RegisteredMachine {
   machine: MachineRecord;
   /** 明文只在本次响应出现;库中仅存哈希 */
@@ -62,6 +70,8 @@ export interface IdentityService {
   rotateAgentSecret(id: string): Promise<RegisteredAgent>;
   /** 控制台会话维护委派白名单;Agent 的 Bearer 无权改自己的名单 */
   setAllowedTargets(id: string, targets: string[]): Promise<AgentRecord>;
+  /** 控制台会话维护 Agent 日 token 上限;无上限行时默认无限量 */
+  setUsageLimit(id: string, input: UsageLimitInput): Promise<AgentRecord>;
   listMachines(query: MachineListQuery): Promise<MachineRecord[]>;
   listAgents(query: AgentListQuery): Promise<AgentRecord[]>;
 }
@@ -265,12 +275,41 @@ export function createIdentityService(deps: IdentityServiceDeps): IdentityServic
     return agent;
   }
 
+  async function setUsageLimit(id: string, input: UsageLimitInput): Promise<AgentRecord> {
+    if ((await findAgentById(db, id)) === undefined) {
+      throw new IdentityError("NOT_FOUND", `Agent ${id} 未注册`);
+    }
+    if (!Number.isInteger(input.dailyTokenLimit) || input.dailyTokenLimit < 0) {
+      throw new IdentityError("VALIDATION_FAILED", "dailyTokenLimit 必须是非负整数");
+    }
+    const warnPercent = input.warnPercent ?? 80;
+    if (!Number.isInteger(warnPercent) || warnPercent < 0 || warnPercent > 100) {
+      throw new IdentityError("VALIDATION_FAILED", "warnPercent 必须是 0~100 的整数");
+    }
+    const hardStop = input.hardStop ?? true;
+    const isActive = input.isActive ?? true;
+    await upsertUsageLimit(db, {
+      agentId: id,
+      dailyTokenLimit: input.dailyTokenLimit,
+      warnPercent,
+      hardStop,
+      isActive,
+      updatedAt: now(),
+    });
+    const agent = await findAgentById(db, id);
+    if (agent === undefined) {
+      throw new Error(`Agent 更新后读不到记录: ${id}`);
+    }
+    return agent;
+  }
+
   return {
     registerMachine,
     registerAgent,
     rotateMachineSecret,
     rotateAgentSecret,
     setAllowedTargets,
+    setUsageLimit,
     listMachines: (query) => listMachines(db, query),
     listAgents: (query) => listAgents(db, query),
   };
