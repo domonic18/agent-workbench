@@ -3,6 +3,7 @@ import { newPrefixedId } from "../../shared/ids.js";
 import type { Db } from "../../store/database.js";
 import {
   findAgentById,
+  findAgentByKey,
   findAgentByMachineProject,
   findMachineById,
   insertAgent,
@@ -32,6 +33,11 @@ export interface RegisterAgentInput {
   machineId?: string | null | undefined;
   /** 机器绑定 Agent 强制 claude_code;机器无关 Agent 必须显式给出外部 runtime */
   runtime?: AgentRuntime | undefined;
+  /**
+   * 稳定 key:Git 项目注册表(PROJECT_REGISTRY)引用的路由目标。
+   * 只有机器无关 Agent 可显式给出;机器绑定的 key 由 /setup 确认流程按项目名派生。
+   */
+  key?: string | null | undefined;
   project: string;
   displayName: string;
   feishuAppId?: string | null | undefined;
@@ -142,6 +148,7 @@ export function createIdentityService(deps: IdentityServiceDeps): IdentityServic
 
     let machineId: string | null;
     let runtime: AgentRuntime;
+    let agentKey: string | null;
     if (input.machineId === null || input.machineId === undefined) {
       // 机器无关 Agent:无 aw-node 的外部运行时(WorkBuddy/Codex/DeepSeek harness),
       // machine_id 写 NULL,要求显式给出属于外部集合的 runtime。
@@ -153,6 +160,13 @@ export function createIdentityService(deps: IdentityServiceDeps): IdentityServic
       }
       machineId = null;
       runtime = input.runtime;
+      agentKey =
+        input.key === undefined || input.key === null || input.key === ""
+          ? null
+          : requireText(input.key, "key", IDENTITY_LIMITS.id);
+      if (agentKey !== null && (await findAgentByKey(db, agentKey)) !== undefined) {
+        throw new IdentityError("CONFLICT", `Agent key ${agentKey} 已被占用`);
+      }
     } else {
       // 机器绑定 Agent:claude_code 经 aw-node 调度,强制校验机器存在与项目去重
       machineId = requireText(input.machineId, "machineId", IDENTITY_LIMITS.id);
@@ -162,6 +176,9 @@ export function createIdentityService(deps: IdentityServiceDeps): IdentityServic
           `绑定机器的 Agent 只能是 claude_code 运行时,收到 ${input.runtime}`,
         );
       }
+      if (input.key !== undefined && input.key !== null && input.key !== "") {
+        throw new IdentityError("VALIDATION_FAILED", "机器绑定 Agent 的 key 由初始化确认流程派生,不接受自报");
+      }
       if ((await findMachineById(db, machineId)) === undefined) {
         throw new IdentityError("NOT_FOUND", `机器 ${machineId} 未注册`);
       }
@@ -169,6 +186,7 @@ export function createIdentityService(deps: IdentityServiceDeps): IdentityServic
         throw new IdentityError("CONFLICT", `机器 ${machineId} 下已存在项目 ${project} 的 Agent`);
       }
       runtime = "claude_code";
+      agentKey = null;
     }
 
     const id = newAgentId();
@@ -181,7 +199,7 @@ export function createIdentityService(deps: IdentityServiceDeps): IdentityServic
         project,
         displayName,
         secretHash: hashSecret(secret),
-        key: null,
+        key: agentKey,
         mcpConfigJson: null,
         bootstrapStatus: "registered",
         feishuAppId,

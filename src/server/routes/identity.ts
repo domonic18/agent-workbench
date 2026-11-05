@@ -19,6 +19,8 @@ const machineCreateSchema = z.object({
 const agentCreateSchema = z.object({
   machineId: z.string().nullable().optional(),
   runtime: z.enum(AGENT_RUNTIMES).optional(),
+  /** 机器无关 Agent 的稳定 key:Git 项目注册表引用的路由目标 */
+  key: z.string().optional(),
   project: z.string(),
   displayName: z.string(),
   feishuAppId: z.string().nullable().optional(),
@@ -49,6 +51,8 @@ interface AgentDto {
   id: string;
   machineId: string | null;
   runtime: AgentRuntime;
+  /** 稳定 key;机器绑定 Agent 由初始化流程派生,人工注册可缺省 */
+  key: string | null;
   project: string;
   displayName: string;
   feishuAppId: string | null;
@@ -75,6 +79,7 @@ function toAgentDto(row: AgentRecord): AgentDto {
     id: row.id,
     machineId: row.machineId,
     runtime: row.runtime,
+    key: row.key,
     project: row.project,
     displayName: row.displayName,
     feishuAppId: row.feishuAppId,

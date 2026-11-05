@@ -202,6 +202,41 @@ describe("身份注册", () => {
     await db.close();
   });
 
+  it("机器无关 Agent 可带稳定 key,重复占用 409;机器绑定 Agent 拒绝自报 key", async () => {
+    const { db, service } = await prepare();
+    const { agent } = await service.registerAgent({
+      project: "workbuddy-pilot",
+      displayName: "Pilot",
+      runtime: "workbuddy",
+      key: "workbuddy-pilot",
+    });
+    expect(agent.key).toBe("workbuddy-pilot");
+
+    await expectCode(
+      () =>
+        service.registerAgent({
+          project: "workbuddy-pilot",
+          displayName: "Impostor",
+          runtime: "codex",
+          key: "workbuddy-pilot",
+        }),
+      "CONFLICT",
+    );
+
+    await service.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
+    await expectCode(
+      () =>
+        service.registerAgent({
+          machineId: "m1",
+          project: "p",
+          displayName: "A",
+          key: "self-serve",
+        }),
+      "VALIDATION_FAILED",
+    );
+    await db.close();
+  });
+
   it("绑定机器的 Agent 拒绝外部 runtime,不静默改写", async () => {
     const { db, service } = await prepare();
     await service.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
