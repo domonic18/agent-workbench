@@ -21,6 +21,7 @@ import {
   requireIdempotencyKey,
   requireSession,
 } from "../middleware/session.js";
+import { parseKeysetCursor } from "./paging.js";
 
 const CONSOLE_ACTOR = "console";
 /** 幂等键作用域:同键在不同接口下互不影响 */
@@ -106,19 +107,6 @@ function sendError(reply: FastifyReply, error: CapabilityError): FastifyReply {
   });
 }
 
-function parseCursor(cursor: string): { createdAt: number; id: string } | undefined {
-  const index = cursor.indexOf(":");
-  if (index <= 0) {
-    return undefined;
-  }
-  const createdAt = Number(cursor.slice(0, index));
-  const id = cursor.slice(index + 1);
-  if (!Number.isInteger(createdAt) || id === "") {
-    return undefined;
-  }
-  return { createdAt, id };
-}
-
 export function registerCapabilityRoutes(
   app: FastifyInstance,
   options: CapabilityRoutesOptions,
@@ -162,8 +150,10 @@ export function registerCapabilityRoutes(
         error: { code: "VALIDATION_FAILED", message: `limit 必须为 1~${LIST_LIMITS.max} 的整数` },
       });
     }
+    const parsed =
+      typeof query.cursor === "string" ? parseKeysetCursor(query.cursor) : undefined;
     const before =
-      typeof query.cursor === "string" ? parseCursor(query.cursor) : undefined;
+      parsed === undefined ? undefined : { createdAt: parsed.sort, id: parsed.id };
     if (typeof query.cursor === "string" && before === undefined) {
       return reply.code(422).send({
         error: { code: "VALIDATION_FAILED", message: "cursor 格式应为 <createdAt>:<id>" },

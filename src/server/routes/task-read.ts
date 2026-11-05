@@ -8,6 +8,7 @@ import type { CapabilitySummary } from "../../store/repositories/capability.js";
 import type { TaskEventRecord } from "../../store/repositories/task.js";
 import { requireSession } from "../middleware/session.js";
 import { invalid } from "./http.js";
+import { parseKeysetCursor, parseLimit, parseSeq } from "./paging.js";
 import { sendError, toTaskDto } from "./task-dto.js";
 
 export interface TaskReadRoutesOptions {
@@ -56,43 +57,6 @@ function toTaskEventDto(row: TaskEventRecord): TaskEventDto {
   };
 }
 
-/** 任务列表游标 `<createdAt>:<id>`,与 audit 缺口的游标格式一致 */
-function parseCursor(cursor: string): { createdAt: number; id: string } | undefined {
-  const index = cursor.indexOf(":");
-  if (index <= 0) {
-    return undefined;
-  }
-  const createdAt = Number(cursor.slice(0, index));
-  const id = cursor.slice(index + 1);
-  if (!Number.isInteger(createdAt) || id === "") {
-    return undefined;
-  }
-  return { createdAt, id };
-}
-
-/** 缺省返回 LIST_LIMITS.default;非法返回 undefined 由调用方回 422 */
-function parseLimit(value: unknown): number | undefined {
-  if (value === undefined) {
-    return LIST_LIMITS.default;
-  }
-  if (typeof value !== "string" || !/^\d+$/.test(value)) {
-    return undefined;
-  }
-  const limit = Number(value);
-  return limit >= 1 && limit <= LIST_LIMITS.max ? limit : undefined;
-}
-
-/** 事件游标就是 seq;缺省 0 表示取全量快照 */
-function parseSeq(value: unknown): number | undefined {
-  if (value === undefined) {
-    return 0;
-  }
-  if (typeof value !== "string" || !/^\d+$/.test(value)) {
-    return undefined;
-  }
-  return Number(value);
-}
-
 export function registerTaskReadRoutes(
   app: FastifyInstance,
   options: TaskReadRoutesOptions,
@@ -139,7 +103,9 @@ export function registerTaskReadRoutes(
 
     let before: { createdAt: number; id: string } | undefined;
     if (query.cursor !== undefined) {
-      before = typeof query.cursor === "string" ? parseCursor(query.cursor) : undefined;
+      const parsed =
+        typeof query.cursor === "string" ? parseKeysetCursor(query.cursor) : undefined;
+      before = parsed === undefined ? undefined : { createdAt: parsed.sort, id: parsed.id };
       if (before === undefined) {
         return invalid(reply, "cursor 格式应为 <createdAt>:<id>");
       }
