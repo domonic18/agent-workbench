@@ -10,35 +10,12 @@ import {
   type AssemblyRecord,
 } from "../../store/repositories/assembly.js";
 import { BootstrapError } from "./errors.js";
+import { DEFAULT_BUG_FIX } from "../routing/policy.js";
+
+export { DEFAULT_BUG_FIX };
 
 /** 机器存活判定窗口:与「离线超过 5 分钟标注心跳超时」同口径 */
 export const HEARTBEAT_FRESH_MS = 5 * 60_000;
-
-/**
- * 默认 bug_fix 装配定义(arch/01 §9.4):定义本体随仓库源码版本化,
- * bootstrap/complete 只落「主责绑定 + 采纳记录」;需要修改时改源码走评审,
- * 不提供在线规则编辑器。M3.9 的确定性 Router 以此为默认加载基线。
- */
-export const DEFAULT_BUG_FIX = {
-  workKind: "bug_fix",
-  routeRule: {
-    ruleId: "default-bug-fix",
-    source: "bug",
-    kind: "submitted",
-    targetRole: "primary",
-  },
-  mandate: {
-    expectedResult:
-      "修复缺陷并提交 PR;PR head SHA 的必需 CI 全部通过后进入待验收,由原 Bug 机器人人工接受",
-    scope:
-      "以原始 Bug 反馈为范围修复缺陷本身,不含顺手重构;退回时在同一工作事项返工,生产发布另行人工确认",
-  },
-  evidence: [
-    "PR 链接与当前 head SHA",
-    "必需 CI 全部通过的记录",
-    "原 Bug 机器人的接受回执",
-  ],
-} as const;
 
 export type PreflightItemKey =
   | "database"

@@ -68,8 +68,8 @@
 
 - 目标: Source 只整理事实，控制台按 Thread owner / Git RouteRule 派工；Assignment/Input/Handback 可恢复；真实 Bug 以 PR+当前提交 CI 待验收并由原 Bug 机器人人工接受/退回
 - 验收标准: 无在线 Slow Router 或 route_evaluation；重复事件不重复开工；worker_inbox 租约与 ACK 可恢复且不重复建 Task；WorkBuddy automation 可处理 Assignment/Input；旧 SHA 绿色 CI/当前 SHA 红色 CI 不待验收；真实 CI 失败与原 Bug 机器人退回后在同一 WorkItem 返工，最终接受才 done；无自动生产发布
-- 状态: 未开始
-- 阻塞项: 依赖 M3.8-3，以及真实 Bug 机器人、Git/CI、目标 worker 和项目角色配置就位
+- 状态: **进行中**。M3.9-1 第十一刀已闭(2026-11-05,Git 版本化策略契约):① `src/domain/routing/policy.ts`(目录按 arch/01 §1 模块表 `domain/routing`,非 domain/work)——`WORK_KINDS`(bug_fix 的 mandate/evidence 自 DEFAULT_BUG_FIX 迁移并**单源化**:assembly.ts 改 re-export,`/setup` 摘要 payload 形状不变)、`ROUTE_RULES`(首条 default-bug-fix:bug/submitted→bug_fix/primary)、`PROJECT_REGISTRY`(首版**空**:首个业务项目随 M3.9-2 真实 Bug 闭环登记,WorkBuddy 试点条目随联测登记;未登记项目的未归属事件确定性 needs_person,不猜);② policy_version=策略内容稳定序列化(键排序,防源码改键序漂移)sha256 前 12 位,不依赖 git(容器内无 .git);③ `validatePolicy` 两级——结构错误(重复 ruleId/未知 work_kind/空字段)fail-fast,引用类(未注册或停用 agent.key、规则限定项目未登记、registry.primary 与 bootstrap_assembly 主责不一致)只告警不阻断,**裁决:引用类不做 fail-fast**——空库重建后 bootstrap 流程必须能起控制台,派工时还会再校验 Agent 注册与启用(arch/02 §3.1);④ main.ts 在 buildApp 后启动校验并打印 version;⑤ 测试 `policy.test.ts` 8 例(版本稳定与键序无关/单源断言/结构 fail-fast/引用告警/bootstrap 一致性,走真实域链路造 agent)。`make check` 全绿
+- 阻塞项: M3.8-3 已闭;真实 Bug 机器人、Git/CI、目标 worker 就位属 M3.9-2 前置——本迭代 Source 侧按用户裁决只做归一化入口;WorkBuddy 真机联测随第十四刀(用户已确认本机运行 WorkBuddy,验收不走脚本模拟)
 
 ### M4: 产出量化 + 周报 + 飞书免登
 

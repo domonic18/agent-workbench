@@ -15,6 +15,7 @@ import { createEmbeddingClient } from "../domain/knowledge/embedding.js";
 import { createKnowledgeEntryService } from "../domain/knowledge/entry-service.js";
 import { createKnowledgeIndexService } from "../domain/knowledge/index-service.js";
 import { createKnowledgeRebuilder } from "../domain/knowledge/rebuild.js";
+import { validatePolicy } from "../domain/routing/policy.js";
 import { ONE_TIME_TOKEN } from "../shared/constants.js";
 import { createDb } from "../store/database.js";
 import { acquireInstanceLock } from "../store/lock.js";
@@ -92,6 +93,10 @@ const app = buildApp({
   webRoot: fileURLToPath(new URL("../../dist/web", import.meta.url)),
   ...(config.feishu === undefined ? {} : { feishu: config.feishu }),
 });
+
+// Git 版本化策略校验(01 §9.2):结构错误 fail-fast;引用缺失只告警,派工时再校验
+const policyValidation = await validatePolicy({ db, log: app.log });
+app.log.info(`work policy 就绪: version=${policyValidation.version}`);
 
 const reconciler = startCapabilityReconciler(service, app.log);
 
