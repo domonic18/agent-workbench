@@ -6,10 +6,12 @@ export interface OverviewMetrics {
   heartbeatTimeouts: number;
 }
 
+import { AGENT_RUNTIMES } from "@shared/constants.js";
+
 export type HeartbeatState = "ok" | "timeout" | "offline" | "unknown";
 
 /** Agent 运行时:与控制台 shared/constants AGENT_RUNTIMES 一一对应;web 侧无 aw-node 绑定概念,只用于展示标签 */
-export type AgentRuntime = "claude_code" | "workbuddy" | "codex" | "deepseek";
+export type AgentRuntime = (typeof AGENT_RUNTIMES)[number];
 
 export interface OverviewAgent {
   id: string;

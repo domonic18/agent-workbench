@@ -1,18 +1,16 @@
 import type {
-  KnowledgeEmbeddingStatus,
-  KnowledgeStatus,
-} from "../api/knowledge.js";
-import type { ChainRelation } from "../api/task-chain.js";
-import type {
-  A2aIntent,
+  A2AIntent as A2aIntent,
   A2aThreadStatus,
   CapabilityStatus,
-  DeliveryStatus,
+  OutboxStatus as DeliveryStatus,
+  KnowledgeEmbeddingStatus,
+  KnowledgeStatus,
   TaskEventKind,
   TaskOrigin,
   TaskStage,
   TaskStatus,
-} from "../api/tasks.js";
+} from "@shared/constants.js";
+import type { ChainRelation } from "../api/task-chain.js";
 import type { AgentRuntime, HeartbeatState } from "../api/types.js";
 
 export type Tone = "positive" | "warning" | "danger" | "muted" | "info";
@@ -90,6 +88,7 @@ export const TASK_STAGE_LABEL: Record<TaskStage, string> = {
 export const TASK_ORIGIN_LABEL: Record<TaskOrigin, string> = {
   feishu: "飞书",
   a2a: "A2A",
+  work_item: "工作事项",
 };
 
 export const TASK_EVENT_LABEL: Record<TaskEventKind, string> = {

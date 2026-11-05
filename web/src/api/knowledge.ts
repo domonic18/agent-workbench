@@ -1,4 +1,16 @@
 import { api, newIdempotencyKey } from "./client.js";
+import {
+  KNOWLEDGE_EMBEDDING_STATUSES,
+  KNOWLEDGE_LIMITS,
+  KNOWLEDGE_STATUSES,
+} from "@shared/constants.js";
+import type {
+  KnowledgeEmbeddingStatus,
+  KnowledgeStatus,
+} from "@shared/constants.js";
+
+export { KNOWLEDGE_EMBEDDING_STATUSES, KNOWLEDGE_LIMITS, KNOWLEDGE_STATUSES };
+export type { KnowledgeEmbeddingStatus, KnowledgeStatus };
 
 /** 知识屏页签(03 §4.4):默认 active;候选与归档各自成页,不做全选批量采纳 */
 export const KNOWLEDGE_VIEWS = ["active", "candidate", "archived"] as const;
@@ -9,19 +21,6 @@ export const KNOWLEDGE_VIEW_LABEL: Record<KnowledgeView, string> = {
   candidate: "待采纳",
   archived: "已归档",
 };
-
-export const KNOWLEDGE_STATUSES = ["draft", "candidate", "active", "archived"] as const;
-export type KnowledgeStatus = (typeof KNOWLEDGE_STATUSES)[number];
-
-export const KNOWLEDGE_EMBEDDING_STATUSES = ["pending", "ready", "failed"] as const;
-export type KnowledgeEmbeddingStatus = (typeof KNOWLEDGE_EMBEDDING_STATUSES)[number];
-
-/** 与服务端 KNOWLEDGE_LIMITS 对齐;web 不直接引用服务端源码 */
-export const KNOWLEDGE_LIMITS = {
-  title: 200,
-  summary: 512,
-  category: 64,
-} as const;
 
 export interface KnowledgeEntryDto {
   id: string;

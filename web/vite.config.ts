@@ -1,9 +1,15 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import { resolve } from "node:path";
 
 // 产物落在仓库根的 dist/web,由控制台同源托管(03 §9)
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      "@shared": resolve(import.meta.dirname, "../src/shared"),
+    },
+  },
   build: {
     outDir: "../dist/web",
     emptyOutDir: true,

@@ -1,66 +1,47 @@
 import { api } from "./client.js";
+import {
+  A2A_INTENTS,
+  A2A_THREAD_STATUSES,
+  CAPABILITY_STATUSES,
+  OUTBOX_STATUSES,
+  TASK_EVENT_KINDS,
+  TASK_ORIGINS,
+  TASK_STAGES,
+  TASK_STATUSES,
+} from "@shared/constants.js";
+import type {
+  A2AIntent as A2aIntent,
+  A2aThreadStatus,
+  CapabilityStatus,
+  OutboxStatus,
+  TaskEventKind,
+  TaskOrigin,
+  TaskStage,
+  TaskStatus,
+} from "@shared/constants.js";
 
-export const TASK_STATUSES = [
-  "pending",
-  "running",
-  "blocked",
-  "review",
-  "done",
-  "cancelled",
-] as const;
-export type TaskStatus = (typeof TASK_STATUSES)[number];
+export {
+  A2A_INTENTS,
+  A2A_THREAD_STATUSES,
+  CAPABILITY_STATUSES,
+  TASK_EVENT_KINDS,
+  TASK_ORIGINS,
+  TASK_STAGES,
+  TASK_STATUSES,
+};
+export type {
+  A2aIntent,
+  A2aThreadStatus,
+  CapabilityStatus,
+  TaskEventKind,
+  TaskOrigin,
+  TaskStage,
+  TaskStatus,
+};
 
-export const TASK_STAGES = [
-  "intake",
-  "plan",
-  "exec",
-  "review",
-  "deliver",
-  "closed",
-] as const;
-export type TaskStage = (typeof TASK_STAGES)[number];
-
-export const TASK_ORIGINS = ["feishu", "a2a"] as const;
-export type TaskOrigin = (typeof TASK_ORIGINS)[number];
-
-export const TASK_EVENT_KINDS = [
-  "created",
-  "stage_changed",
-  "handoff",
-  "blocked",
-  "resumed",
-  "rework",
-  "completed",
-  "failed",
-] as const;
-export type TaskEventKind = (typeof TASK_EVENT_KINDS)[number];
-
-export const CAPABILITY_STATUSES = [
-  "pending",
-  "issuing",
-  "active",
-  "expired",
-  "revoked",
-  "rejected",
-] as const;
-export type CapabilityStatus = (typeof CAPABILITY_STATUSES)[number];
-
-export const A2A_INTENTS = ["request", "reply", "notify", "escalate"] as const;
-export type A2aIntent = (typeof A2A_INTENTS)[number];
-
-export const A2A_THREAD_STATUSES = ["open", "awaiting_reply", "completed", "expired"] as const;
-export type A2aThreadStatus = (typeof A2A_THREAD_STATUSES)[number];
-
-export const DELIVERY_STATUSES = [
-  "pending",
-  "claimed",
-  "sending",
-  "retry_wait",
-  "delivered",
-  "failed",
-  "uncertain",
-] as const;
-export type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
+/** 发件箱投递状态:与控制台 OUTBOX_STATUSES 对齐 */
+export const DELIVERY_STATUSES = OUTBOX_STATUSES;
+export type DeliveryStatus = OutboxStatus;
 
 export interface TaskDto {
   id: string;
