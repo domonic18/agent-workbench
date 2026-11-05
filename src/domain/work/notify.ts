@@ -13,13 +13,14 @@ import { mdText, statusCard } from "../collab/card.js";
  * 卡片形态与协作播报共用 domain/collab/card.ts;群未配置时不入队。
  */
 
-/** 进群通知的状态事件;其余事件(routed/assigned/accepted/input/ci_result/pr_closed)只留库 */
+/** 进群通知的状态事件;其余事件(routed/assigned/input/ci_result/pr_closed)只留库 */
 export type WorkNotifyKind =
   | "task_bound"
   | "pr_linked"
   | "ci_failed"
   | "acceptance_ready"
-  | "returned";
+  | "returned"
+  | "accepted";
 
 export interface NotifyWorkEventInput {
   workItemId: string;
@@ -126,6 +127,12 @@ function buildCard(
         title: `〔退回返工〕${mdText(title)}`,
         template: "orange",
         body: `${item}\n${bug}**理由**:${mdText(reason ?? "未注明原因")}\n**状态**:已退回,${who} 将重新修复`,
+      };
+    case "accepted":
+      return {
+        title: `〔已验收〕${mdText(title)}`,
+        template: "indigo",
+        body: `${item}\n${bug}${pr}**状态**:人工接受,事项已收口`,
       };
   }
 }

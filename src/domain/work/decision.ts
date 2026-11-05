@@ -103,14 +103,22 @@ export async function dispatchBugDecision(
         updatedAt: ctx.at,
       });
     }
+    const eventId = deps.newEventId();
     await appendWorkItemEvent(db, {
-      id: deps.newEventId(),
+      id: eventId,
       workItemId: outcome.workItemId,
       kind: "accepted",
       triggerId: ctx.triggerId,
       evidenceRefsJson: ctx.refsJson,
       payloadJson: JSON.stringify(ctx.request.payload),
       occurredAt: ctx.at,
+    });
+    await notifyWorkEvent(db, {
+      workItemId: outcome.workItemId,
+      eventId,
+      kind: "accepted",
+      chatId: deps.collabChatId,
+      now: ctx.at,
     });
     return {
       resolved: {

@@ -245,6 +245,17 @@ describe("工作事项通知线 notifyWorkEvent", () => {
     await fixture.db.close();
   });
 
+  it("accepted:正文表明人工接受与收口", async () => {
+    const fixture = await prepare();
+    await acceptAssignment(fixture);
+    const payload = await notifyOne(fixture, "wev_n11", "accepted");
+    const card = readCard(payload);
+    expect(card.template).toBe("indigo");
+    expect(card.title).toContain("已验收");
+    expect(card.body).toContain("已收口");
+    await fixture.db.close();
+  });
+
   it("同一 eventId 重入幂等:outbox 只留一条", async () => {
     const fixture = await prepare();
     await acceptAssignment(fixture);
