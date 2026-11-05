@@ -85,7 +85,21 @@ export function createWorkTools(deps: ConsoleToolDeps): ConsoleTool[] {
         }
         const { item, events } = await deps.workers.read(agent.id, workItemId);
         return textResult({
-          work_item: { ...item, scope: JSON.parse(item.scopeJson) as unknown },
+          work_item: {
+            id: item.id,
+            project: item.project,
+            kind: item.kind,
+            title: item.title,
+            expected_result: item.expectedResult,
+            scope: JSON.parse(item.scopeJson) as unknown,
+            status: item.status,
+            stage: item.stage,
+            attention: item.attention,
+            origin_trigger_id: item.originTriggerId,
+            next_action: item.nextAction,
+            latest_summary: item.latestSummary,
+            created_at: item.createdAt,
+          },
           events: events.map((event) => ({
             seq: event.seq,
             kind: event.kind,
