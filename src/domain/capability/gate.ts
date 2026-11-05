@@ -3,7 +3,7 @@ import { TOOL_GATE, type ToolLevel } from "../../shared/constants.js";
 /** 用量状态由宿主注入;M2-5 尚未接账本,一律 unlimited,但判定入口与顺序先固定(M4-1 只填数据) */
 export type UsageState =
   | { kind: "unlimited" }
-  | { kind: "metered"; usedTokens: number; dailyLimit: number }
+  | { kind: "metered"; usedTokens: number; dailyLimit: number; hardStop: boolean }
   | { kind: "unavailable"; reason: string };
 
 /** 已生效授权:点分工具名 + 对应 capability id(审计据此追到 ticket_id) */
@@ -56,7 +56,7 @@ function usageDecision(usage: UsageState, level: ToolLevel): Decision | undefine
       reason: `今日用量读取失败(${usage.reason}),按已达上限处理;请稍后重试或联系控制台核对`,
     };
   }
-  if (usage.kind === "metered" && usage.usedTokens >= usage.dailyLimit) {
+  if (usage.kind === "metered" && usage.hardStop && usage.usedTokens >= usage.dailyLimit) {
     return {
       verdict: "deny",
       level,

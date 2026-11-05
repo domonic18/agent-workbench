@@ -15,7 +15,8 @@ import {
 } from "../../store/repositories/run.js";
 import { insertTask, updateTask } from "../../store/repositories/task.js";
 import { insertTokenUsage } from "../../store/repositories/token-usage.js";
-import { createOverviewService, heartbeatState, startOfLocalDay } from "./service.js";
+import { startOfLocalDay } from "../../shared/time.js";
+import { createOverviewService, heartbeatState } from "./service.js";
 
 const AT = 1_700_000_000_000;
 

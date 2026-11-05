@@ -1,5 +1,6 @@
 import { MACHINE_HEARTBEAT, RUN_IDLE_GAP_MS, type AgentRuntime } from "../../shared/constants.js";
 import { OVERVIEW_SCOPE } from "../../shared/scopes.js";
+import { startOfLocalDay } from "../../shared/time.js";
 import type { Db } from "../../store/database.js";
 import {
   getOverviewMetrics,
@@ -48,13 +49,6 @@ export interface OverviewService {
 export interface OverviewServiceDeps {
   db: Db;
   now?: () => number;
-}
-
-/** 本地日零点:跨时区部署时按控制台所在时区切日,与 03 §4.1 的「今日」一致 */
-export function startOfLocalDay(at: number): number {
-  const date = new Date(at);
-  date.setHours(0, 0, 0, 0);
-  return date.getTime();
 }
 
 function instructionText(value: string | null): string | null {

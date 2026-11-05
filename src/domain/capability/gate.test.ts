@@ -58,7 +58,9 @@ describe("decide", () => {
   });
 
   it("用量硬停先于等级:超限后连 L0 只读也拒", () => {
-    const ctx = context({ usage: { kind: "metered", usedTokens: 100, dailyLimit: 100 } });
+    const ctx = context({
+      usage: { kind: "metered", usedTokens: 100, dailyLimit: 100, hardStop: true },
+    });
     expect(decide(ctx, { tool: "kb.search", args: {} })).toMatchObject({
       verdict: "deny",
       level: "L0",
@@ -66,9 +68,18 @@ describe("decide", () => {
   });
 
   it("未到上限时放行,且不影响后续判定", () => {
-    const ctx = context({ usage: { kind: "metered", usedTokens: 99, dailyLimit: 100 } });
+    const ctx = context({
+      usage: { kind: "metered", usedTokens: 99, dailyLimit: 100, hardStop: true },
+    });
     expect(decide(ctx, { tool: "kb.search", args: {} }).verdict).toBe("allow");
     expect(decide(ctx, { tool: "bash.exec", args: {} }).verdict).toBe("deny");
+  });
+
+  it("hardStop=false 时超上限只计量不拦截", () => {
+    const ctx = context({
+      usage: { kind: "metered", usedTokens: 100, dailyLimit: 100, hardStop: false },
+    });
+    expect(decide(ctx, { tool: "kb.search", args: {} }).verdict).toBe("allow");
   });
 
   it("配置了上限但读不出用量时 fail-closed", () => {
