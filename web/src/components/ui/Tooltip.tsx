@@ -1,6 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import styles from "./controls.module.css";
+import styles from "./overlays.module.css";
 
 export interface TooltipProps {
   /** 气泡文案,也是触发元素的无障碍名 */

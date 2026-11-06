@@ -7,6 +7,8 @@ export interface TableColumn<T> {
   render: (row: T) => ReactNode;
   align?: "left" | "right" | "center";
   width?: string;
+  /** 数字与短标签列不折行 */
+  nowrap?: boolean;
 }
 
 export interface TableProps<T> {
@@ -21,6 +23,8 @@ export interface TableProps<T> {
   minWidth?: string;
   /** 固定列宽：列宽严格按 columns.width 生效，长内容由单元格内元素自己截断 */
   fixedLayout?: boolean;
+  /** 首列当行头渲染（scope="row"），用于「每行一个主体」的对照表 */
+  rowHeader?: boolean;
 }
 
 const ALIGN_CLASS = {
@@ -38,6 +42,7 @@ export function Table<T>({
   empty,
   minWidth,
   fixedLayout = false,
+  rowHeader = false,
 }: TableProps<T>) {
   if (rows.length === 0 && empty !== undefined) {
     return <>{empty}</>;
@@ -55,7 +60,9 @@ export function Table<T>({
                 key={column.key}
                 scope="col"
                 style={column.width === undefined ? undefined : { width: column.width }}
-                className={ALIGN_CLASS[column.align ?? "left"]}
+                className={`${ALIGN_CLASS[column.align ?? "left"]} ${column.nowrap === true ? styles.nowrap : ""}`}
+                data-align={column.align ?? "left"}
+                data-nowrap={column.nowrap === true ? "true" : undefined}
               >
                 {column.header}
               </th>
@@ -69,11 +76,33 @@ export function Table<T>({
               className={onRowClick === undefined ? undefined : styles.clickable}
               onClick={onRowClick === undefined ? undefined : () => onRowClick(row)}
             >
-              {columns.map((column) => (
-                <td key={column.key} className={ALIGN_CLASS[column.align ?? "left"]}>
-                  {column.render(row)}
-                </td>
-              ))}
+              {columns.map((column, index) => {
+                const isRowHeader = rowHeader && index === 0;
+                const cellClass = `${ALIGN_CLASS[column.align ?? "left"]} ${column.nowrap === true ? styles.nowrap : ""}`;
+                if (isRowHeader) {
+                  return (
+                    <th
+                      key={column.key}
+                      scope="row"
+                      className={cellClass}
+                      data-align={column.align ?? "left"}
+                      data-nowrap={column.nowrap === true ? "true" : undefined}
+                    >
+                      {column.render(row)}
+                    </th>
+                  );
+                }
+                return (
+                  <td
+                    key={column.key}
+                    className={cellClass}
+                    data-align={column.align ?? "left"}
+                    data-nowrap={column.nowrap === true ? "true" : undefined}
+                  >
+                    {column.render(row)}
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>

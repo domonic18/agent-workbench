@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import styles from "./surfaces.module.css";
+import styles from "./feedback.module.css";
 
 export interface EmptyStateProps {
   title: ReactNode;

@@ -1,0 +1,243 @@
+/* 基元层·反馈类：骨架 / 空态 / 加载 / 出错 / 步骤条 / 标签页 / 加载更多
+ *
+ * 只引用 global.css 的令牌，不写死数值。
+ */
+
+.skeleton {
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(
+      90deg,
+      var(--surface-3) 25%,
+      var(--surface-2) 37%,
+      var(--surface-3) 63%
+    );
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
+}
+
+.skeletonList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* 空态：64px 圆形图标底座，让「没有数据」也成一块有设计的面 */
+.empty {
+  padding: var(--space-7) var(--space-4);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  text-align: center;
+}
+
+.emptyIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto var(--space-4);
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.emptyTitle {
+  font-size: var(--font-lg);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.emptyDescription {
+  margin-top: var(--space-2);
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+
+.emptyAction {
+  margin-top: var(--space-4);
+}
+
+/* 整屏加载态 */
+.loading {
+  display: flex;
+  min-height: 400px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  color: var(--muted);
+  font-size: var(--font-sm);
+}
+
+.loadingSpinner {
+  display: inline-flex;
+  color: var(--accent);
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 错误态：图标 + 标题 + 说明 + 重试 */
+.errorState {
+  display: flex;
+  min-height: 240px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-6);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-lg);
+  background: var(--danger-soft);
+  text-align: center;
+}
+
+.errorStateIcon {
+  display: inline-flex;
+  color: var(--danger);
+}
+
+.errorStateTitle {
+  font-size: var(--font-md);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.errorStateMessage {
+  max-width: 40em;
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+}
+
+.errorStateAction {
+  margin-top: var(--space-2);
+}
+
+.errorBanner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-md);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: var(--font-sm);
+}
+
+.loadMore {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-4);
+}
+
+/* 步骤条 */
+.stepper {
+  display: flex;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.stepMarker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-icon-tile);
+  height: var(--size-icon-tile);
+  border-radius: var(--radius-full);
+  background: var(--surface-3);
+  color: var(--muted);
+  font-size: var(--font-xs);
+  font-weight: 700;
+}
+
+.stepLabel {
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+
+.stepActive .stepMarker {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.stepActive .stepLabel {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.stepDone .stepMarker {
+  background: var(--positive-soft);
+  border: 1px solid var(--positive-border);
+  color: var(--positive);
+}
+
+.stepDone .stepLabel {
+  color: var(--text-secondary);
+}
+
+/* 标签页：分段控件形态，选中是底色块不是下划线 */
+.tabList {
+  display: flex;
+  gap: var(--space-1);
+  width: fit-content;
+  padding: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.tab {
+  padding: var(--space-2) var(--space-4);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-xs);
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    background var(--duration-fast) var(--ease),
+    color var(--duration-fast) var(--ease);
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tabActive {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: var(--shadow-xs);
+}
+
+.tabPanel {
+  padding-top: var(--space-4);
+}

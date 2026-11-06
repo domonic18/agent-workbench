@@ -2,7 +2,7 @@ import { X } from "lucide-react";
 import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { IconButton } from "./IconButton.js";
-import styles from "./surfaces.module.css";
+import styles from "./overlays.module.css";
 
 export type DialogSize = "sm" | "md" | "lg" | "xl";
 export type DialogVariant = "center" | "drawer";

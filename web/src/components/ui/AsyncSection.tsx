@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Button } from "./Button.js";
 import { Skeleton } from "./Skeleton.js";
-import styles from "./surfaces.module.css";
+import styles from "./feedback.module.css";
 
 export interface AsyncSectionProps {
   /** 首屏加载中 */

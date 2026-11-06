@@ -7,14 +7,21 @@ export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>
   label: string;
   size?: ButtonSize;
   icon: ReactNode;
+  /** surface 带边框（默认）；ghost 无边框，hover 才显形 */
+  variant?: "surface" | "ghost";
 }
+
+const VARIANT_CLASS = {
+  surface: undefined,
+  ghost: styles.iconButtonGhost,
+} as const;
 
 /** 纯图标可点区：触达尺寸不小于 44px 时用 lg（03 §6 移动适配） */
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
-  { label, size = "md", icon, className, type, ...rest },
+  { label, size = "md", icon, variant = "surface", className, type, ...rest },
   ref,
 ) {
-  const classes = [styles.iconButton, styles[size], className]
+  const classes = [styles.iconButton, styles[size], VARIANT_CLASS[variant], className]
     .filter((item): item is string => typeof item === "string" && item !== "")
     .join(" ");
   return (

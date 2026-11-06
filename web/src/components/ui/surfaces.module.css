@@ -1,4 +1,4 @@
-/* 基元层·容器类：面板 / 表格 / 弹窗 / 标签页 / 步骤条 / 空态
+/* 基元层·容器类：面板 / 卡片 / 表格
  *
  * 只引用 global.css 的令牌，不写死数值。
  */
@@ -70,6 +70,7 @@
   font-size: var(--font-sm);
 }
 
+/* 表头：小号大写 + 次级字色，弱于标题但可扫读 */
 .table th {
   position: sticky;
   top: 0;
@@ -77,15 +78,18 @@
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--border);
   background: var(--surface-2);
-  color: var(--text-secondary);
+  color: var(--muted);
+  font-size: var(--font-xs);
   font-weight: 600;
+  letter-spacing: var(--tracking-tight);
   text-align: left;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 
 .table td {
   padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--border);
   vertical-align: middle;
 }
 
@@ -94,7 +98,7 @@
 }
 
 .table tbody tr:hover {
-  background: var(--surface-2);
+  background: var(--row-hover);
 }
 
 /* 固定列宽：列宽以第一行为准，单元格溢出被裁掉 */
@@ -118,326 +122,6 @@
   text-align: center;
 }
 
-.overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-5);
-  background: var(--overlay);
-  animation: fade var(--duration) var(--ease);
-}
-
-@keyframes fade {
-  from {
-    opacity: 0;
-  }
-}
-
-/* 大弹窗在窄屏按抽屉处理：占满整屏，内容不被挤进窄条 */
-@media (max-width: 767px) {
-  .overlayWide {
-    padding: 0;
-  }
-
-  .dialog.lg,
-  .dialog.xl {
-    max-width: none;
-    height: 100%;
-    max-height: 100%;
-    border-radius: 0;
-    border: none;
-  }
-}
-
-.dialog {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-height: 88vh;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  animation: rise var(--duration) var(--ease);
-}
-
-@keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-}
-
-.dialog.sm {
-  max-width: 420px;
-}
-
-.dialog.md {
-  max-width: 560px;
-}
-
-.dialog.lg {
-  max-width: 760px;
-}
-
-.dialog.xl {
-  max-width: 1040px;
-}
-
-.dialogHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-5);
-  border-bottom: 1px solid var(--line-soft);
-}
-
-.dialogTitle {
-  margin: 0;
-  font-size: var(--font-lg);
-  font-weight: 700;
-}
-
-.dialogDescription {
-  margin: var(--space-1) 0 0;
-  font-size: var(--font-sm);
-  color: var(--muted);
-}
-
-.dialogHeading {
-  min-width: 0;
-}
-
-.dialogHeaderExtra {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-/* 抽屉：贴右侧滑出，与居中弹窗共用焦点陷阱与滚动锁 */
-.overlayDrawer {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  align-items: stretch;
-  justify-content: flex-end;
-  background: var(--overlay);
-  animation: fade var(--duration) var(--ease);
-}
-
-.dialogDrawer {
-  width: min(720px, 100%);
-  max-width: 720px;
-  height: 100%;
-  max-height: 100%;
-  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
-  border-right: none;
-}
-
-@media (max-width: 767px) {
-  .dialogDrawer {
-    max-width: none;
-    border-radius: 0;
-    border: none;
-  }
-}
-
-.dialogBody {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: var(--space-5);
-}
-
-.dialogFooter {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-5);
-  border-top: 1px solid var(--line-soft);
-  background: var(--surface-2);
-}
-
-.tabList {
-  display: flex;
-  gap: var(--space-1);
-  border-bottom: 1px solid var(--border);
-}
-
-.tab {
-  margin-bottom: -1px;
-  padding: var(--space-3) var(--space-4);
-  border: none;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: var(--font-sm);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.tab:hover {
-  color: var(--text);
-}
-
-.tabActive {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-}
-
-.tabPanel {
-  padding-top: var(--space-4);
-}
-
-.stepper {
-  display: flex;
-  gap: var(--space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.step {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  min-width: 0;
-}
-
-.stepMarker {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-full);
-  background: var(--surface-3);
-  color: var(--muted);
-  font-size: var(--font-xs);
-  font-weight: 700;
-}
-
-.stepLabel {
-  font-size: var(--font-sm);
-  color: var(--muted);
-}
-
-.stepActive .stepMarker {
-  background: var(--accent);
-  color: var(--on-accent);
-}
-
-.stepActive .stepLabel {
-  color: var(--text);
-  font-weight: 600;
-}
-
-.stepDone .stepMarker {
-  background: var(--positive-soft);
-  border: 1px solid var(--positive-border);
-  color: var(--positive);
-}
-
-.stepDone .stepLabel {
-  color: var(--text-secondary);
-}
-
-.empty {
-  padding: var(--space-7) var(--space-4);
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface-2);
-  text-align: center;
-}
-
-.emptyTitle {
-  font-size: var(--font-lg);
-  font-weight: 600;
-  color: var(--text);
-}
-
-.emptyDescription {
-  margin-top: var(--space-2);
-  font-size: var(--font-sm);
-  color: var(--muted);
-}
-
-.emptyAction {
-  margin-top: var(--space-4);
-}
-
-.toastViewport {
-  position: fixed;
-  right: var(--space-5);
-  bottom: var(--space-5);
-  z-index: 80;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.toast {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 200px;
-  max-width: 360px;
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  box-shadow: var(--shadow-md);
-  font-size: var(--font-sm);
-  animation: rise var(--duration) var(--ease);
-}
-
-.toastPositive {
-  border-color: var(--positive-border);
-  background: var(--positive-soft);
-  color: var(--positive);
-}
-
-.toastDanger {
-  border-color: var(--danger-border);
-  background: var(--danger-soft);
-  color: var(--danger);
-}
-
-.toastInfo {
-  border-color: var(--accent-border);
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-/* 列表三态 */
-.skeletonList {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.errorBanner {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--danger-border);
-  border-radius: var(--radius-md);
-  background: var(--danger-soft);
-  color: var(--danger);
-  font-size: var(--font-sm);
-}
-
-.loadMore {
-  display: flex;
-  justify-content: center;
-  margin-top: var(--space-4);
+.nowrap {
+  white-space: nowrap;
 }

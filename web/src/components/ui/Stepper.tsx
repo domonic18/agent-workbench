@@ -1,5 +1,5 @@
 import { Check } from "lucide-react";
-import styles from "./surfaces.module.css";
+import styles from "./feedback.module.css";
 
 export interface StepperStep {
   key: string;

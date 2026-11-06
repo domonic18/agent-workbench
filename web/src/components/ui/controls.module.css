@@ -1,4 +1,4 @@
-/* 基元层·控件类：按钮 / 输入 / 徽章 / 骨架 / 复制条
+/* 基元层·控件类：按钮 / 输入 / 徽标 / 筛选胶囊 / 复制条
  *
  * 只引用 global.css 的令牌，不写死数值。
  */
@@ -115,6 +115,18 @@
 .iconButton.lg {
   width: var(--size-touch);
   height: var(--size-touch);
+}
+
+/* 无边框变体：放在标题栏等装饰性位置，hover 才显形 */
+.iconButtonGhost {
+  background: transparent;
+  border-color: transparent;
+}
+
+.iconButtonGhost:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent);
 }
 
 .spinner {
@@ -249,28 +261,6 @@
   background: var(--muted-soft);
 }
 
-.skeleton {
-  border-radius: var(--radius-md);
-  background:
-    linear-gradient(
-      90deg,
-      var(--surface-3) 25%,
-      var(--surface-2) 37%,
-      var(--surface-3) 63%
-    );
-  background-size: 400% 100%;
-  animation: shimmer 1.4s ease infinite;
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: 100% 0;
-  }
-  100% {
-    background-position: 0 0;
-  }
-}
-
 .copyField {
   display: flex;
   align-items: center;
@@ -324,35 +314,4 @@
   .chip {
     min-height: var(--size-touch);
   }
-}
-
-/* 提示气泡：触发元素 + 挂在 body 上的浮层 */
-.tooltipTrigger {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--muted);
-  cursor: help;
-}
-
-.tooltipTrigger:focus-visible {
-  outline: none;
-  border-radius: var(--radius-xs);
-  box-shadow: var(--focus-ring);
-}
-
-.tooltipBubble {
-  position: fixed;
-  z-index: 90;
-  width: max-content;
-  max-width: 280px;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  color: var(--text);
-  font-size: var(--font-xs);
-  line-height: 1.6;
-  box-shadow: var(--shadow-md);
-  pointer-events: none;
 }
