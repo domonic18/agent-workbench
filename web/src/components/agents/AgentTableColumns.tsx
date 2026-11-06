@@ -1,10 +1,18 @@
+import { CircleHelp, Monitor } from "lucide-react";
 import type { AgentRosterSummary } from "../../api/identity.js";
 import type { OverviewAgent } from "../../api/types.js";
 import { formatDateTime, formatExactTokens, formatRelativeTime, formatTokens } from "../../shared/format.js";
-import { NOT_COLLECTED, RUNTIME_LABEL } from "../../shared/labels.js";
+import {
+  AGENT_COLUMN_HINT,
+  MACHINE_COLUMN_HINT,
+  NOT_COLLECTED,
+  RUNTIME_LABEL,
+} from "../../shared/labels.js";
 import { agentDisplayName, hasCollector } from "../../shared/agent-label.js";
+import { RUNTIME_ICON } from "../../shared/runtime-icon.js";
 import { Button } from "../ui/Button.js";
 import { Table, type TableColumn } from "../ui/Table.js";
+import { Tooltip } from "../ui/Tooltip.js";
 import { statusBadges, taskMeta } from "./agent-rows.js";
 import styles from "./agents.module.css";
 
@@ -21,7 +29,14 @@ export function buildAgentColumns(options: AgentColumnOptions): TableColumn<Agen
     {
       key: "agent",
       width: "168px",
-      header: "Agent",
+      header: (
+        <span className={styles.headerCell}>
+          机器人
+          <Tooltip label={AGENT_COLUMN_HINT}>
+            <CircleHelp size={13} aria-hidden="true" />
+          </Tooltip>
+        </span>
+      ),
       render: (agent) => (
         <div className={styles.identity}>
           <span className={styles.identityName}>{agentDisplayName(agent)}</span>
@@ -35,15 +50,41 @@ export function buildAgentColumns(options: AgentColumnOptions): TableColumn<Agen
     },
     {
       key: "runtime",
-      width: "88px",
+      width: "56px",
       header: "运行时",
-      render: (agent) => RUNTIME_LABEL[agent.runtime],
+      render: (agent) => {
+        const Icon = RUNTIME_ICON[agent.runtime];
+        return (
+          <Tooltip label={RUNTIME_LABEL[agent.runtime]}>
+            <Icon size={16} aria-hidden="true" />
+          </Tooltip>
+        );
+      },
     },
     {
       key: "machine",
-      width: "108px",
-      header: "机器",
-      render: (agent) => agent.machineDisplayName ?? agent.machineHostname ?? "未绑定",
+      width: "128px",
+      header: (
+        <span className={styles.headerCell}>
+          机器
+          <Tooltip label={MACHINE_COLUMN_HINT}>
+            <CircleHelp size={13} aria-hidden="true" />
+          </Tooltip>
+        </span>
+      ),
+      render: (agent) => {
+        const name = agent.machineDisplayName ?? agent.machineHostname;
+        return (
+          <span className={styles.machineCell}>
+            <Monitor size={14} aria-hidden="true" />
+            {name === null || name === undefined ? (
+              <span className={styles.muted}>未绑定</span>
+            ) : (
+              name
+            )}
+          </span>
+        );
+      },
     },
     {
       key: "status",
@@ -176,18 +217,19 @@ export function buildAgentColumns(options: AgentColumnOptions): TableColumn<Agen
 export interface AgentTableProps {
   agents: readonly AgentRosterSummary[];
   columns: TableColumn<AgentRosterSummary>[];
-  onEdit: (agent: AgentRosterSummary) => void;
+  /** 点行打开详情抽屉;行内「管理」按钮另走 onEdit */
+  onOpenDetail: (agent: AgentRosterSummary) => void;
 }
 
 /** 宽屏表格 */
-export function AgentTable({ agents, columns, onEdit }: AgentTableProps) {
+export function AgentTable({ agents, columns, onOpenDetail }: AgentTableProps) {
   return (
     <div className={styles.tableArea}>
       <Table
         columns={columns}
         rows={[...agents]}
         rowKey={(agent) => agent.id}
-        onRowClick={onEdit}
+        onRowClick={onOpenDetail}
         fixedLayout
       />
     </div>

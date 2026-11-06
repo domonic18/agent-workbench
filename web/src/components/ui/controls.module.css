@@ -330,3 +330,34 @@
     min-height: 36px;
   }
 }
+
+/* 提示气泡：触发元素 + 挂在 body 上的浮层 */
+.tooltipTrigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  cursor: help;
+}
+
+.tooltipTrigger:focus-visible {
+  outline: none;
+  border-radius: var(--radius-xs);
+  box-shadow: var(--focus-ring);
+}
+
+.tooltipBubble {
+  position: fixed;
+  z-index: 90;
+  width: max-content;
+  max-width: 280px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--font-xs);
+  line-height: 1.6;
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+}

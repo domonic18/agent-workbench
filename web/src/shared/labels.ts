@@ -26,6 +26,14 @@ export const RUNTIME_LABEL: Record<AgentRuntime, string> = {
 /** 控制台未采集该 Agent 的过程数据(机器无关运行时或尚未上报)时的统一占位文案 */
 export const NOT_COLLECTED = "未接入 / —";
 
+/** 「机器人」列的列头说明:名称来源与副行含义 */
+export const AGENT_COLUMN_HINT =
+  "「机器人」列是这个 Agent 在飞书群里的机器人名(由 Agent 自报,未回写时回退控制台显示名);下方副行是 cc-connect 项目名,「·」后面是路由 key(默认与项目名相同,相同时不重复显示)。";
+
+/** 「机器」列的列头说明:机器的含义与外部运行时的差别 */
+export const MACHINE_COLUMN_HINT =
+  "该 Agent 运行在哪台执行机上;外部运行时可以登记归属机器,但没有 aw-node 时过程数据未接入。";
+
 /** 状态到文案/色调的映射只在这里维护,组件不自行判断业务枚举(03 §6) */
 export const HEARTBEAT_LABEL: Record<HeartbeatState, string> = {
   ok: "在线",
