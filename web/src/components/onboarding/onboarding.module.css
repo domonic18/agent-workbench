@@ -81,7 +81,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  height: 34px;
+  height: var(--size-control-md);
   padding: 0 var(--space-4);
   border-radius: var(--radius-md);
   background: var(--accent);
@@ -101,7 +101,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 34px;
+  height: var(--size-control-md);
   padding: 0 var(--space-4);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -184,8 +184,8 @@
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: var(--size-icon-tile);
+  height: var(--size-icon-tile);
   border-radius: var(--radius-full);
   background: var(--accent-soft);
   color: var(--accent);
@@ -282,7 +282,7 @@
 .machineIdentity {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-1);
   min-width: 0;
 }
 
@@ -353,7 +353,7 @@
   /* 锚点是独立可点元素，不在全局控件触达规则覆盖范围内 */
   .downloadLink,
   .linkSecondary {
-    min-height: 44px;
+    min-height: var(--size-touch);
   }
 
   .commandHead {

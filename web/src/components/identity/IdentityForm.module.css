@@ -1,125 +1,83 @@
 .form {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--space-4);
 }
 
 .hint {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--font-xs);
   color: var(--muted);
 }
 
 .error {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--font-sm);
   color: var(--danger);
 }
 
 .actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 4px;
-}
-
-.submit {
-  padding: 9px 16px;
-  border: none;
-  border-radius: 8px;
-  background: var(--accent);
-  color: #fff;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.submit:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-.cancel {
-  padding: 9px 16px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
-}
-
-.cancel:hover {
-  background: var(--bg);
+  gap: var(--space-2);
+  margin-top: var(--space-1);
 }
 
 .warning {
   margin: 0;
-  padding: 10px 12px;
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--warning-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--warning-soft);
   color: var(--warning);
-  font-size: 13px;
+  font-size: var(--font-sm);
 }
 
 .secret {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .secretRow {
   display: flex;
   align-items: stretch;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .secretCode {
   flex: 1;
   min-width: 0;
-  padding: 10px 12px;
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: var(--font-xs);
   word-break: break-all;
-}
-
-.copy {
-  padding: 0 14px;
-  border: 1px solid var(--accent-border);
-  border-radius: 8px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  cursor: pointer;
-  white-space: nowrap;
 }
 
 .hints {
   margin: 0;
-  padding-left: 18px;
-  font-size: 12px;
+  padding-left: var(--space-5);
+  font-size: var(--font-xs);
   color: var(--muted);
 }
 
 .hints li {
-  margin-top: 4px;
+  margin-top: var(--space-1);
 }
 
 @media (max-width: 767px) {
-  .submit,
-  .cancel,
-  .copy,
   .secretCode {
-    min-height: 44px;
+    min-height: var(--size-touch);
   }
 
   .actions {
     flex-direction: column-reverse;
   }
 
-  .submit,
-  .cancel {
+  .actions > button {
     width: 100%;
   }
 }

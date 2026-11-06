@@ -1,30 +1,30 @@
 .chain {
-  margin: 0 0 10px;
+  margin: 0 0 var(--space-2);
 }
 
 .chainList {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1);
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: 12px;
+  font-size: var(--font-xs);
 }
 
 .chainItem {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1);
 }
 
 .chainRelation {
-  padding: 1px 7px;
-  border-radius: 999px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
   background: var(--chip-bg);
   color: var(--muted);
-  font-size: 10.5px;
+  font-size: var(--font-2xs);
 }
 
 .chainNode {
@@ -44,7 +44,7 @@
 
 .chainMissing {
   color: var(--warning);
-  font-size: 12px;
+  font-size: var(--font-xs);
 }
 
 .loading {
@@ -59,6 +59,6 @@
   .chainNode {
     display: inline-flex;
     align-items: center;
-    min-height: 44px;
+    min-height: var(--size-touch);
   }
 }

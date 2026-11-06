@@ -3,6 +3,7 @@ import { ApiError } from "../../api/client.js";
 import { rotateAgentKey } from "../../api/identity.js";
 import { agentEnvHints } from "./envHints.js";
 import styles from "./IdentityForm.module.css";
+import { Button } from "../ui/Button.js";
 import { Dialog } from "../ui/Dialog.js";
 import { SecretReveal } from "./SecretReveal.js";
 
@@ -46,17 +47,16 @@ export function AgentRotateDialog({ agent, onClose }: AgentRotateDialogProps) {
             </p>
           )}
           <div className={styles.actions}>
-            <button type="button" className={styles.cancel} onClick={onClose}>
+            <Button variant="secondary" onClick={onClose}>
               取消
-            </button>
-            <button
-              type="button"
-              className={styles.submit}
+            </Button>
+            <Button
+              variant="primary"
+              loading={pending}
               onClick={() => void handleRotate()}
-              disabled={pending}
             >
               {pending ? "轮换中…" : "轮换密钥"}
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
@@ -67,9 +67,9 @@ export function AgentRotateDialog({ agent, onClose }: AgentRotateDialogProps) {
             hints={agentEnvHints(agent.id)}
           />
           <div className={styles.actions}>
-            <button type="button" className={styles.submit} onClick={onClose}>
+            <Button variant="primary" onClick={onClose}>
               我已保存，关闭
-            </button>
+            </Button>
           </div>
         </div>
       )}

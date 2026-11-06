@@ -1,11 +1,11 @@
 .threads {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .thread {
-  padding-top: 10px;
+  padding-top: var(--space-2);
   border-top: 1px solid var(--line-soft);
 }
 
@@ -18,25 +18,26 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
 }
 
 .participants {
-  font-size: 11px;
+  font-size: var(--font-xs);
   color: var(--subtle);
 }
 
+/* 时间线竖轨：轨道与节点都用 space 刻度定位 */
 .messages {
   position: relative;
-  padding-left: 14px;
+  padding-left: var(--space-4);
 }
 
 .messages::before {
   position: absolute;
-  top: 5px;
-  bottom: 5px;
-  left: 3px;
+  top: var(--space-1);
+  bottom: var(--space-1);
+  left: var(--space-1);
   width: 1px;
   background: var(--line-soft);
   content: "";
@@ -44,7 +45,7 @@
 
 .message {
   position: relative;
-  padding-bottom: 10px;
+  padding-bottom: var(--space-2);
 }
 
 .message:last-child {
@@ -53,12 +54,12 @@
 
 .message::before {
   position: absolute;
-  top: 5px;
-  left: -14px;
-  width: 5px;
-  height: 5px;
-  border: 1.5px solid var(--border);
-  border-radius: 50%;
+  top: var(--space-1);
+  left: calc(-1 * var(--space-4));
+  width: var(--space-1);
+  height: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
   background: var(--surface);
   content: "";
 }
@@ -72,8 +73,8 @@
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 4px;
-  font-size: 10.5px;
+  gap: var(--space-1);
+  font-size: var(--font-2xs);
   color: var(--subtle);
 }
 
@@ -83,13 +84,13 @@
 
 .messageFrom {
   margin-top: 1px;
-  font-size: 11.5px;
+  font-size: var(--font-xs);
   font-weight: 600;
   color: var(--text-secondary);
 }
 
 .messageBody {
-  font-size: 12px;
+  font-size: var(--font-xs);
   color: var(--text);
   overflow-wrap: anywhere;
 }
@@ -102,30 +103,30 @@
 .messageMeta {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 14px;
-  margin-top: 5px;
-  font-size: 10.5px;
+  gap: var(--space-1) var(--space-4);
+  margin-top: var(--space-1);
+  font-size: var(--font-2xs);
   color: var(--muted);
 }
 
 .refs {
-  margin-top: 5px;
-  font-size: 10.5px;
+  margin-top: var(--space-1);
+  font-size: var(--font-2xs);
   color: var(--muted);
 }
 
 .refList {
   margin: 0;
-  padding-left: 16px;
+  padding-left: var(--space-4);
 }
 
 .refItem {
-  margin-bottom: 3px;
+  margin-bottom: var(--space-1);
 }
 
 .threadMissing {
   color: var(--warning);
-  font-size: 12px;
+  font-size: var(--font-xs);
 }
 
 .loading {

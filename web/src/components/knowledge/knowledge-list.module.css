@@ -35,7 +35,7 @@
 
 .subline {
   display: block;
-  margin-top: 2px;
+  margin-top: var(--space-1);
   font-size: var(--font-xs);
   color: var(--subtle);
   overflow: hidden;

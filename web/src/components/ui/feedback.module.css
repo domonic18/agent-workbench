@@ -44,8 +44,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 64px;
-  height: 64px;
+  width: var(--size-empty-icon);
+  height: var(--size-empty-icon);
   margin: 0 auto var(--space-4);
   border-radius: var(--radius-full);
   background: var(--accent-soft);

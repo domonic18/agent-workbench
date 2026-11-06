@@ -152,7 +152,7 @@
 }
 
 .required {
-  margin-left: 2px;
+  margin-left: var(--space-1);
   color: var(--danger);
 }
 
@@ -232,7 +232,7 @@
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   font-size: var(--font-xs);
-  line-height: 18px;
+  line-height: var(--font-lg);
   white-space: nowrap;
 }
 

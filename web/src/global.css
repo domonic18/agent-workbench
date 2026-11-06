@@ -93,6 +93,7 @@
   --size-touch: 44px;
   --size-avatar: 32px;
   --size-textarea: 84px;
+  --size-empty-icon: 64px;
 
   /* 动效 */
   --duration-fast: 120ms;
@@ -107,6 +108,17 @@
   --content-max: 1440px;
   --content-narrow: 1100px;
   --content-prose: 720px;
+
+  /* 浮层尺寸 */
+  --dialog-sm: 420px;
+  --dialog-md: 560px;
+  --dialog-lg: 760px;
+  --dialog-xl: 1040px;
+  --drawer-w: 720px;
+  --toast-w-min: 200px;
+  --toast-w-max: 360px;
+  --menu-w-min: 190px;
+  --tooltip-w-max: 280px;
 }
 
 :root[data-theme="dark"] {

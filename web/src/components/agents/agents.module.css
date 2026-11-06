@@ -191,7 +191,7 @@
 @media (max-width: 767px) {
   /* 窄屏靠手指点，卡片动作按 44px 触达底线给 */
   .cardList .rowActionsLeft button {
-    height: 44px;
+    height: var(--size-touch);
     padding: 0 var(--space-4);
   }
 }
@@ -408,6 +408,6 @@
 /* 窄屏触达：委派白名单整行可点，行高按 44px 底线给 */
 @media (max-width: 767px) {
   .targetRow {
-    min-height: 44px;
+    min-height: var(--size-touch);
   }
 }

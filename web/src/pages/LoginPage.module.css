@@ -102,7 +102,7 @@
 
 .card {
   width: 100%;
-  max-width: 380px;
+  max-width: var(--dialog-sm);
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
@@ -166,6 +166,6 @@
   /* 触达区不小于 44px(03 §移动适配) */
   .card input,
   .card button {
-    min-height: 44px;
+    min-height: var(--size-touch);
   }
 }

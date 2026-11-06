@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Button } from "../ui/Button.js";
 import styles from "./IdentityForm.module.css";
 
 export interface SecretRevealProps {
@@ -26,9 +27,9 @@ export function SecretReveal({ secret, note, hints = [] }: SecretRevealProps) {
       </p>
       <div className={styles.secretRow}>
         <code className={styles.secretCode}>{secret}</code>
-        <button type="button" className={styles.copy} onClick={() => void copy()}>
+        <Button variant="secondary" onClick={() => void copy()}>
           {copied === "copied" ? "已复制" : "复制"}
-        </button>
+        </Button>
       </div>
       {copied === "failed" ? (
         <p className={styles.hint}>复制失败，请手动选中密钥。</p>

@@ -53,7 +53,7 @@
 
 .markdown a {
   color: var(--accent);
-  text-underline-offset: 2px;
+  text-underline-offset: var(--space-1);
 }
 
 .markdown code {
@@ -79,7 +79,7 @@
 
 .markdown blockquote {
   padding-left: var(--space-3);
-  border-left: 3px solid var(--border);
+  border-left: var(--space-1) solid var(--border);
   color: var(--text-secondary);
 }
 
