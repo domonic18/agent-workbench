@@ -1,11 +1,13 @@
 import type { IdentityStatus } from "../../shared/constants.js";
 import type { Db } from "../database.js";
 
-/** Agent 档案可改字段;其余列(机器绑定、密钥、路由 key)不由控制台会话改写 */
+/** Agent 档案可改字段;密钥与路由 key 不由控制台会话改写 */
 export interface AgentProfilePatch {
   displayName?: string | undefined;
   project?: string | undefined;
   status?: IdentityStatus | undefined;
+  /** 宿主机器:null 表示解绑(只允许外部运行时) */
+  machineId?: string | null | undefined;
 }
 
 /**
@@ -32,6 +34,10 @@ export async function updateAgentProfile(
   if (patch.status !== undefined) {
     sets.push("status = ?");
     params.push(patch.status);
+  }
+  if (patch.machineId !== undefined) {
+    sets.push("machine_id = ?");
+    params.push(patch.machineId);
   }
   if (sets.length === 0) {
     return true;
@@ -208,6 +214,8 @@ export async function deleteAgentCascade(
 export interface AgentLabel {
   id: string;
   displayName: string;
+  /** 飞书机器人名:对人展示时优先于控制台 displayName */
+  botName: string | null;
   project: string;
   /** 已删除的 Agent 走墓碑,展示时加「已删除」前缀 */
   deleted: boolean;
@@ -225,10 +233,10 @@ export async function resolveAgentLabels(
   }
   const placeholders = unique.map((_, i) => `$${i + 1}`).join(", ");
   const rows = (await db.all(
-    `SELECT id, display_name AS "displayName", project, false AS deleted
+    `SELECT id, display_name AS "displayName", feishu_bot_name AS "botName", project, false AS deleted
        FROM agent WHERE id IN (${placeholders})
      UNION ALL
-     SELECT id, display_name AS "displayName", project, true AS deleted
+     SELECT id, display_name AS "displayName", NULL AS "botName", project, true AS deleted
        FROM agent_tombstone WHERE id IN (${placeholders})`,
     ...unique,
   )) as AgentLabel[];

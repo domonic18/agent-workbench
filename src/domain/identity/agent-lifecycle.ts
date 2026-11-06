@@ -15,12 +15,15 @@ import {
   findAgentByMachineProject,
   type AgentRecord,
 } from "../../store/repositories/agent.js";
+import { findMachineById } from "../../store/repositories/machine.js";
 import { IdentityError } from "./errors.js";
 
 export interface UpdateAgentInput {
   displayName?: string | undefined;
   project?: string | undefined;
   status?: IdentityStatus | undefined;
+  /** 宿主机器:null 表示解绑(只允许外部运行时) */
+  machineId?: string | null | undefined;
 }
 
 /** 删除前的影响预览:数字与实际级联口径一致 */
@@ -93,6 +96,7 @@ export function createAgentLifecycleService(deps: AgentLifecycleDeps): AgentLife
       displayName?: string | undefined;
       project?: string | undefined;
       status?: IdentityStatus | undefined;
+      machineId?: string | null | undefined;
     } = {};
 
     if (input.displayName !== undefined) {
@@ -104,14 +108,37 @@ export function createAgentLifecycleService(deps: AgentLifecycleDeps): AgentLife
     if (input.status !== undefined) {
       patch.status = input.status;
     }
-    if (patch.displayName === undefined && patch.project === undefined && patch.status === undefined) {
+    if (input.machineId !== undefined) {
+      patch.machineId = await resolveMachineBinding(agent, input.machineId);
+    }
+    if (
+      patch.displayName === undefined &&
+      patch.project === undefined &&
+      patch.status === undefined &&
+      patch.machineId === undefined
+    ) {
       throw new IdentityError("VALIDATION_FAILED", "至少要改一项");
     }
 
-    // 机器绑定 Agent 的 (machine_id, project) 唯一:改项目前先查重
-    if (patch.project !== undefined && patch.project !== agent.project && agent.machineId !== null) {
+    // 机器绑定 Agent 的 (machine_id, project) 唯一:改项目或换机器前先查重
+    const targetMachine = patch.machineId === undefined ? agent.machineId : patch.machineId;
+    const targetProject = patch.project ?? agent.project;
+    if (targetMachine !== null && targetMachine !== agent.machineId) {
+      const clash = await findAgentByMachineProject(db, targetMachine, targetProject);
+      if (clash !== undefined && clash.id !== id) {
+        throw new IdentityError(
+          "CONFLICT",
+          `机器 ${targetMachine} 下已存在项目 ${targetProject} 的 Agent`,
+        );
+      }
+    }
+    if (
+      patch.project !== undefined &&
+      patch.project !== agent.project &&
+      agent.machineId !== null
+    ) {
       const clash = await findAgentByMachineProject(db, agent.machineId, patch.project);
-      if (clash !== undefined) {
+      if (clash !== undefined && clash.id !== id) {
         throw new IdentityError(
           "CONFLICT",
           `机器 ${agent.machineId} 下已存在项目 ${patch.project} 的 Agent`,
@@ -123,6 +150,31 @@ export function createAgentLifecycleService(deps: AgentLifecycleDeps): AgentLife
       throw new IdentityError("NOT_FOUND", `Agent ${id} 未注册`);
     }
     return requireAgent(id);
+  }
+
+  /**
+   * 绑定/解绑宿主机器(2026-11-06 用户反馈:WorkBuddy 没有绑定机器的入口)。
+   * claude_code 的机器绑定是采集与调度的前提,不可解绑;外部运行时绑定只登记归属,
+   * 该机 aw-node 不接管它的过程数据。
+   */
+  async function resolveMachineBinding(
+    agent: AgentRecord,
+    machineId: string | null,
+  ): Promise<string | null> {
+    if (machineId === null) {
+      if (agent.runtime === "claude_code") {
+        throw new IdentityError(
+          "VALIDATION_FAILED",
+          "claude_code 运行时依赖该机 aw-node 采集与调度,不能解绑机器",
+        );
+      }
+      return null;
+    }
+    const target = requireText(machineId, "machineId", IDENTITY_LIMITS.id);
+    if ((await findMachineById(db, target)) === undefined) {
+      throw new IdentityError("NOT_FOUND", `机器 ${target} 未注册`);
+    }
+    return target;
   }
 
   async function previewDeletion(id: string): Promise<AgentDeletionPreview> {

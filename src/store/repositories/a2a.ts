@@ -123,6 +123,24 @@ export async function maxRound(db: Db, threadId: string): Promise<number> {
   return row.round;
 }
 
+/** 最近一条回执(reply)的正文:任务结论的来源;同一批任务里取创建时间最新的一条 */
+export async function findLatestReplySummary(
+  db: Db,
+  taskIds: readonly string[],
+): Promise<string | null> {
+  if (taskIds.length === 0) {
+    return null;
+  }
+  const placeholders = taskIds.map((_, i) => `$${i + 1}`).join(", ");
+  const row = (await db.get(
+    `SELECT summary FROM a2a_message
+      WHERE intent = 'reply' AND task_id IN (${placeholders}) AND summary <> ''
+      ORDER BY created_at DESC, id DESC LIMIT 1`,
+    ...taskIds,
+  )) as { summary: string } | undefined;
+  return row?.summary ?? null;
+}
+
 export async function markAck(db: Db, id: string, now: number): Promise<boolean> {
   return (
     (

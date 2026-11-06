@@ -25,9 +25,13 @@ export interface CompletionNotice {
   title: string;
   from: CollabAgentRef;
   to: CollabAgentRef;
+  /** 结论摘要:下游回传的实际结论;取不到时为 null,播报退回「已同步给 X」 */
+  conclusion: string | null;
 }
 
 export interface ClosureNotice {
   taskId: string;
   title: string;
+  /** 结论摘要:根任务收口时取自下游回执;取不到时为 null,播报不写「结论」行 */
+  conclusion: string | null;
 }

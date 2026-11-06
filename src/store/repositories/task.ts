@@ -231,6 +231,14 @@ export async function listTasksByWorkItem(db: Db, workItemId: string): Promise<T
   )) as TaskRecord[];
 }
 
+/** 直接子任务 id:根任务收口时结论取自下游子任务的回执 */
+export async function listChildTaskIds(db: Db, parentId: string): Promise<string[]> {
+  const rows = (await db.all("SELECT id FROM task WHERE parent_task_id = ?", parentId)) as {
+    id: string;
+  }[];
+  return rows.map((row) => row.id);
+}
+
 export interface TaskUpdatePatch {
   id: string;
   fromStage: TaskStage;

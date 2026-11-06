@@ -4,14 +4,12 @@ import { IdentityError } from "../../domain/identity/errors.js";
 import { createIdentityService, type IdentityService } from "../../domain/identity/service.js";
 import {
   AGENT_RUNTIMES,
-  LIST_LIMITS,
   type AgentRuntime,
   type IdentityStatus,
 } from "../../shared/constants.js";
-import { formatKeysetCursor, parseKeysetCursor } from "../../shared/cursor.js";
+import { formatKeysetCursor } from "../../shared/cursor.js";
 import type { Db } from "../../store/database.js";
 import { parseJsonStringArray } from "../../store/json.js";
-import type { MachineRecord } from "../../store/repositories/machine.js";
 import type { AgentRecord } from "../../store/repositories/agent.js";
 import {
   listAgentRosterRows,
@@ -23,13 +21,7 @@ import {
   type UsageLimitRecord,
 } from "../../store/repositories/usage-limit.js";
 import { requireCsrf, requireIdempotencyKey, requireSession } from "../middleware/session.js";
-
-const machineCreateSchema = z.object({
-  id: z.string(),
-  hostname: z.string(),
-  os: z.string(),
-  collectorVersion: z.string(),
-});
+import { parseListQuery } from "./http.js";
 
 const agentCreateSchema = z.object({
   machineId: z.string().nullable().optional(),
@@ -59,16 +51,6 @@ export interface IdentityRoutesOptions {
   service?: IdentityService;
 }
 
-interface MachineDto {
-  id: string;
-  hostname: string;
-  os: string;
-  collectorVersion: string;
-  lastSeenAt: number | null;
-  status: IdentityStatus;
-  createdAt: number;
-}
-
 interface UsageLimitDto {
   dailyTokenLimit: number;
   warnPercent: number;
@@ -86,6 +68,8 @@ interface AgentDto {
   project: string;
   displayName: string;
   feishuAppId: string | null;
+  /** Agent 自报的飞书 bot 名称;为空表示尚未回写,显示时回退 displayName */
+  feishuBotName: string | null;
   status: IdentityStatus;
   allowedTargets: string[];
   createdAt: number;
@@ -93,27 +77,16 @@ interface AgentDto {
   usageLimit: UsageLimitDto | null;
 }
 
-export type { AgentDto, MachineDto, UsageLimitDto };
+export type { AgentDto, UsageLimitDto };
 
 /** 名册视图:身份档案 + 用量与在办聚合,供控制台 Agent 管理表格 */
 interface AgentRosterDto extends AgentDto {
   machineHostname: string | null;
+  machineDisplayName: string | null;
   totalRuns: number;
   totalTokens: number;
   openTasks: number;
   lastRunAt: number | null;
-}
-
-function toMachineDto(row: MachineRecord): MachineDto {
-  return {
-    id: row.id,
-    hostname: row.hostname,
-    os: row.os,
-    collectorVersion: row.collectorVersion,
-    lastSeenAt: row.lastSeenAt,
-    status: row.status,
-    createdAt: row.createdAt,
-  };
 }
 
 function toUsageLimitDto(row: UsageLimitRecord): UsageLimitDto {
@@ -140,6 +113,7 @@ export async function toAgentDto(
     project: row.project,
     displayName: row.displayName,
     feishuAppId: row.feishuAppId,
+    feishuBotName: row.feishuBotName,
     status: row.status,
     allowedTargets: parseJsonStringArray(row.allowedTargetsJson),
     createdAt: row.createdAt,
@@ -160,12 +134,14 @@ function toAgentRosterDto(
     project: row.project,
     displayName: row.displayName,
     feishuAppId: row.feishuAppId,
+    feishuBotName: row.feishuBotName,
     status: row.status,
     allowedTargets: parseJsonStringArray(row.allowedTargetsJson),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     usageLimit: limit === undefined ? null : toUsageLimitDto(limit),
     machineHostname: row.machineHostname,
+    machineDisplayName: row.machineDisplayName,
     totalRuns: row.totalRuns,
     totalTokens: row.totalTokens,
     openTasks: row.openTasks,
@@ -196,76 +172,12 @@ export function validationError(reply: FastifyReply, issues: z.ZodError): Fastif
   });
 }
 
-function parseListQuery(
-  query: Record<string, unknown>,
-  reply: FastifyReply,
-): { limit: number; before?: { createdAt: number; id: string } } | undefined {
-  const limit = typeof query.limit === "string" ? Number(query.limit) : LIST_LIMITS.default;
-  if (!Number.isInteger(limit) || limit < 1 || limit > LIST_LIMITS.max) {
-    void reply.code(422).send({
-      error: { code: "VALIDATION_FAILED", message: `limit 必须为 1~${LIST_LIMITS.max} 的整数` },
-    });
-    return undefined;
-  }
-  const before = typeof query.cursor === "string" ? parseKeysetCursor(query.cursor) : undefined;
-  if (typeof query.cursor === "string" && before === undefined) {
-    void reply.code(422).send({
-      error: { code: "VALIDATION_FAILED", message: "cursor 格式应为 <createdAt>:<id>" },
-    });
-    return undefined;
-  }
-  return { limit, ...(before === undefined ? {} : { before }) };
-}
-
 export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRoutesOptions): void {
   const db = options.db;
   const now = options.now ?? Date.now;
   const service = options.service ?? createIdentityService({ db, now });
   const session = requireSession(db, now);
   const writeGuards = [session, requireCsrf(), requireIdempotencyKey()];
-
-  app.post("/api/machines", { preHandler: writeGuards }, async (request, reply) => {
-    const parsed = machineCreateSchema.safeParse(request.body ?? {});
-    if (!parsed.success) {
-      return validationError(reply, parsed.error);
-    }
-    try {
-      const { machine, secret } = await service.registerMachine(parsed.data);
-      return reply.code(201).send({ machine: toMachineDto(machine), secret });
-    } catch (error) {
-      if (error instanceof IdentityError) {
-        return sendError(reply, error);
-      }
-      throw error;
-    }
-  });
-
-  app.post("/api/machines/:id/rotate", { preHandler: writeGuards }, async (request, reply) => {
-    const { id } = request.params as { id: string };
-    try {
-      const { secret } = await service.rotateMachineSecret(id);
-      return { secret };
-    } catch (error) {
-      if (error instanceof IdentityError) {
-        return sendError(reply, error);
-      }
-      throw error;
-    }
-  });
-
-  app.get("/api/machines", { preHandler: session }, async (request, reply) => {
-    const query = parseListQuery(request.query as Record<string, unknown>, reply);
-    if (query === undefined) {
-      return reply;
-    }
-    const rows = await service.listMachines(query);
-    const last = rows.at(-1);
-    return {
-      items: rows.map(toMachineDto),
-      nextCursor:
-        rows.length === query.limit && last !== undefined ? formatKeysetCursor(last) : null,
-    };
-  });
 
   app.post("/api/agents", { preHandler: writeGuards }, async (request, reply) => {
     const parsed = agentCreateSchema.safeParse(request.body ?? {});

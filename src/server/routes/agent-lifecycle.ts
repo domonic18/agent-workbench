@@ -27,6 +27,8 @@ const agentUpdateSchema = z
     displayName: z.string().optional(),
     project: z.string().optional(),
     status: z.enum(IDENTITY_STATUSES).optional(),
+    /** 宿主机器:null 表示解绑(只允许外部运行时) */
+    machineId: z.string().nullable().optional(),
   })
   .strict();
 

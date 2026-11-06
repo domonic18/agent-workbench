@@ -359,6 +359,49 @@ describe("completionNotice", () => {
       title: "下游任务",
       from: { id: "agt_b", displayName: "Agent B" },
       to: { id: "agt_a", displayName: "Agent A" },
+      conclusion: null,
+    });
+    await db.close();
+  });
+
+  it("结论取本任务最近一条回执正文", async () => {
+    const { service, db } = await prepare();
+    await seed(db);
+    await db.run(
+      `INSERT INTO a2a_thread (id, initiator_task_id, initiator_agent, responder_agent, created_at)
+         VALUES ('thr_1', 'tsk_parent', 'agt_a', 'agt_b', 0)`,
+    );
+    await db.run(
+      `INSERT INTO a2a_message (id, thread_id, task_id, round, from_agent, to_agent, intent,
+         summary, expect, refs_json, created_at)
+         VALUES ('msg_1', 'thr_1', 'tsk_child', 1, 'agt_b', 'agt_a', 'reply',
+           '接口契约已落到 docs/api.md', '', '[]', 0)`,
+    );
+    await service.update({ taskId: "tsk_child", assignee: "agt_b", status: "done" });
+
+    expect(await service.completionNotice("tsk_child")).toMatchObject({
+      conclusion: "接口契约已落到 docs/api.md",
+    });
+    await db.close();
+  });
+
+  it("回执正文为空串时不算结论,播报退回占位", async () => {
+    const { service, db } = await prepare();
+    await seed(db);
+    await db.run(
+      `INSERT INTO a2a_thread (id, initiator_task_id, initiator_agent, responder_agent, created_at)
+         VALUES ('thr_1', 'tsk_parent', 'agt_a', 'agt_b', 0)`,
+    );
+    await db.run(
+      `INSERT INTO a2a_message (id, thread_id, task_id, round, from_agent, to_agent, intent,
+         summary, expect, refs_json, created_at)
+         VALUES ('msg_1', 'thr_1', 'tsk_child', 1, 'agt_b', 'agt_a', 'reply',
+           '   ', '', '[]', 0)`,
+    );
+    await service.update({ taskId: "tsk_child", assignee: "agt_b", status: "done" });
+
+    expect(await service.completionNotice("tsk_child")).toMatchObject({
+      conclusion: null,
     });
     await db.close();
   });

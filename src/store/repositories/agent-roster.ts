@@ -14,10 +14,14 @@ export interface AgentRosterRow {
   key: string | null;
   status: IdentityStatus;
   feishuAppId: string | null;
+  /** Agent 自报的飞书 bot 名称;控制台优先用它显示,空则回退 displayName */
+  feishuBotName: string | null;
   allowedTargetsJson: string;
   createdAt: number;
   updatedAt: number;
   machineHostname: string | null;
+  /** 机器展示名:控制台可改,空表示未回填 */
+  machineDisplayName: string | null;
   /** 累计运行次数 */
   totalRuns: number;
   /** 累计 token(含缓存读写) */
@@ -31,9 +35,11 @@ const ROSTER_COLUMNS = `
   a.id, a.machine_id AS "machineId", a.runtime, a.project,
   a.display_name AS "displayName", a.key, a.status,
   a.feishu_app_id AS "feishuAppId",
+  a.feishu_bot_name AS "feishuBotName",
   a.allowed_targets_json AS "allowedTargetsJson",
   a.created_at AS "createdAt", a.updated_at AS "updatedAt",
   m.hostname AS "machineHostname",
+  m.display_name AS "machineDisplayName",
   COALESCE(r."totalRuns", 0) AS "totalRuns",
   COALESCE(tok."totalTokens", 0) AS "totalTokens",
   COALESCE(t."openTasks", 0) AS "openTasks",

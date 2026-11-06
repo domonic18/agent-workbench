@@ -4,6 +4,8 @@ import type { Db } from "../database.js";
 export interface MachineRecord {
   id: string;
   hostname: string;
+  /** 展示名:可与 hostname 不同(主机名登记成 IP 时可改);为空表示未回填 */
+  displayName: string | null;
   os: string;
   collectorVersion: string;
   collectorSecretHash: string;
@@ -19,7 +21,7 @@ export interface MachineRecord {
 export type MachineConfigStatus = "pending" | "delivered" | "effective";
 
 const MACHINE_COLUMNS = `
-  id, hostname, os, collector_version AS "collectorVersion",
+  id, hostname, display_name AS "displayName", os, collector_version AS "collectorVersion",
   collector_secret_hash AS "collectorSecretHash", last_seen_at AS "lastSeenAt",
   status, created_at AS "createdAt",
   discovery_json AS "discoveryJson", discovery_received_at AS "discoveryReceivedAt",
@@ -38,9 +40,10 @@ export interface NewMachine {
 export async function insertMachine(db: Db, row: NewMachine): Promise<void> {
   await db.run(
     `INSERT INTO machine
-       (id, hostname, os, collector_version, collector_secret_hash, status, created_at)
-     VALUES (?, ?, ?, ?, ?, 'active', ?)`,
-    row.id, row.hostname, row.os, row.collectorVersion, row.collectorSecretHash, row.createdAt,
+       (id, hostname, display_name, os, collector_version, collector_secret_hash, status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'active', ?)`,
+    row.id, row.hostname, row.hostname, row.os, row.collectorVersion, row.collectorSecretHash,
+    row.createdAt,
   );
 }
 
@@ -53,6 +56,19 @@ export async function findMachineById(db: Db, id: string): Promise<MachineRecord
 export async function updateMachineSecretHash(db: Db, id: string, hash: string): Promise<boolean> {
   return (
     (await db.run("UPDATE machine SET collector_secret_hash = ? WHERE id = ?", hash, id)).changes === 1
+  );
+}
+
+/** 改展示名:只动 display_name,hostname 去重键与 Agent 绑定不受影响 */
+export async function updateMachineDisplayName(
+  db: Db,
+  id: string,
+  displayName: string,
+): Promise<boolean> {
+  return (
+    (
+      await db.run("UPDATE machine SET display_name = ? WHERE id = ?", displayName, id)
+    ).changes === 1
   );
 }
 

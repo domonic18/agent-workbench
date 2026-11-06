@@ -237,13 +237,56 @@ describe("身份注册", () => {
     await db.close();
   });
 
-  it("绑定机器的 Agent 拒绝外部 runtime,不静默改写", async () => {
+  it("外部 runtime 可绑定机器:只登记宿主归属,不静默改成 claude_code", async () => {
     const { db, service } = await prepare();
     await service.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
+    const { agent } = await service.registerAgent({
+      machineId: "m1",
+      project: "p",
+      displayName: "A",
+      runtime: "workbuddy",
+      key: "wb-p",
+    });
+    expect(agent.runtime).toBe("workbuddy");
+    expect(agent.machineId).toBe("m1");
+    expect(agent.key).toBe("wb-p");
+    await db.close();
+  });
+
+  it("同机同项目不许有两个 Agent", async () => {
+    const { db, service } = await prepare();
+    await service.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
+    await service.registerAgent({ machineId: "m1", project: "p", displayName: "A" });
     await expectCode(
-      () => service.registerAgent({ machineId: "m1", project: "p", displayName: "A", runtime: "workbuddy" }),
-      "VALIDATION_FAILED",
+      () =>
+        service.registerAgent({
+          machineId: "m1",
+          project: "p",
+          displayName: "B",
+          runtime: "workbuddy",
+        }),
+      "CONFLICT",
     );
+    await db.close();
+  });
+});
+
+describe("机器改名", () => {
+  it("只改展示名,hostname 去重键不动", async () => {
+    const { db, service } = await prepare();
+    await service.registerMachine({ id: "m1", hostname: "192.168.1.244", os: "linux", collectorVersion: "1" });
+
+    const renamed = await service.renameMachine("m1", "  工作室机  ");
+    expect(renamed.displayName).toBe("工作室机");
+    expect(renamed.hostname).toBe("192.168.1.244");
+    await db.close();
+  });
+
+  it("空名与未注册机器都报错", async () => {
+    const { db, service } = await prepare();
+    await service.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
+    await expectCode(() => service.renameMachine("m1", "  "), "VALIDATION_FAILED");
+    await expectCode(() => service.renameMachine("m_ghost", "x"), "NOT_FOUND");
     await db.close();
   });
 });

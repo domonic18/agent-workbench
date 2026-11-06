@@ -23,6 +23,7 @@ import {
 } from "../../store/repositories/work-item.js";
 import { hasActiveAssignment } from "../../store/repositories/work-inbox.js";
 import { agentRef } from "../collab/agent-ref.js";
+import { resolveConclusion } from "../collab/conclusion.js";
 import type { CompletionNotice } from "../collab/notice.js";
 import { closeAncestorsIfComplete } from "./auto-close.js";
 import { TaskError } from "./errors.js";
@@ -310,6 +311,7 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
       title: task.title,
       from: agentRef(from),
       to: agentRef(to),
+      conclusion: await resolveConclusion(db, task.id),
     };
   }
 

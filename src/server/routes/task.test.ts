@@ -372,6 +372,23 @@ describe("task 路由", () => {
       expect(badLimit.statusCode).toBe(422);
     });
 
+    it("展示名给飞书机器人名,不是裸 id", async () => {
+      await fixture.db.run("UPDATE agent SET feishu_bot_name = ? WHERE id = ?", "小工", "agt_a");
+      await createTask("agt_a");
+      const cookie = await consoleCookie();
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/tasks",
+        headers: { cookie },
+      });
+      expect(response.statusCode).toBe(200);
+      const item = response.json().items[0];
+      expect(item.assignee_label).toBe("小工");
+      // 下发人是「console」这种非 Agent 值,原样透出
+      expect(item.assigner_label).toBe("console");
+    });
+
     it("详情一次返回任务、授权摘要与 token 汇总", async () => {
       const taskId = await createTask();
       await seedUsage(taskId);

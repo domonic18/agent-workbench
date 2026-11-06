@@ -53,12 +53,14 @@ export function buildAcceptBulletin(notice: AcceptNotice, chatId: string): Colla
 
 /** ③ 完成:B 下游任务 done,结论已随回执同步 */
 export function buildCompletionBulletin(notice: CompletionNotice, chatId: string): CollabBulletin {
+  const conclusion =
+    notice.conclusion === null ? `已同步给 ${notice.to.displayName}` : mdText(notice.conclusion);
   return {
     chatId,
     card: statusCard({
       title: `〔完成〕${notice.from.displayName} 已完成`,
       template: "green",
-      body: `**任务**:${mdText(notice.title)}\n**结论**:已同步给 ${notice.to.displayName}`,
+      body: `**任务**:${mdText(notice.title)}\n**结论**:${conclusion}`,
     }),
     uuid: `task_done:${notice.taskId}`,
     taskId: notice.taskId,
@@ -67,12 +69,14 @@ export function buildCompletionBulletin(notice: CompletionNotice, chatId: string
 
 /** ④ 验收:根任务在「下游全部终态且回执已确认」时由系统收口 */
 export function buildClosureBulletin(notice: ClosureNotice, chatId: string): CollabBulletin {
+  const conclusion =
+    notice.conclusion === null ? "" : `\n**结论**:${mdText(notice.conclusion)}`;
   return {
     chatId,
     card: statusCard({
       title: "〔验收〕任务已闭环",
       template: "indigo",
-      body: `**任务**:${mdText(notice.title)}`,
+      body: `**任务**:${mdText(notice.title)}${conclusion}`,
     }),
     uuid: `task_closed:${notice.taskId}`,
     taskId: notice.taskId,

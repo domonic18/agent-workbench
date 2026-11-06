@@ -1,6 +1,7 @@
 import type { A2aService } from "../a2a/types.js";
 import type { TaskService } from "../task/service.js";
 import type { Db } from "../../store/database.js";
+import { resolveConclusion } from "./conclusion.js";
 import {
   buildAcceptBulletin,
   buildClosureBulletin,
@@ -33,9 +34,13 @@ async function announceClosures(
     return;
   }
   for (const closed of autoClosed) {
+    const conclusion = await resolveConclusion(options.db, closed.id);
     await enqueueCollabBulletin(
       options.db,
-      buildClosureBulletin({ taskId: closed.id, title: closed.title }, options.chatId),
+      buildClosureBulletin(
+        { taskId: closed.id, title: closed.title, conclusion },
+        options.chatId,
+      ),
       options.now?.(),
     );
   }

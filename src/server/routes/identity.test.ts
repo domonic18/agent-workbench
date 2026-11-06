@@ -63,46 +63,6 @@ describe("identity 路由", () => {
     return response.json() as { agent: { id: string }; secret: string };
   }
 
-  it("未登录 / 缺幂等键都拒绝", async () => {
-    expect((await app.inject({ method: "GET", url: "/api/machines" })).statusCode).toBe(401);
-
-    const noKey = await app.inject({
-      method: "POST",
-      url: "/api/machines",
-      headers: { cookie, "x-requested-with": "fetch" },
-      payload: { id: "m1", hostname: "h", os: "linux", collectorVersion: "1" },
-    });
-    expect(noKey.statusCode).toBe(422);
-  });
-
-  it("注册机器:明文只返回一次,列表不含哈希", async () => {
-    const created = await app.inject({
-      method: "POST",
-      url: "/api/machines",
-      headers: writeHeaders(),
-      payload: { id: "m1", hostname: "h", os: "linux", collectorVersion: "1" },
-    });
-    expect(created.statusCode).toBe(201);
-    const body = created.json() as { machine: Record<string, unknown>; secret: string };
-    expect(typeof body.secret).toBe("string");
-    expect(body.machine).toMatchObject({ id: "m1", status: "active" });
-    expect(body.machine).not.toHaveProperty("collectorSecretHash");
-
-    const duplicate = await app.inject({
-      method: "POST",
-      url: "/api/machines",
-      headers: writeHeaders(),
-      payload: { id: "m1", hostname: "h", os: "linux", collectorVersion: "1" },
-    });
-    expect(duplicate.statusCode).toBe(409);
-
-    const list = await app.inject({ method: "GET", url: "/api/machines", headers: { cookie } });
-    expect(list.statusCode).toBe(200);
-    const items = (list.json() as { items: Record<string, unknown>[] }).items;
-    expect(items).toHaveLength(1);
-    expect(items[0]).not.toHaveProperty("collectorSecretHash");
-  });
-
   it("注册 Agent:机器不存在 404,重复 (machine, project) 409", async () => {
     await app.inject({
       method: "POST",

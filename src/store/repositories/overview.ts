@@ -41,10 +41,13 @@ export async function getOverviewMetrics(db: Db, window: OverviewWindow): Promis
 export interface AgentOverviewRow {
   id: string;
   displayName: string;
+  /** Agent 自报的飞书 bot 名称;控制台优先用它显示,空则回退 displayName */
+  feishuBotName: string | null;
   project: string;
   machineId: string | null;
   runtime: AgentRuntime;
   machineHostname: string | null;
+  machineDisplayName: string | null;
   machineLastSeenAt: number | null;
   lastRunAt: number | null;
   running: number;
@@ -74,10 +77,12 @@ export async function listAgentOverviewRows(
     `SELECT
        a.id,
        a.display_name AS "displayName",
+       a.feishu_bot_name AS "feishuBotName",
        a.project,
        a.machine_id AS "machineId",
        a.runtime AS "runtime",
        m.hostname AS "machineHostname",
+       m.display_name AS "machineDisplayName",
        m.last_seen_at AS "machineLastSeenAt",
        lr."lastRunAt",
        CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS running,

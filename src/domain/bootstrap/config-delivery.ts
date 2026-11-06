@@ -200,7 +200,12 @@ export async function pullMachineConfig(
   return deps.db.transaction(async (tx) => {
     const refreshBotNames = await consumeMachineBotRefresh(tx, input.machineId);
     const agents = (await listAgentsByMachine(tx, input.machineId)).filter(
-      (agent) => agent.status === "active" && agent.bootstrapStatus === "confirmed",
+      (agent) =>
+        agent.status === "active" &&
+        agent.bootstrapStatus === "confirmed" &&
+        // aw-node 只接管 claude_code:外部运行时(WorkBuddy 等)即便登记了宿主机器,
+        // 其配置由自己的客户端持有,不由本机写进 claude.json
+        agent.runtime === "claude_code",
     );
     const delivered: DeliveredAgentConfig[] = [];
     let rotatedAny = false;
@@ -289,7 +294,8 @@ export async function ackMachineConfig(
       (agent) =>
         agent.status === "active" &&
         agent.bootstrapStatus === "confirmed" &&
-        agent.configAckAt === null,
+        agent.configAckAt === null &&
+        agent.runtime === "claude_code",
     );
     const status: MachineConfigStatus = pending.length === 0 ? "effective" : "delivered";
     await updateMachineConfigStatus(tx, input.machineId, status);

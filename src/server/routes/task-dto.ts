@@ -8,7 +8,7 @@ export interface TaskDto {
   title: string;
   assigner: string;
   assignee: string;
-  /** 展示用名:Agent 已被硬删除时显示「已删除 Agent X」,否则与原始 id 相同 */
+  /** 展示用名:Agent 在册时给飞书机器人名(回退控制台显示名),已被硬删除时显示「已删除 Agent X」,不是 Agent 的值(aw-console / human)原样透出 */
   assigner_label: string;
   assignee_label: string;
   project: string;
@@ -27,10 +27,19 @@ export interface TaskDto {
   updated_at: number;
 }
 
-/** 只有墓碑里的(已删除)Agent 需要改写展示;其他情况原样透出 id */
+/**
+ * 展示名:在册 Agent 取飞书机器人名(回退控制台显示名),已删除的加「已删除」前缀,
+ * 不是 Agent 的值(aw-console / human / feishu:xxx)原样透出。
+ */
 function labelFor(id: string, labels: Map<string, AgentLabel> | undefined): string {
   const label = labels?.get(id);
-  return label !== undefined && label.deleted ? `已删除 ${label.displayName}` : id;
+  if (label === undefined) {
+    return id;
+  }
+  if (label.deleted) {
+    return `已删除 ${label.displayName}`;
+  }
+  return label.botName ?? label.displayName;
 }
 
 export function toTaskDto(row: TaskRecord, labels?: Map<string, AgentLabel>): TaskDto {

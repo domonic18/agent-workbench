@@ -36,9 +36,14 @@ const COMPLETION: CompletionNotice = {
   title: "整理接口契约",
   from: { id: "agt_b", displayName: "Agent B" },
   to: { id: "agt_a", displayName: "Agent A" },
+  conclusion: "契约已落到 docs/api.md,字段与错误码对齐",
 };
 
-const CLOSURE: ClosureNotice = { taskId: "tsk_up", title: "接口契约联调" };
+const CLOSURE: ClosureNotice = {
+  taskId: "tsk_up",
+  title: "接口契约联调",
+  conclusion: "联调通过,契约无变更",
+};
 
 function cardText(card: Record<string, unknown>): {
   title: string;
@@ -78,25 +83,37 @@ describe("协作群播报卡片(无 @,控制台直发)", () => {
     expect(JSON.stringify(bulletin.card)).not.toContain("msg_1");
   });
 
-  it("③ 完成卡片:完成方 + 结论已同步给发起方,uuid 按任务固定", () => {
+  it("③ 完成卡片:完成方 + 结论摘要,uuid 按任务固定", () => {
     const bulletin = buildCompletionBulletin(COMPLETION, "oc_group");
     expect(bulletin.uuid).toBe("task_done:tsk_down");
     const view = cardText(bulletin.card);
     expect(view.title).toBe("〔完成〕Agent B 已完成");
     expect(view.template).toBe("green");
     expect(view.elements[0]).toBe(
+      "**任务**:整理接口契约\n**结论**:契约已落到 docs/api.md,字段与错误码对齐",
+    );
+  });
+
+  it("③ 完成卡片:取不到结论时退回「已同步给发起方」", () => {
+    const bulletin = buildCompletionBulletin({ ...COMPLETION, conclusion: null }, "oc_group");
+    expect(cardText(bulletin.card).elements[0]).toBe(
       "**任务**:整理接口契约\n**结论**:已同步给 Agent A",
     );
   });
 
-  it("④ 验收卡片:根任务闭环,uuid 按任务固定", () => {
+  it("④ 验收卡片:根任务闭环并带结论摘要,uuid 按任务固定", () => {
     const bulletin = buildClosureBulletin(CLOSURE, "oc_group");
     expect(bulletin.uuid).toBe("task_closed:tsk_up");
     const view = cardText(bulletin.card);
     expect(view.title).toBe("〔验收〕任务已闭环");
     expect(view.template).toBe("indigo");
-    expect(view.elements[0]).toBe("**任务**:接口契约联调");
+    expect(view.elements[0]).toBe("**任务**:接口契约联调\n**结论**:联调通过,契约无变更");
     expect(JSON.stringify(bulletin.card)).not.toContain("tsk_up");
+  });
+
+  it("④ 验收卡片:取不到结论时不写结论行", () => {
+    const bulletin = buildClosureBulletin({ ...CLOSURE, conclusion: null }, "oc_group");
+    expect(cardText(bulletin.card).elements[0]).toBe("**任务**:接口契约联调");
   });
 
   it("动态内容打断 markdown 语法,防任务标题注入链接或富文本", () => {

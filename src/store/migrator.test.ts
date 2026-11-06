@@ -75,6 +75,7 @@ describe("runMigrations", () => {
       { version: 10, name: "bot_name_refresh" },
       { version: 11, name: "usage_limit" },
       { version: 12, name: "agent_tombstone" },
+      { version: 13, name: "machine_display_name" },
     ]);
     await db.close();
   });

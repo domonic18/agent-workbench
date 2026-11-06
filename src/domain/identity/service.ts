@@ -5,6 +5,7 @@ import {
   findMachineById,
   insertMachine,
   listMachines,
+  updateMachineDisplayName,
   updateMachineSecretHash,
   type MachineListQuery,
   type MachineRecord,
@@ -32,13 +33,13 @@ export interface RegisterMachineInput {
 }
 
 export interface RegisterAgentInput {
-  /** 机器绑定 Agent 必填;机器无关 Agent(无 aw-node 的外部运行时)留空,改由 runtime 区分 */
+  /** 宿主机器:claude_code 由该机 aw-node 采集与调度;外部运行时只登记归属 */
   machineId?: string | null | undefined;
-  /** 机器绑定 Agent 强制 claude_code;机器无关 Agent 必须显式给出外部 runtime */
+  /** 机器无关 Agent 必须显式给出外部 runtime;绑定机器时缺省 claude_code */
   runtime?: AgentRuntime | undefined;
   /**
    * 稳定 key:Git 项目注册表(PROJECT_REGISTRY)引用的路由目标。
-   * 只有机器无关 Agent 可显式给出;机器绑定的 key 由 /setup 确认流程按项目名派生。
+   * 只有外部运行时 Agent 可显式给出;claude_code 的 key 由 /setup 确认流程按项目名派生。
    */
   key?: string | null | undefined;
   project: string;
@@ -74,6 +75,8 @@ export interface IdentityService {
   setAllowedTargets(id: string, targets: string[]): Promise<AgentRecord>;
   /** 控制台会话维护 Agent 日 token 上限;无上限行时默认无限量 */
   setUsageLimit(id: string, input: UsageLimitInput): Promise<AgentRecord>;
+  /** 控制台会话改机器展示名;hostname 是 enroll 去重键,不动 */
+  renameMachine(id: string, displayName: string): Promise<MachineRecord>;
   listMachines(query: MachineListQuery): Promise<MachineRecord[]>;
   listAgents(query: AgentListQuery): Promise<AgentRecord[]>;
 }
@@ -180,16 +183,33 @@ export function createIdentityService(deps: IdentityServiceDeps): IdentityServic
         throw new IdentityError("CONFLICT", `Agent key ${agentKey} 已被占用`);
       }
     } else {
-      // 机器绑定 Agent:claude_code 经 aw-node 调度,强制校验机器存在与项目去重
+      // 机器绑定 Agent:claude_code 经 aw-node 采集与调度;外部运行时(WorkBuddy 等)
+      // 绑定机器只登记「运行时宿主在这台机上」,该机 aw-node 不接管它的过程数据。
       machineId = requireText(input.machineId, "machineId", IDENTITY_LIMITS.id);
-      if (input.runtime !== undefined && input.runtime !== "claude_code") {
+      const external =
+        input.runtime !== undefined &&
+        (EXTERNAL_RUNTIMES as readonly AgentRuntime[]).includes(input.runtime);
+      if (input.runtime !== undefined && !external && input.runtime !== "claude_code") {
         throw new IdentityError(
           "VALIDATION_FAILED",
-          `绑定机器的 Agent 只能是 claude_code 运行时,收到 ${input.runtime}`,
+          `绑定机器的 Agent 只能是 claude_code 或外部运行时,收到 ${input.runtime}`,
         );
       }
-      if (input.key !== undefined && input.key !== null && input.key !== "") {
-        throw new IdentityError("VALIDATION_FAILED", "机器绑定 Agent 的 key 由初始化确认流程派生,不接受自报");
+      if (external) {
+        runtime = input.runtime as AgentRuntime;
+        agentKey =
+          input.key === undefined || input.key === null || input.key === ""
+            ? null
+            : requireText(input.key, "key", IDENTITY_LIMITS.id);
+        if (agentKey !== null && (await findAgentByKey(db, agentKey)) !== undefined) {
+          throw new IdentityError("CONFLICT", `Agent key ${agentKey} 已被占用`);
+        }
+      } else {
+        if (input.key !== undefined && input.key !== null && input.key !== "") {
+          throw new IdentityError("VALIDATION_FAILED", "机器绑定 Agent 的 key 由初始化确认流程派生,不接受自报");
+        }
+        runtime = "claude_code";
+        agentKey = null;
       }
       if ((await findMachineById(db, machineId)) === undefined) {
         throw new IdentityError("NOT_FOUND", `机器 ${machineId} 未注册`);
@@ -197,8 +217,6 @@ export function createIdentityService(deps: IdentityServiceDeps): IdentityServic
       if ((await findAgentByMachineProject(db, machineId, project)) !== undefined) {
         throw new IdentityError("CONFLICT", `机器 ${machineId} 下已存在项目 ${project} 的 Agent`);
       }
-      runtime = "claude_code";
-      agentKey = null;
     }
 
     const id = newAgentId();
@@ -277,6 +295,18 @@ export function createIdentityService(deps: IdentityServiceDeps): IdentityServic
     return agent;
   }
 
+  async function renameMachine(id: string, displayName: string): Promise<MachineRecord> {
+    const name = requireText(displayName, "displayName", IDENTITY_LIMITS.hostname);
+    if (!(await updateMachineDisplayName(db, id, name))) {
+      throw new IdentityError("NOT_FOUND", `机器 ${id} 未注册`);
+    }
+    const machine = await findMachineById(db, id);
+    if (machine === undefined) {
+      throw new Error(`机器改名后读不到记录: ${id}`);
+    }
+    return machine;
+  }
+
   async function setUsageLimit(id: string, input: UsageLimitInput): Promise<AgentRecord> {
     if ((await findAgentById(db, id)) === undefined) {
       throw new IdentityError("NOT_FOUND", `Agent ${id} 未注册`);
@@ -312,6 +342,7 @@ export function createIdentityService(deps: IdentityServiceDeps): IdentityServic
     rotateAgentSecret,
     setAllowedTargets,
     setUsageLimit,
+    renameMachine,
     listMachines: (query) => listMachines(db, query),
     listAgents: (query) => listAgents(db, query),
   };
