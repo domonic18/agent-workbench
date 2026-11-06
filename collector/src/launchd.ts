@@ -174,6 +174,30 @@ export function lintPlist(path: string): string | null {
   return `${result.stderr ?? ""}${result.stdout ?? ""}`.trim();
 }
 
+/** launchd 拆除服务是异步的:bootout 返回后服务仍可能挂在域里,立刻重装会撞 EIO */
+const DRAIN_POLL_MS = 200;
+const DRAIN_MAX_POLLS = 25;
+/** 同名重装的尝试次数 */
+const BOOTSTRAP_ATTEMPTS = 3;
+
+function sleepSync(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function serviceLoaded(run: LaunchctlRunner, domain: string, label: string): boolean {
+  return run(["print", `${domain}/${label}`]).status === 0;
+}
+
+/** 等服务真正从域里消失;bootout 之后必须等,否则同名 bootstrap 报 5: Input/output error */
+function drainService(run: LaunchctlRunner, domain: string, label: string): void {
+  for (let i = 0; i < DRAIN_MAX_POLLS; i += 1) {
+    if (!serviceLoaded(run, domain, label)) {
+      return;
+    }
+    sleepSync(DRAIN_POLL_MS);
+  }
+}
+
 export interface LoadOutcome {
   domain: string;
   /** 装载前的摘除动作(同名服务已存在时发生) */
@@ -190,7 +214,7 @@ export interface LoadDiagnostics {
 
 /**
  * 把服务装载进 launchd。
- * 逐域尝试:先看域是否可达(gui 不存在时用 user),同名服务已挂着就先摘再装。
+ * 逐域尝试(gui → user),同名服务已挂着或正在拆除时先摘干净再装,
  * 全域失败时抛出带诊断与手动重试命令的错误,不再只回一句 launchctl 原文。
  */
 export function loadService(
@@ -209,21 +233,25 @@ export function loadService(
   }
   const failures: { domain: string; message: string }[] = [];
   for (const domain of availableDomains) {
-    const result = run(["bootstrap", domain, plist]);
-    if (result.status === 0) {
-      return { domain, bootedOut: false };
-    }
-    // 同名服务已挂在该域时 bootstrap 报 5: Input/output error,摘掉再装一次
-    if (run(["print", `${domain}/${label}`]).status === 0) {
-      run(["bootout", `${domain}/${label}`]);
-      const retry = run(["bootstrap", domain, plist]);
-      if (retry.status === 0) {
-        return { domain, bootedOut: true };
+    let message = "";
+    let bootedOut = false;
+    for (let attempt = 1; attempt <= BOOTSTRAP_ATTEMPTS; attempt += 1) {
+      const result = run(["bootstrap", domain, plist]);
+      if (result.status === 0) {
+        return { domain, bootedOut };
       }
-      failures.push({ domain, message: retry.stderr || retry.stdout });
-      continue;
+      message = result.stderr || result.stdout;
+      if (serviceLoaded(run, domain, label)) {
+        // 同名服务还挂着:摘掉并等它真正消失,再试下一次
+        run(["bootout", `${domain}/${label}`]);
+        drainService(run, domain, label);
+        bootedOut = true;
+      } else {
+        // 服务已不在,但上一次拆除可能还在收尾:稍等再试
+        sleepSync(DRAIN_POLL_MS);
+      }
     }
-    failures.push({ domain, message: result.stderr || result.stdout });
+    failures.push({ domain, message });
   }
   const detail = failures.map((item) => `  ${item.domain}: ${item.message}`).join("\n");
   const manual = availableDomains
@@ -258,16 +286,23 @@ export function install(options: InstallOptions): void {
   const domains = domainTargets(uid());
   // 旧基线 collector 服务若还在,先停掉并摘除 plist,保证每机单服务
   for (const domain of domains) {
-    runLaunchctl(["bootout", `${domain}/${LEGACY_LABEL}`]);
+    if (serviceLoaded(runLaunchctl, domain, LEGACY_LABEL)) {
+      runLaunchctl(["bootout", `${domain}/${LEGACY_LABEL}`]);
+      drainService(runLaunchctl, domain, LEGACY_LABEL);
+    }
   }
   if (existsSync(plistPath(LEGACY_LABEL))) {
     rmSync(plistPath(LEGACY_LABEL));
   }
   const target = plistPath(options.label);
   mkdirSync(dirname(target), { recursive: true, mode: 0o755 });
-  // 同名服务可能已挂在别的域里(旧版 load 或另一个会话),先摘干净再装载
+  // 同名服务可能已挂在别的域里(旧版 load 或另一个会话),先摘干净再装载;
+  // 拆除是异步的,必须等它真的消失,否则紧接着的 bootstrap 会撞 5: Input/output error
   for (const domain of domains) {
-    runLaunchctl(["bootout", `${domain}/${options.label}`]);
+    if (serviceLoaded(runLaunchctl, domain, options.label)) {
+      runLaunchctl(["bootout", `${domain}/${options.label}`]);
+      drainService(runLaunchctl, domain, options.label);
+    }
   }
   writeFileSync(target, buildPlist(options, args), { mode: 0o600 });
   chmodSync(target, 0o600);
@@ -289,7 +324,10 @@ export function install(options: InstallOptions): void {
 
 export function uninstall(label: string, purge: boolean): void {
   for (const domain of domainTargets(uid())) {
-    runLaunchctl(["bootout", `${domain}/${label}`]);
+    if (serviceLoaded(runLaunchctl, domain, label)) {
+      runLaunchctl(["bootout", `${domain}/${label}`]);
+      drainService(runLaunchctl, domain, label);
+    }
   }
   const target = plistPath(label);
   if (existsSync(target)) {

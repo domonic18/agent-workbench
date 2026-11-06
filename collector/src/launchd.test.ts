@@ -141,10 +141,43 @@ describe("loadService", () => {
     expect(outcome.bootedOut).toBe(true);
   });
 
-  it("全域失败时给出诊断与手动重试命令", () => {
+  it("服务正在拆除(域里已查不到)时重试即成功", () => {
+    let attempts = 0;
     const run = runner((args) => {
       const joined = args.join(" ");
-      if (joined.startsWith("print gui/501") || joined.startsWith("print user/501")) {
+      if (joined === "print gui/501") {
+        return { status: 0 };
+      }
+      if (joined.startsWith("print gui/501/")) {
+        return { status: 1 };
+      }
+      if (joined === "bootstrap gui/501 " + PLIST) {
+        attempts += 1;
+        return attempts >= 2
+          ? { status: 0 }
+          : { status: 1, stderr: "Bootstrap failed: 5: Input/output error" };
+      }
+      return { status: 1, stderr: "unexpected: " + joined };
+    });
+
+    const outcome = loadService(PLIST, LABEL, run, ["gui/501"], DIAGNOSTICS);
+
+    expect(outcome.domain).toBe("gui/501");
+    expect(outcome.bootedOut).toBe(false);
+  });
+
+  it("全域失败时给出诊断与手动重试命令", () => {
+    const loaded = new Set<string>();
+    const run = runner((args) => {
+      const joined = args.join(" ");
+      if (joined === "print gui/501" || joined === "print user/501") {
+        return { status: 0 };
+      }
+      if (joined.startsWith("print ")) {
+        return { status: loaded.has(joined.slice("print ".length)) ? 0 : 1 };
+      }
+      if (joined.startsWith("bootout ")) {
+        loaded.delete(joined.slice("bootout ".length));
         return { status: 0 };
       }
       return { status: 1, stderr: "Bootstrap failed: 5: Input/output error" };
