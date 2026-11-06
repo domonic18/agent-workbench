@@ -6,9 +6,9 @@ import { fetchOverview } from "../api/overview.js";
 import { useRealtimeStream } from "../api/stream.js";
 import type { OverviewAgent } from "../api/types.js";
 import { AgentCards } from "../components/data/AgentCards.js";
-import { EmptyState } from "../components/data/EmptyState.js";
+import { EmptyState } from "../components/ui/EmptyState.js";
 import { MetricCard } from "../components/data/MetricCard.js";
-import { StatusBadge } from "../components/data/StatusBadge.js";
+import { Badge } from "../components/ui/Badge.js";
 import { AgentRegisterDialog } from "../components/identity/AgentRegisterDialog.js";
 import { AgentRotateDialog } from "../components/identity/AgentRotateDialog.js";
 import { MachineRegisterDialog } from "../components/identity/MachineRegisterDialog.js";
@@ -130,7 +130,7 @@ export function OverviewPage() {
                 </span>
               </div>
               <div className={styles.sectionActions}>
-                <StatusBadge tone={REALTIME_TONE[realtime]} text={REALTIME_LABEL[realtime]} />
+                <Badge tone={REALTIME_TONE[realtime]} text={REALTIME_LABEL[realtime]} />
                 <button
                   type="button"
                   className={styles.action}

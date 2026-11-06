@@ -5,8 +5,8 @@ import { ApiError } from "../api/client.js";
 import { fetchAgents } from "../api/identity.js";
 import { useRealtimeStream } from "../api/stream.js";
 import { fetchTasks, readTaskFilters, type TaskFilters } from "../api/tasks.js";
-import { EmptyState } from "../components/data/EmptyState.js";
-import { StatusBadge } from "../components/data/StatusBadge.js";
+import { EmptyState } from "../components/ui/EmptyState.js";
+import { Badge } from "../components/ui/Badge.js";
 import { TaskFiltersForm } from "../components/task/TaskFilters.js";
 import { TaskTable } from "../components/task/TaskTable.js";
 import { useNow } from "../shared/useNow.js";
@@ -53,7 +53,7 @@ export function TasksPage() {
     <div className={styles.page}>
       <TaskFiltersForm
         statusSlot={
-          <StatusBadge tone={REALTIME_TONE[realtime]} text={REALTIME_LABEL[realtime]} />
+          <Badge tone={REALTIME_TONE[realtime]} text={REALTIME_LABEL[realtime]} />
         }
       />
 

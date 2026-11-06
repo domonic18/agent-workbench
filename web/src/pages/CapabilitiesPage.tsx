@@ -9,7 +9,7 @@ import {
 import { ApiError } from "../api/client.js";
 import { CapabilityCard } from "../components/capability/CapabilityCard.js";
 import { DelegationMatrix } from "../components/capability/DelegationMatrix.js";
-import { EmptyState } from "../components/data/EmptyState.js";
+import { EmptyState } from "../components/ui/EmptyState.js";
 import { useNow } from "../shared/useNow.js";
 import styles from "./CapabilitiesPage.module.css";
 

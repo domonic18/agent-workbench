@@ -17,7 +17,7 @@ import {
   KNOWLEDGE_STATUS_LABEL,
   KNOWLEDGE_STATUS_TONE,
 } from "../../shared/labels.js";
-import { StatusBadge } from "../data/StatusBadge.js";
+import { Badge } from "../ui/Badge.js";
 import { KnowledgeEditForm, type KnowledgeEditValues } from "./KnowledgeEditForm.js";
 import markdownStyles from "./knowledge-markdown.module.css";
 import styles from "./knowledge-detail.module.css";
@@ -147,11 +147,11 @@ export function KnowledgeDetail({ entryId, onClose }: KnowledgeDetailProps) {
                 <span className={styles.subtitle}>加载中…</span>
               ) : (
                 <>
-                  <StatusBadge
+                  <Badge
                     tone={KNOWLEDGE_STATUS_TONE[entry.status]}
                     text={KNOWLEDGE_STATUS_LABEL[entry.status]}
                   />
-                  <StatusBadge
+                  <Badge
                     tone={KNOWLEDGE_EMBEDDING_TONE[entry.embeddingStatus]}
                     text={KNOWLEDGE_EMBEDDING_LABEL[entry.embeddingStatus]}
                   />

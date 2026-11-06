@@ -12,6 +12,7 @@ import {
 import { UNAUTHORIZED_EVENT } from "./api/client.js";
 import { bootstrapStatus } from "./api/bootstrap.js";
 import { AppShell } from "./components/layout/AppShell.js";
+import { ToastProvider } from "./components/ui/Toast.js";
 import { LoginPage } from "./pages/LoginPage.js";
 
 /** 路由级懒加载:首屏只带导航与登录,总览/任务/详情按需加载(03 §8) */
@@ -88,24 +89,26 @@ function BootstrapGuard() {
 export function App() {
   return (
     <BrowserRouter>
-      <UnauthorizedRedirect />
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/setup" element={<SetupPage />} />
-        <Route element={<AppShell />}>
-          <Route element={<BootstrapGuard />}>
-            <Route path="/overview" element={<OverviewPage />} />
-            <Route path="/tasks" element={<TasksPage />}>
-              <Route path=":id" element={<TaskDrawerRoute />} />
+      <ToastProvider>
+        <UnauthorizedRedirect />
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/setup" element={<SetupPage />} />
+          <Route element={<AppShell />}>
+            <Route element={<BootstrapGuard />}>
+              <Route path="/overview" element={<OverviewPage />} />
+              <Route path="/tasks" element={<TasksPage />}>
+                <Route path=":id" element={<TaskDrawerRoute />} />
+              </Route>
+              <Route path="/capabilities" element={<CapabilitiesPage />} />
+              <Route path="/knowledge" element={<KnowledgePage />}>
+                <Route path=":id" element={<KnowledgeDetailRoute />} />
+              </Route>
+              <Route path="*" element={<Navigate to="/overview" replace />} />
             </Route>
-            <Route path="/capabilities" element={<CapabilitiesPage />} />
-            <Route path="/knowledge" element={<KnowledgePage />}>
-              <Route path=":id" element={<KnowledgeDetailRoute />} />
-            </Route>
-            <Route path="*" element={<Navigate to="/overview" replace />} />
           </Route>
-        </Route>
-      </Routes>
+        </Routes>
+      </ToastProvider>
     </BrowserRouter>
   );
 }

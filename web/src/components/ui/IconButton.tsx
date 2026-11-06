@@ -1,0 +1,25 @@
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
+import type { ButtonSize } from "./Button.js";
+import styles from "./controls.module.css";
+
+export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  /** 无障碍名称：图标按钮没有可见文字，必须显式给出 */
+  label: string;
+  size?: ButtonSize;
+  icon: ReactNode;
+}
+
+/** 纯图标可点区：触达尺寸不小于 44px 时用 lg（03 §6 移动适配） */
+export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
+  { label, size = "md", icon, className, type, ...rest },
+  ref,
+) {
+  const classes = [styles.iconButton, styles[size], className]
+    .filter((item): item is string => typeof item === "string" && item !== "")
+    .join(" ");
+  return (
+    <button {...rest} ref={ref} type={type ?? "button"} aria-label={label} title={label} className={classes}>
+      {icon}
+    </button>
+  );
+});

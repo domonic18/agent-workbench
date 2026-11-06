@@ -9,7 +9,7 @@ import {
   readKnowledgeSearch,
   readKnowledgeView,
 } from "../api/knowledge.js";
-import { EmptyState } from "../components/data/EmptyState.js";
+import { EmptyState } from "../components/ui/EmptyState.js";
 import { KnowledgeList } from "../components/knowledge/KnowledgeList.js";
 import { useNow } from "../shared/useNow.js";
 import styles from "./KnowledgePage.module.css";

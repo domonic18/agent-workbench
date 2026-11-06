@@ -12,7 +12,7 @@ import {
 import { ApiError } from "../../api/client.js";
 import { CAPABILITY_STATUS_LABEL, CAPABILITY_STATUS_TONE } from "../../shared/labels.js";
 import { formatDateTime, formatDuration } from "../../shared/format.js";
-import { StatusBadge } from "../data/StatusBadge.js";
+import { Badge } from "../ui/Badge.js";
 import styles from "./CapabilityCard.module.css";
 
 export interface CapabilityCardProps {
@@ -102,7 +102,7 @@ export function CapabilityCard({ capability, view, now }: CapabilityCardProps) {
           <h3 className={styles.target}>{capability.target}</h3>
           <span className={styles.action}>{capability.action}</span>
         </div>
-        <StatusBadge
+        <Badge
           tone={CAPABILITY_STATUS_TONE[capability.status]}
           text={CAPABILITY_STATUS_LABEL[capability.status]}
         />

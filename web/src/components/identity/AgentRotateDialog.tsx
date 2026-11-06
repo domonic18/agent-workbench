@@ -3,7 +3,7 @@ import { ApiError } from "../../api/client.js";
 import { rotateAgentKey } from "../../api/identity.js";
 import { agentEnvHints } from "./envHints.js";
 import styles from "./IdentityForm.module.css";
-import { Modal } from "./Modal.js";
+import { Dialog } from "../ui/Dialog.js";
 import { SecretReveal } from "./SecretReveal.js";
 
 export interface AgentRotateDialogProps {
@@ -30,7 +30,7 @@ export function AgentRotateDialog({ agent, onClose }: AgentRotateDialogProps) {
   }
 
   return (
-    <Modal title={secret === null ? "轮换 Agent 密钥" : "新密钥已生成"} onClose={onClose} dismissible={secret === null}>
+    <Dialog title={secret === null ? "轮换 Agent 密钥" : "新密钥已生成"} onClose={onClose} dismissible={secret === null}>
       {secret === null ? (
         <div className={styles.form}>
           <p className={styles.hint}>
@@ -73,6 +73,6 @@ export function AgentRotateDialog({ agent, onClose }: AgentRotateDialogProps) {
           </div>
         </div>
       )}
-    </Modal>
+    </Dialog>
   );
 }

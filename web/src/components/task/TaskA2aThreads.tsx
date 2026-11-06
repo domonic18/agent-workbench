@@ -7,7 +7,7 @@ import {
   DELIVERY_STATUS_LABEL,
   DELIVERY_STATUS_TONE,
 } from "../../shared/labels.js";
-import { StatusBadge } from "../data/StatusBadge.js";
+import { Badge } from "../ui/Badge.js";
 import styles from "./task-a2a.module.css";
 
 export interface TaskA2aThreadsProps {
@@ -36,7 +36,7 @@ export function TaskA2aThreads({ threads, loading, error, agentNames }: TaskA2aT
               {agentLabel(thread.initiator_agent)} → {agentLabel(thread.responder_agent)} ·{" "}
               {formatDateTime(thread.created_at)}
             </span>
-            <StatusBadge
+            <Badge
               tone={A2A_THREAD_STATUS_TONE[thread.status]}
               text={A2A_THREAD_STATUS_LABEL[thread.status]}
             />
@@ -87,7 +87,7 @@ function Message({
             "未入队"
           ) : (
             <>
-              <StatusBadge
+              <Badge
                 tone={DELIVERY_STATUS_TONE[message.delivery.status]}
                 text={DELIVERY_STATUS_LABEL[message.delivery.status]}
               />

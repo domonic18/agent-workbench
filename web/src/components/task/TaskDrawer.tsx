@@ -16,7 +16,7 @@ import {
   TASK_STATUS_LABEL,
 } from "../../shared/labels.js";
 import { useNow } from "../../shared/useNow.js";
-import { StatusBadge } from "../data/StatusBadge.js";
+import { Badge } from "../ui/Badge.js";
 import { TaskA2aThreads } from "./TaskA2aThreads.js";
 import { TaskChainView } from "./TaskChainView.js";
 import { TaskDetailSummary } from "./TaskDetailSummary.js";
@@ -112,7 +112,7 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
                   {TASK_STATUS_LABEL[task.status]}
                 </span>
               )}
-              <StatusBadge tone={REALTIME_TONE[realtime]} text={REALTIME_LABEL[realtime]} />
+              <Badge tone={REALTIME_TONE[realtime]} text={REALTIME_LABEL[realtime]} />
             </div>
           </div>
           <button type="button" className={styles.close} onClick={onClose} aria-label="关闭">

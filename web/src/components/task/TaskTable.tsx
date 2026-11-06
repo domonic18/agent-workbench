@@ -7,7 +7,7 @@ import {
   formatTokens,
 } from "../../shared/format.js";
 import { TASK_ORIGIN_LABEL, TASK_STAGE_LABEL, TASK_STATUS_LABEL, TASK_STATUS_TONE } from "../../shared/labels.js";
-import { StatusBadge } from "../data/StatusBadge.js";
+import { Badge } from "../ui/Badge.js";
 import styles from "./TaskTable.module.css";
 
 export interface TaskTableProps {
@@ -101,7 +101,7 @@ export function TaskTable({ tasks, agentNames, search, now = Date.now() }: TaskT
                   </td>
                   <td>{TASK_STAGE_LABEL[task.stage]}</td>
                   <td>
-                    <StatusBadge
+                    <Badge
                       tone={TASK_STATUS_TONE[task.status]}
                       text={TASK_STATUS_LABEL[task.status]}
                     />
@@ -138,7 +138,7 @@ export function TaskTable({ tasks, agentNames, search, now = Date.now() }: TaskT
               >
                 <span className={styles.cardTop}>
                   <span className={styles.cardTitle}>{task.title}</span>
-                  <StatusBadge
+                  <Badge
                     tone={TASK_STATUS_TONE[task.status]}
                     text={TASK_STATUS_LABEL[task.status]}
                   />

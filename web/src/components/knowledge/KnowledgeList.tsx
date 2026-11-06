@@ -16,7 +16,7 @@ import {
   KNOWLEDGE_STATUS_LABEL,
   KNOWLEDGE_STATUS_TONE,
 } from "../../shared/labels.js";
-import { StatusBadge } from "../data/StatusBadge.js";
+import { Badge } from "../ui/Badge.js";
 import styles from "./knowledge-list.module.css";
 
 export interface KnowledgeListProps {
@@ -183,7 +183,7 @@ export function KnowledgeList({ items, view, search, now }: KnowledgeListProps) 
                 </td>
                 <td>{entry.category === "" ? "—" : entry.category}</td>
                 <td>
-                  <StatusBadge
+                  <Badge
                     tone={KNOWLEDGE_STATUS_TONE[entry.status]}
                     text={KNOWLEDGE_STATUS_LABEL[entry.status]}
                   />
@@ -192,7 +192,7 @@ export function KnowledgeList({ items, view, search, now }: KnowledgeListProps) 
                   {entry.embeddingStatus === "ready" ? (
                     <span className={styles.muted}>已索引</span>
                   ) : (
-                    <StatusBadge
+                    <Badge
                       tone={KNOWLEDGE_EMBEDDING_TONE[entry.embeddingStatus]}
                       text={KNOWLEDGE_EMBEDDING_LABEL[entry.embeddingStatus]}
                     />
@@ -217,7 +217,7 @@ export function KnowledgeList({ items, view, search, now }: KnowledgeListProps) 
               <Link to={detailPath(entry.id, view, search)} className={styles.cardTitle}>
                 {entry.title}
               </Link>
-              <StatusBadge
+              <Badge
                 tone={KNOWLEDGE_STATUS_TONE[entry.status]}
                 text={KNOWLEDGE_STATUS_LABEL[entry.status]}
               />
@@ -226,7 +226,7 @@ export function KnowledgeList({ items, view, search, now }: KnowledgeListProps) 
               <span>{entry.category === "" ? "未分类" : entry.category}</span>
               <span>{formatRelativeTime(entry.updatedAt, now)}</span>
               {entry.embeddingStatus === "ready" ? null : (
-                <StatusBadge
+                <Badge
                   tone={KNOWLEDGE_EMBEDDING_TONE[entry.embeddingStatus]}
                   text={KNOWLEDGE_EMBEDDING_LABEL[entry.embeddingStatus]}
                 />

@@ -12,7 +12,7 @@ import {
   TASK_EVENT_LABEL,
   TASK_STAGE_LABEL,
 } from "../../shared/labels.js";
-import { StatusBadge } from "../data/StatusBadge.js";
+import { Badge } from "../ui/Badge.js";
 import { describeTaskEvent, latestEventReason } from "./task-event.js";
 import styles from "./task-drawer.module.css";
 
@@ -118,7 +118,7 @@ export function TaskDetailSummary({
           <ul className={styles.capList}>
             {capabilities.map((capability) => (
               <li key={capability.id} className={styles.capItem}>
-                <StatusBadge
+                <Badge
                   tone={CAPABILITY_STATUS_TONE[capability.status]}
                   text={CAPABILITY_STATUS_LABEL[capability.status]}
                 />{" "}

@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { ApiError } from "../../api/client.js";
 import { fetchAgents, setAgentTargets, type AgentSummary } from "../../api/identity.js";
-import { EmptyState } from "../data/EmptyState.js";
+import { EmptyState } from "../ui/EmptyState.js";
 import styles from "./DelegationMatrix.module.css";
 
 function sameSet(a: readonly string[], b: readonly string[]): boolean {

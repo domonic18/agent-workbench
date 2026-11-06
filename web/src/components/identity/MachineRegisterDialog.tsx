@@ -3,7 +3,7 @@ import { ApiError } from "../../api/client.js";
 import { createMachine, type MachineSecret } from "../../api/identity.js";
 import { machineEnvHints } from "./envHints.js";
 import styles from "./IdentityForm.module.css";
-import { Modal } from "./Modal.js";
+import { Dialog } from "../ui/Dialog.js";
 import { SecretReveal } from "./SecretReveal.js";
 
 export interface MachineRegisterDialogProps {
@@ -40,7 +40,7 @@ export function MachineRegisterDialog({ onClose }: MachineRegisterDialogProps) {
   }
 
   return (
-    <Modal
+    <Dialog
       title={created === null ? "机器登记" : "机器已登记"}
       onClose={onClose}
       dismissible={created === null}
@@ -132,6 +132,6 @@ export function MachineRegisterDialog({ onClose }: MachineRegisterDialogProps) {
           </div>
         </div>
       )}
-    </Modal>
+    </Dialog>
   );
 }

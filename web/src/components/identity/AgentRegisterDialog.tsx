@@ -9,7 +9,7 @@ import {
 } from "../../api/identity.js";
 import { agentEnvHints } from "./envHints.js";
 import styles from "./IdentityForm.module.css";
-import { Modal } from "./Modal.js";
+import { Dialog } from "../ui/Dialog.js";
 import { SecretReveal } from "./SecretReveal.js";
 
 export interface AgentRegisterDialogProps {
@@ -60,7 +60,7 @@ export function AgentRegisterDialog({ onClose }: AgentRegisterDialogProps) {
   }
 
   return (
-    <Modal
+    <Dialog
       title={created === null ? "注册 Agent" : "Agent 已注册"}
       onClose={onClose}
       dismissible={created === null}
@@ -172,6 +172,6 @@ export function AgentRegisterDialog({ onClose }: AgentRegisterDialogProps) {
           </div>
         </div>
       )}
-    </Modal>
+    </Dialog>
   );
 }
