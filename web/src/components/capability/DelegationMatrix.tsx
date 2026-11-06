@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { ApiError } from "../../api/client.js";
 import { fetchAgents, setAgentTargets, type AgentSummary } from "../../api/identity.js";
 import { EmptyState } from "../ui/EmptyState.js";
+import { Button } from "../ui/Button.js";
 import styles from "./DelegationMatrix.module.css";
 
 function sameSet(a: readonly string[], b: readonly string[]): boolean {
@@ -75,14 +76,13 @@ export function DelegationMatrix() {
             行=发起方，列=收件方；勾选即允许该发起方向该收件方发送 A2A 消息。默认全不勾，自我委派不可选。
           </p>
         </div>
-        <button
-          type="button"
-          className={styles.save}
+        <Button
+          variant="primary"
           disabled={pending || dirty.length === 0}
           onClick={() => void save()}
         >
           {pending ? "保存中…" : "保存委派"}
-        </button>
+        </Button>
       </header>
 
       {agentsQuery.isPending ? <p className={styles.loading}>加载中…</p> : null}
@@ -94,13 +94,9 @@ export function DelegationMatrix() {
               ? agentsQuery.error.message
               : "Agent 列表加载失败"}
           </span>
-          <button
-            type="button"
-            className={styles.retry}
-            onClick={() => void agentsQuery.refetch()}
-          >
+          <Button size="sm" variant="secondary" onClick={() => void agentsQuery.refetch()}>
             重试
-          </button>
+          </Button>
         </div>
       ) : null}
 

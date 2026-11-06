@@ -197,7 +197,7 @@ describe("任务详情抽屉", () => {
     renderDrawer({}, onClose);
     await screen.findByText("阶段 接入 → 执行");
 
-    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.keyDown(document, { key: "Escape" });
     expect(onClose).toHaveBeenCalled();
   });
 });

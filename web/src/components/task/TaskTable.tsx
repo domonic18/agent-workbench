@@ -8,6 +8,7 @@ import {
 } from "../../shared/format.js";
 import { TASK_ORIGIN_LABEL, TASK_STAGE_LABEL, TASK_STATUS_LABEL, TASK_STATUS_TONE } from "../../shared/labels.js";
 import { Badge } from "../ui/Badge.js";
+import { Table, type TableColumn } from "../ui/Table.js";
 import styles from "./TaskTable.module.css";
 
 export interface TaskTableProps {
@@ -50,79 +51,123 @@ function OutputCell({ output }: { output: string | null }) {
 export function TaskTable({ tasks, agentNames, search, now = Date.now() }: TaskTableProps) {
   const navigate = useNavigate();
 
+  const columns: TableColumn<TaskDto>[] = [
+    {
+      key: "task",
+      header: "任务",
+      width: "290px",
+      render: (task) => (
+        <>
+          <Link
+            className={styles.rowLink}
+            to={taskUrl(task.id, search)}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <span className={styles.primary}>{task.title}</span>
+          </Link>
+          <div className={styles.subline}>
+            <code className={styles.mono}>{task.id}</code>
+            <span className={styles.origin}>{TASK_ORIGIN_LABEL[task.origin]}</span>
+          </div>
+        </>
+      ),
+    },
+    {
+      key: "assigner",
+      header: "下发人",
+      width: "116px",
+      render: (task) => (
+        <span className={styles.clip} title={task.assigner_label}>
+          {task.assigner_label}
+        </span>
+      ),
+    },
+    {
+      key: "assignee",
+      header: "承接",
+      width: "150px",
+      render: (task) => {
+        const name = agentNames.get(task.assignee);
+        return (
+          <>
+            <span className={styles.clip}>{name ?? task.assignee_label}</span>
+            {name === undefined ? null : (
+              <span className={`${styles.mono} ${styles.clip}`}>{task.assignee}</span>
+            )}
+          </>
+        );
+      },
+    },
+    {
+      key: "round",
+      header: "轮次",
+      width: "68px",
+      render: (task) => (
+        <>
+          <div>第 {task.round} 轮</div>
+          {task.rework_count > 0 ? (
+            <div className={styles.muted}>返工 {task.rework_count} 次</div>
+          ) : null}
+        </>
+      ),
+    },
+    {
+      key: "stage",
+      header: "阶段",
+      width: "58px",
+      render: (task) => TASK_STAGE_LABEL[task.stage],
+    },
+    {
+      key: "status",
+      header: "状态",
+      width: "76px",
+      render: (task) => (
+        <Badge tone={TASK_STATUS_TONE[task.status]} text={TASK_STATUS_LABEL[task.status]} />
+      ),
+    },
+    {
+      key: "output",
+      header: "产出",
+      width: "140px",
+      render: (task) => (
+        <span className={styles.clipWide}>
+          <OutputCell output={task.output} />
+        </span>
+      ),
+    },
+    {
+      key: "duration",
+      header: "耗时",
+      width: "64px",
+      align: "right",
+      render: (task) => (
+        <span title={formatDuration((task.ended_at ?? now) - task.created_at)}>
+          {formatCompactDuration((task.ended_at ?? now) - task.created_at)}
+        </span>
+      ),
+    },
+    {
+      key: "tokens",
+      header: "Token",
+      width: "72px",
+      align: "right",
+      render: (task) => (
+        <span title={formatExactTokens(task.total_tokens)}>{formatTokens(task.total_tokens)}</span>
+      ),
+    },
+  ];
+
   return (
     <>
-      <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>任务</th>
-              <th>下发人</th>
-              <th>承接</th>
-              <th>轮次</th>
-              <th>阶段</th>
-              <th>状态</th>
-              <th>产出</th>
-              <th className={styles.numeric}>耗时</th>
-              <th className={styles.numeric}>Token</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tasks.map((task) => {
-              const url = taskUrl(task.id, search);
-              const assigneeName = agentNames.get(task.assignee);
-              return (
-                <tr key={task.id} className={styles.row} onClick={() => navigate(url)}>
-                  <td>
-                    <Link
-                      className={styles.rowLink}
-                      to={url}
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      <span className={styles.primary}>{task.title}</span>
-                    </Link>
-                    <div className={styles.subline}>
-                      <code className={styles.mono}>{task.id}</code>
-                      <span className={styles.origin}>{TASK_ORIGIN_LABEL[task.origin]}</span>
-                    </div>
-                  </td>
-                  <td>{task.assigner_label}</td>
-                  <td>
-                    <div>{assigneeName ?? task.assignee_label}</div>
-                    {assigneeName === undefined ? null : (
-                      <div className={styles.mono}>{task.assignee}</div>
-                    )}
-                  </td>
-                  <td>
-                    第 {task.round} 轮
-                    {task.rework_count > 0 ? (
-                      <div className={styles.muted}>返工 {task.rework_count} 次</div>
-                    ) : null}
-                  </td>
-                  <td>{TASK_STAGE_LABEL[task.stage]}</td>
-                  <td>
-                    <Badge
-                      tone={TASK_STATUS_TONE[task.status]}
-                      text={TASK_STATUS_LABEL[task.status]}
-                    />
-                  </td>
-                  <td>
-                    <OutputCell output={task.output} />
-                  </td>
-                  <td
-                    className={styles.numeric}
-                    title={formatDuration((task.ended_at ?? now) - task.created_at)}
-                  >
-                    {formatCompactDuration((task.ended_at ?? now) - task.created_at)}
-                  </td>
-                  <td className={styles.numeric} title={formatExactTokens(task.total_tokens)}>
-                    {formatTokens(task.total_tokens)}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div className={styles.tableArea}>
+        <Table
+          columns={columns}
+          rows={[...tasks]}
+          rowKey={(task) => task.id}
+          minWidth="1034px"
+          fixedLayout
+          onRowClick={(task) => navigate(taskUrl(task.id, search))}
+        />
       </div>
 
       {/* 移动端只留最关键三列:任务 / 承接 / 状态,其余进详情抽屉(03 §8) */}

@@ -1,4 +1,6 @@
 import { KNOWLEDGE_LIMITS } from "../../api/knowledge.js";
+import { Button } from "../ui/Button.js";
+import { Field, Input, Textarea } from "../ui/Field.js";
 import styles from "./knowledge-detail.module.css";
 
 export interface KnowledgeEditValues {
@@ -30,57 +32,53 @@ export function KnowledgeEditForm({
   return (
     <>
       <div className={styles.toolbar}>
-        <button
-          type="button"
-          className={styles.primary}
+        <Button
+          variant="primary"
           disabled={busy || values.title.trim() === ""}
+          loading={busy}
           onClick={onSubmit}
         >
           {busy ? "保存中…" : "保存"}
-        </button>
-        <button type="button" className={styles.secondary} disabled={busy} onClick={onCancel}>
+        </Button>
+        <Button variant="secondary" disabled={busy} onClick={onCancel}>
           取消
-        </button>
+        </Button>
       </div>
 
       <div className={styles.editForm}>
-        <label className={styles.field}>
-          <span className={styles.fieldLabel}>标题</span>
-          <input
-            className={styles.input}
+        <Field label="标题" htmlFor="kb-edit-title">
+          <Input
+            id="kb-edit-title"
             value={values.title}
             maxLength={KNOWLEDGE_LIMITS.title}
             onChange={(event) => patch({ title: event.target.value })}
           />
-        </label>
-        <label className={styles.field}>
-          <span className={styles.fieldLabel}>摘要</span>
-          <input
-            className={styles.input}
+        </Field>
+        <Field label="摘要" htmlFor="kb-edit-summary">
+          <Input
+            id="kb-edit-summary"
             value={values.summary}
             maxLength={KNOWLEDGE_LIMITS.summary}
             onChange={(event) => patch({ summary: event.target.value })}
           />
-        </label>
-        <label className={styles.field}>
-          <span className={styles.fieldLabel}>分类</span>
-          <input
-            className={styles.input}
+        </Field>
+        <Field label="分类" htmlFor="kb-edit-category">
+          <Input
+            id="kb-edit-category"
             value={values.category}
             maxLength={KNOWLEDGE_LIMITS.category}
             onChange={(event) => patch({ category: event.target.value })}
           />
-        </label>
-        <label className={styles.field}>
-          <span className={styles.fieldLabel}>正文（Markdown）</span>
-          <textarea
-            className={styles.textarea}
+        </Field>
+        <Field label="正文（Markdown）" htmlFor="kb-edit-content" hint="保存会写入 Markdown 文件并重建该条索引。">
+          <Textarea
+            id="kb-edit-content"
+            className={styles.contentInput}
             value={values.content}
             rows={16}
             onChange={(event) => patch({ content: event.target.value })}
           />
-        </label>
-        <p className={styles.editHint}>保存会写入 Markdown 文件并重建该条索引。</p>
+        </Field>
       </div>
     </>
   );

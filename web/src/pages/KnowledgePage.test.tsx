@@ -70,8 +70,8 @@ describe("知识屏", () => {
     expect((await screen.findAllByText("部署约定")).length).toBeGreaterThan(0);
     expect(fetchKnowledge).toHaveBeenCalledWith("active", {});
     expect(
-      screen.getByRole("link", { name: "已生效" }).getAttribute("aria-current"),
-    ).toBe("page");
+      screen.getByRole("tab", { name: "已生效" }).getAttribute("aria-selected"),
+    ).toBe("true");
   });
 
   it("待采纳页签带数量角标,并逐条给出采纳按钮", async () => {
@@ -97,7 +97,7 @@ describe("知识屏", () => {
     });
     renderPage("/knowledge");
 
-    fireEvent.click(screen.getByRole("link", { name: "已归档" }));
+    fireEvent.click(screen.getByRole("tab", { name: "已归档" }));
 
     await waitFor(() => expect(fetchKnowledge).toHaveBeenCalledWith("archived", {}));
     expect(await screen.findByText("没有已归档条目")).toBeTruthy();

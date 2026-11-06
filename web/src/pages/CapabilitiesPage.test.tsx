@@ -62,8 +62,8 @@ describe("授权屏", () => {
     expect(await screen.findByText("没有待批授权")).toBeTruthy();
     expect(fetchCapabilities).toHaveBeenCalledWith("pending", undefined);
     expect(
-      screen.getByRole("link", { name: "待批" }).getAttribute("aria-current"),
-    ).toBe("page");
+      screen.getByRole("tab", { name: "待批" }).getAttribute("aria-selected"),
+    ).toBe("true");
   });
 
   it("按 URL 视图请求并渲染生效卡片", async () => {
@@ -75,7 +75,7 @@ describe("授权屏", () => {
 
     expect(await screen.findByText("db:prod")).toBeTruthy();
     expect(fetchCapabilities).toHaveBeenCalledWith("active", undefined);
-    expect(screen.getByRole("link", { name: "生效" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("tab", { name: "生效" }).getAttribute("aria-selected")).toBe("true");
     expect(screen.getByText("剩余有效期")).toBeTruthy();
   });
 
@@ -83,7 +83,7 @@ describe("授权屏", () => {
     vi.mocked(fetchCapabilities).mockResolvedValue({ items: [], nextCursor: null });
     renderPage("/capabilities");
 
-    fireEvent.click(screen.getByRole("link", { name: "历史" }));
+    fireEvent.click(screen.getByRole("tab", { name: "历史" }));
 
     await waitFor(() => expect(fetchCapabilities).toHaveBeenCalledWith("history", undefined));
     expect(await screen.findByText("暂无历史授权")).toBeTruthy();

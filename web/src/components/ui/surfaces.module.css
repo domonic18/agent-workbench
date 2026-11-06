@@ -97,6 +97,15 @@
   background: var(--surface-2);
 }
 
+/* 固定列宽：列宽以第一行为准，单元格溢出被裁掉 */
+.tableFixed {
+  table-layout: fixed;
+}
+
+.tableFixed td {
+  overflow: hidden;
+}
+
 .clickable {
   cursor: pointer;
 }
@@ -197,6 +206,46 @@
   margin: var(--space-1) 0 0;
   font-size: var(--font-sm);
   color: var(--muted);
+}
+
+.dialogHeading {
+  min-width: 0;
+}
+
+.dialogHeaderExtra {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* 抽屉：贴右侧滑出，与居中弹窗共用焦点陷阱与滚动锁 */
+.overlayDrawer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  background: var(--overlay);
+  animation: fade var(--duration) var(--ease);
+}
+
+.dialogDrawer {
+  width: min(720px, 100%);
+  max-width: 720px;
+  height: 100%;
+  max-height: 100%;
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+  border-right: none;
+}
+
+@media (max-width: 767px) {
+  .dialogDrawer {
+    max-width: none;
+    border-radius: 0;
+    border: none;
+  }
 }
 
 .dialogBody {
@@ -365,4 +414,30 @@
   border-color: var(--accent-border);
   background: var(--accent-soft);
   color: var(--accent);
+}
+
+/* 列表三态 */
+.skeletonList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.errorBanner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-md);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: var(--font-sm);
+}
+
+.loadMore {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-4);
 }

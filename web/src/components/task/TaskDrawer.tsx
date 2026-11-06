@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { ApiError } from "../../api/client.js";
 import { fetchAgents } from "../../api/identity.js";
 import { useRealtimeStream } from "../../api/stream.js";
@@ -17,6 +17,8 @@ import {
 } from "../../shared/labels.js";
 import { useNow } from "../../shared/useNow.js";
 import { Badge } from "../ui/Badge.js";
+import { Button } from "../ui/Button.js";
+import { Dialog } from "../ui/Dialog.js";
 import { TaskA2aThreads } from "./TaskA2aThreads.js";
 import { TaskChainView } from "./TaskChainView.js";
 import { TaskDetailSummary } from "./TaskDetailSummary.js";
@@ -76,116 +78,83 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
     [agents.data],
   );
 
-  useEffect(() => {
-    function handleKey(event: KeyboardEvent): void {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    }
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [onClose]);
-
   const assigneeName =
     task === undefined ? taskId : agentNames.get(task.assignee) ?? task.assignee_label;
 
   return (
-    <div className={styles.drawerOverlay} onClick={onClose}>
-      <aside
-        className={styles.drawer}
-        role="dialog"
-        aria-modal="true"
-        aria-label="任务详情"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header className={styles.drawerHeader}>
-          <div className={styles.drawerHeading}>
-            <h2 className={styles.drawerTitle}>
-              {task === undefined ? taskId : `${task.id} · ${task.title}`}
-            </h2>
-            <div className={styles.drawerMeta}>
-              {task === undefined ? (
-                <span className={styles.drawerSubtitle}>加载中…</span>
-              ) : (
-                <span className={styles.drawerSubtitle}>
-                  {task.assigner_label} → {assigneeName} · 第 {task.round} 轮 ·{" "}
-                  {TASK_STATUS_LABEL[task.status]}
-                </span>
-              )}
-              <Badge tone={REALTIME_TONE[realtime]} text={REALTIME_LABEL[realtime]} />
-            </div>
-          </div>
-          <button type="button" className={styles.close} onClick={onClose} aria-label="关闭">
-            ×
-          </button>
-        </header>
-
-        <div className={styles.drawerBody}>
-          {detail.isPending ? <p className={styles.loading}>加载中…</p> : null}
-          {detail.isError ? (
-            <div className={styles.errorBox} role="alert">
-              <span>{errorMessage(detail.error, "任务详情加载失败")}</span>
-              <button type="button" className={styles.retry} onClick={() => void detail.refetch()}>
-                重试
-              </button>
-            </div>
-          ) : null}
-
-          {detail.data === undefined ? null : (
-            <>
-              <TaskDetailSummary
-                task={detail.data.task}
-                capabilities={detail.data.capabilities}
-                tokens={detail.data.tokens}
-                events={taskEvents}
-                agentNames={agentNames}
-                now={now}
-              />
-
-              <section className={styles.inlineSection} aria-label="轮次链">
-                <div className={styles.sectionHeading}>
-                  <h3 className={styles.inlineTitle}>轮次链</h3>
-                  <span className={styles.sectionHint}>A2A 内容只在这里，不进群</span>
-                </div>
-                <TaskChainView
-                  chain={chain.data}
-                  loading={chain.isPending}
-                  error={
-                    chain.isError ? errorMessage(chain.error, "来源链加载失败") : null
-                  }
-                  currentTaskId={detail.data.task.id}
-                />
-                <TaskA2aThreads
-                  threads={a2a.data?.threads ?? []}
-                  loading={a2a.isPending}
-                  error={a2a.isError ? errorMessage(a2a.error, "A2A 线程加载失败") : null}
-                  agentNames={agentNames}
-                />
-              </section>
-
-              {events.isError ? (
-                <div className={styles.errorBox} role="alert">
-                  <span>{errorMessage(events.error, "事件加载失败")}</span>
-                  <button
-                    type="button"
-                    className={styles.retry}
-                    onClick={() => void events.refetch()}
-                  >
-                    重试
-                  </button>
-                </div>
-              ) : (
-                <TaskTimeline
-                  events={taskEvents}
-                  hasMore={events.hasNextPage}
-                  loadingMore={events.isFetchingNextPage}
-                  onLoadMore={() => void events.fetchNextPage()}
-                />
-              )}
-            </>
-          )}
+    <Dialog
+      variant="drawer"
+      ariaLabel="任务详情"
+      onClose={onClose}
+      title={task === undefined ? taskId : `${task.id} · ${task.title}`}
+      description={
+        task === undefined
+          ? "加载中…"
+          : `${task.assigner_label} → ${assigneeName} · 第 ${task.round} 轮 · ${
+              TASK_STATUS_LABEL[task.status]
+            }`
+      }
+      headerExtra={<Badge tone={REALTIME_TONE[realtime]} text={REALTIME_LABEL[realtime]} />}
+    >
+      {detail.isPending ? <p className={styles.loading}>加载中…</p> : null}
+      {detail.isError ? (
+        <div className={styles.errorBox} role="alert">
+          <span>{errorMessage(detail.error, "任务详情加载失败")}</span>
+          <Button size="sm" variant="secondary" onClick={() => void detail.refetch()}>
+            重试
+          </Button>
         </div>
-      </aside>
-    </div>
+      ) : null}
+
+      {detail.data === undefined ? null : (
+        <>
+          <TaskDetailSummary
+            task={detail.data.task}
+            capabilities={detail.data.capabilities}
+            tokens={detail.data.tokens}
+            events={taskEvents}
+            agentNames={agentNames}
+            now={now}
+          />
+
+          <section className={styles.inlineSection} aria-label="轮次链">
+            <div className={styles.sectionHeading}>
+              <h3 className={styles.inlineTitle}>轮次链</h3>
+              <span className={styles.sectionHint}>A2A 内容只在这里，不进群</span>
+            </div>
+            <TaskChainView
+              chain={chain.data}
+              loading={chain.isPending}
+              error={
+                chain.isError ? errorMessage(chain.error, "来源链加载失败") : null
+              }
+              currentTaskId={detail.data.task.id}
+            />
+            <TaskA2aThreads
+              threads={a2a.data?.threads ?? []}
+              loading={a2a.isPending}
+              error={a2a.isError ? errorMessage(a2a.error, "A2A 线程加载失败") : null}
+              agentNames={agentNames}
+            />
+          </section>
+
+          {events.isError ? (
+            <div className={styles.errorBox} role="alert">
+              <span>{errorMessage(events.error, "事件加载失败")}</span>
+              <Button size="sm" variant="secondary" onClick={() => void events.refetch()}>
+                重试
+              </Button>
+            </div>
+          ) : (
+            <TaskTimeline
+              events={taskEvents}
+              hasMore={events.hasNextPage}
+              loadingMore={events.isFetchingNextPage}
+              onLoadMore={() => void events.fetchNextPage()}
+            />
+          )}
+        </>
+      )}
+    </Dialog>
   );
 }

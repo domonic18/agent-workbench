@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ApiError } from "../../api/client.js";
@@ -18,6 +18,8 @@ import {
   KNOWLEDGE_STATUS_TONE,
 } from "../../shared/labels.js";
 import { Badge } from "../ui/Badge.js";
+import { Button } from "../ui/Button.js";
+import { Dialog } from "../ui/Dialog.js";
 import { KnowledgeEditForm, type KnowledgeEditValues } from "./KnowledgeEditForm.js";
 import markdownStyles from "./knowledge-markdown.module.css";
 import styles from "./knowledge-detail.module.css";
@@ -61,16 +63,6 @@ export function KnowledgeDetail({ entryId, onClose }: KnowledgeDetailProps) {
 
   const entry = detail.data?.entry;
   const content = detail.data?.content ?? "";
-
-  useEffect(() => {
-    function handleKey(event: KeyboardEvent): void {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    }
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [onClose]);
 
   async function refresh(): Promise<void> {
     await queryClient.invalidateQueries({ queryKey: ["knowledge"] });
@@ -129,151 +121,124 @@ export function KnowledgeDetail({ entryId, onClose }: KnowledgeDetailProps) {
   const busy = save.isPending || adopt.isPending || archive.isPending;
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <aside
-        className={styles.drawer}
-        role="dialog"
-        aria-modal="true"
-        aria-label="知识详情"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header className={styles.header}>
-          <div className={styles.heading}>
-            <h2 className={styles.title}>
-              {entry === undefined ? entryId : entry.title}
-            </h2>
-            <div className={styles.headMeta}>
-              {entry === undefined ? (
-                <span className={styles.subtitle}>加载中…</span>
-              ) : (
-                <>
-                  <Badge
-                    tone={KNOWLEDGE_STATUS_TONE[entry.status]}
-                    text={KNOWLEDGE_STATUS_LABEL[entry.status]}
-                  />
-                  <Badge
-                    tone={KNOWLEDGE_EMBEDDING_TONE[entry.embeddingStatus]}
-                    text={KNOWLEDGE_EMBEDDING_LABEL[entry.embeddingStatus]}
-                  />
-                </>
-              )}
-            </div>
-          </div>
-          <button type="button" className={styles.close} onClick={onClose} aria-label="关闭">
-            ×
-          </button>
-        </header>
+    <Dialog
+      variant="drawer"
+      ariaLabel="知识详情"
+      onClose={onClose}
+      title={entry === undefined ? entryId : entry.title}
+      headerExtra={
+        entry === undefined ? null : (
+          <>
+            <Badge
+              tone={KNOWLEDGE_STATUS_TONE[entry.status]}
+              text={KNOWLEDGE_STATUS_LABEL[entry.status]}
+            />
+            <Badge
+              tone={KNOWLEDGE_EMBEDDING_TONE[entry.embeddingStatus]}
+              text={KNOWLEDGE_EMBEDDING_LABEL[entry.embeddingStatus]}
+            />
+          </>
+        )
+      }
+    >
+      {detail.isPending ? <p className={styles.loading}>加载中…</p> : null}
 
-        <div className={styles.body}>
-          {detail.isPending ? <p className={styles.loading}>加载中…</p> : null}
+      {detail.isError ? (
+        <div className={styles.errorBox} role="alert">
+          <span>{errorMessage(detail.error, "知识详情加载失败")}</span>
+          <Button size="sm" variant="secondary" onClick={() => void detail.refetch()}>
+            重试
+          </Button>
+        </div>
+      ) : null}
 
-          {detail.isError ? (
-            <div className={styles.errorBox} role="alert">
-              <span>{errorMessage(detail.error, "知识详情加载失败")}</span>
-              <button type="button" className={styles.retry} onClick={() => void detail.refetch()}>
-                重试
-              </button>
-            </div>
+      {actionError === null ? null : (
+        <div className={styles.errorBox} role="alert">
+          <span>{actionError}</span>
+        </div>
+      )}
+
+      {entry === undefined || detail.isError ? null : (
+        <>
+          <dl className={styles.meta}>
+            <MetaRow label="路径">
+              <span className={styles.path}>{entry.path}</span>
+            </MetaRow>
+            <MetaRow label="分类">{entry.category === "" ? "未分类" : entry.category}</MetaRow>
+            <MetaRow label="来源任务">
+              {entry.sourceTaskId === null ? "—" : entry.sourceTaskId}
+            </MetaRow>
+            <MetaRow label="来源 Agent">
+              {entry.sourceAgentId === null ? "—" : entry.sourceAgentId}
+            </MetaRow>
+            <MetaRow label="创建时间">{formatDateTime(entry.createdAt)}</MetaRow>
+            <MetaRow label="更新时间">{formatDateTime(entry.updatedAt)}</MetaRow>
+          </dl>
+
+          {entry.protected ? (
+            <p className={styles.protectedNote}>
+              index.md / log.md 由系统维护，控制台只读。
+            </p>
           ) : null}
 
-          {actionError === null ? null : (
-            <div className={styles.errorBox} role="alert">
-              <span>{actionError}</span>
-            </div>
-          )}
-
-          {entry === undefined || detail.isError ? null : (
+          {editing ? (
+            <KnowledgeEditForm
+              values={form}
+              busy={save.isPending}
+              onChange={setForm}
+              onSubmit={() => save.mutate(form)}
+              onCancel={() => {
+                setEditing(false);
+                setActionError(null);
+              }}
+            />
+          ) : (
             <>
-              <dl className={styles.meta}>
-                <MetaRow label="路径">
-                  <span className={styles.path}>{entry.path}</span>
-                </MetaRow>
-                <MetaRow label="分类">{entry.category === "" ? "未分类" : entry.category}</MetaRow>
-                <MetaRow label="来源任务">
-                  {entry.sourceTaskId === null ? "—" : entry.sourceTaskId}
-                </MetaRow>
-                <MetaRow label="来源 Agent">
-                  {entry.sourceAgentId === null ? "—" : entry.sourceAgentId}
-                </MetaRow>
-                <MetaRow label="创建时间">{formatDateTime(entry.createdAt)}</MetaRow>
-                <MetaRow label="更新时间">{formatDateTime(entry.updatedAt)}</MetaRow>
-              </dl>
-
-              {entry.protected ? (
-                <p className={styles.protectedNote}>
-                  index.md / log.md 由系统维护，控制台只读。
-                </p>
-              ) : null}
-
-              {editing ? (
-                <KnowledgeEditForm
-                  values={form}
-                  busy={save.isPending}
-                  onChange={setForm}
-                  onSubmit={() => save.mutate(form)}
-                  onCancel={() => {
-                    setEditing(false);
-                    setActionError(null);
-                  }}
-                />
-              ) : (
-                <>
-                  <div className={styles.toolbar}>
-                    {entry.protected ? null : (
-                      <button
-                        type="button"
-                        className={styles.secondary}
-                        onClick={() => startEditing(entry, content)}
-                      >
-                        编辑
-                      </button>
-                    )}
-                    {entry.status === "candidate" ? (
-                      <>
-                        <button
-                          type="button"
-                          className={styles.primary}
-                          disabled={busy}
-                          onClick={() => adopt.mutate()}
-                        >
-                          {adopt.isPending ? "采纳中…" : "采纳"}
-                        </button>
-                        <button
-                          type="button"
-                          className={confirmArchive ? styles.danger : styles.secondary}
-                          disabled={busy}
-                          onClick={() => {
-                            if (!confirmArchive) {
-                              setConfirmArchive(true);
-                              return;
-                            }
-                            archive.mutate();
-                          }}
-                        >
-                          {archive.isPending ? "丢弃中…" : confirmArchive ? "确认丢弃" : "丢弃"}
-                        </button>
-                        {confirmArchive ? (
-                          <button
-                            type="button"
-                            className={styles.secondary}
-                            onClick={() => setConfirmArchive(false)}
-                          >
-                            取消
-                          </button>
-                        ) : null}
-                      </>
+              <div className={styles.toolbar}>
+                {entry.protected ? null : (
+                  <Button variant="secondary" onClick={() => startEditing(entry, content)}>
+                    编辑
+                  </Button>
+                )}
+                {entry.status === "candidate" ? (
+                  <>
+                    <Button
+                      variant="primary"
+                      disabled={busy}
+                      loading={adopt.isPending}
+                      onClick={() => adopt.mutate()}
+                    >
+                      {adopt.isPending ? "采纳中…" : "采纳"}
+                    </Button>
+                    <Button
+                      variant={confirmArchive ? "danger" : "secondary"}
+                      disabled={busy}
+                      onClick={() => {
+                        if (!confirmArchive) {
+                          setConfirmArchive(true);
+                          return;
+                        }
+                        archive.mutate();
+                      }}
+                    >
+                      {archive.isPending ? "丢弃中…" : confirmArchive ? "确认丢弃" : "丢弃"}
+                    </Button>
+                    {confirmArchive ? (
+                      <Button variant="secondary" onClick={() => setConfirmArchive(false)}>
+                        取消
+                      </Button>
                     ) : null}
-                  </div>
+                  </>
+                ) : null}
+              </div>
 
-                  <div className={markdownStyles.markdown}>
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-                  </div>
-                </>
-              )}
+              <div className={markdownStyles.markdown}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+              </div>
             </>
           )}
-        </div>
-      </aside>
-    </div>
+        </>
+      )}
+    </Dialog>
   );
 }

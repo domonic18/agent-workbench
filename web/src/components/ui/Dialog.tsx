@@ -5,6 +5,7 @@ import { IconButton } from "./IconButton.js";
 import styles from "./surfaces.module.css";
 
 export type DialogSize = "sm" | "md" | "lg" | "xl";
+export type DialogVariant = "center" | "drawer";
 
 export interface DialogProps {
   title: ReactNode;
@@ -13,6 +14,12 @@ export interface DialogProps {
   /** 一次性密钥展示后置 false，避免误触关闭丢失内容 */
   dismissible?: boolean;
   size?: DialogSize;
+  /** 抽屉：贴右侧滑出，窄屏占满整屏 */
+  variant?: DialogVariant;
+  /** 无障碍名；不给时用 title（字符串时） */
+  ariaLabel?: string;
+  /** 标题行右侧附加内容（状态徽章等） */
+  headerExtra?: ReactNode;
   footer?: ReactNode;
   children: ReactNode;
 }
@@ -26,6 +33,9 @@ export function Dialog({
   onClose,
   dismissible = true,
   size = "md",
+  variant = "center",
+  ariaLabel,
+  headerExtra,
   footer,
   children,
 }: DialogProps) {
@@ -94,11 +104,16 @@ export function Dialog({
     }
   }
 
+  const drawer = variant === "drawer";
+  const overlayClass = drawer
+    ? styles.overlayDrawer
+    : size === "lg" || size === "xl"
+      ? `${styles.overlay} ${styles.overlayWide}`
+      : styles.overlay;
+
   return createPortal(
     <div
-      className={`${styles.overlay} ${
-        size === "lg" || size === "xl" ? styles.overlayWide : ""
-      }`}
+      className={overlayClass}
       onClick={() => {
         if (dismissible) {
           onCloseRef.current();
@@ -107,21 +122,24 @@ export function Dialog({
     >
       <div
         ref={panelRef}
-        className={`${styles.dialog} ${styles[size]}`}
+        className={`${styles.dialog} ${drawer ? styles.dialogDrawer : styles[size]}`}
         role="dialog"
         aria-modal="true"
-        aria-label={typeof title === "string" ? title : undefined}
+        aria-label={ariaLabel ?? (typeof title === "string" ? title : undefined)}
         tabIndex={-1}
         onKeyDown={handleTab}
         onClick={(event) => event.stopPropagation()}
       >
         <div className={styles.dialogHeader}>
-          <div>
+          <div className={styles.dialogHeading}>
             <h2 className={styles.dialogTitle}>{title}</h2>
             {description === undefined ? null : (
               <p className={styles.dialogDescription}>{description}</p>
             )}
           </div>
+          {headerExtra === undefined ? null : (
+            <div className={styles.dialogHeaderExtra}>{headerExtra}</div>
+          )}
           {dismissible ? (
             <IconButton label="关闭" icon={<X size={16} aria-hidden="true" />} onClick={onClose} />
           ) : null}

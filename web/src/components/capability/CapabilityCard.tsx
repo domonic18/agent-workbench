@@ -13,6 +13,8 @@ import { ApiError } from "../../api/client.js";
 import { CAPABILITY_STATUS_LABEL, CAPABILITY_STATUS_TONE } from "../../shared/labels.js";
 import { formatDateTime, formatDuration } from "../../shared/format.js";
 import { Badge } from "../ui/Badge.js";
+import { Button } from "../ui/Button.js";
+import { Card } from "../ui/Panel.js";
 import styles from "./CapabilityCard.module.css";
 
 export interface CapabilityCardProps {
@@ -96,11 +98,11 @@ export function CapabilityCard({ capability, view, now }: CapabilityCardProps) {
   const revoked = capability.status === "revoked";
 
   return (
-    <article className={styles.card}>
+    <Card className={styles.card}>
       <header className={styles.header}>
         <div className={styles.titleGroup}>
           <h3 className={styles.target}>{capability.target}</h3>
-          <span className={styles.action}>{capability.action}</span>
+          <Badge tone="info" text={capability.action} />
         </div>
         <Badge
           tone={CAPABILITY_STATUS_TONE[capability.status]}
@@ -164,45 +166,40 @@ export function CapabilityCard({ capability, view, now }: CapabilityCardProps) {
             <div className={styles.failure}>
               <span>签发失败，可重试；当前未生效。</span>
               <div className={styles.failureActions}>
-                <button type="button" className={styles.primary} onClick={handleRetry}>
+                <Button variant="primary" onClick={handleRetry}>
                   重试
-                </button>
-                <button
-                  type="button"
-                  className={styles.secondary}
-                  onClick={() => setIssueFailed(false)}
-                >
+                </Button>
+                <Button variant="secondary" onClick={() => setIssueFailed(false)}>
                   知道了
-                </button>
+                </Button>
               </div>
             </div>
           ) : capability.status === "issuing" ? (
             <>
-              <button type="button" className={styles.primary} disabled>
+              <Button variant="primary" disabled>
                 签发中…
-              </button>
-              <button type="button" className={styles.secondary} disabled>
+              </Button>
+              <Button variant="secondary" disabled>
                 拒绝
-              </button>
+              </Button>
             </>
           ) : (
             <>
-              <button
-                type="button"
-                className={styles.primary}
+              <Button
+                variant="primary"
                 onClick={handleApprove}
                 disabled={pending}
+                loading={pending}
               >
                 {pending ? "签发中…" : "批准"}
-              </button>
-              <button
-                type="button"
-                className={styles.secondary}
+              </Button>
+              <Button
+                variant="secondary"
                 onClick={handleReject}
                 disabled={pending}
               >
                 拒绝
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -210,33 +207,28 @@ export function CapabilityCard({ capability, view, now }: CapabilityCardProps) {
 
       {view === "active" ? (
         <div className={styles.actions}>
-          <button
-            type="button"
-            className={confirmRevoke ? styles.danger : styles.secondary}
+          <Button
+            variant={confirmRevoke ? "danger" : "secondary"}
             onClick={handleRevoke}
             disabled={pending}
           >
             {confirmRevoke ? "确认吊销" : "吊销"}
-          </button>
+          </Button>
           {confirmRevoke ? (
-            <button
-              type="button"
-              className={styles.secondary}
-              onClick={() => setConfirmRevoke(false)}
-            >
+            <Button variant="secondary" onClick={() => setConfirmRevoke(false)}>
               取消
-            </button>
+            </Button>
           ) : null}
         </div>
       ) : null}
 
       {view === "history" && capability.status === "rejected" ? (
         <div className={styles.actions}>
-          <button type="button" className={styles.secondary} onClick={handleRetry} disabled={pending}>
+          <Button variant="secondary" onClick={handleRetry} disabled={pending}>
             {pending ? "申请中…" : "重新申请"}
-          </button>
+          </Button>
         </div>
       ) : null}
-    </article>
+    </Card>
   );
 }

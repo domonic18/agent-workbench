@@ -37,7 +37,8 @@ export function Panel({ title, description, actions, footer, children, className
 
 export interface CardProps {
   children: ReactNode;
-  className?: string;
+  /** CSS Module 类名取值可能是 undefined，调用方可直接透传 */
+  className?: string | undefined;
 }
 
 /** 无标题的浅容器 */

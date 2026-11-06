@@ -1,6 +1,6 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useEffect, useState, type FormEvent } from "react";
-import { Link, Outlet, useSearchParams } from "react-router";
+import { Outlet, useSearchParams } from "react-router";
 import { ApiError } from "../api/client.js";
 import {
   fetchKnowledge,
@@ -9,8 +9,13 @@ import {
   readKnowledgeSearch,
   readKnowledgeView,
 } from "../api/knowledge.js";
-import { EmptyState } from "../components/ui/EmptyState.js";
 import { KnowledgeList } from "../components/knowledge/KnowledgeList.js";
+import { AsyncSection } from "../components/ui/AsyncSection.js";
+import { Badge } from "../components/ui/Badge.js";
+import { Button } from "../components/ui/Button.js";
+import { EmptyState } from "../components/ui/EmptyState.js";
+import { Input } from "../components/ui/Field.js";
+import { Tabs } from "../components/ui/Tabs.js";
 import { useNow } from "../shared/useNow.js";
 import styles from "./KnowledgePage.module.css";
 
@@ -59,12 +64,10 @@ export function KnowledgePage() {
   const items = knowledgeQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const counts = knowledgeQuery.data?.pages[0]?.counts;
 
-  function tabPath(target: (typeof KNOWLEDGE_VIEWS)[number]): string {
-    const next = new URLSearchParams({ view: target });
-    if (search !== "") {
-      next.set("q", search);
-    }
-    return `/knowledge?${next.toString()}`;
+  function selectView(target: string): void {
+    const next = new URLSearchParams(params);
+    next.set("view", target);
+    setParams(next, { replace: true });
   }
 
   function submitSearch(event: FormEvent<HTMLFormElement>): void {
@@ -79,86 +82,83 @@ export function KnowledgePage() {
     setParams(next, { replace: true });
   }
 
+  function clearSearch(): void {
+    const next = new URLSearchParams(params);
+    next.delete("q");
+    setParams(next, { replace: true });
+  }
+
+  const searchForm = (
+    <form className={styles.search} role="search" onSubmit={submitSearch}>
+      <Input
+        type="search"
+        value={term}
+        placeholder="搜索标题、摘要或正文"
+        aria-label="搜索知识"
+        onChange={(event) => setTerm(event.target.value)}
+      />
+      <Button type="submit" variant="primary">
+        搜索
+      </Button>
+      {search === "" ? null : (
+        <Button variant="ghost" size="sm" onClick={clearSearch}>
+          清除
+        </Button>
+      )}
+    </form>
+  );
+
+  const list =
+    items.length === 0 ? (
+      <EmptyState
+        title={search === "" ? EMPTY_HINT[view].title : "没有匹配的知识"}
+        description={
+          search === "" ? EMPTY_HINT[view].description : "换个关键词，或清除搜索后重试。"
+        }
+      />
+    ) : (
+      <KnowledgeList items={items} view={view} search={search} now={now} />
+    );
+
   return (
     <div className={styles.page}>
-      <nav className={styles.tabs} aria-label="知识状态">
-        {KNOWLEDGE_VIEWS.map((option) => (
-          <Link
-            key={option}
-            to={tabPath(option)}
-            replace
-            className={`${styles.tab} ${option === view ? styles.tabActive : ""}`}
-            aria-current={option === view ? "page" : undefined}
-          >
-            {KNOWLEDGE_VIEW_LABEL[option]}
-            {option === "candidate" ? (
-              <span className={styles.count}>{counts?.candidate ?? 0}</span>
-            ) : null}
-          </Link>
-        ))}
-      </nav>
-
-      <form className={styles.search} role="search" onSubmit={submitSearch}>
-        <input
-          type="search"
-          className={styles.input}
-          value={term}
-          placeholder="搜索标题、摘要或正文"
-          aria-label="搜索知识"
-          onChange={(event) => setTerm(event.target.value)}
-        />
-        <button type="submit" className={styles.submit}>
-          搜索
-        </button>
-        {search === "" ? null : (
-          <Link to={tabPath(view)} replace className={styles.clear}>
-            清除
-          </Link>
-        )}
-      </form>
-
-      {knowledgeQuery.isPending ? <p className={styles.loading}>加载中…</p> : null}
-
-      {knowledgeQuery.isError ? (
-        <div className={styles.errorBox} role="alert">
-          <span>
-            {knowledgeQuery.error instanceof ApiError
-              ? knowledgeQuery.error.message
-              : "知识列表加载失败"}
-          </span>
-          <button
-            type="button"
-            className={styles.retry}
-            onClick={() => void knowledgeQuery.refetch()}
-          >
-            重试
-          </button>
-        </div>
-      ) : null}
-
-      {!knowledgeQuery.isPending && !knowledgeQuery.isError ? (
-        items.length === 0 ? (
-          <EmptyState
-            title={search === "" ? EMPTY_HINT[view].title : "没有匹配的知识"}
-            description={
-              search === "" ? EMPTY_HINT[view].description : "换个关键词，或清除搜索后重试。"
-            }
-          />
-        ) : (
-          <KnowledgeList items={items} view={view} search={search} now={now} />
-        )
-      ) : null}
-
-      {knowledgeQuery.hasNextPage ? (
-        <button
-          type="button"
-          className={styles.more}
-          disabled={knowledgeQuery.isFetchingNextPage}
-          onClick={() => void knowledgeQuery.fetchNextPage()}
-        >
-          {knowledgeQuery.isFetchingNextPage ? "加载中…" : "加载更多"}
-        </button>
-      ) : null}
+      <Tabs
+        value={view}
+        onValueChange={selectView}
+        items={KNOWLEDGE_VIEWS.map((option) => ({
+          key: option,
+          label: (
+            <>
+              {KNOWLEDGE_VIEW_LABEL[option]}
+              {option === "candidate" ? (
+                <Badge tone="warning" text={counts?.candidate ?? 0} />
+              ) : null}
+            </>
+          ),
+          content:
+            option === view ? (
+              <>
+                {searchForm}
+                <AsyncSection
+                  pending={knowledgeQuery.isPending}
+                  error={
+                    knowledgeQuery.isError
+                      ? knowledgeQuery.error instanceof ApiError
+                        ? knowledgeQuery.error.message
+                        : "知识列表加载失败"
+                      : null
+                  }
+                  onRetry={() => void knowledgeQuery.refetch()}
+                  hasMore={knowledgeQuery.hasNextPage}
+                  fetchingMore={knowledgeQuery.isFetchingNextPage}
+                  onLoadMore={() => void knowledgeQuery.fetchNextPage()}
+                >
+                  {list}
+                </AsyncSection>
+              </>
+            ) : null,
+        }))}
+      />
 
       <p className={styles.note}>
         只有已生效条目参与 Agent 检索；候选必须逐条采纳，避免 Agent 自己决定知识库。

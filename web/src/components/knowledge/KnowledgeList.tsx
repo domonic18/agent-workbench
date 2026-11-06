@@ -17,6 +17,8 @@ import {
   KNOWLEDGE_STATUS_TONE,
 } from "../../shared/labels.js";
 import { Badge } from "../ui/Badge.js";
+import { Button } from "../ui/Button.js";
+import { Table, type TableColumn } from "../ui/Table.js";
 import styles from "./knowledge-list.module.css";
 
 export interface KnowledgeListProps {
@@ -65,39 +67,34 @@ function RowActions({
     <div className={styles.rowActions}>
       {entry.status === "candidate" ? (
         <>
-          <button
-            type="button"
-            className={styles.primary}
-            onClick={onAdopt}
-            disabled={busy}
-          >
+          <Button variant="primary" size="sm" onClick={onAdopt} disabled={busy}>
             {pendingAction === "adopt" ? "采纳中…" : "采纳"}
-          </button>
-          <button
-            type="button"
-            className={confirming ? styles.danger : styles.secondary}
+          </Button>
+          <Button
+            variant={confirming ? "danger" : "secondary"}
+            size="sm"
             onClick={onArchive}
             disabled={busy}
           >
             {pendingAction === "archive" ? "丢弃中…" : confirming ? "确认丢弃" : "丢弃"}
-          </button>
+          </Button>
           {confirming ? (
-            <button type="button" className={styles.secondary} onClick={onCancelArchive}>
+            <Button variant="secondary" size="sm" onClick={onCancelArchive}>
               取消
-            </button>
+            </Button>
           ) : null}
         </>
       ) : null}
       {entry.embeddingStatus === "ready" ? null : (
-        <button
-          type="button"
-          className={styles.secondary}
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={onReindex}
           disabled={busy}
           title="重新建立关键词与向量索引"
         >
           {pendingAction === "reindex" ? "索引中…" : "重试索引"}
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -146,6 +143,66 @@ export function KnowledgeList({ items, view, search, now }: KnowledgeListProps) 
       void run(entry.id, "reindex", () => reindexKnowledgeEntry(entry.id), "索引重试失败"),
   });
 
+  const columns: TableColumn<KnowledgeEntryDto>[] = [
+    {
+      key: "title",
+      header: "标题",
+      width: "38%",
+      render: (entry) => (
+        <>
+          <Link to={detailPath(entry.id, view, search)} className={styles.title} title={entry.path}>
+            {entry.title}
+          </Link>
+          <span className={styles.subline}>
+            {entry.summary === "" ? entry.path : entry.summary}
+          </span>
+        </>
+      ),
+    },
+    {
+      key: "category",
+      header: "分类",
+      width: "10%",
+      render: (entry) => (entry.category === "" ? "—" : entry.category),
+    },
+    {
+      key: "status",
+      header: "状态",
+      width: "10%",
+      render: (entry) => (
+        <Badge tone={KNOWLEDGE_STATUS_TONE[entry.status]} text={KNOWLEDGE_STATUS_LABEL[entry.status]} />
+      ),
+    },
+    {
+      key: "embedding",
+      header: "索引",
+      width: "10%",
+      render: (entry) =>
+        entry.embeddingStatus === "ready" ? (
+          <span className={styles.muted}>已索引</span>
+        ) : (
+          <Badge
+            tone={KNOWLEDGE_EMBEDDING_TONE[entry.embeddingStatus]}
+            text={KNOWLEDGE_EMBEDDING_LABEL[entry.embeddingStatus]}
+          />
+        ),
+    },
+    {
+      key: "updated",
+      header: "更新时间",
+      width: "12%",
+      render: (entry) => (
+        <span title={formatDateTime(entry.updatedAt)}>{formatRelativeTime(entry.updatedAt, now)}</span>
+      ),
+    },
+    {
+      key: "actions",
+      header: "操作",
+      width: "20%",
+      render: (entry) => <RowActions {...actionsOf(entry)} />,
+    },
+  ];
+
   return (
     <div className={styles.wrap}>
       {error === null ? null : (
@@ -154,60 +211,8 @@ export function KnowledgeList({ items, view, search, now }: KnowledgeListProps) 
         </p>
       )}
 
-      <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>标题</th>
-              <th>分类</th>
-              <th>状态</th>
-              <th>索引</th>
-              <th>更新时间</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((entry) => (
-              <tr key={entry.id}>
-                <td>
-                  <Link
-                    to={detailPath(entry.id, view, search)}
-                    className={styles.title}
-                    title={entry.path}
-                  >
-                    {entry.title}
-                  </Link>
-                  <span className={styles.subline}>
-                    {entry.summary === "" ? entry.path : entry.summary}
-                  </span>
-                </td>
-                <td>{entry.category === "" ? "—" : entry.category}</td>
-                <td>
-                  <Badge
-                    tone={KNOWLEDGE_STATUS_TONE[entry.status]}
-                    text={KNOWLEDGE_STATUS_LABEL[entry.status]}
-                  />
-                </td>
-                <td>
-                  {entry.embeddingStatus === "ready" ? (
-                    <span className={styles.muted}>已索引</span>
-                  ) : (
-                    <Badge
-                      tone={KNOWLEDGE_EMBEDDING_TONE[entry.embeddingStatus]}
-                      text={KNOWLEDGE_EMBEDDING_LABEL[entry.embeddingStatus]}
-                    />
-                  )}
-                </td>
-                <td title={formatDateTime(entry.updatedAt)}>
-                  {formatRelativeTime(entry.updatedAt, now)}
-                </td>
-                <td>
-                  <RowActions {...actionsOf(entry)} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className={styles.tableArea}>
+        <Table columns={columns} rows={items} rowKey={(entry) => entry.id} minWidth="760px" fixedLayout />
       </div>
 
       <ul className={styles.cards}>

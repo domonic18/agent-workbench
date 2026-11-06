@@ -3,25 +3,9 @@
 }
 
 .note {
-  margin: 24px 0 0;
-  padding-top: 12px;
+  margin: var(--space-6) 0 0;
+  padding-top: var(--space-3);
   border-top: 1px solid var(--border);
-  font-size: 11.5px;
+  font-size: var(--font-xs);
   color: var(--subtle);
-}
-
-.loading {
-  composes: loading from "./task-shared.module.css";
-}
-
-.errorBox {
-  composes: errorBox from "./task-shared.module.css";
-}
-
-.retry {
-  composes: retry from "./task-shared.module.css";
-}
-
-.more {
-  composes: more from "./task-shared.module.css";
 }

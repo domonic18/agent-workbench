@@ -4,9 +4,10 @@ import { Outlet, useLocation } from "react-router";
 import { ApiError } from "../api/client.js";
 import { fetchAgents } from "../api/identity.js";
 import { fetchTasks, readTaskFilters, type TaskFilters } from "../api/tasks.js";
-import { EmptyState } from "../components/ui/EmptyState.js";
 import { TaskFiltersForm } from "../components/task/TaskFilters.js";
 import { TaskTable } from "../components/task/TaskTable.js";
+import { AsyncSection } from "../components/ui/AsyncSection.js";
+import { EmptyState } from "../components/ui/EmptyState.js";
 import { useNow } from "../shared/useNow.js";
 import styles from "../components/task/task-list.module.css";
 
@@ -47,27 +48,21 @@ export function TasksPage() {
     <div className={styles.page}>
       <TaskFiltersForm />
 
-      {tasksQuery.isPending ? <p className={styles.loading}>加载中…</p> : null}
-
-      {tasksQuery.isError ? (
-        <div className={styles.errorBox} role="alert">
-          <span>
-            {tasksQuery.error instanceof ApiError
+      <AsyncSection
+        pending={tasksQuery.isPending}
+        error={
+          tasksQuery.isError
+            ? tasksQuery.error instanceof ApiError
               ? tasksQuery.error.message
-              : "任务列表加载失败"}
-          </span>
-          <button
-            type="button"
-            className={styles.retry}
-            onClick={() => void tasksQuery.refetch()}
-          >
-            重试
-          </button>
-        </div>
-      ) : null}
-
-      {!tasksQuery.isPending && !tasksQuery.isError ? (
-        tasks.length === 0 ? (
+              : "任务列表加载失败"
+            : null
+        }
+        onRetry={() => void tasksQuery.refetch()}
+        hasMore={tasksQuery.hasNextPage}
+        fetchingMore={tasksQuery.isFetchingNextPage}
+        onLoadMore={() => void tasksQuery.fetchNextPage()}
+      >
+        {tasks.length === 0 ? (
           <EmptyState
             title={hasFilters ? "没有匹配的任务" : "暂无任务记录"}
             description={
@@ -83,19 +78,8 @@ export function TasksPage() {
             search={location.search}
             now={now}
           />
-        )
-      ) : null}
-
-      {tasksQuery.hasNextPage ? (
-        <button
-          type="button"
-          className={styles.more}
-          disabled={tasksQuery.isFetchingNextPage}
-          onClick={() => void tasksQuery.fetchNextPage()}
-        >
-          {tasksQuery.isFetchingNextPage ? "加载中…" : "加载更多"}
-        </button>
-      ) : null}
+        )}
+      </AsyncSection>
 
       <p className={styles.note}>
         仅显示已自报的任务——Agent 判断不需要建单的活不会出现在这里。

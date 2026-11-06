@@ -1,52 +1,38 @@
 .card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
   min-width: 0;
-  padding: 15px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
 }
 
 .header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 .titleGroup {
   display: flex;
   flex: 1 1 auto;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 10px;
+  align-items: center;
+  gap: var(--space-2);
   min-width: 0;
 }
 
 .target {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--font-md);
   font-weight: 700;
   color: var(--text);
   overflow-wrap: anywhere;
 }
 
-.action {
-  padding: 1px 8px;
-  border: 1px solid var(--accent-border);
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
-}
-
 .meta {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 8px 14px;
+  gap: var(--space-2) var(--space-3);
   margin: 0;
 }
 
@@ -58,32 +44,32 @@
 }
 
 .metaItem dt {
-  font-size: 11px;
+  font-size: var(--font-xs);
   color: var(--muted);
 }
 
 .metaItem dd {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--font-sm);
   color: var(--text);
   overflow-wrap: anywhere;
 }
 
 .mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: var(--font-xs);
   color: var(--subtle);
 }
 
 .scopeSection {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .scopeTitle {
   margin: 0;
-  font-size: 11.5px;
+  font-size: var(--font-sm);
   font-weight: 600;
   color: var(--text-secondary);
 }
@@ -91,15 +77,15 @@
 /* 审批人必须看到完整范围,不折叠、不截断 */
 .scope {
   margin: 0;
-  padding: 10px 12px;
+  padding: var(--space-3);
   max-height: 320px;
   overflow: auto;
   border: 1px solid var(--line-soft);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--surface-2);
   color: var(--text);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11.5px;
+  font-family: var(--font-mono);
+  font-size: var(--font-xs);
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
@@ -107,80 +93,34 @@
 
 .error {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--font-sm);
   color: var(--danger);
 }
 
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-}
-
-.primary,
-.secondary,
-.danger {
-  padding: 7px 16px;
-  border-radius: 8px;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.primary {
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  color: var(--on-accent);
-  font-weight: 600;
-}
-
-.secondary {
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text);
-}
-
-.secondary:hover {
-  background: var(--bg);
-}
-
-.danger {
-  border: 1px solid var(--danger);
-  background: var(--danger);
-  color: #fff;
-  font-weight: 600;
-}
-
-.primary:disabled,
-.secondary:disabled,
-.danger:disabled {
-  opacity: 0.55;
-  cursor: default;
+  gap: var(--space-2);
 }
 
 .failure {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
+  gap: var(--space-2);
+  padding: var(--space-3);
   border: 1px solid var(--warning-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--warning-soft);
   color: var(--warning);
-  font-size: 12px;
+  font-size: var(--font-sm);
 }
 
 .failureActions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 @media (max-width: 767px) {
-  .primary,
-  .secondary,
-  .danger {
-    min-height: 44px;
-  }
-
   .actions > button,
   .failureActions > button {
     flex: 1;

@@ -1,84 +1,21 @@
 .wrap {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 .error {
   margin: 0;
-  padding: 10px 12px;
+  padding: var(--space-3) var(--space-4);
   border: 1px solid var(--danger-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--danger-soft);
   color: var(--danger);
-  font-size: 12px;
+  font-size: var(--font-sm);
 }
 
-.tableWrap {
-  overflow-x: auto;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
-}
-
-.table {
-  width: 100%;
-  min-width: 760px;
-  table-layout: fixed;
-  border-collapse: collapse;
-  font-size: 12px;
-}
-
-.table th,
-.table td {
-  padding: 0 12px;
-  text-align: left;
-  vertical-align: middle;
-  border-bottom: 1px solid var(--line-soft);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.table th {
-  height: 36px;
-  border-bottom-color: var(--border);
-  background: var(--header-bg);
-  color: var(--muted);
-  font-size: 11.5px;
-  font-weight: 600;
-}
-
-.table td {
-  height: 48px;
-}
-
-.table th:nth-child(1) {
-  width: 38%;
-}
-
-.table th:nth-child(2) {
-  width: 10%;
-}
-
-.table th:nth-child(3) {
-  width: 10%;
-}
-
-.table th:nth-child(4) {
-  width: 10%;
-}
-
-.table th:nth-child(5) {
-  width: 12%;
-}
-
-.table th:nth-child(6) {
-  width: 20%;
-}
-
-.table tbody tr:last-child td {
-  border-bottom: none;
+.tableArea {
+  display: block;
 }
 
 .title {
@@ -87,6 +24,7 @@
   font-weight: 600;
   text-decoration: none;
   overflow: hidden;
+  white-space: nowrap;
   text-overflow: ellipsis;
 }
 
@@ -98,64 +36,25 @@
 .subline {
   display: block;
   margin-top: 2px;
-  font-size: 10.5px;
+  font-size: var(--font-xs);
   color: var(--subtle);
   overflow: hidden;
+  white-space: nowrap;
   text-overflow: ellipsis;
 }
 
 .muted {
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: var(--font-sm);
 }
 
 .rowActions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
-.primary,
-.secondary,
-.danger {
-  height: 26px;
-  padding: 0 10px;
-  border-radius: 6px;
-  font-size: 11.5px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.primary {
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  color: var(--on-accent);
-  font-weight: 600;
-}
-
-.secondary {
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-secondary);
-}
-
-.secondary:hover {
-  background: var(--bg);
-}
-
-.danger {
-  border: 1px solid var(--danger-border);
-  background: var(--danger-soft);
-  color: var(--danger);
-}
-
-.primary:disabled,
-.secondary:disabled,
-.danger:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
+/* 窄屏：表格转卡片 */
 .cards {
   display: none;
   margin: 0;
@@ -166,10 +65,10 @@
 .card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 14px;
+  gap: var(--space-2);
+  padding: var(--space-4);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--surface);
 }
 
@@ -177,12 +76,12 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .cardTitle {
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--font-md);
   font-weight: 600;
   text-decoration: none;
   overflow-wrap: anywhere;
@@ -192,26 +91,19 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  font-size: 11.5px;
+  gap: var(--space-2);
+  font-size: var(--font-sm);
   color: var(--muted);
 }
 
 @media (max-width: 767px) {
-  .tableWrap {
+  .tableArea {
     display: none;
   }
 
   .cards {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-  }
-
-  .primary,
-  .secondary,
-  .danger {
-    min-height: 44px;
-    padding: 0 14px;
+    gap: var(--space-3);
   }
 }

@@ -2,6 +2,9 @@ import { type FormEvent, useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { readTaskFilters, TASK_STATUSES } from "../../api/tasks.js";
 import { TASK_STATUS_LABEL } from "../../shared/labels.js";
+import { Button } from "../ui/Button.js";
+import { ChipGroup } from "../ui/Chip.js";
+import { Input } from "../ui/Field.js";
 import styles from "./TaskFilters.module.css";
 
 /** 筛选条件只存 URL query,刷新与回退后保持一致(03 §3) */
@@ -50,41 +53,32 @@ export function TaskFiltersForm() {
   return (
     <form className={styles.filters} onSubmit={apply} aria-label="任务筛选">
       <div className={styles.filterRow}>
-        <div className={styles.chips} role="group" aria-label="状态筛选">
-          <button
-            type="button"
-            className={`${styles.chip} ${status === "" ? styles.chipActive : ""}`}
-            aria-pressed={status === ""}
-            onClick={() => applyStatus("")}
-          >
-            全部
-          </button>
-          {TASK_STATUSES.map((value) => (
-            <button
-              key={value}
-              type="button"
-              className={`${styles.chip} ${status === value ? styles.chipActive : ""}`}
-              aria-pressed={status === value}
-              onClick={() => applyStatus(value)}
-            >
-              {TASK_STATUS_LABEL[value]}
-            </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          className={styles.moreToggle}
+        <ChipGroup
+          label="状态筛选"
+          value={status}
+          onValueChange={applyStatus}
+          options={[
+            { key: "", label: "全部" },
+            ...TASK_STATUSES.map((value) => ({
+              key: value,
+              label: TASK_STATUS_LABEL[value],
+            })),
+          ]}
+        />
+        <Button
+          variant="ghost"
+          size="sm"
           aria-expanded={moreOpen}
           onClick={() => setMoreOpen((open) => !open)}
         >
           更多筛选
-        </button>
+        </Button>
         <div className={styles.filterAside}>
-          <span className={styles.sortHint}>
+          <span
+            className={styles.sortHint}
+            title="任务按最后事件时间倒序排列，点任一行查看轮次链。"
+          >
             默认按最后事件倒序
-            <span className={styles.help} title="任务按最后事件时间倒序排列，点任一行查看轮次链。">
-              ?
-            </span>
           </span>
         </div>
       </div>
@@ -95,9 +89,8 @@ export function TaskFiltersForm() {
             <label className={styles.label} htmlFor="task-filter-project">
               项目
             </label>
-            <input
+            <Input
               id="task-filter-project"
-              className={styles.control}
               value={project}
               onChange={(event) => setProject(event.target.value)}
               placeholder="全部项目"
@@ -107,21 +100,20 @@ export function TaskFiltersForm() {
             <label className={styles.label} htmlFor="task-filter-assignee">
               承接方
             </label>
-            <input
+            <Input
               id="task-filter-assignee"
-              className={styles.control}
               value={assignee}
               onChange={(event) => setAssignee(event.target.value)}
               placeholder="Agent ID"
             />
           </div>
           <div className={styles.actions}>
-            <button type="submit" className={styles.apply}>
+            <Button type="submit" variant="primary">
               应用
-            </button>
-            <button type="button" className={styles.reset} onClick={reset}>
+            </Button>
+            <Button variant="secondary" onClick={reset}>
               重置
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}

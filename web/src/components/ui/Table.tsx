@@ -17,6 +17,10 @@ export interface TableProps<T> {
   onRowClick?: (row: T) => void;
   /** 无数据时的占位 */
   empty?: ReactNode;
+  /** 表格最小宽度，列多时靠横向滚动兜住 */
+  minWidth?: string;
+  /** 固定列宽：列宽严格按 columns.width 生效，长内容由单元格内元素自己截断 */
+  fixedLayout?: boolean;
 }
 
 const ALIGN_CLASS = {
@@ -26,13 +30,24 @@ const ALIGN_CLASS = {
 } as const;
 
 /** 粘性表头 + 行悬浮态的表格；窄屏由调用方转卡片 */
-export function Table<T>({ columns, rows, rowKey, onRowClick, empty }: TableProps<T>) {
+export function Table<T>({
+  columns,
+  rows,
+  rowKey,
+  onRowClick,
+  empty,
+  minWidth,
+  fixedLayout = false,
+}: TableProps<T>) {
   if (rows.length === 0 && empty !== undefined) {
     return <>{empty}</>;
   }
   return (
     <div className={styles.tableWrap}>
-      <table className={styles.table}>
+      <table
+        className={`${styles.table}${fixedLayout ? ` ${styles.tableFixed}` : ""}`}
+        style={minWidth === undefined ? undefined : { minWidth }}
+      >
         <thead>
           <tr>
             {columns.map((column) => (

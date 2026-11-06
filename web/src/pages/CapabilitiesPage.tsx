@@ -1,5 +1,5 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { Link, useSearchParams } from "react-router";
+import { useSearchParams } from "react-router";
 import {
   CAPABILITY_VIEW_LABEL,
   CAPABILITY_VIEWS,
@@ -9,7 +9,9 @@ import {
 import { ApiError } from "../api/client.js";
 import { CapabilityCard } from "../components/capability/CapabilityCard.js";
 import { DelegationMatrix } from "../components/capability/DelegationMatrix.js";
+import { AsyncSection } from "../components/ui/AsyncSection.js";
 import { EmptyState } from "../components/ui/EmptyState.js";
+import { Tabs } from "../components/ui/Tabs.js";
 import { useNow } from "../shared/useNow.js";
 import styles from "./CapabilitiesPage.module.css";
 
@@ -32,7 +34,7 @@ const EMPTY_HINT: Record<
 };
 
 export function CapabilitiesPage() {
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const view = readCapabilityView(params);
   const now = useNow(1_000);
 
@@ -48,68 +50,52 @@ export function CapabilitiesPage() {
 
   const capabilities = capabilitiesQuery.data?.pages.flatMap((page) => page.items) ?? [];
 
+  function selectView(next: string): void {
+    const nextParams = new URLSearchParams(params);
+    nextParams.set("view", next);
+    setParams(nextParams, { replace: true });
+  }
+
+  const list =
+    capabilities.length === 0 ? (
+      <EmptyState title={EMPTY_HINT[view].title} description={EMPTY_HINT[view].description} />
+    ) : (
+      <div className={styles.grid}>
+        {capabilities.map((capability) => (
+          <CapabilityCard key={capability.id} capability={capability} view={view} now={now} />
+        ))}
+      </div>
+    );
+
   return (
     <div className={styles.page}>
-      <nav className={styles.tabs} aria-label="授权状态">
-        {CAPABILITY_VIEWS.map((option) => (
-          <Link
-            key={option}
-            to={`/capabilities?view=${option}`}
-            replace
-            className={`${styles.tab} ${option === view ? styles.tabActive : ""}`}
-            aria-current={option === view ? "page" : undefined}
-          >
-            {CAPABILITY_VIEW_LABEL[option]}
-          </Link>
-        ))}
-      </nav>
-
-      {capabilitiesQuery.isPending ? <p className={styles.loading}>加载中…</p> : null}
-
-      {capabilitiesQuery.isError ? (
-        <div className={styles.errorBox} role="alert">
-          <span>
-            {capabilitiesQuery.error instanceof ApiError
-              ? capabilitiesQuery.error.message
-              : "授权列表加载失败"}
-          </span>
-          <button
-            type="button"
-            className={styles.retry}
-            onClick={() => void capabilitiesQuery.refetch()}
-          >
-            重试
-          </button>
-        </div>
-      ) : null}
-
-      {!capabilitiesQuery.isPending && !capabilitiesQuery.isError ? (
-        capabilities.length === 0 ? (
-          <EmptyState
-            title={EMPTY_HINT[view].title}
-            description={EMPTY_HINT[view].description}
-          />
-        ) : (
-          <ul className={styles.list}>
-            {capabilities.map((capability) => (
-              <li key={capability.id}>
-                <CapabilityCard capability={capability} view={view} now={now} />
-              </li>
-            ))}
-          </ul>
-        )
-      ) : null}
-
-      {capabilitiesQuery.hasNextPage ? (
-        <button
-          type="button"
-          className={styles.more}
-          disabled={capabilitiesQuery.isFetchingNextPage}
-          onClick={() => void capabilitiesQuery.fetchNextPage()}
-        >
-          {capabilitiesQuery.isFetchingNextPage ? "加载中…" : "加载更多"}
-        </button>
-      ) : null}
+      <Tabs
+        value={view}
+        onValueChange={selectView}
+        items={CAPABILITY_VIEWS.map((option) => ({
+          key: option,
+          label: CAPABILITY_VIEW_LABEL[option],
+          content:
+            option === view ? (
+              <AsyncSection
+                pending={capabilitiesQuery.isPending}
+                error={
+                  capabilitiesQuery.isError
+                    ? capabilitiesQuery.error instanceof ApiError
+                      ? capabilitiesQuery.error.message
+                      : "授权列表加载失败"
+                    : null
+                }
+                onRetry={() => void capabilitiesQuery.refetch()}
+                hasMore={capabilitiesQuery.hasNextPage}
+                fetchingMore={capabilitiesQuery.isFetchingNextPage}
+                onLoadMore={() => void capabilitiesQuery.fetchNextPage()}
+              >
+                {list}
+              </AsyncSection>
+            ) : null,
+        }))}
+      />
 
       <DelegationMatrix />
     </div>

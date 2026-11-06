@@ -293,3 +293,40 @@
   font-size: var(--font-sm);
   overflow-wrap: anywhere;
 }
+
+/* 状态筛选胶囊 */
+.chipGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.chip {
+  height: 28px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.chip:hover {
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+.chipActive,
+.chipActive:hover {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+@media (max-width: 767px) {
+  .chip {
+    min-height: 36px;
+  }
+}
