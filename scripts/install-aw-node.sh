@@ -1,7 +1,10 @@
 #!/bin/sh
 # aw-node 一键安装 / 升级脚本(只支持 macOS)
 # 用法:
-#   curl -fsSL <release>/install-aw-node.sh | sh -s -- --url https://aw.example.com
+#   首次加入:
+#     curl -fsSL <release>/install-aw-node.sh | sh -s -- --url https://aw.example.com
+#   覆盖安装(已加入过的机器,不需要一次性 token,不换机器身份):
+#     curl -fsSL <release>/install-aw-node.sh | sh -s -- --url https://aw.example.com --mode upgrade
 # 一次性 enroll token 由脚本交互式隐藏输入;Agent 代跑时经 stdin 或 AW_ENROLL_TOKEN 传入,
 # 永不写在命令行参数里。
 set -eu
@@ -16,6 +19,8 @@ YES=0
 SOURCE="auto"
 CLAUDE_DIR=""
 CC_DIR=""
+MODE="auto"
+DRY_RUN=0
 
 usage() {
   cat <<'EOF'
@@ -30,12 +35,18 @@ usage() {
   --source <auto|console|github>
                         产物来源:auto 先取控制台镜像,取不到再回退 GitHub Release;
                         console 只用控制台;github 只用 GitHub Release
+  --mode <auto|enroll|upgrade>
+                        auto(默认):本机已有凭据就覆盖安装,没有就走首次加入;
+                        enroll:强制用一次性 token 重新加入;upgrade:强制覆盖安装
   --claude-dir <path>   覆盖 Claude 数据目录
   --cc-connect-dir <p>  覆盖 cc-connect 数据目录
+  --dry-run             只打印将要执行的动作,不改机器
   --yes                 不询问确认(自动化/Agent 代跑)
   -h, --help            显示帮助
 
-一次性 enroll token 优先读 AW_ENROLL_TOKEN,否则交互式隐藏输入。
+覆盖安装(upgrade)复用本机已落盘的机器凭据,不需要一次性 token,也不重新登记机器;
+既有的 launchd 环境变量(项目列表、AW_EXTRA_PROJECTS 等)原样保留。
+首次加入(enroll)才需要一次性 enroll token,优先读 AW_ENROLL_TOKEN,否则交互式隐藏输入。
 EOF
 }
 
@@ -49,6 +60,8 @@ while [ $# -gt 0 ]; do
     --source) SOURCE="$2"; shift 2 ;;
     --claude-dir) CLAUDE_DIR="$2"; shift 2 ;;
     --cc-connect-dir) CC_DIR="$2"; shift 2 ;;
+    --mode) MODE="$2"; shift 2 ;;
+    --dry-run) DRY_RUN=1; shift ;;
     --yes) YES=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "未知参数: $1" >&2; usage >&2; exit 2 ;;
@@ -61,16 +74,51 @@ if [ -z "$URL" ]; then
   exit 2
 fi
 
-if [ "$(uname -s)" != "Darwin" ]; then
-  echo "aw-node 目前只支持 macOS" >&2
-  exit 2
+case "$MODE" in
+  auto | enroll | upgrade) ;;
+  *) echo "未知 --mode: $MODE(取 auto|enroll|upgrade)" >&2; exit 2 ;;
+esac
+
+# 已有凭据说明本机早已加入,默认走覆盖安装:不重新登记机器,也不需要一次性 token
+CREDENTIALS_FILE="$STATE_DIR/credentials.json"
+if [ "$MODE" = "auto" ]; then
+  if [ -f "$CREDENTIALS_FILE" ]; then
+    MODE="upgrade"
+  else
+    MODE="enroll"
+  fi
 fi
 
 case "$(uname -m)" in
   arm64) ARCH="arm64" ;;
   x86_64) ARCH="x64" ;;
-  *) echo "不支持的 CPU 架构: $(uname -m)" >&2; exit 2 ;;
+  *) ARCH="unsupported" ;;
 esac
+
+if [ "$MODE" = "upgrade" ]; then
+  echo "模式:覆盖安装(复用 $CREDENTIALS_FILE 的机器凭据,不需要 enroll token)"
+else
+  echo "模式:首次加入(需要一次性 enroll token)"
+fi
+
+# dry-run 不碰机器,也不做平台判定,方便在任何系统上预览将要执行的动作
+if [ "$DRY_RUN" = "1" ]; then
+  echo "产物: aw-node-macos-$ARCH"
+  echo "来源: $SOURCE"
+  echo "状态目录: $STATE_DIR"
+  echo "(dry-run,不改机器)"
+  exit 0
+fi
+
+if [ "$(uname -s)" != "Darwin" ]; then
+  echo "aw-node 目前只支持 macOS" >&2
+  exit 2
+fi
+
+if [ "$ARCH" = "unsupported" ]; then
+  echo "不支持的 CPU 架构: $(uname -m)" >&2
+  exit 2
+fi
 
 if [ "$VERSION" = "latest" ]; then
   GITHUB_BASE="https://github.com/$REPO/releases/latest/download"
@@ -158,7 +206,12 @@ if [ "$EXPECTED" != "$ACTUAL" ]; then
 fi
 chmod 755 "$TMPDIR_AW/$ASSET"
 
-set -- "$TMPDIR_AW/$ASSET" enroll --url "$URL" --state-dir "$STATE_DIR"
+if [ "$MODE" = "upgrade" ]; then
+  # 覆盖安装:机器身份已在本地凭据里,直接重装 launchd 服务,不重新登记
+  set -- "$TMPDIR_AW/$ASSET" install --url "$URL" --state-dir "$STATE_DIR"
+else
+  set -- "$TMPDIR_AW/$ASSET" enroll --url "$URL" --state-dir "$STATE_DIR"
+fi
 if [ -n "$PROJECTS" ]; then set -- "$@" --projects "$PROJECTS"; fi
 if [ -n "$CLAUDE_DIR" ]; then set -- "$@" --claude-dir "$CLAUDE_DIR"; fi
 if [ -n "$CC_DIR" ]; then set -- "$@" --cc-connect-dir "$CC_DIR"; fi
@@ -185,16 +238,26 @@ run_enroll() {
   fi
 }
 
-if ! run_enroll "$@"; then
-  echo "" >&2
-  if [ -f "$STATE_DIR/credentials.json" ]; then
-    # 凭据已落盘说明兑换成功、失败在装载环节:重装不需要再要 token
-    echo "机器凭据已落盘($STATE_DIR/credentials.json),装载失败可直接重试,无需再要 token:" >&2
+if [ "$MODE" = "upgrade" ]; then
+  # 覆盖安装不需要 token
+  if ! "$@"; then
+    echo "" >&2
+    echo "覆盖安装失败;可重试(不需要 enroll token):" >&2
     echo "  $HOME/.local/bin/aw-node install --url $URL" >&2
-  else
-    echo "enroll 未完成,机器未登记;请检查 token 是否过期(15 分钟有效)后重试。" >&2
+    exit 1
   fi
-  exit 1
+else
+  if ! run_enroll "$@"; then
+    echo "" >&2
+    if [ -f "$STATE_DIR/credentials.json" ]; then
+      # 凭据已落盘说明兑换成功、失败在装载环节:重装不需要再要 token
+      echo "机器凭据已落盘($STATE_DIR/credentials.json),装载失败可直接重试,无需再要 token:" >&2
+      echo "  $HOME/.local/bin/aw-node install --url $URL" >&2
+    else
+      echo "enroll 未完成,机器未登记;请检查 token 是否过期(15 分钟有效)后重试。" >&2
+    fi
+    exit 1
+  fi
 fi
 
 echo ""
