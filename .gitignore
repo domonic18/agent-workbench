@@ -54,3 +54,7 @@ docs/plan/*.local.md
 
 # compose 插值密钥(2026-11-03 重基线)
 docker/.env
+
+# A2A 真机实测接入包:含 Agent Bearer 与一次性令牌,不入库
+e2e/a2a-real/out/
+e2e/a2a-real/.console-password
