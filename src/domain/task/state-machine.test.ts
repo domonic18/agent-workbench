@@ -22,6 +22,11 @@ describe("任务状态机", () => {
     expect(canTransitionStatus("running", "pending")).toBe(false);
   });
 
+  it("非法跃迁的错误里带合法去向,Agent 才知道该改哪个值", () => {
+    expect(() => assertStageTransition("review", "closed")).toThrow(/当前可选:exec、deliver/);
+    expect(() => assertStatusTransition("pending", "done")).toThrow(/当前可选:running、cancelled/);
+  });
+
   it("终态没有出口", () => {
     expect(canTransitionStatus("done", "running")).toBe(false);
     expect(canTransitionStatus("cancelled", "pending")).toBe(false);

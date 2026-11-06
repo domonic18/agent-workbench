@@ -205,6 +205,7 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
           dimension: error.dimension,
           from: error.from,
           to: error.to,
+          allowed: error.allowed,
         });
       }
       throw error;

@@ -16,6 +16,7 @@ import { announceAck, announceHandoff, announceTaskUpdate } from "../domain/coll
 import { writeKnowledgeCandidate } from "../domain/knowledge/agent-write.js";
 import { searchKnowledge } from "../domain/knowledge/retrieval.js";
 import type { TaskCreateInput } from "../domain/task/service.js";
+import { transitionGuide } from "../domain/task/state-machine.js";
 import {
   errorResult,
   nullableText,
@@ -70,7 +71,10 @@ function createTaskTools(deps: ConsoleToolDeps): ConsoleTool[] {
     {
       name: "task_update",
       gateName: "task.update",
-      description: "推进自己名下任务的状态 / 阶段,或更新输出引用与截止时间。",
+      description:
+        "推进自己名下任务的状态 / 阶段,或更新输出引用与截止时间。" +
+        `${transitionGuide()}。` +
+        "关单只需 status=done(stage 与 status 相互独立,不必走完 stage);只传要改的字段,不传的保持原值。",
       inputSchema: {
         type: "object",
         properties: {

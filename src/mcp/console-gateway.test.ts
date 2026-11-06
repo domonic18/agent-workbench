@@ -115,6 +115,15 @@ describe("console gateway", () => {
     await db.close();
   });
 
+  it("task_update 的工具说明写明合法跃迁路径,Agent 才能自己关单", async () => {
+    const { db, gateway } = await setup();
+    const tool = gateway.listTools().find((entry) => entry.name === "task_update");
+    expect(tool?.description).toContain("pending→running|cancelled");
+    expect(tool?.description).toContain("review→exec|deliver");
+    expect(tool?.description).toContain("status=done");
+    await db.close();
+  });
+
   it("task_update 审计带任务归属,任务完成后落 done", async () => {
     const { db, agent, gateway } = await setup();
     const created = parse(

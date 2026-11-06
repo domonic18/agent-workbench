@@ -5,8 +5,11 @@ export class InvalidTransitionError extends Error {
     readonly dimension: "status" | "stage",
     readonly from: string,
     readonly to: string,
+    readonly allowed: readonly string[] = [],
   ) {
-    super(`非法${dimension === "status" ? "状态" : "阶段"}跃迁: ${from} → ${to}`);
+    // 把合法去向写进错误里:Agent 拿到错误才知道该改哪个值,否则只能放弃收口
+    const hint = allowed.length > 0 ? `(当前可选:${allowed.join("、")})` : "";
+    super(`非法${dimension === "status" ? "状态" : "阶段"}跃迁: ${from} → ${to}${hint}`);
     this.name = "InvalidTransitionError";
   }
 }
@@ -39,15 +42,29 @@ export function canTransitionStage(from: TaskStage, to: TaskStage): boolean {
   return STAGE_TRANSITIONS[from].includes(to);
 }
 
+function render(table: Record<string, readonly string[]>): string {
+  return Object.entries(table)
+    .map(([from, tos]) => `${from}→${tos.length > 0 ? tos.join("|") : "无"}`)
+    .join(";");
+}
+
+/**
+ * 合法跃迁路径的说明文案:给 MCP 工具说明用,与上面的表同源,
+ * 免得说明写一套、实现走另一套,Agent 照说明做却撞非法跃迁。
+ */
+export function transitionGuide(): string {
+  return `status 合法跃迁:${render(STATUS_TRANSITIONS)};stage 合法跃迁:${render(STAGE_TRANSITIONS)}`;
+}
+
 export function assertStatusTransition(from: TaskStatus, to: TaskStatus): void {
   if (!canTransitionStatus(from, to)) {
-    throw new InvalidTransitionError("status", from, to);
+    throw new InvalidTransitionError("status", from, to, STATUS_TRANSITIONS[from]);
   }
 }
 
 export function assertStageTransition(from: TaskStage, to: TaskStage): void {
   if (!canTransitionStage(from, to)) {
-    throw new InvalidTransitionError("stage", from, to);
+    throw new InvalidTransitionError("stage", from, to, STAGE_TRANSITIONS[from]);
   }
 }
 
