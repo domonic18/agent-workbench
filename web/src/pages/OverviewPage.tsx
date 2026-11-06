@@ -12,6 +12,7 @@ import { StatusBadge } from "../components/data/StatusBadge.js";
 import { AgentRegisterDialog } from "../components/identity/AgentRegisterDialog.js";
 import { AgentRotateDialog } from "../components/identity/AgentRotateDialog.js";
 import { MachineRegisterDialog } from "../components/identity/MachineRegisterDialog.js";
+import { ExecutionSetupPanel } from "../components/setup/ExecutionSetupPanel.js";
 import { formatExactTokens, formatTokens } from "../shared/format.js";
 import {
   REALTIME_LABEL,
@@ -159,6 +160,16 @@ export function OverviewPage() {
                 onRefreshBotName={(agent) => void handleRefreshBotName(agent)}
               />
             )}
+          </section>
+
+          <section className={styles.section}>
+            <details className={styles.disclosure}>
+              <summary>添加执行机</summary>
+              <p className={styles.hint}>
+                新机器装 aw-node:复制命令到目标机执行,按提示粘贴一次性 enroll token;也可直接下载对应平台产物。
+              </p>
+              <ExecutionSetupPanel />
+            </details>
           </section>
 
           <section className={styles.section}>

@@ -4,14 +4,14 @@
   align-items: center;
   justify-content: center;
   background: var(--bg, #0e1116);
-  color: var(--fg, #e6edf3);
+  color: var(--text, #e6edf3);
   padding: 24px;
 }
 
 .card {
   width: 100%;
   max-width: 640px;
-  background: var(--panel, #161b22);
+  background: var(--surface, #161b22);
   border: 1px solid var(--border, #30363d);
   border-radius: 12px;
   padding: 28px;
@@ -102,7 +102,24 @@
 .buttonSecondary {
   background: transparent;
   border: 1px solid var(--border, #30363d);
-  color: var(--fg, #e6edf3);
+  color: var(--text, #e6edf3);
+}
+
+/* 独立次要按钮:不依附 .button,面板内直接使用 */
+.buttonGhost {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #30363d);
+  background: transparent;
+  color: var(--text, #e6edf3);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.buttonGhost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .error {
@@ -122,6 +139,65 @@
   border: 1px solid var(--border, #30363d);
   border-radius: 8px;
   padding: 14px;
+}
+
+/* 标签与复制按钮同排:标签左、复制右 */
+.fieldHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.copyButton {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border, #30363d);
+  background: transparent;
+  color: var(--text, #e6edf3);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.copyButton:hover {
+  border-color: var(--accent, #2f81f7);
+}
+
+.artifactList {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+}
+
+.artifact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border, #30363d);
+}
+
+.artifact:last-child {
+  border-bottom: none;
+}
+
+.artifactInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.artifactLink {
+  color: var(--accent, #2f81f7);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.artifactLink:hover {
+  text-decoration: underline;
 }
 
 .project {

@@ -38,6 +38,15 @@ function fakeResponse(body: unknown): Response {
   return { ok: true, status: 200, json: async () => body } as Response;
 }
 
+/** 按路径分派响应:总览快照与执行面产物清单形状不同 */
+function fakeFetch(body: unknown): ReturnType<typeof vi.fn> {
+  return vi.fn(async (input: RequestInfo | URL) =>
+    fakeResponse(String(input).includes("/api/bootstrap/artifacts")
+      ? { publicUrl: null, assets: [] }
+      : body),
+  );
+}
+
 function renderPage(): void {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
@@ -59,10 +68,7 @@ describe("总览页", () => {
   });
 
   it("无 Agent 时给排查空态并保留可见性说明", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => fakeResponse(snapshot())),
-    );
+    vi.stubGlobal("fetch", fakeFetch(snapshot()));
     renderPage();
 
     expect(await screen.findByText("采集器未上报")).toBeTruthy();
@@ -77,31 +83,29 @@ describe("总览页", () => {
   it("订阅 overview 作用域并展示 Agent 行", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        fakeResponse(
-          snapshot({
-            agents: [
-              {
-                id: "agt_a",
-                displayName: "构建 Agent",
-                project: "aw",
-                machineId: "m1",
-                runtime: "claude_code",
-                machineHostname: "build-box",
-                machineLastSeenAt: 1_699_999_999_000,
-                heartbeat: "ok",
-                lastRunAt: null,
-                running: true,
-                currentTaskId: "tsk_1",
-                currentTaskTitle: "实现接口契约",
-                currentTaskStage: "exec",
-                currentTaskStatus: "running",
-                currentInstruction: null,
-                todayTokens: 42,
-              },
-            ],
-          }),
-        ),
+      fakeFetch(
+        snapshot({
+          agents: [
+            {
+              id: "agt_a",
+              displayName: "构建 Agent",
+              project: "aw",
+              machineId: "m1",
+              runtime: "claude_code",
+              machineHostname: "build-box",
+              machineLastSeenAt: 1_699_999_999_000,
+              heartbeat: "ok",
+              lastRunAt: null,
+              running: true,
+              currentTaskId: "tsk_1",
+              currentTaskTitle: "实现接口契约",
+              currentTaskStage: "exec",
+              currentTaskStatus: "running",
+              currentInstruction: null,
+              todayTokens: 42,
+            },
+          ],
+        }),
       ),
     );
     renderPage();

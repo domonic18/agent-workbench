@@ -78,8 +78,26 @@ export function bootstrapAdmin(token: string, password: string): Promise<unknown
   return api.post("/api/bootstrap/admin", { token, password });
 }
 
+export interface ArtifactView {
+  name: string;
+  label: string;
+  size: number;
+  sha256: string | null;
+}
+
+/** 执行面产物目录:公开产物名、大小与校验和,不含任何凭据 */
+export interface ArtifactCatalog {
+  publicUrl: string | null;
+  assets: ArtifactView[];
+}
+
 export function bootstrapStatus(): Promise<BootstrapStatus> {
   return api.get("/api/bootstrap/status");
+}
+
+/** 匿名可读:控制台镜像的执行面产物(取件口为空时 assets 为空) */
+export function fetchArtifacts(): Promise<ArtifactCatalog> {
+  return api.get("/api/bootstrap/artifacts");
 }
 
 export function issueEnrollToken(): Promise<{ token: string; expiresAt: number }> {
