@@ -11,7 +11,9 @@ import type { AgentRuntime } from "../../api/types.js";
 import { RUNTIME_LABEL } from "../../shared/labels.js";
 import { agentEnvHints } from "./envHints.js";
 import styles from "./IdentityForm.module.css";
+import { Button } from "../ui/Button.js";
 import { Dialog } from "../ui/Dialog.js";
+import { Field, Input, Select } from "../ui/Field.js";
 import { SecretReveal } from "./SecretReveal.js";
 
 export interface AgentRegisterDialogProps {
@@ -35,6 +37,7 @@ export function AgentRegisterDialog({ onClose }: AgentRegisterDialogProps) {
   const [pending, setPending] = useState(false);
 
   const external = EXTERNAL_RUNTIMES.includes(runtime);
+  const machineList = machines.data ?? [];
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -86,13 +89,17 @@ export function AgentRegisterDialog({ onClose }: AgentRegisterDialogProps) {
     >
       {created === null ? (
         <form className={styles.form} onSubmit={(event) => void handleSubmit(event)}>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="agent-runtime">
-              运行时
-            </label>
-            <select
+          <Field
+            label="运行时"
+            htmlFor="agent-runtime"
+            hint={
+              external
+                ? "外部运行时不由 aw-node 调度，过程数据固定显示「未接入」。"
+                : "Claude Code 由该机的 aw-node 采集与调度。"
+            }
+          >
+            <Select
               id="agent-runtime"
-              className={styles.select}
               value={runtime}
               onChange={(event) => setRuntime(event.target.value as AgentRuntime)}
             >
@@ -102,115 +109,105 @@ export function AgentRegisterDialog({ onClose }: AgentRegisterDialogProps) {
                   {RUNTIME_LABEL[value]}
                 </option>
               ))}
-            </select>
-            <p className={styles.hint}>
-              {external
-                ? "外部运行时不由 aw-node 调度，过程数据固定显示「未接入」。"
-                : "Claude Code 由该机的 aw-node 采集与调度。"}
-            </p>
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="agent-machine">
-              机器
-            </label>
-            <select
+            </Select>
+          </Field>
+
+          <Field
+            label="机器"
+            htmlFor="agent-machine"
+            required={!external}
+            hint={
+              external
+                ? "Claude Code 必选：选择已接入的执行机；外部运行时可不绑定"
+                : "选择已接入的执行机"
+            }
+            error={
+              machines.isError
+                ? "机器列表加载失败，请先到「接入执行机」页完成安装。"
+                : machines.data !== undefined && machineList.length === 0
+                  ? "还没有已接入的执行机。请先到「接入执行机」页完成安装，执行机会自动登记。"
+                  : null
+            }
+          >
+            <Select
               id="agent-machine"
-              className={styles.select}
               value={machineId}
               onChange={(event) => setMachineId(event.target.value)}
               required={!external}
             >
               <option value="">
-                {external ? "不绑定机器" : "选择已登记的机器"}
+                {external ? "不绑定机器" : "选择已接入的执行机"}
               </option>
-              {(machines.data ?? []).map((machine) => (
+              {machineList.map((machine) => (
                 <option key={machine.id} value={machine.id}>
                   {machine.displayName}（{machine.id}）
                 </option>
               ))}
-            </select>
-            {machines.isPending ? <p className={styles.hint}>加载机器…</p> : null}
-            {machines.isError ? (
-              <p className={styles.error}>机器列表加载失败，请先完成机器登记。</p>
-            ) : null}
-            {machines.data !== undefined && machines.data.length === 0 ? (
-              <p className={styles.hint}>还没有机器。请先用「机器登记」添加一台。</p>
-            ) : null}
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="agent-project">
-              项目
-            </label>
-            <input
-              id="agent-project"
-              className={styles.input}
-              value={project}
-              onChange={(event) => setProject(event.target.value)}
-              placeholder="cc-connect 项目名"
-              required
-            />
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="agent-display-name">
-              显示名
-            </label>
-            <input
+            </Select>
+          </Field>
+
+          <Field label="显示名" htmlFor="agent-display-name" required>
+            <Input
               id="agent-display-name"
-              className={styles.input}
               value={displayName}
               onChange={(event) => setDisplayName(event.target.value)}
+              placeholder="控制台里的名称，飞书 bot 名字回写后以 bot 名为准"
               required
             />
-          </div>
+          </Field>
+
+          <Field label="项目" htmlFor="agent-project" required>
+            <Input
+              id="agent-project"
+              value={project}
+              onChange={(event) => setProject(event.target.value)}
+              placeholder="cc-connect 项目名，如 cc-sysdev（路由 key 默认取它）"
+              required
+            />
+          </Field>
+
           {external ? (
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor="agent-key">
-                路由 key（可选）
-              </label>
-              <input
+            <Field label="路由 key（可选）" htmlFor="agent-key">
+              <Input
                 id="agent-key"
-                className={styles.input}
                 value={key}
                 onChange={(event) => setKey(event.target.value)}
-                placeholder="项目注册表引用该 Agent 用的稳定键"
+                placeholder="Git 项目注册表引用该 Agent 用的稳定键，如 a2a-real-workbuddy"
               />
-            </div>
+            </Field>
           ) : null}
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="agent-feishu-app">
-              飞书 App ID（可选）
-            </label>
-            <input
+
+          <Field label="飞书 App ID（可选）" htmlFor="agent-feishu-app">
+            <Input
               id="agent-feishu-app"
-              className={styles.input}
               value={feishuAppId}
               onChange={(event) => setFeishuAppId(event.target.value)}
+              placeholder="飞书自建应用的 App ID（cli_xxx），留空表示不绑定应用"
             />
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="agent-targets">
-              可委派目标（可选）
-            </label>
-            <input
+          </Field>
+
+          <Field label="可委派目标（可选）" htmlFor="agent-targets">
+            <Input
               id="agent-targets"
-              className={styles.input}
               value={allowedTargets}
               onChange={(event) => setAllowedTargets(event.target.value)}
-              placeholder="多个 Agent ID 用英文逗号分隔"
+              placeholder="可委派的目标 Agent ID，多个用英文逗号分隔"
             />
-          </div>
+          </Field>
+
           {error === null ? null : (
             <p className={styles.error} role="alert">
               {error}
             </p>
           )}
+
           <div className={styles.actions}>
-            <button type="button" className={styles.cancel} onClick={onClose}>
+            <Button variant="ghost" onClick={onClose}>
               取消
-            </button>
-            <button type="submit" className={styles.submit} disabled={pending}>
+            </Button>
+            <Button type="submit" variant="primary" loading={pending}>
               {pending ? "注册中…" : "注册"}
-            </button>
+            </Button>
           </div>
         </form>
       ) : (
@@ -224,9 +221,9 @@ export function AgentRegisterDialog({ onClose }: AgentRegisterDialogProps) {
             hints={agentEnvHints(created.agent.id)}
           />
           <div className={styles.actions}>
-            <button type="button" className={styles.submit} onClick={onClose}>
+            <Button variant="primary" onClick={onClose}>
               我已保存，关闭
-            </button>
+            </Button>
           </div>
         </div>
       )}

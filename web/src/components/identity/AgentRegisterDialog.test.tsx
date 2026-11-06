@@ -58,9 +58,9 @@ describe("Agent 注册弹窗", () => {
     renderDialog();
 
     expect(await screen.findByRole("option", { name: /build-box/ })).toBeTruthy();
-    fireEvent.change(screen.getByLabelText("机器"), { target: { value: "m1" } });
-    fireEvent.change(screen.getByLabelText("项目"), { target: { value: "aw" } });
-    fireEvent.change(screen.getByLabelText("显示名"), { target: { value: "构建 Agent" } });
+    fireEvent.change(screen.getByLabelText(/机器/), { target: { value: "m1" } });
+    fireEvent.change(screen.getByLabelText(/项目/), { target: { value: "aw" } });
+    fireEvent.change(screen.getByLabelText(/显示名/), { target: { value: "构建 Agent" } });
     fireEvent.change(screen.getByLabelText("可委派目标（可选）"), {
       target: { value: "agt_b, agt_c," },
     });
@@ -77,10 +77,10 @@ describe("Agent 注册弹窗", () => {
     expect(screen.getByText(/关闭后不可再查看/)).toBeTruthy();
   });
 
-  it("没有机器时提示先登记机器", async () => {
+  it("没有机器时提示先接入执行机", async () => {
     vi.mocked(fetchMachines).mockResolvedValue([]);
     renderDialog();
 
-    expect(await screen.findByText(/请先用「机器登记」添加一台/)).toBeTruthy();
+    expect(await screen.findByText(/还没有已接入的执行机/)).toBeTruthy();
   });
 });
