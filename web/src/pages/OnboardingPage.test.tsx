@@ -93,12 +93,23 @@ describe("接入执行机页", () => {
 
     await screen.findByText("选择平台产物");
     await gotoStep(1);
-    expect(screen.getByText(/artifacts\/install\.sh/)).toBeTruthy();
+    expect(screen.getAllByText(/artifacts\/install\.sh/).length).toBeGreaterThan(0);
     expect(screen.queryByText("ott_demo_token")).toBeNull();
 
     screen.getByRole("button", { name: "签发 enroll token" }).click();
     expect(await screen.findByText("ott_demo_token")).toBeTruthy();
     expect(screen.getByText("剩余有效期")).toBeTruthy();
+  });
+
+  it("已加入过的机器给覆盖安装命令,不带令牌", async () => {
+    vi.stubGlobal("fetch", fakeFetch());
+    renderPage();
+
+    await screen.findByText("选择平台产物");
+    await gotoStep(1);
+    const upgrade = screen.getByText(/--mode upgrade/);
+    expect(upgrade.textContent).toContain("artifacts/install.sh");
+    expect(upgrade.textContent).not.toContain("token");
   });
 
   it("第三步列出已上线执行机", async () => {

@@ -15,6 +15,7 @@ export interface InstallStepProps {
  */
 export function InstallStep({ origin, enroll }: InstallStepProps) {
   const installCommand = `curl -fsSL ${origin}/artifacts/install.sh | sh -s -- --url ${origin}`;
+  const upgradeCommand = `curl -fsSL ${origin}/artifacts/install.sh | sh -s -- --url ${origin} --mode upgrade`;
   const manualCommand = `aw-node enroll --url ${origin}`;
 
   return (
@@ -70,6 +71,32 @@ export function InstallStep({ origin, enroll }: InstallStepProps) {
             <div className={styles.stepBody}>
               <p className={styles.stepTitle}>自检</p>
               <p className={styles.stepDesc}>安装脚本末尾会跑一次 aw-node doctor；也可以随时用 aw-node status 查看当前状态。</p>
+            </div>
+          </li>
+        </ol>
+      </Panel>
+
+      <Panel
+        title="覆盖安装（已加入过的机器）"
+        description="这台机已经 enroll 过就直接用这条：不需要一次性 token，不换机器身份，Agent 绑定不动，既有的 launchd 环境变量也原样保留。"
+      >
+        <ol className={styles.steps}>
+          <li className={styles.step}>
+            <span className={styles.stepMarker} aria-hidden="true">
+              1
+            </span>
+            <div className={styles.stepBody}>
+              <p className={styles.stepTitle}>在目标机执行覆盖安装命令</p>
+              <p className={styles.stepDesc}>
+                脚本复用本机已落盘的机器凭据重装服务，会先摘干净旧服务再装载，等价于升级。
+                换版本、修复安装、重新绑定项目都用它。
+              </p>
+              <CopyBlock
+                label="覆盖安装命令"
+                value={upgradeCommand}
+                copyLabel="复制命令"
+                copiedText="覆盖安装命令已复制"
+              />
             </div>
           </li>
         </ol>
