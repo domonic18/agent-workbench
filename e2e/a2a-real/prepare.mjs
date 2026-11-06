@@ -9,6 +9,7 @@
 // 用法:
 //   node e2e/a2a-real/prepare.mjs            装配 S1/S2 + 签发 S3 enroll token
 //   node e2e/a2a-real/prepare.mjs --finalize  MacBook 登记完成后补齐 S3 角色与白名单
+//   node e2e/a2a-real/prepare.mjs --finalize --receiver cc-sysdev  指定 S3 接收方项目
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { api, consoleSession, fail, mcpAlive, ok, outDir, publicUrl, writeBundle, writeText } from "./common.mjs";
@@ -20,6 +21,13 @@ const S2_RECEIVER_KEY = "a2a-real-workbuddy";
 const S2_PROJECT = "a2a-real";
 
 const finalize = process.argv.includes("--finalize");
+// 接收方覆盖:某些接收方的模型可能限流或不可用,需要换一个已确认的项目
+const receiverArgIndex = process.argv.indexOf("--receiver");
+if (receiverArgIndex >= 0 && receiverArgIndex + 1 >= process.argv.length) {
+  console.error("--receiver 后面要给项目名(如 --receiver cc-sysdev)");
+  process.exit(2);
+}
+const receiverOverride = receiverArgIndex >= 0 ? process.argv[receiverArgIndex + 1] : undefined;
 
 const SCENARIOS = {
   s1: {
@@ -174,7 +182,14 @@ if (finalize) {
   ok("MacBook 上报项目", reported.map((item) => item.name).join(", "));
   // 优先确认尚未确认过的项目;已确认则直接复用既有 Agent
   const pending = reported.find((item) => item.confirmed !== true);
-  const project = pending?.name ?? reported[0].name;
+  const overridden = receiverOverride === undefined
+    ? undefined
+    : reported.find((item) => item.name === receiverOverride);
+  if (receiverOverride !== undefined && overridden === undefined) {
+    fail("指定接收方项目", `MacBook 上未上报 ${receiverOverride};可选:${reported.map((item) => item.name).join(", ")}`);
+    process.exit(1);
+  }
+  const project = overridden?.name ?? pending?.name ?? reported[0].name;
   const existing = (await listAgents(session.cookie)).find(
     (item) => item.machineId === remote.id && item.project === project,
   );
