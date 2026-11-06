@@ -12,22 +12,11 @@ import {
 import { homedir, userInfo } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { ensureStateDirs } from "./config.js";
+import { buildPlist, readPlistEnv, type InstallOptions } from "./plist.js";
 
 export const LABEL = "com.agent-workbench.aw-node";
 /** 旧基线 label:升级时一并摘除,避免双服务并存 */
 export const LEGACY_LABEL = "com.agent-workbench.collector";
-
-export interface InstallOptions {
-  url: string;
-  collectorId: string;
-  secret: string;
-  projects: string[];
-  stateDir: string;
-  backfill: boolean;
-  label: string;
-  claudeDir: string | null;
-  ccConnectDir: string | null;
-}
 
 export interface LaunchctlResult {
   status: number;
@@ -47,30 +36,25 @@ export function runLaunchctl(args: string[]): LaunchctlResult {
   };
 }
 
-function xmlEscape(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
-}
-
 export function plistPath(label: string): string {
   return join(homedir(), "Library", "LaunchAgents", `${label}.plist`);
 }
 
-function installBinary(): string {
-  const target = join(homedir(), ".local", "bin", "aw-node");
-  const execPath = process.execPath;
-  const runningAsNode = /(^|\/)node$/.test(basename(execPath));
-  if (runningAsNode || execPath === target) {
-    return target;
-  }
+/**
+ * 先删后拷地替换二进制。
+ * 直接覆盖已签名的二进制会留下失效签名,launchd 拉起时进程被 SIGKILL(exit 137),
+ * 表现为服务刚装上就消失——必须先 unlink 再拷。
+ */
+export function replaceBinary(target: string, source: string): void {
   mkdirSync(dirname(target), { recursive: true, mode: 0o755 });
-  copyFileSync(execPath, target);
+  rmSync(target, { force: true });
+  copyFileSync(source, target);
   chmodSync(target, 0o755);
-  return target;
+}
+
+/** 编译产物的落位路径;launchd 只认这个路径,换版即换这个文件 */
+function binaryPath(): string {
+  return join(homedir(), ".local", "bin", "aw-node");
 }
 
 /**
@@ -85,52 +69,7 @@ export function resolveProgramArgs(): { args: string[]; needsExecutableCheck: bo
   if (runningAsNode && scriptPath !== undefined) {
     return { args: [execPath, scriptPath, "run"], needsExecutableCheck: false };
   }
-  return { args: [installBinary(), "run"], needsExecutableCheck: true };
-}
-
-export function buildPlist(options: InstallOptions, args: readonly string[]): string {
-  const env: Record<string, string> = {
-    AW_INGEST_URL: options.url,
-    AW_COLLECTOR_ID: options.collectorId,
-    AW_COLLECTOR_SECRET: options.secret,
-    AW_STATE_DIR: options.stateDir,
-  };
-  if (options.projects.length > 0) {
-    env.AW_AGENT_PROJECTS = options.projects.join(",");
-  }
-  if (options.backfill) {
-    env.AW_BACKFILL = "1";
-  }
-  if (options.claudeDir !== null) {
-    env.AW_CLAUDE_DIR = options.claudeDir;
-  }
-  if (options.ccConnectDir !== null) {
-    env.AW_CC_CONNECT_DIR = options.ccConnectDir;
-  }
-  const envXml = Object.entries(env)
-    .map(([key, value]) => `<key>${xmlEscape(key)}</key><string>${xmlEscape(value)}</string>`)
-    .join("\n    ");
-  const argsXml = args
-    .map((arg) => `<string>${xmlEscape(arg)}</string>`)
-    .join("");
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key><string>${xmlEscape(options.label)}</string>
-  <key>ProgramArguments</key><array>${argsXml}</array>
-  <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><true/>
-  <key>ThrottleInterval</key><integer>10</integer>
-  <key>StandardOutPath</key><string>${xmlEscape(join(options.stateDir, "aw-node.log"))}</string>
-  <key>StandardErrorPath</key><string>${xmlEscape(join(options.stateDir, "aw-node.err"))}</string>
-  <key>EnvironmentVariables</key>
-  <dict>
-    ${envXml}
-  </dict>
-</dict>
-</plist>
-`;
+  return { args: [binaryPath(), "run"], needsExecutableCheck: true };
 }
 
 export function uid(): number {
@@ -277,12 +216,6 @@ export function install(options: InstallOptions): void {
   ensureStateDirs(options.stateDir);
   const { args, needsExecutableCheck } = resolveProgramArgs();
   const program = args[0] ?? "";
-  if (needsExecutableCheck) {
-    const problem = checkExecutable(program);
-    if (problem !== null) {
-      throw new Error(`执行机程序不可用(${program}: ${problem});请重新安装 aw-node 后再试`);
-    }
-  }
   const domains = domainTargets(uid());
   // 旧基线 collector 服务若还在,先停掉并摘除 plist,保证每机单服务
   for (const domain of domains) {
@@ -304,7 +237,18 @@ export function install(options: InstallOptions): void {
       drainService(runLaunchctl, domain, options.label);
     }
   }
-  writeFileSync(target, buildPlist(options, args), { mode: 0o600 });
+  // 旧服务摘干净后再换二进制:先换会让仍在跑的服务撞上已被删掉的路径
+  if (needsExecutableCheck && program !== process.execPath) {
+    replaceBinary(program, process.execPath);
+  }
+  if (needsExecutableCheck) {
+    const problem = checkExecutable(program);
+    if (problem !== null) {
+      throw new Error(`执行机程序不可用(${program}: ${problem});请重新安装 aw-node 后再试`);
+    }
+  }
+  // 重装要保留既有 plist 里用户自己加的环境变量,不能只写 install 掌控的那几个键
+  writeFileSync(target, buildPlist(options, args, readPlistEnv(target)), { mode: 0o600 });
   chmodSync(target, 0o600);
   const lint = lintPlist(target);
   if (lint !== null) {

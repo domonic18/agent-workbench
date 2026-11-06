@@ -27,9 +27,9 @@ import {
   plistPath,
   serviceRunning,
   uninstall,
-  type InstallOptions,
 } from "./launchd.js";
 import { createLogger } from "./log.js";
+import type { InstallOptions } from "./plist.js";
 import { loadState, sortedStreams, streamIdFor } from "./state.js";
 
 function argValue(argv: string[], name: string): string | null {
