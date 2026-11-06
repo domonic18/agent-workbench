@@ -10,14 +10,16 @@ import {
 } from "./config-sync.js";
 import { createLogger, type Logger } from "./log.js";
 
-/** 六步协议提示词:与旧调度脚本原文一致,变更需同步 docs/arch/04 */
+/** 六步协议提示词:按收到消息的 intent 分支;变更需同步 docs/arch/04 */
 export const DISPATCH_PROMPT = `这是一次由执行面调度器发起的协作唤醒:你的 a2a 收件箱存在未处理消息。这不是群通知,群回复纪律(NOREPLY 抑制)不适用于本次会话;在没有完成下列步骤之前,禁止直接结束回合。
 按序完成:
 1) 调 a2a_inbox 拉取完整消息,记下 msg_id 与 thread_id;
-2) request/escalate:先 task_create 建「你自己名下」的下游任务,再 a2a_ack(msg_id=收到的消息, task_id=你的任务);reply:阅读并 a2a_ack 确认;notify:阅读并 a2a_ack;
-3) 执行消息要求的本职工作(读文件、查代码、写结论);
-4) a2a_send 回执:task_id 用你自己的任务,必须带 thread_id 回原线程,intent=reply,reply_to=收到的 msg_id,结论写进 summary,deadline 必填;
-5) task_update 按合法路径推进状态直至关单(pending→running→done,不允许跳级)。
+2) 按收到的 intent 分支:
+   - request / escalate:先 task_create 建「你自己名下」的下游任务,再 a2a_ack(msg_id=收到的消息, task_id=你的任务);
+   - reply / notify:只 a2a_ack(msg_id=收到的消息) 确认,不要 task_create;
+3) 只有 request / escalate 才执行消息要求的本职工作(读文件、查代码、写结论);reply 只需读懂结论;
+4) 只有 request / escalate 才 a2a_send 回执:task_id 用你自己的任务,必须带 thread_id 回原线程,intent=reply,reply_to=收到的 msg_id,结论写进 summary,deadline 必填;收到的是 reply 时不要再发回执——对回执再回执会形成乒乓,系统据此收口;
+5) 只有 request / escalate 才 task_update 按合法路径推进状态直至关闭(pending→running→done,不允许跳级)。
 过程与结论只写进回执与任务字段。全部步骤完成后,最终回复用一句话概述处理结果(消息条数与任务 id)。`;
 
 /** 会话可用工具:读文件、查代码、跑命令,以及控制台 MCP(拉收件箱、建任务、回执) */
