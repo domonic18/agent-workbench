@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import { openDatabase, type Db } from "../database.js";
 import {
   findMachineById,
+  findReusableMachine,
   insertMachine,
   listMachines,
+  updateMachineCollectorVersion,
   updateMachineSecretHash,
   type NewMachine,
 } from "./machine.js";
@@ -62,6 +64,37 @@ describe("machine 仓储", () => {
       before: { createdAt: first[1]!.createdAt, id: first[1]!.id },
     });
     expect(second.map((row) => row.id)).toEqual(["m1"]);
+    await db.close();
+  });
+
+  it("复用候选只认同主机名同系统且无存活上报的机器", async () => {
+    const db = await prepare();
+    await insertMachine(db, machine({ id: "m_stale" }));
+    await insertMachine(db, machine({ id: "m_other_host", hostname: "other.local" }));
+    await insertMachine(db, machine({ id: "m_other_os", os: "linux" }));
+
+    const stale = await findReusableMachine(db, {
+      hostname: "macmini.local",
+      os: "darwin",
+      staleBefore: 5_000,
+    });
+    expect(stale?.id).toBe("m_stale");
+    expect(
+      await findReusableMachine(db, {
+        hostname: "missing.local",
+        os: "darwin",
+        staleBefore: 5_000,
+      }),
+    ).toBeUndefined();
+    await db.close();
+  });
+
+  it("刷新采集器版本不改机器 id", async () => {
+    const db = await prepare();
+    await insertMachine(db, machine());
+
+    expect(await updateMachineCollectorVersion(db, "macmini-01", "0.2.0")).toBe(true);
+    expect((await findMachineById(db, "macmini-01"))?.collectorVersion).toBe("0.2.0");
     await db.close();
   });
 });

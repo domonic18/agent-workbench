@@ -1,8 +1,8 @@
-import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { ackMachineConfig, pullMachineConfig } from "../../domain/bootstrap/config-delivery.js";
 import { saveDiscoveryReport } from "../../domain/bootstrap/discovery.js";
+import { enrollMachine } from "../../domain/bootstrap/enroll.js";
 import { BootstrapError } from "../../domain/bootstrap/errors.js";
 import { consumeOneTimeToken } from "../../domain/bootstrap/one-time-token.js";
 import { IdentityError } from "../../domain/identity/errors.js";
@@ -24,11 +24,6 @@ interface EnrollBody {
   hostname?: unknown;
   os?: unknown;
   collector_version?: unknown;
-}
-
-/** 服务端生成机器 id:enroll 不接受客户端自报 id,避免冒名已登记机器 */
-function newMachineId(): string {
-  return `m-${randomBytes(6).toString("hex")}`;
 }
 
 function textOf(value: unknown, field: string): string {
@@ -102,13 +97,13 @@ export function registerAwNodeRoutes(app: FastifyInstance, options: AwNodeRoutes
         .code(consumed.reason === "invalid" ? 401 : 410)
         .send({ error: { code: "UNAUTHORIZED", message: "enroll token 无效或已失效" } });
     }
-    const { machine, secret } = await service.registerMachine({
-      id: newMachineId(),
-      hostname,
-      os,
-      collectorVersion,
-    });
-    return reply.code(201).send({ machine_id: machine.id, collector_secret: secret });
+    const enrolled = await enrollMachine(
+      { db, now, service },
+      { hostname, os, collectorVersion },
+    );
+    return reply
+      .code(201)
+      .send({ machine_id: enrolled.machineId, collector_secret: enrolled.secret });
   });
 
   app.post(

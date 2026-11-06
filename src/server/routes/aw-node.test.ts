@@ -98,6 +98,28 @@ describe("POST /api/aw-node/enroll", () => {
     await fixture.app.close();
   });
 
+  it("同一台机重新 enroll 复用机器行,不新增行", async () => {
+    const fixture = await enrollApp();
+    const first = await fixture.app.inject({
+      method: "POST",
+      url: "/api/aw-node/enroll",
+      payload: enrollPayload(await seedEnrollToken(fixture.db)),
+    });
+    const second = await fixture.app.inject({
+      method: "POST",
+      url: "/api/aw-node/enroll",
+      payload: enrollPayload(await seedEnrollToken(fixture.db)),
+    });
+
+    expect(first.statusCode).toBe(201);
+    expect(second.statusCode).toBe(201);
+    expect(second.json().machine_id).toBe(first.json().machine_id);
+    expect(second.json().collector_secret).not.toBe(first.json().collector_secret);
+    expect(await fixture.db.get("SELECT COUNT(*)::int AS n FROM machine")).toEqual({ n: 1 });
+    await fixture.db.close();
+    await fixture.app.close();
+  });
+
   it("过期令牌 410,且不消费不落机", async () => {
     const fixture = await enrollApp();
     const start = 1_000_000;

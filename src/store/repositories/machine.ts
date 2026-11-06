@@ -56,6 +56,40 @@ export async function updateMachineSecretHash(db: Db, id: string, hash: string):
   );
 }
 
+/** 复用存量机器行时刷新采集器版本;机器 id 与 Agent 绑定不变 */
+export async function updateMachineCollectorVersion(
+  db: Db,
+  id: string,
+  collectorVersion: string,
+): Promise<boolean> {
+  return (
+    (await db.run(
+      "UPDATE machine SET collector_version = ? WHERE id = ?",
+      collectorVersion, id,
+    )).changes === 1
+  );
+}
+
+/**
+ * 复用候选:同主机名同系统、状态可用、且已无存活上报(从未上报或心跳超时)的机器。
+ * 执行机重装或密钥丢失后重新 enroll 时复用同一行,避免同一台机在库里堆出多行,
+ * 也保住该行上已有的 Agent 绑定。
+ */
+export async function findReusableMachine(
+  db: Db,
+  query: { hostname: string; os: string; staleBefore: number },
+): Promise<MachineRecord | undefined> {
+  const rows = (await db.all(
+    `SELECT ${MACHINE_COLUMNS} FROM machine
+      WHERE hostname = ? AND os = ? AND status = 'active'
+        AND (last_seen_at IS NULL OR last_seen_at < ?)
+      ORDER BY created_at DESC, id DESC
+      LIMIT 1`,
+    query.hostname, query.os, query.staleBefore,
+  )) as MachineRecord[];
+  return rows[0];
+}
+
 /** 采集器心跳只推进机器存活时间;机器活着不等于 Agent 在跑 */
 export async function touchMachineLastSeen(db: Db, id: string, now: number): Promise<boolean> {
   return (
