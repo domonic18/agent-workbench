@@ -23,19 +23,19 @@
 }
 
 .sm {
-  height: 28px;
+  height: var(--size-control-sm);
   padding: 0 var(--space-3);
   font-size: var(--font-sm);
 }
 
 .md {
-  height: 34px;
+  height: var(--size-control-md);
   padding: 0 var(--space-4);
   font-size: var(--font-md);
 }
 
 .lg {
-  height: 42px;
+  height: var(--size-control-lg);
   padding: 0 var(--space-5);
   font-size: var(--font-lg);
 }
@@ -84,8 +84,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: var(--size-control-md);
+  height: var(--size-control-md);
   padding: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -108,13 +108,13 @@
 }
 
 .iconButton.sm {
-  width: 28px;
-  height: 28px;
+  width: var(--size-control-sm);
+  height: var(--size-control-sm);
 }
 
 .iconButton.lg {
-  width: 44px;
-  height: 44px;
+  width: var(--size-touch);
+  height: var(--size-touch);
 }
 
 .spinner {
@@ -170,12 +170,12 @@
 
 .input,
 .select {
-  height: 34px;
+  height: var(--size-control-md);
   padding: 0 var(--space-3);
 }
 
 .textarea {
-  min-height: 84px;
+  min-height: var(--size-textarea);
   padding: var(--space-2) var(--space-3);
   line-height: 1.55;
   resize: vertical;
@@ -209,16 +209,16 @@
 }
 
 .invalid:focus {
-  box-shadow: 0 0 0 3px rgb(180 35 24 / 22%);
+  box-shadow: var(--danger-focus);
 }
 
 .badge {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  padding: 1px var(--space-2);
+  padding: var(--space-1) var(--space-2);
   border: 1px solid transparent;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-sm);
   font-size: var(--font-xs);
   line-height: 18px;
   white-space: nowrap;
@@ -227,31 +227,26 @@
 .tonePositive {
   color: var(--positive);
   background: var(--positive-soft);
-  border-color: var(--positive-border);
 }
 
 .toneWarning {
   color: var(--warning);
   background: var(--warning-soft);
-  border-color: var(--warning-border);
 }
 
 .toneDanger {
   color: var(--danger);
   background: var(--danger-soft);
-  border-color: var(--danger-border);
 }
 
 .toneInfo {
-  color: var(--accent);
-  background: var(--accent-soft);
-  border-color: var(--accent-border);
+  color: var(--info);
+  background: var(--info-soft);
 }
 
 .toneMuted {
   color: var(--muted);
   background: var(--muted-soft);
-  border-color: var(--border);
 }
 
 .skeleton {
@@ -302,7 +297,7 @@
 }
 
 .chip {
-  height: 28px;
+  height: var(--size-control-sm);
   padding: 0 var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-full);
@@ -327,7 +322,7 @@
 
 @media (max-width: 767px) {
   .chip {
-    min-height: 36px;
+    min-height: var(--size-touch);
   }
 }
 

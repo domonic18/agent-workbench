@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { Tone } from "../../shared/labels.js";
+import type { Tone } from "../../shared/tone.js";
 import styles from "./controls.module.css";
 
 export interface BadgeProps {

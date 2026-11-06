@@ -20,16 +20,3 @@
   color: var(--text);
   border-color: var(--border-strong);
 }
-
-/* 深色侧栏上的变体 */
-.onDark {
-  background: transparent;
-  border-color: var(--sidebar-border);
-  color: var(--sidebar-text);
-}
-
-.onDark:hover {
-  background: var(--sidebar-bg-hover);
-  border-color: var(--sidebar-text);
-  color: var(--sidebar-text-strong);
-}

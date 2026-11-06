@@ -13,7 +13,8 @@ import type {
 import type { ChainRelation } from "../api/task-chain.js";
 import type { AgentRuntime, HeartbeatState } from "../api/types.js";
 
-export type Tone = "positive" | "warning" | "danger" | "muted" | "info";
+export type { Tone } from "./tone.js";
+import type { Tone } from "./tone.js";
 
 /** 机器无关(无 aw-node)的外部运行时:控制台不采集其 run/对话/Token,只显示分类标签 */
 export const RUNTIME_LABEL: Record<AgentRuntime, string> = {

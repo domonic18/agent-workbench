@@ -4,7 +4,7 @@
   background: var(--bg);
 }
 
-/* 侧栏固定深色：明暗两套主题下都是「产品外壳」的视觉锚 */
+/* 侧栏与内容区同族底色 + 1px 边框，选中态是底色块而非色块药丸 */
 .nav {
   display: flex;
   flex: 0 0 var(--sidebar-w);
@@ -13,9 +13,9 @@
   height: 100vh;
   position: sticky;
   top: 0;
-  background: var(--sidebar-bg);
-  border-right: 1px solid var(--sidebar-border);
-  color: var(--sidebar-text);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  color: var(--text-secondary);
 }
 
 .brand {
@@ -23,7 +23,7 @@
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-4) var(--space-5);
-  border-bottom: 1px solid var(--sidebar-border);
+  border-bottom: 1px solid var(--border);
 }
 
 .brandMark {
@@ -45,14 +45,14 @@
   display: block;
   font-size: var(--font-md);
   font-weight: 700;
-  color: var(--sidebar-text-strong);
+  color: var(--text);
 }
 
 .brandSub {
   display: block;
   margin-top: 1px;
   font-size: var(--font-xs);
-  color: var(--sidebar-text);
+  color: var(--muted);
 }
 
 .links {
@@ -70,7 +70,7 @@
   height: 38px;
   padding: 0 var(--space-3);
   border-radius: var(--radius-md);
-  color: var(--sidebar-text);
+  color: var(--text-secondary);
   font-size: var(--font-md);
   text-decoration: none;
   transition:
@@ -79,13 +79,13 @@
 }
 
 .link:hover {
-  background: var(--sidebar-bg-hover);
-  color: var(--sidebar-text-strong);
+  background: var(--surface-2);
+  color: var(--text);
 }
 
 .active {
-  background: var(--sidebar-active-bg);
-  color: var(--sidebar-active-text);
+  background: var(--surface-2);
+  color: var(--text);
   font-weight: 600;
 }
 
@@ -94,7 +94,7 @@
   flex-direction: column;
   gap: var(--space-3);
   padding: var(--space-4) var(--space-5);
-  border-top: 1px solid var(--sidebar-border);
+  border-top: 1px solid var(--border);
 }
 
 .envLocal,
@@ -127,7 +127,7 @@
 
 .version {
   font-size: var(--font-xs);
-  color: var(--sidebar-text);
+  color: var(--muted);
 }
 
 .body {

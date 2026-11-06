@@ -111,7 +111,7 @@ function Shell() {
           <span className={env.local ? styles.envLocal : styles.envTunnel}>{env.label}</span>
           <div className={styles.footerRow}>
             <span className={styles.version}>{APP_VERSION}</span>
-            <ThemeToggle variant="sidebar" />
+            <ThemeToggle />
           </div>
         </div>
       </nav>

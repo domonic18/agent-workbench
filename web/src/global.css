@@ -1,55 +1,55 @@
 /* 设计基线：颜色、尺度、动效的唯一出处（03 §设计基线）
  *
- * 颜色保持语义命名，明暗两套值；间距/圆角/阴影/字号/动效是此前完全缺失的一层，
- * 组件基元与页面只引用令牌，不写死数值。
+ * 色板对齐 SquadSight 的设计语言：靛蓝主色 + 分层底色（bg / surface / surface-2 / surface-3），
+ * 明暗两套值语义同名覆盖。组件里不写死颜色、间距、圆角、字号与动效时长，一律引用令牌。
  */
 
 :root {
   color-scheme: light;
 
   /* 表面与文字 */
-  --bg: #f4f6f9;
+  --bg: #f8fafc;
   --surface: #ffffff;
-  --surface-2: #f8fafc;
-  --surface-3: #f1f5f9;
+  --surface-2: #f1f5f9;
+  --surface-3: #e2e8f0;
   --header-bg: #ffffff;
   --border: #e2e8f0;
   --border-strong: #cbd5e1;
-  --line-soft: #eef2f7;
-  --text: #0f172a;
-  --text-secondary: #475569;
+  --border-hover: #cbd5e1;
+  --line-soft: #edf1f5;
+  --row-hover: #f7f9fc;
+  --text: #1e293b;
+  --text-secondary: #52607a;
   --muted: #64748b;
   --subtle: #94a3b8;
 
+  /* 主色：靛蓝 */
+  --accent: #5e6ad2;
+  --accent-hover: #6872e3;
+  --accent-soft: rgb(94 106 210 / 10%);
+  --accent-border: #c6caf0;
+
   /* 语义色 */
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
-  --accent-soft: #eff6ff;
-  --accent-border: #bfdbfe;
-  --positive: #15803d;
-  --positive-soft: #ecfdf3;
-  --positive-border: #bbf7d0;
-  --warning: #b45309;
-  --warning-soft: #fffbeb;
-  --warning-border: #fde68a;
-  --danger: #b42318;
-  --danger-soft: #fef2f2;
-  --danger-border: #fecaca;
+  --positive: #2ea043;
+  --positive-soft: rgb(46 160 67 / 10%);
+  --positive-border: #b7e3c1;
+  --warning: #d29922;
+  --warning-soft: rgb(210 153 34 / 10%);
+  --warning-border: #edd39a;
+  --danger: #f85149;
+  --danger-soft: rgb(248 81 73 / 10%);
+  --danger-border: #f5b6b2;
+  --info: #58a6ff;
+  --info-soft: rgb(88 166 255 / 10%);
+  --info-border: #b3d4ff;
+
   --chip-bg: #f1f5f9;
   --muted-soft: #f8fafc;
   --on-accent: #ffffff;
-  --avatar-bg: #dbeafe;
-  --avatar-text: #1e40af;
-  --overlay: rgb(15 23 42 / 45%);
-
-  /* 侧栏固定深色，明暗两套都是「产品外壳」的视觉锚 */
-  --sidebar-bg: #0f172a;
-  --sidebar-bg-hover: #1e293b;
-  --sidebar-text: #cbd5e1;
-  --sidebar-text-strong: #f8fafc;
-  --sidebar-border: #1e293b;
-  --sidebar-active-bg: #1e3a8a;
-  --sidebar-active-text: #ffffff;
+  --on-accent-muted: rgb(255 255 255 / 78%);
+  --avatar-bg: #eceefa;
+  --avatar-text: #4a55bd;
+  --overlay: rgb(12 14 18 / 45%);
 
   /* 间距刻度 */
   --space-1: 4px;
@@ -74,76 +74,93 @@
   --shadow-lg: 0 20px 48px rgb(15 23 42 / 16%);
 
   /* 字号 */
+  --font-2xs: 10px;
   --font-xs: 12px;
   --font-sm: 13px;
   --font-md: 14px;
   --font-lg: 16px;
   --font-xl: 20px;
-  --font-2xl: 26px;
+  --font-2xl: 24px;
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --tracking-tight: 0.03em;
+  --tracking-wide: 0.06em;
+
+  /* 控件尺寸 */
+  --size-control-sm: 28px;
+  --size-control-md: 34px;
+  --size-control-lg: 42px;
+  --size-icon-tile: 22px;
+  --size-touch: 44px;
+  --size-avatar: 26px;
+  --size-textarea: 84px;
 
   /* 动效 */
   --duration-fast: 120ms;
   --duration: 160ms;
   --ease: cubic-bezier(0.2, 0.6, 0.3, 1);
-  --focus-ring: 0 0 0 3px rgb(37 99 235 / 28%);
+  --focus-ring: 0 0 0 3px rgb(94 106 210 / 30%);
+  --danger-focus: 0 0 0 3px rgb(248 81 73 / 24%);
 
   /* 布局 */
-  --sidebar-w: 232px;
-  --topbar-h: 56px;
+  --sidebar-w: 220px;
+  --topbar-h: 52px;
   --content-max: 1440px;
+  --content-narrow: 1100px;
+  --content-prose: 720px;
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --bg: #0b0f16;
-  --surface: #131922;
-  --surface-2: #171e28;
-  --surface-3: #1c242f;
-  --header-bg: #131922;
-  --border: #232c39;
-  --border-strong: #33404f;
-  --line-soft: #1b232d;
-  --text: #e8edf5;
+  --bg: #0c0e12;
+  --surface: #111318;
+  --surface-2: #181a21;
+  --surface-3: #1c1f26;
+  --header-bg: #111318;
+  --border: #23262d;
+  --border-strong: #2e323c;
+  --border-hover: #2e323c;
+  --line-soft: #1b1f26;
+  --row-hover: #16191f;
+  --text: #f0f1f5;
   --text-secondary: #b3bece;
-  --muted: #8d99ab;
+  --muted: #8a8f98;
   --subtle: #6b7688;
 
-  --accent: #6ea8fe;
-  --accent-hover: #8bb8ff;
-  --accent-soft: #16233a;
-  --accent-border: #2b4470;
-  --positive: #5cc98d;
-  --positive-soft: #10261a;
-  --positive-border: #225238;
-  --warning: #e3b04b;
-  --warning-soft: #2a2110;
-  --warning-border: #574118;
-  --danger: #f2837a;
-  --danger-soft: #2d1615;
-  --danger-border: #5f2b27;
-  --chip-bg: #1d252f;
-  --muted-soft: #1a222c;
-  --on-accent: #0b0f16;
-  --avatar-bg: #1e2f4d;
-  --avatar-text: #b9cdf5;
-  --overlay: rgb(2 6 12 / 62%);
+  /* 深底上靛蓝对比度不足，提亮一档 */
+  --accent: #6e78dd;
+  --accent-hover: #828ce8;
+  --accent-soft: rgb(94 106 210 / 14%);
+  --accent-border: #3d4077;
 
-  --sidebar-bg: #080c12;
-  --sidebar-bg-hover: #151d27;
-  --sidebar-text: #97a3b4;
-  --sidebar-text-strong: #f1f5f9;
-  --sidebar-border: #1a222d;
-  --sidebar-active-bg: #1d3a63;
-  --sidebar-active-text: #ffffff;
+  --positive: #2ea043;
+  --positive-soft: rgb(46 160 67 / 14%);
+  --positive-border: #23512f;
+  --warning: #d29922;
+  --warning-soft: rgb(210 153 34 / 14%);
+  --warning-border: #55411a;
+  --danger: #f85149;
+  --danger-soft: rgb(248 81 73 / 14%);
+  --danger-border: #5e2b28;
+  --info: #58a6ff;
+  --info-soft: rgb(88 166 255 / 14%);
+  --info-border: #244a72;
+
+  --chip-bg: #181a21;
+  --muted-soft: #181a21;
+  --on-accent: #ffffff;
+  --on-accent-muted: rgb(255 255 255 / 78%);
+  --avatar-bg: #232842;
+  --avatar-text: #aeb6f0;
+  --overlay: rgb(0 0 0 / 62%);
 
   --shadow-xs: 0 1px 2px rgb(0 0 0 / 40%);
   --shadow-sm: 0 1px 3px rgb(0 0 0 / 45%), 0 1px 2px rgb(0 0 0 / 30%);
   --shadow-md: 0 6px 18px rgb(0 0 0 / 50%);
   --shadow-lg: 0 24px 56px rgb(0 0 0 / 62%);
 
-  --focus-ring: 0 0 0 3px rgb(110 168 254 / 32%);
+  --focus-ring: 0 0 0 3px rgb(110 120 221 / 36%);
+  --danger-focus: 0 0 0 3px rgb(248 81 73 / 30%);
 }
 
 * {
@@ -236,6 +253,6 @@ kbd {
   select,
   input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
   textarea {
-    min-height: 44px;
+    min-height: var(--size-touch);
   }
 }
