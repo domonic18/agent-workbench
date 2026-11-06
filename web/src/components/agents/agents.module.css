@@ -15,6 +15,9 @@
 }
 
 .select {
+  /* 基元默认 width:100%（表单里占满一行），工具条里要并排，须显式收窄 */
+  flex: 0 0 150px;
+  width: auto;
   min-width: 130px;
 }
 
