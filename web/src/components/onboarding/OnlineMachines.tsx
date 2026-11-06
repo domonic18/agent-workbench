@@ -1,9 +1,18 @@
-import { useQuery } from "@tanstack/react-query";
-import { fetchDiscovery, type DiscoveryMachineView } from "../../api/bootstrap.js";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ApiError } from "../../api/client.js";
+import {
+  confirmAgents,
+  fetchDiscovery,
+  type DiscoveryMachineView,
+} from "../../api/bootstrap.js";
 import { formatRelativeTime } from "../../shared/format.js";
+import { useProjectSelection } from "../machines/useProjectSelection.js";
 import { Badge } from "../ui/Badge.js";
+import { Button } from "../ui/Button.js";
 import { EmptyState } from "../ui/EmptyState.js";
 import { Panel } from "../ui/Panel.js";
+import { useToast } from "../ui/Toast.js";
 import type { Tone } from "../../shared/labels.js";
 import styles from "./onboarding.module.css";
 
@@ -19,19 +28,50 @@ const STATUS_LABEL: Record<string, string> = {
   revoked: "已吊销",
 };
 
-function MachineRow({ machine }: { machine: DiscoveryMachineView }) {
+function MachineRow({
+  machine,
+  onRegistered,
+}: {
+  machine: DiscoveryMachineView;
+  onRegistered: () => void;
+}) {
   const tone = STATUS_TONE[machine.status] ?? "muted";
   const label = STATUS_LABEL[machine.status] ?? machine.status;
   const confirmed = machine.projects.filter((project) => project.confirmed).length;
+  // 心跳与发现上报不同源:心跳是存活上报,发现是 cc-connect 扫描结果,不能混用
+  const heartbeat = machine.lastSeenAt === null ? "未上报" : formatRelativeTime(machine.lastSeenAt);
+  const discovered = machine.receivedAt === null ? "未上报" : formatRelativeTime(machine.receivedAt);
+  const pending = machine.projects.filter((project) => !project.confirmed);
+  const { pickedFor, toggle, isChecked } = useProjectSelection([
+    { machineId: machine.machineId, projects: pending },
+  ]);
+  const [submitting, setSubmitting] = useState(false);
+  const toast = useToast();
+
+  async function register(): Promise<void> {
+    const entries = pickedFor(machine.machineId).map((project) => ({ project: project.name }));
+    if (entries.length === 0) {
+      toast.push("至少选一个项目", "danger");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await confirmAgents(machine.machineId, entries);
+      toast.push(`已登记 ${entries.length} 个 Agent`, "positive");
+      onRegistered();
+    } catch (caught) {
+      toast.push(caught instanceof ApiError ? caught.message : "登记失败", "danger");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <li className={styles.machineRow}>
       <div className={styles.machineIdentity}>
         <span className={styles.machineName}>{machine.hostname}</span>
         <span className={styles.machineSub}>
-          {machine.machineId} ·{" "}
-          {machine.receivedAt === null
-            ? "尚未上报心跳"
-            : `${formatRelativeTime(machine.receivedAt)}上报心跳`}
+          {machine.machineId} · 心跳 {heartbeat} · 发现 {discovered}
         </span>
       </div>
       <div className={styles.machineTags}>
@@ -40,12 +80,47 @@ function MachineRow({ machine }: { machine: DiscoveryMachineView }) {
         </span>
         <Badge tone={tone} text={label} />
       </div>
+      {pending.length > 0 ? (
+        <div className={styles.machineProjects}>
+          <span className={styles.machineSub}>待登记项目</span>
+          <ul className={styles.projectList}>
+            {pending.map((project) => (
+              <li key={project.name}>
+                <label className={styles.projectCheck}>
+                  <input
+                    type="checkbox"
+                    checked={isChecked(machine.machineId, project.name)}
+                    onChange={(event) =>
+                      toggle(machine.machineId, project.name, event.target.checked)
+                    }
+                  />
+                  <span>
+                    {project.name}
+                    {project.feishuBotName === undefined ? null : (
+                      <span className={styles.machineSub}> · {project.feishuBotName}</span>
+                    )}
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          <Button
+            variant="primary"
+            size="sm"
+            loading={submitting}
+            onClick={() => void register()}
+          >
+            登记为 Agent
+          </Button>
+        </div>
+      ) : null}
     </li>
   );
 }
 
 /** 第 3 步下半：已上线机器清单。执行机每轮心跳都会回报，控制台按轮询刷新。 */
 export function OnlineMachines() {
+  const client = useQueryClient();
   const machines = useQuery({
     queryKey: ["discovery"],
     queryFn: fetchDiscovery,
@@ -73,7 +148,13 @@ export function OnlineMachines() {
       ) : (
         <ul className={styles.machineList}>
           {list.map((machine) => (
-            <MachineRow key={machine.machineId} machine={machine} />
+            <MachineRow
+              key={machine.machineId}
+              machine={machine}
+              onRegistered={() => {
+                void client.invalidateQueries({ queryKey: ["discovery"] });
+              }}
+            />
           ))}
         </ul>
       )}

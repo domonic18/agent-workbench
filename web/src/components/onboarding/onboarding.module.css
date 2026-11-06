@@ -305,6 +305,39 @@
   align-items: center;
 }
 
+/* 待登记项目：确认后由控制台建 Agent 并走配置下发 */
+.machineProjects {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1 0 100%;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+/* 登记按钮按内容宽度，不随卡片拉满 */
+.machineProjects > button {
+  align-self: flex-start;
+}
+
+.projectList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.projectCheck {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-sm);
+  color: var(--text);
+  cursor: pointer;
+}
+
 @media (max-width: 767px) {
   .platformGrid {
     grid-template-columns: 1fr;

@@ -1,12 +1,13 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ApiError } from "../../../api/client.js";
 import { confirmAgents, fetchDiscovery } from "../../../api/bootstrap.js";
+import { formatRelativeTime } from "../../../shared/format.js";
+import { useProjectSelection } from "../../machines/useProjectSelection.js";
 import { Feedback } from "../Feedback.js";
 import styles from "../setup.module.css";
 
 export function StepProjects() {
-  const [selected, setSelected] = useState<Record<string, Record<string, boolean>>>({});
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
@@ -18,34 +19,25 @@ export function StepProjects() {
   });
 
   const machines = discovery.data?.machines ?? [];
-  const picked = useMemo(
-    () => machines.flatMap((machine) =>
-      machine.projects.filter((project) => selected[machine.machineId]?.[project.name] !== false),
-    ),
-    [machines, selected],
+  // 按机器分组：Agent 绑定的是机器，跨机项目不能并到同一台机去确认
+  const { pickedFor, pickedCount, toggle, isChecked } = useProjectSelection(
+    machines.map((machine) => ({ machineId: machine.machineId, projects: machine.projects })),
   );
-
-  function toggle(machineId: string, name: string, value: boolean): void {
-    setSelected((prev) => ({
-      ...prev,
-      [machineId]: { ...(prev[machineId] ?? {}), [name]: value },
-    }));
-  }
 
   async function confirm(): Promise<void> {
     setPending(true);
     setError(null);
-    const machineId = machines[0]?.machineId;
-    if (machineId === undefined) {
-      setError("尚未检测到执行机,请先完成上一步");
-      setPending(false);
-      return;
-    }
     try {
-      await confirmAgents(
-        machineId,
-        picked.map((project) => ({ project: project.name })),
-      );
+      for (const machine of machines) {
+        const picked = pickedFor(machine.machineId);
+        if (picked.length === 0) {
+          continue;
+        }
+        await confirmAgents(
+          machine.machineId,
+          picked.map((project) => ({ project: project.name })),
+        );
+      }
       setConfirmed(true);
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "确认失败");
@@ -66,12 +58,18 @@ export function StepProjects() {
         machines.map((machine) => (
           <div key={machine.machineId} className={styles.section}>
             <strong>{machine.hostname}</strong>
+            <span className={styles.hint}>
+              {machine.machineId} · 心跳{" "}
+              {machine.lastSeenAt === null ? "未上报" : formatRelativeTime(machine.lastSeenAt)}
+            </span>
             {machine.projects.map((project) => (
               <label key={project.name} className={styles.project}>
                 <input
                   type="checkbox"
-                  checked={selected[machine.machineId]?.[project.name] !== false}
-                  onChange={(event) => toggle(machine.machineId, project.name, event.target.checked)}
+                  checked={isChecked(machine.machineId, project.name)}
+                  onChange={(event) =>
+                    toggle(machine.machineId, project.name, event.target.checked)
+                  }
                 />
                 <span>
                   {project.name}
@@ -85,13 +83,13 @@ export function StepProjects() {
           </div>
         ))
       )}
-      {machines.length > 0 && picked.length === 0 ? (
+      {machines.length > 0 && pickedCount === 0 ? (
         <p className={styles.hint}>执行机尚未上报可确认的项目,请确认目标机已配置 cc-connect。</p>
       ) : null}
       <button
         className={styles.button}
         onClick={() => void confirm()}
-        disabled={pending || picked.length === 0}
+        disabled={pending || pickedCount === 0}
       >
         {pending ? "确认中…" : confirmed ? "已确认,等待配置下发" : "确认项目与主责 Agent"}
       </button>

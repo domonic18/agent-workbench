@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../components/ui/Toast.js";
 import { OnboardingPage } from "./OnboardingPage.js";
@@ -29,17 +29,25 @@ function fakeFetch(): ReturnType<typeof vi.fn> {
       return json({ token: "ott_demo_token", expiresAt: Date.now() + 15 * 60 * 1000 });
     }
     if (path.includes("/api/bootstrap/discovery")) {
+      const now = Date.now();
       return json({
         machines: [
           {
             machineId: "mch_1",
             hostname: "build-box",
             status: "active",
-            receivedAt: Date.now(),
-            projects: [{ name: "aw", confirmed: true }],
+            lastSeenAt: now - 60_000,
+            receivedAt: now - 3_600_000,
+            projects: [
+              { name: "aw", confirmed: false },
+              { name: "cli", confirmed: false },
+            ],
           },
         ],
       });
+    }
+    if (path.includes("/api/bootstrap/agents")) {
+      return json({ agents: [{ id: "agt_1", key: "k", project: "aw", displayName: "aw" }] });
     }
     return json({});
   });
@@ -101,5 +109,84 @@ describe("接入执行机页", () => {
     await gotoStep(2);
     expect(await screen.findByText("build-box")).toBeTruthy();
     expect(screen.getByText("已激活")).toBeTruthy();
+  });
+
+  it("执行机清单分开显示心跳与发现上报时间", async () => {
+    vi.stubGlobal("fetch", fakeFetch());
+    renderPage();
+
+    await screen.findByText("选择平台产物");
+    await gotoStep(2);
+    const row = await screen.findByText("build-box");
+    const sub = row.nextElementSibling?.textContent ?? "";
+    expect(sub).toContain("心跳 1 分钟前");
+    expect(sub).toContain("发现 1 小时前");
+  });
+
+  it("按机器把待登记项目登记为 Agent", async () => {
+    const fetcher = fakeFetch();
+    vi.stubGlobal("fetch", fetcher);
+    renderPage();
+
+    await screen.findByText("选择平台产物");
+    await gotoStep(2);
+    const button = await screen.findByRole("button", { name: "登记为 Agent" });
+    button.click();
+
+    await waitFor(() => {
+      const call = fetcher.mock.calls.find(([input]) =>
+        String(input).includes("/api/bootstrap/agents"),
+      );
+      expect(call).toBeDefined();
+      const init = call?.[1] as RequestInit | undefined;
+      expect(JSON.parse(String(init?.body))).toEqual({
+        machineId: "mch_1",
+        agents: [{ project: "aw" }, { project: "cli" }],
+      });
+    });
+    expect(await screen.findByText("已登记 2 个 Agent")).toBeTruthy();
+  });
+
+  it("取消勾选的项目不进登记请求", async () => {
+    const fetcher = fakeFetch();
+    vi.stubGlobal("fetch", fetcher);
+    renderPage();
+
+    await screen.findByText("选择平台产物");
+    await gotoStep(2);
+    await screen.findByText("build-box");
+    const cli = screen.getByText("cli").closest("label")?.querySelector("input");
+    fireEvent.click(cli as HTMLInputElement);
+    screen.getByRole("button", { name: "登记为 Agent" }).click();
+
+    await waitFor(() => {
+      const call = fetcher.mock.calls.find(([input]) =>
+        String(input).includes("/api/bootstrap/agents"),
+      );
+      expect(call).toBeDefined();
+      const init = call?.[1] as RequestInit | undefined;
+      expect(JSON.parse(String(init?.body)).agents).toEqual([{ project: "aw" }]);
+    });
+  });
+
+  it("一个项目都不选时不发登记请求", async () => {
+    const fetcher = fakeFetch();
+    vi.stubGlobal("fetch", fetcher);
+    renderPage();
+
+    await screen.findByText("选择平台产物");
+    await gotoStep(2);
+    await screen.findByText("build-box");
+    for (const name of ["aw", "cli"]) {
+      const box = screen.getByText(name).closest("label")?.querySelector("input");
+      fireEvent.click(box as HTMLInputElement);
+    }
+    screen.getByRole("button", { name: "登记为 Agent" }).click();
+
+    expect(await screen.findByText("至少选一个项目")).toBeTruthy();
+    const posted = fetcher.mock.calls.some(([input]) =>
+      String(input).includes("/api/bootstrap/agents"),
+    );
+    expect(posted).toBe(false);
   });
 });

@@ -48,6 +48,9 @@ export interface DiscoveryMachineView {
   machineId: string;
   hostname: string;
   status: string;
+  /** 心跳:aw-node 最近一次上报存活的时间 */
+  lastSeenAt: number | null;
+  /** 发现上报:最近一次上报 cc-connect 发现结果的时间,与心跳不同源 */
   receivedAt: number | null;
   projects: DiscoveryProjectView[];
 }
