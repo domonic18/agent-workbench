@@ -17,6 +17,9 @@ services:
       - postgres:/var/lib/postgresql/data
     ports:
       - "127.0.0.1:5433:5432"
+    # Docker 默认 /dev/shm 只有 64MB,PG 每个后端进程要占 32MB 共享段;
+    # 单测并发建库打满后报 "could not resize shared memory segment",后端被信号杀导致整库进恢复
+    shm_size: 512mb
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U agent_workbench -d agent_workbench"]
       interval: 10s
