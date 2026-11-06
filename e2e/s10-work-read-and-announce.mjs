@@ -17,6 +17,7 @@
 import { execFileSync } from "node:child_process";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { createAgentCleaner, reportCleanup } from "./lib/cleanup.mjs";
 
 const base = (process.env.AW_S10_URL ?? "http://127.0.0.1:8787").replace(/\/$/, "");
 const pgContainer = process.env.AW_S10_PG_CONTAINER ?? "agent-workbench-postgres-1";
@@ -108,6 +109,39 @@ if (cookie === undefined) {
   process.exit(1);
 }
 ok("控制台登录", "session ok");
+
+// 收尾清理:本次建出的 Agent 跑完即删,不在库里留垃圾
+const cleaner = createAgentCleaner({ base, cookie, keyPrefix: `s10-cleanup-${runId}` });
+
+// 路由注册表:派工要按 key 命中一个在册 Agent,先建一个 key=workbuddy-pilot 的试点 Agent
+const pilot = await api("/api/agents", {
+  method: "POST",
+  cookie,
+  key: `s10-pilot-${runId}`,
+  body: {
+    runtime: "workbuddy",
+    key: PROJECT,
+    project: PROJECT,
+    displayName: "S10 Pilot WorkBuddy",
+  },
+});
+if (pilot.status === 201) {
+  cleaner.track(pilot.body.agent.id);
+  ok("注册路由试点 Agent", `id=${pilot.body.agent.id}`);
+} else if (pilot.status === 409) {
+  const list = await api(`/api/agents?limit=200`, { cookie });
+  const found = (list.body.items ?? []).find((a) => a.key === PROJECT);
+  if (found === undefined) {
+    fail("复用路由试点 Agent", "注册 409 但列表未找到 key=" + PROJECT);
+    reportCleanup(await cleaner.run());
+    process.exit(1);
+  }
+  ok("复用路由试点 Agent", `id=${found.id}`);
+} else {
+  fail("注册路由试点 Agent", `status=${pilot.status}`);
+  reportCleanup(await cleaner.run());
+  process.exit(1);
+}
 
 // ── Part A:work-items 读侧 API ──────────────────────────────────────────
 // ② 触发一条新事项(注册表路由到试点 Agent,只读断言不领取)
@@ -205,6 +239,7 @@ const regB = await api("/api/agents", {
   body: { runtime: "codex", project: `s10-b-${runId}`, displayName: "S10 Worker B" },
 });
 assert(regB.status === 201, "注册下游 Agent B", `id=${regB.body?.agent?.id}`);
+if (regB.status === 201) cleaner.track(regB.body.agent.id);
 const regA = await api("/api/agents", {
   method: "POST",
   cookie,
@@ -217,7 +252,11 @@ const regA = await api("/api/agents", {
   },
 });
 assert(regA.status === 201, "注册发送方 Agent A(白名单含 B)", `id=${regA.body?.agent?.id}`);
-if (process.exitCode === 1) process.exit(1);
+if (regA.status === 201) cleaner.track(regA.body.agent.id);
+if (process.exitCode === 1) {
+  reportCleanup(await cleaner.run());
+  process.exit(1);
+}
 
 function mcpClient(token, name) {
   const client = new Client({ name, version: "0.0.1" });
@@ -284,4 +323,5 @@ assert(closedState === "delivered", "〔验收〕播报已投递协作群", `sta
 
 await a.close();
 await b.close();
+reportCleanup(await cleaner.run());
 console.log(process.exitCode === 1 ? "S10 FAILED" : "DONE");

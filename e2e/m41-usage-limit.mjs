@@ -11,10 +11,12 @@
 //   AW_M41_PASSWORD=<控制台口令> node e2e/m41-usage-limit.mjs
 // 可选:AW_M41_URL=http://127.0.0.1:8799
 //      AW_M41_DATABASE_URL=postgres://…(② 需要直写一条 token_usage 造用量,
-//      因为机器无关 Agent 无采集归属路径;等价于 M4-1 计划里的「手动插入 token_usage」)
+//      因为机器无关 Agent 无采集归属路径;等价于 M4-1 计划里的「手动插入 token_usage」;
+//      同时用于收尾删掉本次建的测试机器行,缺省则机器行保留)
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import pg from "pg";
+import { createAgentCleaner, reportCleanup } from "./lib/cleanup.mjs";
 
 const base = (process.env.AW_M41_URL ?? "http://127.0.0.1:8787").replace(/\/$/, "");
 const password = process.env.AW_M41_PASSWORD;
@@ -73,6 +75,45 @@ if (cookie === undefined) {
 }
 ok("控制台登录", "session ok");
 
+// 收尾清理:本次建出的 Agent 跑完即删,不在库里留垃圾
+const cleaner = createAgentCleaner({ base, cookie, keyPrefix: `m41-cleanup-${runId}` });
+
+/**
+ * 删本次建的测试机器行:机器表对 agent_run / ingest_receipt 是 RESTRICT,
+ * 先清引用再删本体。没有机器删除路由,只能直写库。
+ */
+async function cleanupMachine() {
+  if (databaseUrl === undefined || databaseUrl === "") {
+    console.log(`SKIP 机器行清理:${MACHINE}(未提供 AW_M41_DATABASE_URL)`);
+    return;
+  }
+  const pool = new pg.Pool({ connectionString: databaseUrl });
+  try {
+    await pool.query(
+      `DELETE FROM timeline_event WHERE run_id IN (SELECT id FROM agent_run WHERE machine = $1)`,
+      [MACHINE],
+    );
+    await pool.query(
+      `DELETE FROM token_usage WHERE run_id IN (SELECT id FROM agent_run WHERE machine = $1)`,
+      [MACHINE],
+    );
+    await pool.query("DELETE FROM agent_run WHERE machine = $1", [MACHINE]);
+    await pool.query("DELETE FROM ingest_receipt WHERE collector_id = $1", [MACHINE]);
+    await pool.query("DELETE FROM machine WHERE id = $1", [MACHINE]);
+    console.log(`CLEANUP 已删除机器 ${MACHINE}`);
+  } catch (error) {
+    console.log(`CLEANUP 机器清理失败 ${MACHINE} :: ${error.message}`);
+  } finally {
+    await pool.end();
+  }
+}
+
+/** Agent + 机器一起收尾 */
+async function cleanupAll() {
+  reportCleanup(await cleaner.run());
+  await cleanupMachine();
+}
+
 // ② 机器 + 机器绑定 Agent(采集归属目标)
 const machine = await api("/api/machines", {
   method: "POST",
@@ -99,10 +140,12 @@ const collector = await api("/api/agents", {
 });
 if (collector.status !== 201) {
   fail("注册机器绑定 Agent", `status=${collector.status} ${JSON.stringify(collector.body)}`);
+  await cleanupAll();
   process.exit(1);
 }
 const collectorAgentId = collector.body.agent.id;
 const collectorAgentToken = `${collectorAgentId}.${collector.body.secret}`;
+cleaner.track(collectorAgentId);
 
 // ③ 机器无关 Agent:路由注册表 workbuddy-pilot.primary 指向它的 key
 const pilot = await api("/api/agents", {
@@ -121,12 +164,14 @@ let pilotToken;
 if (pilot.status === 201) {
   pilotId = pilot.body.agent.id;
   pilotToken = `${pilotId}.${pilot.body.secret}`;
+  cleaner.track(pilotId);
 } else if (pilot.status === 409) {
   // key 已被上一轮占用:复用该 Agent 并轮换密钥
   const list = await api("/api/agents?limit=200", { cookie });
   const found = (list.body.items ?? []).find((a) => a.key === PROJECT);
   if (found === undefined) {
     fail("复用 pilot Agent", "注册 409 但列表未找到 key=" + PROJECT);
+    await cleanupAll();
     process.exit(1);
   }
   const rotated = await api(`/api/agents/${found.id}/rotate`, {
@@ -138,6 +183,7 @@ if (pilot.status === 201) {
   pilotToken = `${pilotId}.${rotated.body.secret}`;
 } else {
   fail("注册 pilot Agent", `status=${pilot.status} ${JSON.stringify(pilot.body)}`);
+  await cleanupAll();
   process.exit(1);
 }
 ok("注册机器与两个 Agent", `collector=${collectorAgentId} pilot=${pilotId}`);
@@ -327,4 +373,5 @@ const missing = await api("/api/agents/agt_missing/usage-limit", {
 });
 assert(missing.status === 404, "不存在 Agent 404", `status=${missing.status}`);
 
+await cleanupAll();
 console.log(process.exitCode === 1 ? "M4-1 FAILED" : "DONE");

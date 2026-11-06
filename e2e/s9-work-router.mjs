@@ -10,6 +10,7 @@
 // 可选:AW_S9_URL=http://127.0.0.1:8787
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { createAgentCleaner, reportCleanup } from "./lib/cleanup.mjs";
 
 const base = (process.env.AW_S9_URL ?? "http://127.0.0.1:8787").replace(/\/$/, "");
 const password = process.env.AW_S9_PASSWORD;
@@ -64,6 +65,9 @@ if (cookie === undefined) {
 }
 ok("控制台登录", "session ok");
 
+// 收尾清理:本次建出的 Agent 跑完即删,不在库里留垃圾
+const cleaner = createAgentCleaner({ base, cookie, keyPrefix: `s9-cleanup-${runId}` });
+
 // ② 注册/复用试点 workbuddy Agent(key=workbuddy-pilot,注册表路由目标)
 let pilot = await api("/api/agents", {
   method: "POST",
@@ -79,6 +83,7 @@ let pilot = await api("/api/agents", {
 let wbToken;
 if (pilot.status === 201) {
   wbToken = `${pilot.body.agent.id}.${pilot.body.secret}`;
+  cleaner.track(pilot.body.agent.id);
   ok("注册试点 Agent", `id=${pilot.body.agent.id} key=${pilot.body.agent.key}`);
 } else if (pilot.status === 409) {
   const list = await api(`/api/agents?limit=200`, { cookie });
@@ -112,9 +117,11 @@ const outsider = await api("/api/agents", {
 });
 if (outsider.status !== 201) {
   fail("注册外部 Agent", `status=${outsider.status}`);
+  reportCleanup(await cleaner.run());
   process.exit(1);
 }
 const outToken = `${outsider.body.agent.id}.${outsider.body.secret}`;
+cleaner.track(outsider.body.agent.id);
 
 function trigger(eventId, extra = {}) {
   return api("/api/work/triggers", {
@@ -146,7 +153,7 @@ assert(
 );
 const workItemId = t1.body.workItem.id;
 
-// ⑤ Agent Bearer 连 /mcp:tools/list 11 工具(SDK connect() 不返回 client,须自己持有)
+// ⑤ Agent Bearer 连 /mcp:tools/list 全量工具(SDK connect() 不返回 client,须自己持有)
 function mcpClient(token, name) {
   const client = new Client({ name, version: "0.0.1" });
   return client
@@ -173,8 +180,10 @@ assert(
       "work_read",
       "work_ack",
       "work_handback",
+      "work_report",
+      "work_decide",
     ]),
-  "tools/list 11 工具",
+  "tools/list 全量工具",
   tools.join(","),
 );
 
@@ -262,4 +271,5 @@ assert((outInbox.inbox ?? []).length === 0, "外部 Agent 领不到别人 inbox"
 
 await wb.close();
 await out.close();
+reportCleanup(await cleaner.run());
 console.log(process.exitCode === 1 ? "S9 FAILED" : "DONE");
