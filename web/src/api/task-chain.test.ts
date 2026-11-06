@@ -18,6 +18,8 @@ function task(id: string, parentTaskId: string | null = null): TaskDto {
     title: `任务 ${id}`,
     assigner: "feishu:alice",
     assignee: "agt_a",
+    assigner_label: "feishu:alice",
+    assignee_label: "agt_a",
     project: "aw",
     parent_task_id: parentTaskId,
     round: 1,

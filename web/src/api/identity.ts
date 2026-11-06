@@ -14,6 +14,64 @@ export interface AgentSummary {
   allowedTargets: string[];
   createdAt: number;
   updatedAt: number;
+  /** 稳定 key:机器无关 Agent 的路由标识,机器绑定 Agent 为 null */
+  key: string | null;
+  usageLimit: AgentUsageLimit | null;
+}
+
+export interface AgentUsageLimit {
+  dailyTokenLimit: number;
+  warnPercent: number;
+  hardStop: boolean;
+  isActive: boolean;
+  updatedAt: number;
+}
+
+/** 名册视图:身份档案 + 用量与在办聚合,供控制台 Agent 管理表格 */
+export interface AgentRosterSummary extends AgentSummary {
+  machineHostname: string | null;
+  totalRuns: number;
+  totalTokens: number;
+  openTasks: number;
+  lastRunAt: number | null;
+}
+
+/** 删除影响的三组计数 */
+export interface AgentDeleteImpact {
+  destroyed: {
+    workerInbox: number;
+    a2aThread: number;
+    a2aMessage: number;
+    a2aDeadLetter: number;
+    outboxPull: number;
+    agentRun: number;
+    timelineEvent: number;
+    tokenUsage: number;
+    usageLimit: number;
+  };
+  detached: {
+    workTrigger: number;
+    knowledgeEntry: number;
+  };
+  retained: {
+    task: number;
+    toolCallLog: number;
+    workItem: number;
+  };
+}
+
+export interface AgentDeletionPreview {
+  agent: {
+    id: string;
+    displayName: string;
+    project: string;
+    machineId: string | null;
+    status: IdentityStatus;
+  };
+  impact: AgentDeleteImpact;
+  /** 该 Agent 是默认 bug_fix 路由的主责:删除会被拦,须先指定接替者 */
+  bootstrapPrimary: boolean;
+  bootstrapPrimaryAgentId: string | null;
 }
 
 export interface MachineSummary {
@@ -77,8 +135,8 @@ export function fetchMachines(): Promise<MachineSummary[]> {
   return listAll<MachineSummary>("/api/machines");
 }
 
-export function fetchAgents(): Promise<AgentSummary[]> {
-  return listAll<AgentSummary>("/api/agents");
+export function fetchAgents(): Promise<AgentRosterSummary[]> {
+  return listAll<AgentRosterSummary>("/api/agents");
 }
 
 export function createAgent(input: CreateAgentInput): Promise<AgentSecret> {
@@ -111,4 +169,52 @@ export function setAgentTargets(
     { targets },
     { idempotencyKey: newIdempotencyKey() },
   );
+}
+
+export interface UpdateAgentInput {
+  displayName?: string;
+  project?: string;
+  status?: IdentityStatus;
+}
+
+/** 改档案:改名 / 改项目 / 启停 */
+export function updateAgent(
+  id: string,
+  input: UpdateAgentInput,
+): Promise<{ agent: AgentSummary; replayed: boolean }> {
+  return api.patch<{ agent: AgentSummary; replayed: boolean }>(
+    `/api/agents/${encodeURIComponent(id)}`,
+    input,
+    { idempotencyKey: newIdempotencyKey() },
+  );
+}
+
+/** 删除前的三级影响清单 */
+export function fetchAgentDeleteImpact(
+  id: string,
+): Promise<{ preview: AgentDeletionPreview }> {
+  return api.get<{ preview: AgentDeletionPreview }>(
+    `/api/agents/${encodeURIComponent(id)}/delete-impact`,
+  );
+}
+
+/**
+ * 硬删除 Agent 并级联清理关联行。
+ * 主责 Agent 须给接替者,否则服务端 409。
+ */
+export function deleteAgent(
+  id: string,
+  options: { reassignBootstrapPrimaryTo?: string } = {},
+): Promise<{ id: string; replayed: boolean; bootstrapPrimaryReassignedTo: string | null }> {
+  const body =
+    options.reassignBootstrapPrimaryTo === undefined
+      ? undefined
+      : { reassignBootstrapPrimaryTo: options.reassignBootstrapPrimaryTo };
+  return api.delete<{
+    id: string;
+    replayed: boolean;
+    bootstrapPrimaryReassignedTo: string | null;
+  }>(`/api/agents/${encodeURIComponent(id)}`, body, {
+    idempotencyKey: newIdempotencyKey(),
+  });
 }

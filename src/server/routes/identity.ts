@@ -7,6 +7,10 @@ import { formatKeysetCursor, parseKeysetCursor } from "../../shared/cursor.js";
 import type { Db } from "../../store/database.js";
 import { parseJsonStringArray } from "../../store/json.js";
 import type { AgentRecord, MachineRecord } from "../../store/repositories/identity.js";
+import {
+  listAgentRosterRows,
+  type AgentRosterRow,
+} from "../../store/repositories/agent-roster.js";
 import { findUsageLimitByAgentId, findUsageLimitsByAgentIds, type UsageLimitRecord } from "../../store/repositories/usage-limit.js";
 import { requireCsrf, requireIdempotencyKey, requireSession } from "../middleware/session.js";
 
@@ -79,6 +83,17 @@ interface AgentDto {
   usageLimit: UsageLimitDto | null;
 }
 
+export type { AgentDto, MachineDto, UsageLimitDto };
+
+/** 名册视图:身份档案 + 用量与在办聚合,供控制台 Agent 管理表格 */
+interface AgentRosterDto extends AgentDto {
+  machineHostname: string | null;
+  totalRuns: number;
+  totalTokens: number;
+  openTasks: number;
+  lastRunAt: number | null;
+}
+
 function toMachineDto(row: MachineRecord): MachineDto {
   return {
     id: row.id,
@@ -101,7 +116,7 @@ function toUsageLimitDto(row: UsageLimitRecord): UsageLimitDto {
   };
 }
 
-async function toAgentDto(
+export async function toAgentDto(
   db: Db,
   row: AgentRecord,
   limit?: UsageLimitRecord | undefined,
@@ -123,7 +138,32 @@ async function toAgentDto(
   };
 }
 
-function sendError(reply: FastifyReply, error: IdentityError): FastifyReply {
+function toAgentRosterDto(
+  row: AgentRosterRow,
+  limit: UsageLimitRecord | undefined,
+): AgentRosterDto {
+  return {
+    id: row.id,
+    machineId: row.machineId,
+    runtime: row.runtime,
+    key: row.key,
+    project: row.project,
+    displayName: row.displayName,
+    feishuAppId: row.feishuAppId,
+    status: row.status,
+    allowedTargets: parseJsonStringArray(row.allowedTargetsJson),
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    usageLimit: limit === undefined ? null : toUsageLimitDto(limit),
+    machineHostname: row.machineHostname,
+    totalRuns: row.totalRuns,
+    totalTokens: row.totalTokens,
+    openTasks: row.openTasks,
+    lastRunAt: row.lastRunAt,
+  };
+}
+
+export function sendError(reply: FastifyReply, error: IdentityError): FastifyReply {
   return reply.code(error.status).send({
     error: {
       code: error.code,
@@ -133,7 +173,7 @@ function sendError(reply: FastifyReply, error: IdentityError): FastifyReply {
   });
 }
 
-function validationError(reply: FastifyReply, issues: z.ZodError): FastifyReply {
+export function validationError(reply: FastifyReply, issues: z.ZodError): FastifyReply {
   return reply.code(422).send({
     error: {
       code: "VALIDATION_FAILED",
@@ -285,14 +325,14 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
     if (query === undefined) {
       return reply;
     }
-    const rows = await service.listAgents(query);
+    const rows = await listAgentRosterRows(db, query);
     const limits = await findUsageLimitsByAgentIds(
       db,
       rows.map((row) => row.id),
     );
     const last = rows.at(-1);
     return {
-      items: await Promise.all(rows.map((row) => toAgentDto(db, row, limits.get(row.id)))),
+      items: rows.map((row) => toAgentRosterDto(row, limits.get(row.id))),
       nextCursor:
         rows.length === query.limit && last !== undefined ? formatKeysetCursor(last) : null,
     };

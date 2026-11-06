@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { openDatabase } from "./database.js";
+import { defaultMigrationsDir, loadMigrations } from "./migrator.js";
 
 describe("openDatabase", () => {
   it("建独立 PG 库并完成迁移,可执行查询", async () => {
     const db = await openDatabase();
 
     expect(await db.get("SELECT 1 AS ok")).toEqual({ ok: 1 });
-    expect(await db.get("SELECT COUNT(*) AS n FROM schema_migration")).toEqual({ n: 11 });
+    const applied = await db.get<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM schema_migration",
+    );
+    expect(applied).toEqual({ n: loadMigrations(defaultMigrationsDir()).length });
     await db.close();
   });
 

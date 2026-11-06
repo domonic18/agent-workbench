@@ -25,6 +25,8 @@ function task(overrides: Partial<TaskDto> = {}): TaskDto {
     title: "实现任务屏",
     assigner: "feishu:alice",
     assignee: "agt_a",
+    assigner_label: "feishu:alice",
+    assignee_label: "agt_a",
     project: "aw",
     parent_task_id: null,
     round: 1,

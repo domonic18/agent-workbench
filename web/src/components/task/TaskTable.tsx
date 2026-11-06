@@ -86,9 +86,9 @@ export function TaskTable({ tasks, agentNames, search, now = Date.now() }: TaskT
                       <span className={styles.origin}>{TASK_ORIGIN_LABEL[task.origin]}</span>
                     </div>
                   </td>
-                  <td>{task.assigner}</td>
+                  <td>{task.assigner_label}</td>
                   <td>
-                    <div>{assigneeName ?? task.assignee}</div>
+                    <div>{assigneeName ?? task.assignee_label}</div>
                     {assigneeName === undefined ? null : (
                       <div className={styles.mono}>{task.assignee}</div>
                     )}
@@ -145,7 +145,7 @@ export function TaskTable({ tasks, agentNames, search, now = Date.now() }: TaskT
                 </span>
                 <span className={styles.cardMeta}>
                   <span className={styles.cardMetaLabel}>承接</span>
-                  <span>{assigneeName ?? task.assignee}</span>
+                  <span>{assigneeName ?? task.assignee_label}</span>
                 </span>
               </Link>
             </li>

@@ -48,6 +48,8 @@ describe("Agent 注册弹窗", () => {
         allowedTargets: ["agt_b"],
         createdAt: 1_700_000_000_000,
         updatedAt: 1_700_000_000_000,
+        key: null,
+        usageLimit: null,
       },
       secret: "agent_secret",
     });

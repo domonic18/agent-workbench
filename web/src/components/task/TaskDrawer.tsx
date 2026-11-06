@@ -87,7 +87,7 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
   }, [onClose]);
 
   const assigneeName =
-    task === undefined ? taskId : agentNames.get(task.assignee) ?? task.assignee;
+    task === undefined ? taskId : agentNames.get(task.assignee) ?? task.assignee_label;
 
   return (
     <div className={styles.drawerOverlay} onClick={onClose}>
@@ -108,7 +108,7 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
                 <span className={styles.drawerSubtitle}>加载中…</span>
               ) : (
                 <span className={styles.drawerSubtitle}>
-                  {task.assigner} → {assigneeName} · 第 {task.round} 轮 ·{" "}
+                  {task.assigner_label} → {assigneeName} · 第 {task.round} 轮 ·{" "}
                   {TASK_STATUS_LABEL[task.status]}
                 </span>
               )}

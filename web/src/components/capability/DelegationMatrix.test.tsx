@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../api/client.js";
-import { fetchAgents, setAgentTargets, type AgentSummary } from "../../api/identity.js";
+import { fetchAgents, setAgentTargets, type AgentRosterSummary } from "../../api/identity.js";
 import { DelegationMatrix } from "./DelegationMatrix.js";
 
 vi.mock("../../api/identity.js", () => ({
@@ -10,7 +10,11 @@ vi.mock("../../api/identity.js", () => ({
   setAgentTargets: vi.fn(),
 }));
 
-function agent(id: string, displayName: string, allowedTargets: string[] = []): AgentSummary {
+function agent(
+  id: string,
+  displayName: string,
+  allowedTargets: string[] = [],
+): AgentRosterSummary {
   return {
     id,
     machineId: "m1",
@@ -22,6 +26,13 @@ function agent(id: string, displayName: string, allowedTargets: string[] = []): 
     allowedTargets,
     createdAt: 0,
     updatedAt: 0,
+    key: null,
+    usageLimit: null,
+    machineHostname: "build-box",
+    totalRuns: 0,
+    totalTokens: 0,
+    openTasks: 0,
+    lastRunAt: null,
   };
 }
 

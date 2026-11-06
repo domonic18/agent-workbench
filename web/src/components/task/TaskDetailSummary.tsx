@@ -73,12 +73,12 @@ export function TaskDetailSummary({
       <dl className={styles.summaryRows}>
         <SummaryRow label="项目">{task.project}</SummaryRow>
         <SummaryRow label="承接">
-          {assigneeName ?? task.assignee}
+          {assigneeName ?? task.assignee_label}
           {assigneeName === undefined ? null : (
             <span className={styles.inlineMono}>{task.assignee}</span>
           )}
         </SummaryRow>
-        <SummaryRow label="下发">{task.assigner}</SummaryRow>
+        <SummaryRow label="下发">{task.assigner_label}</SummaryRow>
         <SummaryRow label="阶段">{TASK_STAGE_LABEL[task.stage]}</SummaryRow>
         <SummaryRow label="轮次">
           第 {task.round} 轮

@@ -1,5 +1,6 @@
 import type { FastifyReply } from "fastify";
 import type { TaskError } from "../../domain/task/errors.js";
+import type { AgentLabel } from "../../store/repositories/agent-lifecycle.js";
 import type { TaskRecord } from "../../store/repositories/task.js";
 
 export interface TaskDto {
@@ -7,6 +8,9 @@ export interface TaskDto {
   title: string;
   assigner: string;
   assignee: string;
+  /** 展示用名:Agent 已被硬删除时显示「已删除 Agent X」,否则与原始 id 相同 */
+  assigner_label: string;
+  assignee_label: string;
   project: string;
   parent_task_id: string | null;
   round: number;
@@ -23,12 +27,20 @@ export interface TaskDto {
   updated_at: number;
 }
 
-export function toTaskDto(row: TaskRecord): TaskDto {
+/** 只有墓碑里的(已删除)Agent 需要改写展示;其他情况原样透出 id */
+function labelFor(id: string, labels: Map<string, AgentLabel> | undefined): string {
+  const label = labels?.get(id);
+  return label !== undefined && label.deleted ? `已删除 ${label.displayName}` : id;
+}
+
+export function toTaskDto(row: TaskRecord, labels?: Map<string, AgentLabel>): TaskDto {
   return {
     id: row.id,
     title: row.title,
     assigner: row.assigner,
     assignee: row.assignee,
+    assigner_label: labelFor(row.assigner, labels),
+    assignee_label: labelFor(row.assignee, labels),
     project: row.project,
     parent_task_id: row.parentTaskId,
     round: row.round,

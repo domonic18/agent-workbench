@@ -48,6 +48,9 @@ export interface TaskDto {
   title: string;
   assigner: string;
   assignee: string;
+  /** 展示用名:Agent 已被硬删除时显示「已删除 Agent X」,否则与原始 id 相同 */
+  assigner_label: string;
+  assignee_label: string;
   project: string;
   parent_task_id: string | null;
   round: number;

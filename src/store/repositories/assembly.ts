@@ -19,6 +19,21 @@ export async function findAssembly(db: Db): Promise<AssemblyRecord | undefined> 
   return row;
 }
 
+/** 主责 Agent 被删除时改指接替者;装配记录本身保留(work_kind 与装配时刻是历史事实) */
+export async function updateAssemblyPrimaryAgent(
+  db: Db,
+  primaryAgentId: string,
+): Promise<boolean> {
+  return (
+    (
+      await db.run(
+        "UPDATE bootstrap_assembly SET primary_agent_id = ? WHERE id = ?",
+        primaryAgentId, ASSEMBLY_SINGLETON_ID,
+      )
+    ).changes === 1
+  );
+}
+
 export async function insertAssembly(
   db: Db,
   row: AssemblyRecord,

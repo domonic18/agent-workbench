@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createTestDatabase, resolveTestAdminUrl, type Db } from "./database.js";
-import { defaultMigrationsDir, runMigrations } from "./migrator.js";
+import { defaultMigrationsDir, loadMigrations, runMigrations } from "./migrator.js";
 
 async function tableNames(db: Db): Promise<string[]> {
   const rows = (await db.all(
@@ -19,7 +19,7 @@ describe("runMigrations", () => {
   it("空库执行建表并记账", async () => {
     const db = await createTestDatabase(resolveTestAdminUrl());
 
-    expect(await runMigrations(db)).toBe(11);
+    expect(await runMigrations(db)).toBe(loadMigrations(defaultMigrationsDir()).length);
     expect(await tableNames(db)).toEqual(
       expect.arrayContaining([
         "task",
@@ -53,6 +53,7 @@ describe("runMigrations", () => {
         "work_thread",
         "thread_subscription",
         "worker_inbox",
+        "agent_tombstone",
         "knowledge_entry",
         "knowledge_chunk",
         "knowledge_vec",
@@ -73,6 +74,7 @@ describe("runMigrations", () => {
       { version: 9, name: "agent_display_name" },
       { version: 10, name: "bot_name_refresh" },
       { version: 11, name: "usage_limit" },
+      { version: 12, name: "agent_tombstone" },
     ]);
     await db.close();
   });

@@ -4,8 +4,9 @@ import { createTaskReadService, type TaskReadService } from "../../domain/task/r
 import { LIST_LIMITS, TASK_STATUSES, type TaskStatus } from "../../shared/constants.js";
 import { parseJsonObject } from "../../shared/json.js";
 import type { Db } from "../../store/database.js";
+import { resolveAgentLabels } from "../../store/repositories/agent-lifecycle.js";
 import type { CapabilitySummary } from "../../store/repositories/capability.js";
-import type { TaskEventRecord } from "../../store/repositories/task.js";
+import type { TaskEventRecord, TaskRecord } from "../../store/repositories/task.js";
 import { requireSession } from "../middleware/session.js";
 import { invalid } from "./http.js";
 import { parseKeysetCursor, parseLimit, parseSeq } from "./paging.js";
@@ -55,6 +56,11 @@ function toTaskEventDto(row: TaskEventRecord): TaskEventDto {
     payload: parseJsonObject(row.payloadJson),
     occurred_at: row.occurredAt,
   };
+}
+
+/** 一页任务里出现过的承接方与下发人去重,供墓碑解析 */
+function agentIdsOf(rows: readonly TaskRecord[]): string[] {
+  return [...new Set(rows.flatMap((row) => [row.assignee, row.assigner]))];
 }
 
 export function registerTaskReadRoutes(
@@ -119,8 +125,10 @@ export function registerTaskReadRoutes(
       ...(before === undefined ? {} : { before }),
     });
     const last = result.items.at(-1);
+    // 承接方可能已被硬删除:查墓碑把裸 id 换成「已删除 Agent X」
+    const labels = await resolveAgentLabels(db, agentIdsOf(result.items));
     return {
-      items: result.items.map(toTaskDto),
+      items: result.items.map((row) => toTaskDto(row, labels)),
       nextCursor:
         result.hasMore && last !== undefined ? `${last.createdAt}:${last.id}` : null,
     };
@@ -130,8 +138,9 @@ export function registerTaskReadRoutes(
     const { id } = request.params as { id: string };
     try {
       const result = await read.detail(id);
+      const labels = await resolveAgentLabels(db, agentIdsOf([result.task]));
       return {
-        task: toTaskDto(result.task),
+        task: toTaskDto(result.task, labels),
         capabilities: result.capabilities.map(toCapabilityDto),
         tokens: result.tokens,
         revision: result.revision,
