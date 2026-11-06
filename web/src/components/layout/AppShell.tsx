@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { logout } from "../../api/auth.js";
+import { ThemeToggle } from "./ThemeToggle.js";
 import styles from "./AppShell.module.css";
 
 function NavIcon({ name }: { name: "overview" | "tasks" | "auth" | "knowledge" }) {
@@ -135,6 +136,7 @@ export function AppShell() {
           <h1 className={styles.pageTitle}>{pageTitle(location.pathname)}</h1>
           <span className={env.local ? styles.envLocal : styles.envTunnel}>{env.label}</span>
           <div className={styles.topbarRight}>
+            <ThemeToggle />
             <span className={styles.user}>
               <span className={styles.avatar} aria-hidden="true">
                 管

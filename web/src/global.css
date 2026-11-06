@@ -1,67 +1,149 @@
+/* 设计基线：颜色、尺度、动效的唯一出处（03 §设计基线）
+ *
+ * 颜色保持语义命名，明暗两套值；间距/圆角/阴影/字号/动效是此前完全缺失的一层，
+ * 组件基元与页面只引用令牌，不写死数值。
+ */
+
 :root {
   color-scheme: light;
-  --bg: #f5f6f8;
+
+  /* 表面与文字 */
+  --bg: #f4f6f9;
   --surface: #ffffff;
-  --surface-2: #fafbfc;
-  --header-bg: #fbfbfc;
-  --border: #e5e7eb;
-  --line-soft: #eef0f3;
-  --text: #111827;
-  --text-secondary: #4b5563;
-  --muted: #6b7280;
-  --subtle: #9ca3af;
+  --surface-2: #f8fafc;
+  --surface-3: #f1f5f9;
+  --header-bg: #ffffff;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --line-soft: #eef2f7;
+  --text: #0f172a;
+  --text-secondary: #475569;
+  --muted: #64748b;
+  --subtle: #94a3b8;
+
+  /* 语义色 */
   --accent: #2563eb;
-  --accent-soft: #eff4ff;
-  --accent-border: #c7d7fe;
+  --accent-hover: #1d4ed8;
+  --accent-soft: #eff6ff;
+  --accent-border: #bfdbfe;
   --positive: #15803d;
-  --positive-soft: #eaf6ee;
-  --positive-border: #cfe8d8;
+  --positive-soft: #ecfdf3;
+  --positive-border: #bbf7d0;
   --warning: #b45309;
-  --warning-soft: #fdf3e4;
-  --warning-border: #f3ddb9;
+  --warning-soft: #fffbeb;
+  --warning-border: #fde68a;
   --danger: #b42318;
-  --danger-soft: #fef1f0;
-  --danger-border: #f5c6c1;
-  --chip-bg: #f2f3f5;
-  --muted-soft: #f3f4f6;
+  --danger-soft: #fef2f2;
+  --danger-border: #fecaca;
+  --chip-bg: #f1f5f9;
+  --muted-soft: #f8fafc;
   --on-accent: #ffffff;
-  --avatar-bg: #dbe4f7;
-  --avatar-text: #2b4a8b;
-  --overlay: rgb(15 23 42 / 32%);
+  --avatar-bg: #dbeafe;
+  --avatar-text: #1e40af;
+  --overlay: rgb(15 23 42 / 45%);
+
+  /* 侧栏固定深色，明暗两套都是「产品外壳」的视觉锚 */
+  --sidebar-bg: #0f172a;
+  --sidebar-bg-hover: #1e293b;
+  --sidebar-text: #cbd5e1;
+  --sidebar-text-strong: #f8fafc;
+  --sidebar-border: #1e293b;
+  --sidebar-active-bg: #1e3a8a;
+  --sidebar-active-text: #ffffff;
+
+  /* 间距刻度 */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* 圆角 */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 999px;
+
+  /* 浮起层级 */
+  --shadow-xs: 0 1px 2px rgb(15 23 42 / 6%);
+  --shadow-sm: 0 1px 3px rgb(15 23 42 / 8%), 0 1px 2px rgb(15 23 42 / 4%);
+  --shadow-md: 0 6px 16px rgb(15 23 42 / 10%);
+  --shadow-lg: 0 20px 48px rgb(15 23 42 / 16%);
+
+  /* 字号 */
+  --font-xs: 12px;
+  --font-sm: 13px;
+  --font-md: 14px;
+  --font-lg: 16px;
+  --font-xl: 20px;
+  --font-2xl: 26px;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  /* 动效 */
+  --duration-fast: 120ms;
+  --duration: 160ms;
+  --ease: cubic-bezier(0.2, 0.6, 0.3, 1);
+  --focus-ring: 0 0 0 3px rgb(37 99 235 / 28%);
+
+  /* 布局 */
+  --sidebar-w: 232px;
+  --topbar-h: 56px;
+  --content-max: 1440px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --bg: #12151b;
-    --surface: #1a1f27;
-    --surface-2: #1d232c;
-    --header-bg: #1d232c;
-    --border: #2b323d;
-    --line-soft: #252c36;
-    --text: #e6e9ef;
-    --text-secondary: #b7bfcb;
-    --muted: #9aa3b2;
-    --subtle: #7c8595;
-    --accent: #7aa2ff;
-    --accent-soft: #1d2a44;
-    --accent-border: #2f4470;
-    --positive: #6fd39a;
-    --positive-soft: #17301f;
-    --positive-border: #2a5238;
-    --warning: #e8b45c;
-    --warning-soft: #33280f;
-    --warning-border: #5a451c;
-    --danger: #ff8a80;
-    --danger-soft: #3a1c1a;
-    --danger-border: #6a2f2a;
-    --chip-bg: #232932;
-    --muted-soft: #232932;
-    --on-accent: #10151d;
-    --avatar-bg: #263552;
-    --avatar-text: #b9cdf5;
-    --overlay: rgb(0 0 0 / 55%);
-  }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #0b0f16;
+  --surface: #131922;
+  --surface-2: #171e28;
+  --surface-3: #1c242f;
+  --header-bg: #131922;
+  --border: #232c39;
+  --border-strong: #33404f;
+  --line-soft: #1b232d;
+  --text: #e8edf5;
+  --text-secondary: #b3bece;
+  --muted: #8d99ab;
+  --subtle: #6b7688;
+
+  --accent: #6ea8fe;
+  --accent-hover: #8bb8ff;
+  --accent-soft: #16233a;
+  --accent-border: #2b4470;
+  --positive: #5cc98d;
+  --positive-soft: #10261a;
+  --positive-border: #225238;
+  --warning: #e3b04b;
+  --warning-soft: #2a2110;
+  --warning-border: #574118;
+  --danger: #f2837a;
+  --danger-soft: #2d1615;
+  --danger-border: #5f2b27;
+  --chip-bg: #1d252f;
+  --muted-soft: #1a222c;
+  --on-accent: #0b0f16;
+  --avatar-bg: #1e2f4d;
+  --avatar-text: #b9cdf5;
+  --overlay: rgb(2 6 12 / 62%);
+
+  --sidebar-bg: #080c12;
+  --sidebar-bg-hover: #151d27;
+  --sidebar-text: #97a3b4;
+  --sidebar-text-strong: #f1f5f9;
+  --sidebar-border: #1a222d;
+  --sidebar-active-bg: #1d3a63;
+  --sidebar-active-text: #ffffff;
+
+  --shadow-xs: 0 1px 2px rgb(0 0 0 / 40%);
+  --shadow-sm: 0 1px 3px rgb(0 0 0 / 45%), 0 1px 2px rgb(0 0 0 / 30%);
+  --shadow-md: 0 6px 18px rgb(0 0 0 / 50%);
+  --shadow-lg: 0 24px 56px rgb(0 0 0 / 62%);
+
+  --focus-ring: 0 0 0 3px rgb(110 168 254 / 32%);
 }
 
 * {
@@ -79,21 +161,71 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: var(--font-md);
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
+  color: inherit;
 }
 
 button {
-  color: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
 }
 
 a {
   color: var(--accent);
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+code,
+kbd {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+/* 滚动条：与主题同色，避免默认滚动条割裂画面 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 3px solid transparent;
+  border-radius: var(--radius-full);
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
