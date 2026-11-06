@@ -165,20 +165,36 @@ if [ -n "$CC_DIR" ]; then set -- "$@" --cc-connect-dir "$CC_DIR"; fi
 if [ "$BACKFILL" = "1" ]; then set -- "$@" --backfill; fi
 
 # token 经 stdin 传给 enroll(非 TTY 时 aw-node 直接读管道),不落命令行与 shell history
-if [ -z "${AW_ENROLL_TOKEN:-}" ] && [ -r /dev/tty ]; then
-  printf 'enroll token(一次性,输入不显示): ' > /dev/tty
-  OLD_STTY=$(stty -g < /dev/tty 2>/dev/null || true)
-  if [ -n "$OLD_STTY" ]; then stty -echo < /dev/tty; fi
-  IFS= read -r ENROLL_TOKEN < /dev/tty || ENROLL_TOKEN=""
-  if [ -n "$OLD_STTY" ]; then stty "$OLD_STTY" < /dev/tty; fi
-  printf '\n' > /dev/tty
-  if [ -n "$ENROLL_TOKEN" ]; then
-    printf '%s' "$ENROLL_TOKEN" | "$@"
+run_enroll() {
+  if [ -n "${AW_ENROLL_TOKEN:-}" ]; then
+    "$@"
+  elif [ -r /dev/tty ]; then
+    printf 'enroll token(一次性,输入不显示): ' > /dev/tty
+    OLD_STTY=$(stty -g < /dev/tty 2>/dev/null || true)
+    if [ -n "$OLD_STTY" ]; then stty -echo < /dev/tty; fi
+    IFS= read -r ENROLL_TOKEN < /dev/tty || ENROLL_TOKEN=""
+    if [ -n "$OLD_STTY" ]; then stty "$OLD_STTY" < /dev/tty; fi
+    printf '\n' > /dev/tty
+    if [ -n "$ENROLL_TOKEN" ]; then
+      printf '%s' "$ENROLL_TOKEN" | "$@"
+    else
+      "$@"
+    fi
   else
     "$@"
   fi
-else
-  "$@"
+}
+
+if ! run_enroll "$@"; then
+  echo "" >&2
+  if [ -f "$STATE_DIR/credentials.json" ]; then
+    # 凭据已落盘说明兑换成功、失败在装载环节:重装不需要再要 token
+    echo "机器凭据已落盘($STATE_DIR/credentials.json),装载失败可直接重试,无需再要 token:" >&2
+    echo "  $HOME/.local/bin/aw-node install --url $URL" >&2
+  else
+    echo "enroll 未完成,机器未登记;请检查 token 是否过期(15 分钟有效)后重试。" >&2
+  fi
+  exit 1
 fi
 
 echo ""

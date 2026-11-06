@@ -1,7 +1,15 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { resolveInstallIdentity } from "./cli.js";
 import type { EnrollCredentials } from "./enroll.js";
-import { buildPlist, LABEL, LEGACY_LABEL, type InstallOptions } from "./launchd.js";
+import {
+  buildPlist,
+  domainTargets,
+  LABEL,
+  LEGACY_LABEL,
+  loadService,
+  type InstallOptions,
+  type LaunchctlRunner,
+} from "./launchd.js";
 
 const CREDENTIALS: EnrollCredentials = {
   consoleUrl: "https://aw.example.com",
@@ -42,7 +50,7 @@ afterEach(() => {
 
 describe("buildPlist", () => {
   it("写入 aw-node label、run 参数、密钥 env 与日志路径", () => {
-    const plist = buildPlist(options(), "/Users/t/.local/bin/aw-node");
+    const plist = buildPlist(options(), ["/Users/t/.local/bin/aw-node", "run"]);
     expect(plist).toContain(`<string>${LABEL}</string>`);
     expect(plist).toContain("<string>run</string>");
     expect(plist).toContain("<key>AW_COLLECTOR_ID</key><string>mach_1</string>");
@@ -54,7 +62,10 @@ describe("buildPlist", () => {
   });
 
   it("空项目不写 AW_AGENT_PROJECTS,backfill 写 AW_BACKFILL", () => {
-    const plist = buildPlist(options({ projects: [], backfill: true }), "/Users/t/.local/bin/aw-node");
+    const plist = buildPlist(options({ projects: [], backfill: true }), [
+      "/Users/t/.local/bin/aw-node",
+      "run",
+    ]);
     expect(plist).not.toContain("AW_AGENT_PROJECTS");
     expect(plist).toContain("<key>AW_BACKFILL</key><string>1</string>");
   });
@@ -63,6 +74,93 @@ describe("buildPlist", () => {
     expect(LABEL).not.toEqual(LEGACY_LABEL);
     expect(LABEL).toBe("com.agent-workbench.aw-node");
     expect(LEGACY_LABEL).toBe("com.agent-workbench.collector");
+  });
+});
+
+describe("loadService", () => {
+  const PLIST = "/Users/t/Library/LaunchAgents/com.agent-workbench.aw-node.plist";
+  const DIAGNOSTICS = { binary: "/Users/t/.local/bin/aw-node(已校验可执行)", plist: "通过" };
+
+  function runner(handler: (args: string[]) => { status: number; stdout?: string; stderr?: string }) {
+    return ((args: string[]) => {
+      const result = handler(args);
+      return {
+        status: result.status,
+        stdout: result.stdout ?? "",
+        stderr: result.stderr ?? "",
+      };
+    }) as LaunchctlRunner;
+  }
+
+  it("gui 域装载失败时退回 user 域", () => {
+    const run = runner((args) => {
+      const joined = args.join(" ");
+      if (joined === "print gui/501" || joined === "print user/501") {
+        return { status: 0 };
+      }
+      if (joined === "bootstrap gui/501 " + PLIST) {
+        return { status: 1, stderr: "Bootstrap failed: 5: Input/output error" };
+      }
+      if (joined === "bootstrap user/501 " + PLIST) {
+        return { status: 0 };
+      }
+      return { status: 1, stderr: "unexpected: " + joined };
+    });
+
+    const outcome = loadService(PLIST, LABEL, run, domainTargets(501), DIAGNOSTICS);
+
+    expect(outcome.domain).toBe("user/501");
+    expect(outcome.bootedOut).toBe(false);
+  });
+
+  it("同名服务已挂着时先摘再装", () => {
+    let bootedOut = false;
+    const run = runner((args) => {
+      const joined = args.join(" ");
+      if (joined === "print gui/501") {
+        return { status: 0 };
+      }
+      if (joined === `print gui/501/${LABEL}`) {
+        return { status: bootedOut ? 1 : 0 };
+      }
+      if (joined === "bootstrap gui/501 " + PLIST) {
+        return bootedOut
+          ? { status: 0 }
+          : { status: 1, stderr: "Bootstrap failed: 5: Input/output error" };
+      }
+      if (joined === `bootout gui/501/${LABEL}`) {
+        bootedOut = true;
+        return { status: 0 };
+      }
+      return { status: 1, stderr: "unexpected: " + joined };
+    });
+
+    const outcome = loadService(PLIST, LABEL, run, ["gui/501"], DIAGNOSTICS);
+
+    expect(outcome.domain).toBe("gui/501");
+    expect(outcome.bootedOut).toBe(true);
+  });
+
+  it("全域失败时给出诊断与手动重试命令", () => {
+    const run = runner((args) => {
+      const joined = args.join(" ");
+      if (joined.startsWith("print gui/501") || joined.startsWith("print user/501")) {
+        return { status: 0 };
+      }
+      return { status: 1, stderr: "Bootstrap failed: 5: Input/output error" };
+    });
+
+    expect(() => loadService(PLIST, LABEL, run, domainTargets(501), DIAGNOSTICS)).toThrow(
+      /launchd 装载失败[\s\S]*gui\/501: Bootstrap failed[\s\S]*user\/501[\s\S]*手动重试/,
+    );
+  });
+
+  it("域都不可达时直接说明会话没有可用 launchd 域", () => {
+    const run = runner(() => ({ status: 1, stderr: "Could not find service" }));
+
+    expect(() => loadService(PLIST, LABEL, run, domainTargets(501), DIAGNOSTICS)).toThrow(
+      /launchd 域不可达/,
+    );
   });
 });
 
