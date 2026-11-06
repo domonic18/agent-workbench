@@ -116,4 +116,12 @@ describe("总览页", () => {
     expect(FakeEventSource.lastUrl).toContain("scope=overview");
     expect(FakeEventSource.lastUrl).toContain("client_id=");
   });
+
+  it("执行机接入面板默认展开,下载直链不藏在折叠区里", async () => {
+    vi.stubGlobal("fetch", fakeFetch(snapshot()));
+    renderPage();
+
+    const disclosure = (await screen.findByText("添加执行机")).closest("details");
+    expect(disclosure?.open).toBe(true);
+  });
 });

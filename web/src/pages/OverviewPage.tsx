@@ -163,7 +163,8 @@ export function OverviewPage() {
           </section>
 
           <section className={styles.section}>
-            <details className={styles.disclosure}>
+            {/* 默认展开:下载地址是本页对外交付物,收起状态等于没做 */}
+            <details className={styles.disclosure} open>
               <summary>添加执行机</summary>
               <p className={styles.hint}>
                 新机器装 aw-node:复制命令到目标机执行,按提示粘贴一次性 enroll token;也可直接下载对应平台产物。
