@@ -17,6 +17,8 @@ interface ThemeContextValue {
   preference: ThemePreference;
   resolved: ResolvedTheme;
   setPreference: (next: ThemePreference) => void;
+  /** 在明亮与暗黑之间直接切换（顶栏开关用） */
+  toggleTheme: () => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -65,9 +67,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const toggleTheme = useCallback(() => {
+    setPreference(resolved === "dark" ? "light" : "dark");
+  }, [resolved, setPreference]);
+
   const value = useMemo(
-    () => ({ preference, resolved, setPreference }),
-    [preference, resolved, setPreference],
+    () => ({ preference, resolved, setPreference, toggleTheme }),
+    [preference, resolved, setPreference, toggleTheme],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

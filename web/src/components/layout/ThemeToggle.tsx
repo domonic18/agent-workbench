@@ -1,38 +1,18 @@
-import { Laptop, Moon, Sun } from "lucide-react";
-import { useTheme, type ThemePreference } from "../../shared/theme.js";
-import styles from "./ThemeToggle.module.css";
+import { Moon, Sun } from "lucide-react";
+import { useTheme } from "../../shared/theme.js";
+import { IconButton } from "../ui/IconButton.js";
 
-const NEXT: Record<ThemePreference, ThemePreference> = {
-  light: "dark",
-  dark: "system",
-  system: "light",
-};
-
-const ICON: Record<ThemePreference, typeof Sun> = {
-  light: Sun,
-  dark: Moon,
-  system: Laptop,
-};
-
-const LABEL: Record<ThemePreference, string> = {
-  light: "浅色",
-  dark: "深色",
-  system: "跟随系统",
-};
-
+/** 顶栏主题开关：在明亮与暗黑之间直接切换（跟随系统在账号菜单里选） */
 export function ThemeToggle() {
-  const { preference, resolved, setPreference } = useTheme();
-  const Icon = ICON[preference];
+  const { resolved, toggleTheme } = useTheme();
+  const dark = resolved === "dark";
 
   return (
-    <button
-      type="button"
-      className={styles.toggle}
-      title={`主题：${LABEL[preference]}（当前${resolved === "dark" ? "深色" : "浅色"}）`}
-      aria-label={`切换主题，当前${LABEL[preference]}`}
-      onClick={() => setPreference(NEXT[preference])}
-    >
-      <Icon size={16} strokeWidth={1.8} aria-hidden="true" />
-    </button>
+    <IconButton
+      variant="ghost"
+      label={dark ? "切换到明亮模式" : "切换到暗黑模式"}
+      icon={dark ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
+      onClick={toggleTheme}
+    />
   );
 }

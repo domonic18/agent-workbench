@@ -261,6 +261,30 @@
   background: var(--muted-soft);
 }
 
+.toneIcon {
+  display: inline-flex;
+}
+
+.toneIconPositive {
+  color: var(--positive);
+}
+
+.toneIconWarning {
+  color: var(--warning);
+}
+
+.toneIconDanger {
+  color: var(--danger);
+}
+
+.toneIconInfo {
+  color: var(--info);
+}
+
+.toneIconMuted {
+  color: var(--muted);
+}
+
 .copyField {
   display: flex;
   align-items: center;

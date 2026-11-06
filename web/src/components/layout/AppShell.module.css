@@ -26,19 +26,14 @@
   border-bottom: 1px solid var(--border);
 }
 
-.brandMark {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-md);
-  background: var(--accent);
-  color: var(--on-accent);
-  font-size: var(--font-xs);
-  font-weight: 800;
-  letter-spacing: 0.04em;
+.brandLogo {
+  display: inline-flex;
+  color: var(--accent);
+}
+
+.brandText {
+  display: block;
+  min-width: 0;
 }
 
 .brandTitle {
@@ -59,8 +54,24 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 2px;
-  padding: var(--space-3);
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-3);
+  overflow-y: auto;
+}
+
+.navGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.navGroupLabel {
+  padding: 0 var(--space-3);
+  color: var(--muted);
+  font-size: var(--font-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
 }
 
 .link {
@@ -71,7 +82,8 @@
   padding: 0 var(--space-3);
   border-radius: var(--radius-md);
   color: var(--text-secondary);
-  font-size: var(--font-md);
+  font-size: var(--font-sm);
+  font-weight: 500;
   text-decoration: none;
   transition:
     background var(--duration-fast) var(--ease),
@@ -91,38 +103,11 @@
 
 .navFooter {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4) var(--space-5);
-  border-top: 1px solid var(--border);
-}
-
-.envLocal,
-.envTunnel {
-  display: inline-flex;
-  align-self: flex-start;
-  padding: 2px var(--space-2);
-  border-radius: var(--radius-full);
-  font-size: var(--font-xs);
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.envLocal {
-  background: var(--positive-soft);
-  color: var(--positive);
-}
-
-.envTunnel {
-  background: var(--warning-soft);
-  color: var(--warning);
-}
-
-.footerRow {
-  display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--border);
 }
 
 .version {
@@ -145,7 +130,7 @@
   align-items: center;
   gap: var(--space-4);
   height: var(--topbar-h);
-  padding: 0 var(--space-5);
+  padding: 0 var(--space-6);
   background: var(--header-bg);
   border-bottom: 1px solid var(--border);
 }
@@ -159,8 +144,8 @@
 
 .pageTitle {
   margin: 0;
-  font-size: var(--font-xl);
-  font-weight: 700;
+  font-size: var(--font-lg);
+  font-weight: 600;
   color: var(--text);
 }
 
@@ -175,25 +160,28 @@
 .topbarRight {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
   margin-left: auto;
 }
 
-.user {
-  display: flex;
+.avatarButton {
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  color: var(--text-secondary);
-  font-size: var(--font-sm);
-  white-space: nowrap;
+  justify-content: center;
+  width: var(--size-avatar);
+  height: var(--size-avatar);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
 }
 
 .avatar {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 100%;
+  height: 100%;
   border-radius: var(--radius-full);
   background: var(--avatar-bg);
   color: var(--avatar-text);
@@ -201,28 +189,13 @@
   font-weight: 700;
 }
 
-.logout {
-  padding: var(--space-1) var(--space-2);
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--subtle);
-  font-size: var(--font-sm);
-  cursor: pointer;
-}
-
-.logout:hover {
-  background: var(--muted-soft);
-  color: var(--text);
-}
-
 .main {
   flex: 1;
   width: 100%;
-  max-width: var(--content-max);
+  max-width: var(--content-narrow);
   min-width: 0;
   margin: 0 auto;
-  padding: var(--space-5);
+  padding: var(--space-5) var(--space-6);
 }
 
 .pageLoading {
@@ -250,43 +223,44 @@
     border-bottom: none;
   }
 
+  .brandText {
+    display: none;
+  }
+
   .links {
     flex: 1;
     flex-direction: row;
     gap: var(--space-1);
+    padding: var(--space-2) var(--space-3);
     overflow-x: auto;
+  }
+
+  .navGroup {
+    flex-direction: row;
+    gap: var(--space-1);
+  }
+
+  .navGroupLabel {
+    display: none;
   }
 
   .link {
     flex: 0 0 auto;
     /* 窄屏是手指操作，导航项的触达高度按 44px 底线给 */
-    min-height: 44px;
+    min-height: var(--size-touch);
     display: inline-flex;
     align-items: center;
     padding: 0 var(--space-3);
-    font-size: var(--font-sm);
     white-space: nowrap;
   }
 
   .navFooter {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
     padding: var(--space-2) var(--space-4);
-  }
-
-  .footerRow {
-    gap: var(--space-3);
   }
 
   .topbar {
     height: auto;
     padding: var(--space-3) var(--space-4);
-  }
-
-  .pageTitle {
-    font-size: var(--font-lg);
   }
 
   .pageDescription {

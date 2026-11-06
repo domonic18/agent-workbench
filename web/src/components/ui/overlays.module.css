@@ -192,6 +192,69 @@
   color: var(--accent);
 }
 
+/* 下拉菜单：非模态，挂在 body 上定位，不加遮罩 */
+.menuAnchor {
+  display: inline-flex;
+}
+
+.menu {
+  position: fixed;
+  z-index: 95;
+  min-width: 190px;
+  padding: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+}
+
+.menuHeading {
+  padding: var(--space-2) var(--space-3);
+  color: var(--muted);
+  font-size: var(--font-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: var(--font-sm);
+  text-align: left;
+}
+
+.menuItem:hover,
+.menuItem:focus-visible {
+  background: var(--surface-2);
+  outline: none;
+}
+
+.menuItemDanger {
+  color: var(--danger);
+}
+
+.menuItemDisabled {
+  color: var(--muted);
+  cursor: default;
+}
+
+.menuItemDisabled:hover {
+  background: transparent;
+}
+
+.menuItemIcon {
+  display: inline-flex;
+  color: var(--muted);
+}
+
 /* 提示气泡：触发元素 + 挂在 body 上的浮层 */
 .tooltipTrigger {
   display: inline-flex;

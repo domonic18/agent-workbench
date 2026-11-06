@@ -28,7 +28,7 @@ function stubMatchMedia(dark: boolean): {
 }
 
 function Probe(): React.ReactElement {
-  const { preference, resolved, setPreference } = useTheme();
+  const { preference, resolved, setPreference, toggleTheme } = useTheme();
   return (
     <div>
       <span data-testid="preference">{preference}</span>
@@ -39,6 +39,9 @@ function Probe(): React.ReactElement {
         data-testid="to-dark"
       >
         深色
+      </button>
+      <button type="button" onClick={toggleTheme} data-testid="toggle">
+        切换
       </button>
     </div>
   );
@@ -110,5 +113,22 @@ describe("主题机制", () => {
 
     expect(screen.getByTestId("preference").textContent).toBe("light");
     expect(document.documentElement.dataset.theme).toBe("light");
+  });
+
+  it("切换开关在明亮与暗黑之间直接来回", () => {
+    stubMatchMedia(false);
+    render(
+      <ThemeProvider>
+        <Probe />
+      </ThemeProvider>,
+    );
+
+    fireEvent.click(screen.getByTestId("toggle"));
+    expect(screen.getByTestId("resolved").textContent).toBe("dark");
+    expect(screen.getByTestId("preference").textContent).toBe("dark");
+
+    fireEvent.click(screen.getByTestId("toggle"));
+    expect(screen.getByTestId("resolved").textContent).toBe("light");
+    expect(screen.getByTestId("preference").textContent).toBe("light");
   });
 });
