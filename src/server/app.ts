@@ -14,6 +14,7 @@ import { requireAllowedHost } from "./middleware/host.js";
 import { requireConsoleReadiness } from "./middleware/bootstrap-mode.js";
 import { createApprovalNotifier } from "./notification/approval.js";
 import { registerA2aRoutes } from "./routes/a2a.js";
+import { registerAgentDetailRoutes } from "./routes/agent-detail.js";
 import { registerAgentLifecycleRoutes } from "./routes/agent-lifecycle.js";
 import { registerAgentSelfRoutes } from "./routes/agent-self.js";
 import { registerAuditRoutes } from "./routes/audit.js";
@@ -114,6 +115,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     registerIdentityRoutes(app, { db, ...timing });
     registerMachineRoutes(app, { db, ...timing });
     registerAgentLifecycleRoutes(app, { db, ...timing });
+    registerAgentDetailRoutes(app, { db, ...timing });
     registerAgentSelfRoutes(app, { db, ...timing });
     registerOverviewRoutes(app, { db, ...timing });
     registerBootstrapRoutes(app, {

@@ -10,6 +10,19 @@ export function parseJsonStringArray(json: string): string[] {
   }
 }
 
+/** 解析 JSON 对象列(如 timeline_event.payload_json);坏值或非对象退化为空对象 */
+export function parseJsonObject(json: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(json) as unknown;
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      return {};
+    }
+    return parsed as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
 /** 替换符 U+FFFD:标出「此处原有一个 PG 存不下的字符」 */
 const REPLACEMENT = "\uFFFD";
 
