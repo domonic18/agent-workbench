@@ -5,6 +5,7 @@ import { logout } from "../../api/auth.js";
 import { RealtimeProvider, useRealtimeStatus } from "../../api/stream.js";
 import { Badge } from "../ui/Badge.js";
 import { REALTIME_LABEL, REALTIME_TONE } from "../../shared/labels.js";
+import { APP_NAME, APP_NAME_EN, APP_VERSION } from "../../shared/app.js";
 import { ThemeToggle } from "./ThemeToggle.js";
 import styles from "./AppShell.module.css";
 
@@ -80,8 +81,8 @@ function Shell() {
             AW
           </span>
           <span>
-            <span className={styles.brandTitle}>智能体工作台</span>
-            <span className={styles.brandSub}>Agent Workbench</span>
+            <span className={styles.brandTitle}>{APP_NAME}</span>
+            <span className={styles.brandSub}>{APP_NAME_EN}</span>
           </span>
         </div>
 
@@ -104,7 +105,7 @@ function Shell() {
         <div className={styles.navFooter}>
           <span className={env.local ? styles.envLocal : styles.envTunnel}>{env.label}</span>
           <div className={styles.footerRow}>
-            <span className={styles.version}>v0.1</span>
+            <span className={styles.version}>{APP_VERSION}</span>
             <ThemeToggle variant="sidebar" />
           </div>
         </div>

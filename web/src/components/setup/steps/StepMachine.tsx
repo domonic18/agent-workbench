@@ -1,12 +1,10 @@
 import { type BootstrapStatus } from "../../../api/bootstrap.js";
-import { StepHeader } from "../StepHeader.js";
 import { ExecutionSetupPanel } from "../ExecutionSetupPanel.js";
 import styles from "../setup.module.css";
 
-export function StepMachine({ step, status }: { step: number; status: BootstrapStatus }) {
+export function StepMachine({ status }: { status: BootstrapStatus }) {
   return (
     <div className={styles.card}>
-      <StepHeader step={step} />
       <h1 className={styles.title}>添加执行机</h1>
       <p className={styles.description}>
         在目标机执行下面的命令,按提示粘贴一次性 enroll token(输入不回显)。控制台据此换取机器 ID、安装并启动 aw-node。

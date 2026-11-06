@@ -2,11 +2,10 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ApiError } from "../../../api/client.js";
 import { confirmAgents, fetchDiscovery } from "../../../api/bootstrap.js";
-import { StepHeader } from "../StepHeader.js";
 import { Feedback } from "../Feedback.js";
 import styles from "../setup.module.css";
 
-export function StepProjects({ step }: { step: number }) {
+export function StepProjects() {
   const [selected, setSelected] = useState<Record<string, Record<string, boolean>>>({});
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +56,6 @@ export function StepProjects({ step }: { step: number }) {
 
   return (
     <div className={styles.card}>
-      <StepHeader step={step} />
       <h1 className={styles.title}>添加项目</h1>
       <p className={styles.description}>
         确认执行机上报的 cc-connect 项目,控制台据此创建主责 Agent 并下发不含明文 Bearer 的运行时配置。

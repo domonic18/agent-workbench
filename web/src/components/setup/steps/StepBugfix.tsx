@@ -3,16 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { ApiError } from "../../../api/client.js";
 import { completeSetup, type BootstrapStatus } from "../../../api/bootstrap.js";
 import { fetchAgents } from "../../../api/identity.js";
-import { StepHeader } from "../StepHeader.js";
 import { Feedback } from "../Feedback.js";
 import styles from "../setup.module.css";
 
 export function StepBugfix({
-  step,
   status,
   onComplete,
 }: {
-  step: number;
   status: BootstrapStatus;
   onComplete: () => void;
 }) {
@@ -49,7 +46,6 @@ export function StepBugfix({
 
   return (
     <div className={styles.card}>
-      <StepHeader step={step} />
       <h1 className={styles.title}>启用 Bug 工作流</h1>
       <p className={styles.description}>核对默认 bug_fix 装配摘要,选择主责 Agent 后完成初始化。无需手工编辑 RouteRule 或 Mandate。</p>
       <div className={styles.section}>

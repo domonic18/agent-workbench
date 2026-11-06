@@ -2,11 +2,10 @@ import { type FormEvent, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "../../../api/client.js";
 import { bootstrapAdmin } from "../../../api/bootstrap.js";
-import { StepHeader } from "../StepHeader.js";
 import { Feedback } from "../Feedback.js";
 import styles from "../setup.module.css";
 
-export function StepAdmin({ step }: { step: number }) {
+export function StepAdmin() {
   const queryClient = useQueryClient();
   const [token, setToken] = useState("");
   const [password, setPassword] = useState("");
@@ -29,7 +28,6 @@ export function StepAdmin({ step }: { step: number }) {
 
   return (
     <div className={styles.card}>
-      <StepHeader step={step} />
       <h1 className={styles.title}>初始化控制台</h1>
       <p className={styles.description}>
         输入本机启动输出的 bootstrap token 并设置管理员口令,即解锁完整控制台。空库与空知识将自动建好。

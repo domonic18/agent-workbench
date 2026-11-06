@@ -34,7 +34,7 @@ afterEach(() => {
 
 describe("StepMachine", () => {
   it("安装命令指向控制台下发的安装脚本,不含令牌", () => {
-    render(<StepMachine step={2} status={STATUS} />);
+    render(<StepMachine status={STATUS} />);
     const command = screen.getByLabelText("在目标机执行") as HTMLTextAreaElement;
     expect(command.value).toContain("/artifacts/install.sh");
     expect(command.value).toContain("sh -s -- --url");
@@ -43,7 +43,7 @@ describe("StepMachine", () => {
 
   it("签发的令牌单独展示,安装命令不随令牌变化", async () => {
     vi.mocked(bootstrap.issueEnrollToken).mockResolvedValueOnce({ token: "ott_abc123", expiresAt: 1 });
-    render(<StepMachine step={2} status={STATUS} />);
+    render(<StepMachine status={STATUS} />);
     fireEvent.click(screen.getByRole("button", { name: "签发 enroll token" }));
     await waitFor(() => expect(screen.getByLabelText(/enroll token/)).toBeTruthy());
     expect((screen.getByLabelText(/enroll token/) as HTMLTextAreaElement).value).toBe("ott_abc123");

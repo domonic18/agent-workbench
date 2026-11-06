@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { type ReactNode } from "react";
 import { ApiError } from "../api/client.js";
 import { bootstrapStatus } from "../api/bootstrap.js";
 import {
@@ -8,6 +9,8 @@ import {
   StepMachine,
   StepProjects,
 } from "../components/setup/SetupSteps.js";
+import { SetupStepper } from "../components/setup/SetupStepper.js";
+import { APP_NAME, APP_VERSION } from "../shared/app.js";
 import styles from "../components/setup/setup.module.css";
 
 function stepForPhase(phase: string): number {
@@ -18,6 +21,23 @@ function stepForPhase(phase: string): number {
     case "ready": return 5;
     default: return 1;
   }
+}
+
+function Shell({ children }: { children: ReactNode }) {
+  return (
+    <div className={styles.page}>
+      <div className={styles.shell}>
+        <header className={styles.shellHead}>
+          <span className={styles.shellMark} aria-hidden="true">
+            AW
+          </span>
+          <span className={styles.shellTitle}>{APP_NAME}</span>
+          <span className={styles.shellVersion}>{APP_VERSION}</span>
+        </header>
+        {children}
+      </div>
+    </div>
+  );
 }
 
 export function SetupPage() {
@@ -32,15 +52,15 @@ export function SetupPage() {
   const error = statusQuery.error;
   const unauthorized = error instanceof ApiError && error.status === 401;
   if (statusQuery.isLoading && !unauthorized) {
-    return <div className={styles.page}><div className={styles.card}>读取初始化状态…</div></div>;
+    return <Shell><div className={styles.card}>读取初始化状态…</div></Shell>;
   }
   if (error !== null && !unauthorized) {
     return (
-      <div className={styles.page}>
+      <Shell>
         <div className={styles.card}>
           <p className={styles.error}>初始化状态读取失败:{(error as ApiError).message}</p>
         </div>
-      </div>
+      </Shell>
     );
   }
 
@@ -48,48 +68,53 @@ export function SetupPage() {
   if (status === undefined) {
     // 无凭据:bootstrap mode,先走第 1 步设置管理员
     return (
-      <div className={styles.page}>
-        <StepAdmin step={1} />
-      </div>
+      <Shell>
+        <SetupStepper step={1} />
+        <StepAdmin />
+      </Shell>
     );
   }
 
   const step = stepForPhase(status.phase);
   if (step === 5) {
     return (
-      <div className={styles.page}>
+      <Shell>
+        <SetupStepper completed />
         <StepDone status={status} />
-      </div>
+      </Shell>
     );
   }
   if (step === 1) {
     return (
-      <div className={styles.page}>
-        <StepAdmin step={1} />
-      </div>
+      <Shell>
+        <SetupStepper step={1} />
+        <StepAdmin />
+      </Shell>
     );
   }
   if (step === 2) {
     return (
-      <div className={styles.page}>
-        <StepMachine step={2} status={status} />
-      </div>
+      <Shell>
+        <SetupStepper step={2} />
+        <StepMachine status={status} />
+      </Shell>
     );
   }
   if (step === 3) {
     return (
-      <div className={styles.page}>
-        <StepProjects step={3} />
-      </div>
+      <Shell>
+        <SetupStepper step={3} />
+        <StepProjects />
+      </Shell>
     );
   }
   return (
-    <div className={styles.page}>
+    <Shell>
+      <SetupStepper step={4} />
       <StepBugfix
-        step={4}
         status={status}
         onComplete={() => void queryClient.invalidateQueries({ queryKey: ["bootstrap", "status"] })}
       />
-    </div>
+    </Shell>
   );
 }

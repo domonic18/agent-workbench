@@ -1,69 +1,92 @@
+/* 首次使用引导：页面骨架与各步表单
+ *
+ * 尺度一律取 global.css 令牌，不写死数值。
+ */
+
 .page {
   min-height: 100vh;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  padding: var(--space-6) var(--space-4) var(--space-7);
   background: var(--bg);
   color: var(--text);
-  padding: 24px;
+}
+
+.shell {
+  width: 100%;
+  max-width: 760px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.shellHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.shellMark {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: var(--sidebar-bg);
+  color: var(--sidebar-text-strong);
+  font-size: var(--font-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.shellTitle {
+  font-size: var(--font-lg);
+  font-weight: 600;
+}
+
+.shellVersion {
+  margin-left: auto;
+  font-size: var(--font-xs);
+  color: var(--muted);
 }
 
 .card {
   width: 100%;
-  max-width: 640px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 28px;
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-sm);
 }
 
 .title {
-  font-size: 20px;
-  margin: 0 0 4px;
+  margin: 0 0 var(--space-1);
+  font-size: var(--font-xl);
+  font-weight: 600;
 }
 
 .description {
   color: var(--muted);
-  margin: 0 0 20px;
-  font-size: 14px;
-}
-
-.steps {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 24px;
-}
-
-.step {
-  flex: 1;
-  height: 4px;
-  border-radius: 2px;
-  background: var(--border);
-}
-
-.stepActive {
-  background: var(--accent);
-}
-
-.stepDone {
-  background: var(--positive);
+  margin: 0 0 var(--space-5);
+  font-size: var(--font-md);
 }
 
 .label {
   display: block;
-  font-size: 13px;
-  margin: 14px 0 6px;
+  font-size: var(--font-sm);
+  margin: var(--space-3) 0 var(--space-2);
   color: var(--muted);
 }
 
 .input {
   width: 100%;
   padding: 9px 11px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: var(--bg);
   color: inherit;
-  font-size: 14px;
+  font-size: var(--font-md);
   box-sizing: border-box;
 }
 
@@ -71,25 +94,25 @@
   width: 100%;
   min-height: 64px;
   padding: 9px 11px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: var(--bg);
   color: inherit;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 13px;
+  font-family: var(--font-mono);
+  font-size: var(--font-sm);
   box-sizing: border-box;
   resize: vertical;
 }
 
 .button {
-  margin-top: 18px;
+  margin-top: var(--space-5);
   width: 100%;
   padding: 10px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: none;
   background: var(--accent);
-  color: #fff;
-  font-size: 14px;
+  color: var(--on-accent);
+  font-size: var(--font-md);
   font-weight: 600;
   cursor: pointer;
 }
@@ -107,13 +130,13 @@
 
 /* 独立次要按钮:不依附 .button,面板内直接使用 */
 .buttonGhost {
-  margin-top: 10px;
+  margin-top: var(--space-3);
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--font-sm);
   cursor: pointer;
 }
 
@@ -124,21 +147,21 @@
 
 .error {
   color: var(--danger);
-  font-size: 13px;
-  margin-top: 12px;
+  font-size: var(--font-sm);
+  margin-top: var(--space-3);
 }
 
 .hint {
   color: var(--muted);
-  font-size: 12px;
-  margin-top: 6px;
+  font-size: var(--font-xs);
+  margin-top: var(--space-2);
 }
 
 .section {
-  margin-top: 16px;
+  margin-top: var(--space-4);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 14px;
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
 }
 
 /* 标签与复制按钮同排:标签左、复制右 */
@@ -146,17 +169,17 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .copyButton {
   flex-shrink: 0;
   padding: 3px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text);
-  font-size: 12px;
+  font-size: var(--font-xs);
   cursor: pointer;
 }
 
@@ -167,15 +190,15 @@
 .artifactList {
   list-style: none;
   padding: 0;
-  margin: 8px 0 0;
+  margin: var(--space-2) 0 0;
 }
 
 .artifact {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 8px 0;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
   border-bottom: 1px solid var(--border);
 }
 
@@ -192,7 +215,7 @@
 
 .artifactLink {
   color: var(--accent);
-  font-size: 14px;
+  font-size: var(--font-md);
   text-decoration: none;
 }
 
@@ -203,51 +226,60 @@
 .project {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-3);
   padding: 6px 0;
-  font-size: 14px;
+  font-size: var(--font-md);
 }
 
 .checklist {
   list-style: none;
   padding: 0;
-  margin: 12px 0 0;
+  margin: var(--space-3) 0 0;
 }
 
 .checkItem {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: var(--space-2);
   padding: 6px 0;
-  font-size: 14px;
+  font-size: var(--font-md);
   border-bottom: 1px solid var(--border);
 }
 
 .badge {
-  font-size: 11px;
-  padding: 1px 7px;
-  border-radius: 10px;
+  font-size: var(--font-xs);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-full);
   flex-shrink: 0;
 }
 
 .ok {
-  background: color-mix(in srgb, var(--positive) 18%, transparent);
+  background: var(--positive-soft);
   color: var(--positive);
 }
 
 .fail {
-  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  background: var(--danger-soft);
   color: var(--danger);
 }
 
 .neutral {
-  background: color-mix(in srgb, var(--muted) 18%, transparent);
+  background: var(--muted-soft);
   color: var(--muted);
 }
 
 .evidence {
-  margin: 6px 0 0;
+  margin: var(--space-2) 0 0;
   padding-left: 18px;
-  font-size: 13px;
+  font-size: var(--font-sm);
   color: var(--muted);
+}
+
+@media (max-width: 767px) {
+  /* 触达区不小于 44px(03 §移动适配) */
+  .card input,
+  .card select,
+  .card button {
+    min-height: 44px;
+  }
 }
