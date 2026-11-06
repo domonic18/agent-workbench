@@ -19,7 +19,7 @@ export const DISPATCH_PROMPT = `这是一次由执行面调度器发起的协作
    - reply / notify:只 a2a_ack(msg_id=收到的消息) 确认,不要 task_create;
 3) 只有 request / escalate 才执行消息要求的本职工作(读文件、查代码、写结论);reply 只需读懂结论;
 4) 只有 request / escalate 才 a2a_send 回执:task_id 用你自己的任务,必须带 thread_id 回原线程,intent=reply,reply_to=收到的 msg_id,结论写进 summary,deadline 必填;收到的是 reply 时不要再发回执——对回执再回执会形成乒乓,系统据此收口;
-5) 只有 request / escalate 才 task_update 按合法路径推进状态直至关闭(pending→running→done,不允许跳级)。
+5) 只有 request / escalate 才 task_update 推进自己名下任务:开工先 status=running,收尾 status=done——关单只需 status=done,stage 可停在任意阶段;stage 与 status 相互独立,不要把 review 直接跳到 closed(非法跃迁,会报错)。
 过程与结论只写进回执与任务字段。全部步骤完成后,最终回复用一句话概述处理结果(消息条数与任务 id)。`;
 
 /** 会话可用工具:读文件、查代码、跑命令,以及控制台 MCP(拉收件箱、建任务、回执) */
@@ -35,7 +35,7 @@ export const WORK_DISPATCH_PROMPT = `这是一次由执行面调度器发起的�
 2) 逐件处理:work_read 读事项 Mandate 与事件历史;task_create(带 work_item_id)建你名下的承接任务并记下 task_id;work_ack(inbox_id=派工行, task_id=承接任务)确认承接;
 3) 执行本职工作:按 expected_result 修复缺陷本身,不超出 Mandate 范围,不顺手重构;
 4) 修复完成后:git checkout -b 语义化分支并提交修改;gh pr create 提 PR,PR body 第一行写 "Fixes #<N>"(issue 编号从 Mandate 与事项引用/事件 payload 中取,取不到就回查 bug 反馈原文,不许猜);
-5) task_update 按合法路径推进承接任务直至 done(pending→running→done,不允许跳级),output 写清 PR URL 与修复摘要;
+5) task_update 推进承接任务:开工先 status=running,收尾 status=done(关单只需 status=done,stage 与 status 相互独立),output 写清 PR URL 与修复摘要;
 6) 确实超出能力或范围的,work_handback(inbox_id, reason)说明理由,不要硬修;不要用 work_handback 替代失败后的重试。
 过程与结论只写进任务字段与 PR 描述。全部步骤完成后,最终回复用一句话概述(处理件数、任务 id、PR URL 或退回理由)。`;
 

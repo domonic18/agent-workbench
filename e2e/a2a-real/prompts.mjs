@@ -16,7 +16,7 @@ export function receiverPrompt() {
    - reply / notify:只 a2a_ack(msg_id=收到的消息) 确认,不要 task_create,也不要再发回执——对回执再回执会形成乒乓,系统据此收口;
 3) 只有 request / escalate 才执行消息 summary 里要求的工作,结论写进任务 output;
 4) 只有 request / escalate 才 a2a_send 回执:intent=reply,thread_id 与收到的消息一致,reply_to=收到的 msg_id,task_id=你自己的任务,summary 写结论,deadline 必填(填当前时间加 30 分钟的 RFC3339 时间,例如 2026-11-06T09:00:00Z);
-5) 只有 request / escalate 才 task_update 按合法路径推进状态直至 done(pending→running→done,不允许跳级)。
+5) 只有 request / escalate 才 task_update 推进自己名下任务:开工先 status=running,收尾 status=done——关单只需 status=done,stage 可停在任意阶段;stage 与 status 相互独立,不要把 review 直接跳到 closed(非法跃迁,会报错)。
 过程与结论只写进回执与任务字段。全部步骤完成后,最终回复用一句话概述(消息条数与任务 id)。`;
 }
 
