@@ -217,6 +217,10 @@
   color: var(--accent);
   font-size: var(--font-md);
   text-decoration: none;
+  /* 下载入口是独立可点元素，窄屏按 44px 触达底线给 */
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
 }
 
 .artifactLink:hover {

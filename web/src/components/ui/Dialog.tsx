@@ -96,7 +96,9 @@ export function Dialog({
 
   return createPortal(
     <div
-      className={styles.overlay}
+      className={`${styles.overlay} ${
+        size === "lg" || size === "xl" ? styles.overlayWide : ""
+      }`}
       onClick={() => {
         if (dismissible) {
           onCloseRef.current();

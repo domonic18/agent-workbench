@@ -259,7 +259,10 @@
 
   .link {
     flex: 0 0 auto;
-    height: 34px;
+    /* 窄屏是手指操作，导航项的触达高度按 44px 底线给 */
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
     padding: 0 var(--space-3);
     font-size: var(--font-sm);
     white-space: nowrap;

@@ -57,7 +57,7 @@ export function DelegationMatrix() {
       await Promise.all(
         dirty.map((agent) => setAgentTargets(agent.id, selection[agent.id] ?? [])),
       );
-      await queryClient.invalidateQueries({ queryKey: ["agents"] });
+      await queryClient.invalidateQueries({ queryKey: ["agents"], exact: true });
       setDraft(null);
     } catch (caught) {
       setError(messageOf(caught, "保存失败，请稍后再试"));

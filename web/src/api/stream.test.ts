@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { getClientId, queryKeyForScope, reconnectDelay } from "./stream.js";
+import { getClientId, queryKeyForScope, queryKeysForScope, reconnectDelay } from "./stream.js";
 
 describe("实时订阅辅助", () => {
   afterEach(() => {
@@ -31,5 +31,18 @@ describe("实时订阅辅助", () => {
     expect(queryKeyForScope("overview")).toEqual(["overview"]);
     expect(queryKeyForScope("task:tsk_1")).toEqual(["task", "tsk_1"]);
     expect(queryKeyForScope("unknown")).toEqual([]);
+  });
+
+  it("overview 水位同时失效总览、任务列表与 Agent 名册", () => {
+    expect(queryKeysForScope("overview")).toEqual([
+      { queryKey: ["overview"], exact: false },
+      { queryKey: ["tasks"], exact: false },
+      // 名册精确匹配:前缀匹配会连带重取逐 Agent 的删除影响预览
+      { queryKey: ["agents"], exact: true },
+    ]);
+    expect(queryKeysForScope("task:tsk_1")).toEqual([
+      { queryKey: ["task", "tsk_1"], exact: false },
+    ]);
+    expect(queryKeysForScope("unknown")).toEqual([]);
   });
 });

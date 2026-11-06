@@ -41,6 +41,34 @@ export function queryKeyForScope(scope: string): readonly unknown[] {
   return [];
 }
 
+/** 一个 scope 会失效哪些查询 */
+export interface ScopeInvalidation {
+  queryKey: readonly unknown[];
+  /** 前缀匹配会连带命中子键,需要精确时置 true */
+  exact: boolean;
+}
+
+/**
+ * 一个 scope 会失效哪些查询。
+ * 任务表的触发器同样推进 overview 水位,任务列表没有自己的作用域;
+ * 名册归启停与删除影响,也在 overview 水位里,否则别的会话改了名册这边不动。
+ */
+export function queryKeysForScope(scope: string): readonly ScopeInvalidation[] {
+  const key = queryKeyForScope(scope);
+  if (key.length === 0) {
+    return [];
+  }
+  if (scope === "overview") {
+    return [
+      { queryKey: key, exact: false },
+      { queryKey: ["tasks"], exact: false },
+      // 名册与逐 Agent 的删除影响预览共用 ["agents"] 前缀,精确匹配才不会重取已删 Agent 的预览
+      { queryKey: ["agents"], exact: true },
+    ];
+  }
+  return [{ queryKey: key, exact: false }];
+}
+
 export function useRealtimeStream(scopes: readonly string[]): RealtimeStatus {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<RealtimeStatus>("connecting");
@@ -54,13 +82,11 @@ export function useRealtimeStream(scopes: readonly string[]): RealtimeStatus {
     let failures = 0;
 
     const invalidate = (scope: string): void => {
-      const key = queryKeyForScope(scope);
-      if (key.length > 0) {
-        void queryClient.invalidateQueries({ queryKey: key });
-      }
-      // 任务表的触发器同样推进 overview 水位,列表没有自己的作用域
-      if (scope === "overview") {
-        void queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      for (const target of queryKeysForScope(scope)) {
+        void queryClient.invalidateQueries({
+          queryKey: target.queryKey,
+          exact: target.exact,
+        });
       }
     };
 

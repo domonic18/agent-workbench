@@ -229,3 +229,13 @@ kbd {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* 窄屏靠手指点：交互控件统一抬到 44px 触达底线（min-height 会盖过固定 height） */
+@media (max-width: 767px) {
+  button,
+  select,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+  textarea {
+    min-height: 44px;
+  }
+}
