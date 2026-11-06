@@ -47,6 +47,8 @@ export interface DiscoveryProjectView {
 export interface DiscoveryMachineView {
   machineId: string;
   hostname: string;
+  /** 展示名:控制台可改;为空表示与 hostname 相同 */
+  displayName: string | null;
   status: string;
   /** 心跳:aw-node 最近一次上报存活的时间 */
   lastSeenAt: number | null;

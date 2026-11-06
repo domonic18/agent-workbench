@@ -17,6 +17,7 @@ function agent(overrides: Partial<AgentRosterSummary> = {}): AgentRosterSummary 
     project: "aw",
     displayName: "构建 Agent",
     feishuAppId: null,
+    feishuBotName: null,
     status: "active",
     allowedTargets: [],
     createdAt: 0,
@@ -24,6 +25,7 @@ function agent(overrides: Partial<AgentRosterSummary> = {}): AgentRosterSummary 
     key: null,
     usageLimit: null,
     machineHostname: "build-box",
+    machineDisplayName: null,
     totalRuns: 3,
     totalTokens: 1200,
     openTasks: 1,
@@ -45,10 +47,12 @@ function live(overrides: Partial<OverviewAgent> = {}): OverviewAgent {
   return {
     id: "agt_a",
     displayName: "构建 Agent",
+    feishuBotName: null,
     project: "aw",
     machineId: "m1",
     runtime: "claude_code",
     machineHostname: "build-box",
+    machineDisplayName: null,
     machineLastSeenAt: 0,
     heartbeat: "ok",
     lastRunAt: null,
@@ -195,5 +199,35 @@ describe("Agent 管理表格", () => {
 
     const table = within(await screen.findByRole("table"));
     expect(table.getAllByText("未接入 / —").length).toBe(3);
+  });
+
+  it("外部运行时绑了机器也没有过程数据,仍显示未接入", async () => {
+    vi.mocked(fetchAgents).mockResolvedValue([
+      agent({ id: "agt_wb", runtime: "workbuddy", machineHostname: "build-box" }),
+    ]);
+    renderTable();
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getAllByText("未接入 / —").length).toBe(3);
+  });
+
+  it("Agent 列显示飞书机器人名,不是 cc-connect 项目名", async () => {
+    vi.mocked(fetchAgents).mockResolvedValue([
+      agent({ displayName: "cc-connect 项目名", feishuBotName: "小工" }),
+    ]);
+    renderTable();
+
+    expect(await screen.findByText("小工")).toBeTruthy();
+    expect(screen.queryByText("cc-connect 项目名")).toBeNull();
+  });
+
+  it("机器列优先显示展示名", async () => {
+    vi.mocked(fetchAgents).mockResolvedValue([
+      agent({ machineHostname: "192.168.1.244", machineDisplayName: "工作室机" }),
+    ]);
+    renderTable();
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getByText("工作室机")).toBeTruthy();
   });
 });

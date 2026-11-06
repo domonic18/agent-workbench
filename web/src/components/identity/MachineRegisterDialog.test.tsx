@@ -16,6 +16,7 @@ describe("机器登记弹窗", () => {
       machine: {
         id: "macmini-01",
         hostname: "mini",
+        displayName: "mini",
         os: "macOS 15",
         collectorVersion: "0.1.0",
         lastSeenAt: null,

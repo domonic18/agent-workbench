@@ -7,6 +7,8 @@ import {
   type CreateAgentInput,
   fetchMachines,
 } from "../../api/identity.js";
+import type { AgentRuntime } from "../../api/types.js";
+import { RUNTIME_LABEL } from "../../shared/labels.js";
 import { agentEnvHints } from "./envHints.js";
 import styles from "./IdentityForm.module.css";
 import { Dialog } from "../ui/Dialog.js";
@@ -16,20 +18,27 @@ export interface AgentRegisterDialogProps {
   onClose: () => void;
 }
 
+/** 外部运行时:没有 aw-node,只登记归属机器 */
+const EXTERNAL_RUNTIMES: AgentRuntime[] = ["workbuddy", "codex", "deepseek"];
+
 export function AgentRegisterDialog({ onClose }: AgentRegisterDialogProps) {
   const machines = useQuery({ queryKey: ["machines"], queryFn: fetchMachines });
+  const [runtime, setRuntime] = useState<AgentRuntime>("claude_code");
   const [machineId, setMachineId] = useState("");
   const [project, setProject] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [key, setKey] = useState("");
   const [feishuAppId, setFeishuAppId] = useState("");
   const [allowedTargets, setAllowedTargets] = useState("");
   const [created, setCreated] = useState<AgentSecret | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
+  const external = EXTERNAL_RUNTIMES.includes(runtime);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    if (machineId === "") {
+    if (runtime === "claude_code" && machineId === "") {
       setError("请选择机器");
       return;
     }
@@ -37,10 +46,20 @@ export function AgentRegisterDialog({ onClose }: AgentRegisterDialogProps) {
     setError(null);
     try {
       const input: CreateAgentInput = {
-        machineId,
         project: project.trim(),
         displayName: displayName.trim(),
       };
+      if (external) {
+        input.runtime = runtime;
+        if (machineId !== "") {
+          input.machineId = machineId;
+        }
+        if (key.trim() !== "") {
+          input.key = key.trim();
+        }
+      } else {
+        input.machineId = machineId;
+      }
       if (feishuAppId.trim() !== "") {
         input.feishuAppId = feishuAppId.trim();
       }
@@ -68,6 +87,29 @@ export function AgentRegisterDialog({ onClose }: AgentRegisterDialogProps) {
       {created === null ? (
         <form className={styles.form} onSubmit={(event) => void handleSubmit(event)}>
           <div className={styles.field}>
+            <label className={styles.label} htmlFor="agent-runtime">
+              运行时
+            </label>
+            <select
+              id="agent-runtime"
+              className={styles.select}
+              value={runtime}
+              onChange={(event) => setRuntime(event.target.value as AgentRuntime)}
+            >
+              <option value="claude_code">{RUNTIME_LABEL.claude_code}</option>
+              {EXTERNAL_RUNTIMES.map((value) => (
+                <option key={value} value={value}>
+                  {RUNTIME_LABEL[value]}
+                </option>
+              ))}
+            </select>
+            <p className={styles.hint}>
+              {external
+                ? "外部运行时不由 aw-node 调度，过程数据固定显示「未接入」。"
+                : "Claude Code 由该机的 aw-node 采集与调度。"}
+            </p>
+          </div>
+          <div className={styles.field}>
             <label className={styles.label} htmlFor="agent-machine">
               机器
             </label>
@@ -76,12 +118,14 @@ export function AgentRegisterDialog({ onClose }: AgentRegisterDialogProps) {
               className={styles.select}
               value={machineId}
               onChange={(event) => setMachineId(event.target.value)}
-              required
+              required={!external}
             >
-              <option value="">选择已登记的机器</option>
+              <option value="">
+                {external ? "不绑定机器" : "选择已登记的机器"}
+              </option>
               {(machines.data ?? []).map((machine) => (
                 <option key={machine.id} value={machine.id}>
-                  {machine.hostname}（{machine.id}）
+                  {machine.displayName}（{machine.id}）
                 </option>
               ))}
             </select>
@@ -118,6 +162,20 @@ export function AgentRegisterDialog({ onClose }: AgentRegisterDialogProps) {
               required
             />
           </div>
+          {external ? (
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="agent-key">
+                路由 key（可选）
+              </label>
+              <input
+                id="agent-key"
+                className={styles.input}
+                value={key}
+                onChange={(event) => setKey(event.target.value)}
+                placeholder="项目注册表引用该 Agent 用的稳定键"
+              />
+            </div>
+          ) : null}
           <div className={styles.field}>
             <label className={styles.label} htmlFor="agent-feishu-app">
               飞书 App ID（可选）

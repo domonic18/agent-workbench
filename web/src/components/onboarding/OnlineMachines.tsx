@@ -7,6 +7,7 @@ import {
   type DiscoveryMachineView,
 } from "../../api/bootstrap.js";
 import { formatRelativeTime } from "../../shared/format.js";
+import { MachineRenameDialog } from "../machines/MachineRenameDialog.js";
 import { useProjectSelection } from "../machines/useProjectSelection.js";
 import { Badge } from "../ui/Badge.js";
 import { Button } from "../ui/Button.js";
@@ -35,6 +36,7 @@ function MachineRow({
   machine: DiscoveryMachineView;
   onRegistered: () => void;
 }) {
+  const [renaming, setRenaming] = useState(false);
   const tone = STATUS_TONE[machine.status] ?? "muted";
   const label = STATUS_LABEL[machine.status] ?? machine.status;
   const confirmed = machine.projects.filter((project) => project.confirmed).length;
@@ -69,9 +71,14 @@ function MachineRow({
   return (
     <li className={styles.machineRow}>
       <div className={styles.machineIdentity}>
-        <span className={styles.machineName}>{machine.hostname}</span>
+        <span className={styles.machineName}>
+          {machine.displayName ?? machine.hostname}
+        </span>
         <span className={styles.machineSub}>
           {machine.machineId} · 心跳 {heartbeat} · 发现 {discovered}
+          {machine.displayName === null || machine.displayName === machine.hostname
+            ? ""
+            : ` · 主机名 ${machine.hostname}`}
         </span>
       </div>
       <div className={styles.machineTags}>
@@ -79,7 +86,21 @@ function MachineRow({
           项目 {machine.projects.length} 个（已登记 {confirmed}）
         </span>
         <Badge tone={tone} text={label} />
+        <Button size="sm" variant="ghost" onClick={() => setRenaming(true)}>
+          改名
+        </Button>
       </div>
+      {renaming ? (
+        <MachineRenameDialog
+          machine={{
+            id: machine.machineId,
+            hostname: machine.hostname,
+            displayName: machine.displayName,
+          }}
+          onClose={() => setRenaming(false)}
+          onSaved={onRegistered}
+        />
+      ) : null}
       {pending.length > 0 ? (
         <div className={styles.machineProjects}>
           <span className={styles.machineSub}>待登记项目</span>

@@ -6,12 +6,20 @@ import styles from "./task-timeline.module.css";
 
 export interface TaskTimelineProps {
   events: readonly TaskEventDto[];
+  /** Agent id → 机器人名;事件正文里的下发人用它替掉裸 id */
+  agentNames: ReadonlyMap<string, string>;
   hasMore: boolean;
   loadingMore: boolean;
   onLoadMore: () => void;
 }
 
-export function TaskTimeline({ events, hasMore, loadingMore, onLoadMore }: TaskTimelineProps) {
+export function TaskTimeline({
+  events,
+  agentNames,
+  hasMore,
+  loadingMore,
+  onLoadMore,
+}: TaskTimelineProps) {
   const ordered = [...events].reverse();
   return (
     <section className={styles.section} aria-label="事件流">
@@ -29,7 +37,7 @@ export function TaskTimeline({ events, hasMore, loadingMore, onLoadMore }: TaskT
             <li key={event.id} className={styles.timelineItem}>
               <span className={styles.kind}>{TASK_EVENT_LABEL[event.kind]}</span>
               <span className={styles.time}>{formatDateTime(event.occurred_at)}</span>
-              <span className={styles.desc}>{describeTaskEvent(event)}</span>
+              <span className={styles.desc}>{describeTaskEvent(event, agentNames)}</span>
             </li>
           ))}
         </ol>

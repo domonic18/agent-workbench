@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { ApiError } from "../../api/client.js";
 import { fetchAgents, setAgentTargets, type AgentSummary } from "../../api/identity.js";
+import { agentDisplayName } from "../../shared/agent-label.js";
 import { EmptyState } from "../ui/EmptyState.js";
 import { Button } from "../ui/Button.js";
 import styles from "./DelegationMatrix.module.css";
@@ -116,7 +117,7 @@ export function DelegationMatrix() {
                   </th>
                   {agents.map((agent) => (
                     <th key={agent.id} scope="col" title={agent.id}>
-                      {agent.displayName}
+                      {agentDisplayName(agent)}
                     </th>
                   ))}
                 </tr>
@@ -125,7 +126,7 @@ export function DelegationMatrix() {
                 {agents.map((initiator) => (
                   <tr key={initiator.id}>
                     <th scope="row" className={styles.rowHead} title={initiator.id}>
-                      {initiator.displayName}
+                      {agentDisplayName(initiator)}
                     </th>
                     {agents.map((recipient) => {
                       const self = initiator.id === recipient.id;
@@ -138,7 +139,7 @@ export function DelegationMatrix() {
                             checked={checked}
                             disabled={self || pending}
                             onChange={() => toggle(initiator, recipient)}
-                            aria-label={`${initiator.displayName} 委派给 ${recipient.displayName}`}
+                            aria-label={`${agentDisplayName(initiator)} 委派给 ${recipient.displayName}`}
                           />
                         </td>
                       );

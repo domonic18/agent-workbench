@@ -15,6 +15,7 @@ import {
   REALTIME_TONE,
   TASK_STATUS_LABEL,
 } from "../../shared/labels.js";
+import { agentMentionLabel, agentNameMap } from "../../shared/agent-label.js";
 import { useNow } from "../../shared/useNow.js";
 import { Badge } from "../ui/Badge.js";
 import { Button } from "../ui/Button.js";
@@ -73,13 +74,16 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
     },
   });
 
-  const agentNames = useMemo(
-    () => new Map((agents.data ?? []).map((agent) => [agent.id, agent.displayName])),
-    [agents.data],
-  );
+  const agentNames = useMemo(() => agentNameMap(agents.data ?? []), [agents.data]);
 
+  const assignerName =
+    task === undefined
+      ? taskId
+      : agentMentionLabel(task.assigner, agentNames, task.assigner_label);
   const assigneeName =
-    task === undefined ? taskId : agentNames.get(task.assignee) ?? task.assignee_label;
+    task === undefined
+      ? taskId
+      : agentMentionLabel(task.assignee, agentNames, task.assignee_label);
 
   return (
     <Dialog
@@ -90,7 +94,7 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
       description={
         task === undefined
           ? "加载中…"
-          : `${task.assigner_label} → ${assigneeName} · 第 ${task.round} 轮 · ${
+          : `${assignerName} → ${assigneeName} · 第 ${task.round} 轮 · ${
               TASK_STATUS_LABEL[task.status]
             }`
       }
@@ -148,6 +152,7 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
           ) : (
             <TaskTimeline
               events={taskEvents}
+              agentNames={agentNames}
               hasMore={events.hasNextPage}
               loadingMore={events.isFetchingNextPage}
               onLoadMore={() => void events.fetchNextPage()}

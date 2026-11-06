@@ -74,6 +74,23 @@ describe("任务表格", () => {
     expect(within(cards).getByText("进行中")).toBeTruthy();
   });
 
+  it("下发人与承接人都用机器人名,不显示裸 id", () => {
+    renderTable(
+      [task({ assigner: "agt_a", assigner_label: "agt_a" })],
+      new Map([["agt_a", "小工"]]),
+    );
+
+    const table = screen.getByRole("table");
+    const headers = within(table)
+      .getAllByRole("columnheader")
+      .map((cell) => cell.textContent);
+    const cells = within(table).getAllByRole("cell");
+    const assigner = cells[headers.indexOf("下发人")];
+    const assignee = cells[headers.indexOf("承接")];
+    expect(assigner?.textContent).toBe("小工");
+    expect(assignee?.textContent).toContain("小工");
+  });
+
   it("HTTP 产出渲染为外链,其余按代码展示,缺失给占位", () => {
     renderTable([
       task({ id: "tsk_http", title: "外链任务", output: "https://example.com/report" }),

@@ -16,10 +16,13 @@ export type AgentRuntime = (typeof AGENT_RUNTIMES)[number];
 export interface OverviewAgent {
   id: string;
   displayName: string;
+  /** Agent 自报的飞书 bot 名称;为空表示尚未回写,显示时回退 displayName */
+  feishuBotName: string | null;
   project: string;
   machineId: string | null;
   runtime: AgentRuntime;
   machineHostname: string | null;
+  machineDisplayName: string | null;
   machineLastSeenAt: number | null;
   heartbeat: HeartbeatState;
   lastRunAt: number | null;

@@ -57,7 +57,7 @@ export function StepProjects() {
       ) : (
         machines.map((machine) => (
           <div key={machine.machineId} className={styles.section}>
-            <strong>{machine.hostname}</strong>
+            <strong>{machine.displayName ?? machine.hostname}</strong>
             <span className={styles.hint}>
               {machine.machineId} · 心跳{" "}
               {machine.lastSeenAt === null ? "未上报" : formatRelativeTime(machine.lastSeenAt)}

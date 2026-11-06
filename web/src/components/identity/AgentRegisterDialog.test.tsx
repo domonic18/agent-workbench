@@ -29,6 +29,7 @@ describe("Agent 注册弹窗", () => {
       {
         id: "m1",
         hostname: "build-box",
+      displayName: "build-box",
         os: "macOS",
         collectorVersion: "0.1.0",
         lastSeenAt: null,
@@ -44,6 +45,7 @@ describe("Agent 注册弹窗", () => {
         project: "aw",
         displayName: "构建 Agent",
         feishuAppId: null,
+    feishuBotName: null,
         status: "active",
         allowedTargets: ["agt_b"],
         createdAt: 1_700_000_000_000,

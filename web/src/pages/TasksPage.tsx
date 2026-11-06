@@ -9,6 +9,7 @@ import { TaskTable } from "../components/task/TaskTable.js";
 import { AsyncSection } from "../components/ui/AsyncSection.js";
 import { EmptyState } from "../components/ui/EmptyState.js";
 import { useNow } from "../shared/useNow.js";
+import { agentNameMap } from "../shared/agent-label.js";
 import styles from "../components/task/task-list.module.css";
 
 function toQuery(filters: TaskFilters) {
@@ -36,10 +37,7 @@ export function TasksPage() {
   });
   const agentsQuery = useQuery({ queryKey: ["agents"], queryFn: fetchAgents });
 
-  const agentNames = useMemo(
-    () => new Map((agentsQuery.data ?? []).map((agent) => [agent.id, agent.displayName])),
-    [agentsQuery.data],
-  );
+  const agentNames = useMemo(() => agentNameMap(agentsQuery.data ?? []), [agentsQuery.data]);
   const tasks = tasksQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const hasFilters =
     filters.status !== null || filters.project !== null || filters.assignee !== null;

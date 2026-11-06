@@ -1,4 +1,5 @@
 import type { TaskEventDto } from "../../api/tasks.js";
+import { agentMentionLabel } from "../../shared/agent-label.js";
 import { TASK_EVENT_LABEL, TASK_ORIGIN_LABEL, TASK_STAGE_LABEL, TASK_STATUS_LABEL } from "../../shared/labels.js";
 
 function asText(value: unknown): string | null {
@@ -31,8 +32,14 @@ function move(from: unknown, to: unknown, label: (value: unknown) => string): st
   return `${label(from)} → ${label(to)}`;
 }
 
-/** 事件正文只描述 payload,不替服务端推断未落库的语义 */
-export function describeTaskEvent(event: TaskEventDto): string {
+/**
+ * 事件正文只描述 payload,不替服务端推断未落库的语义。
+ * 下发人是 Agent 时用机器人名(名册里查得到才替,查不到原样透出)。
+ */
+export function describeTaskEvent(
+  event: TaskEventDto,
+  names?: ReadonlyMap<string, string>,
+): string {
   const payload = event.payload;
   switch (event.kind) {
     case "created": {
@@ -43,7 +50,7 @@ export function describeTaskEvent(event: TaskEventDto): string {
       const project = asText(payload.project);
       return [
         `来源 ${originLabel}`,
-        assigner === null ? null : `下发人 ${assigner}`,
+        assigner === null ? null : `下发人 ${agentMentionLabel(assigner, names, assigner)}`,
         project === null ? null : `项目 ${project}`,
       ]
         .filter((part): part is string => part !== null)

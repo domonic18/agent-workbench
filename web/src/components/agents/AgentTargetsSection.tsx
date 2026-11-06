@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ApiError } from "../../api/client.js";
 import { setAgentTargets, type AgentRosterSummary } from "../../api/identity.js";
+import { agentDisplayName } from "../../shared/agent-label.js";
 import { Button } from "../ui/Button.js";
 import { useToast } from "../ui/Toast.js";
 import styles from "./agents.module.css";
@@ -65,7 +66,7 @@ export function AgentTargetsSection({ agent, allAgents, onSaved }: AgentTargetsS
                 disabled={pending}
                 onChange={() => toggle(other.id)}
               />
-              <span>{other.displayName}</span>
+              <span>{agentDisplayName(other)}</span>
               <span className={styles.identitySub}>{other.project}</span>
             </label>
           ))}

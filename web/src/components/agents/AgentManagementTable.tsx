@@ -3,26 +3,13 @@ import { useMemo, useState } from "react";
 import { ApiError } from "../../api/client.js";
 import { fetchAgents, type AgentRosterSummary } from "../../api/identity.js";
 import type { OverviewAgent } from "../../api/types.js";
-import {
-  formatDateTime,
-  formatExactTokens,
-  formatRelativeTime,
-  formatTokens,
-} from "../../shared/format.js";
-import {
-  HEARTBEAT_LABEL,
-  HEARTBEAT_TONE,
-  NOT_COLLECTED,
-  RUNTIME_LABEL,
-  TASK_STAGE_LABEL,
-  TASK_STATUS_LABEL,
-} from "../../shared/labels.js";
+import { RUNTIME_LABEL } from "../../shared/labels.js";
 import { NARROW_QUERY, useMediaQuery } from "../../shared/useMediaQuery.js";
-import { Badge } from "../ui/Badge.js";
 import { Button } from "../ui/Button.js";
 import { EmptyState } from "../ui/EmptyState.js";
 import { Input, Select } from "../ui/Field.js";
-import { Table, type TableColumn } from "../ui/Table.js";
+import { AgentCardList } from "./AgentCardList.js";
+import { AgentTable, buildAgentColumns } from "./AgentTableColumns.js";
 import styles from "./agents.module.css";
 
 export interface AgentManagementTableProps {
@@ -44,49 +31,16 @@ function matches(agent: AgentRosterSummary, keyword: string): boolean {
   if (keyword === "") {
     return true;
   }
-  const haystack = [agent.displayName, agent.project, agent.key ?? "", agent.id]
+  const haystack = [
+    agent.displayName,
+    agent.feishuBotName ?? "",
+    agent.project,
+    agent.key ?? "",
+    agent.id,
+  ]
     .join(" ")
     .toLowerCase();
   return haystack.includes(keyword);
-}
-
-function taskMeta(live: OverviewAgent | undefined): string {
-  if (live === undefined) {
-    return "";
-  }
-  const stage = live.currentTaskStage;
-  const status = live.currentTaskStatus;
-  const parts = [];
-  if (stage !== null && stage !== undefined) {
-    parts.push(TASK_STAGE_LABEL[stage as keyof typeof TASK_STAGE_LABEL] ?? stage);
-  }
-  if (status !== null && status !== undefined) {
-    parts.push(TASK_STATUS_LABEL[status as keyof typeof TASK_STATUS_LABEL] ?? status);
-  }
-  return parts.join(" · ");
-}
-
-/** 状态列三段编码：启停 + 心跳 + 运行态，颜色之外都带文字 */
-function statusBadges(agent: AgentRosterSummary, live: OverviewAgent | undefined) {
-  const badges = [];
-  if (agent.status === "disabled") {
-    badges.push(<Badge key="disabled" tone="muted" text="已停用" />);
-  } else {
-    badges.push(<Badge key="enabled" tone="positive" text="启用" />);
-  }
-  if (agent.status === "active") {
-    badges.push(
-      <Badge
-        key="heartbeat"
-        tone={HEARTBEAT_TONE[live?.heartbeat ?? "unknown"]}
-        text={HEARTBEAT_LABEL[live?.heartbeat ?? "unknown"]}
-      />,
-    );
-    if (live?.running === true) {
-      badges.push(<Badge key="running" tone="info" text="运行中" />);
-    }
-  }
-  return badges;
 }
 
 export function AgentManagementTable({
@@ -118,7 +72,10 @@ export function AgentManagementTable({
   const machines = useMemo(() => {
     const map = new Map<string, string>();
     for (const agent of agents) {
-      map.set(agent.machineId ?? "none", agent.machineHostname ?? "未绑定机器");
+      map.set(
+        agent.machineId ?? "none",
+        agent.machineDisplayName ?? agent.machineHostname ?? "未绑定机器",
+      );
     }
     return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1], "zh-Hans-CN"));
   }, [agents]);
@@ -142,165 +99,10 @@ export function AgentManagementTable({
     });
   }, [agents, keyword, machine, runtime, status]);
 
-  const columns: TableColumn<AgentRosterSummary>[] = [
-    {
-      key: "agent",
-      width: "168px",
-      header: "Agent",
-      render: (agent) => (
-        <div className={styles.identity}>
-          <span className={styles.identityName}>{agent.displayName}</span>
-          <span className={styles.identitySub}>
-            {agent.project}
-            {agent.key === null ? "" : ` · ${agent.key}`}
-          </span>
-        </div>
-      ),
-    },
-    {
-      key: "runtime",
-      width: "88px",
-      header: "运行时",
-      render: (agent) => RUNTIME_LABEL[agent.runtime],
-    },
-    {
-      key: "machine",
-      width: "108px",
-      header: "机器",
-      render: (agent) => agent.machineHostname ?? "未绑定",
-    },
-    {
-      key: "status",
-      width: "128px",
-      header: "状态",
-      render: (agent) => (
-        <div className={styles.statusCell}>{statusBadges(agent, liveById.get(agent.id))}</div>
-      ),
-    },
-    {
-      key: "task",
-      width: "200px",
-      header: "当前任务",
-      render: (agent) => {
-        const live = liveById.get(agent.id);
-        const title = live?.currentTaskTitle ?? null;
-        if (title !== null) {
-          const meta = taskMeta(live);
-          return (
-            <div className={styles.taskCell}>
-              <span className={styles.taskTitle} title={title}>
-                {title}
-              </span>
-              {meta === "" ? null : <span className={styles.taskMeta}>{meta}</span>}
-            </div>
-          );
-        }
-        // 未建单的运行会话没有任务标题，用最近一条指令回答「在忙什么」，比一句横杠有用
-        if (live?.running === true && live.currentInstruction !== null) {
-          return (
-            <div className={styles.taskCell}>
-              <span className={styles.taskTitle} title={live.currentInstruction}>
-                <span className={styles.instructionTag}>最近指令</span>
-                {live.currentInstruction}
-              </span>
-            </div>
-          );
-        }
-        return (
-          <span className={styles.muted}>
-            {live?.running === true ? "运行中 · 当前会话未关联任务" : "当前没有进行中的任务"}
-          </span>
-        );
-      },
-    },
-    {
-      key: "todayTokens",
-      width: "84px",
-      header: "今日 Token",
-      align: "right",
-      render: (agent) => {
-        // 机器无关的外部运行时没有 aw-node，Token 固定「未接入 / —」，不显示为 0
-        if (agent.machineId === null) {
-          return <span className={styles.muted}>{NOT_COLLECTED}</span>;
-        }
-        const live = liveById.get(agent.id);
-        if (live === undefined) {
-          return <span className={styles.muted}>—</span>;
-        }
-        return (
-          <span title={formatExactTokens(live.todayTokens)}>
-            {formatTokens(live.todayTokens)}
-          </span>
-        );
-      },
-    },
-    {
-      key: "runs",
-      width: "88px",
-      header: "累计运行",
-      align: "right",
-      render: (agent) => {
-        if (agent.machineId === null) {
-          return <span className={styles.muted}>{NOT_COLLECTED}</span>;
-        }
-        return (
-          <div>
-            <div>{agent.totalRuns} 次</div>
-            <div className={styles.taskMeta}>{formatTokens(agent.totalTokens)} tok</div>
-          </div>
-        );
-      },
-    },
-    {
-      key: "lastRun",
-      width: "88px",
-      header: "最近运行",
-      render: (agent) => {
-        if (agent.machineId === null) {
-          return <span className={styles.muted}>{NOT_COLLECTED}</span>;
-        }
-        if (agent.lastRunAt === null) {
-          return <span className={styles.muted}>从未运行</span>;
-        }
-        return (
-          <span title={formatDateTime(agent.lastRunAt)}>
-            {formatRelativeTime(agent.lastRunAt)}
-          </span>
-        );
-      },
-    },
-    {
-      key: "actions",
-      width: "92px",
-      header: "操作",
-      align: "right",
-      render: (agent) => (
-        <div className={styles.rowActions}>
-          {/* 行点击进管理：动作按钮要先截断冒泡，否则一次点击触发两件事 */}
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={(event) => {
-              event.stopPropagation();
-              onRotateKey(agent);
-            }}
-          >
-            密钥
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={(event) => {
-              event.stopPropagation();
-              onEdit(agent);
-            }}
-          >
-            管理
-          </Button>
-        </div>
-      ),
-    },
-  ];
+  const columns = useMemo(
+    () => buildAgentColumns({ liveById, onEdit, onRotateKey }),
+    [liveById, onEdit, onRotateKey],
+  );
 
   if (agentsQuery.isPending) {
     return <p className={styles.muted}>加载中…</p>;
@@ -328,7 +130,7 @@ export function AgentManagementTable({
           <Input
             type="search"
             value={keyword}
-            placeholder="搜索显示名 / 项目 / key"
+            placeholder="搜索机器人名 / 项目 / key"
             aria-label="搜索 Agent"
             onChange={(event) => setKeyword(event.target.value)}
           />
@@ -386,80 +188,14 @@ export function AgentManagementTable({
           <EmptyState title="没有匹配的 Agent" description="换个关键词，或清掉筛选条件再试。" />
         )
       ) : narrow ? (
-        <ul className={styles.cardList} aria-label="Agent 卡片">
-          {visible.map((agent) => {
-            const live = liveById.get(agent.id);
-            const title = live?.currentTaskTitle ?? null;
-            const instruction =
-              title === null && live?.running === true ? live.currentInstruction : null;
-            return (
-              <li key={agent.id} className={styles.card}>
-                <div className={styles.cardTop}>
-                  <div className={styles.identity}>
-                    <span className={styles.identityName}>{agent.displayName}</span>
-                    <span className={styles.identitySub}>
-                      {agent.project} · {RUNTIME_LABEL[agent.runtime]}
-                    </span>
-                  </div>
-                  <div className={styles.statusCell}>{statusBadges(agent, live)}</div>
-                </div>
-                {title === null ? (
-                  instruction === null ? (
-                    <p className={styles.muted}>
-                      {live?.running === true
-                        ? "运行中 · 当前会话未关联任务"
-                        : "当前没有进行中的任务"}
-                    </p>
-                  ) : (
-                    <p className={styles.cardInstruction} title={instruction}>
-                      <span className={styles.instructionTag}>最近指令</span>
-                      {instruction}
-                    </p>
-                  )
-                ) : (
-                  <p className={styles.cardInstruction} title={title}>
-                    {title}
-                    {taskMeta(live) === "" ? "" : ` · ${taskMeta(live)}`}
-                  </p>
-                )}
-                <div className={styles.cardMeta}>
-                  {agent.machineId === null ? (
-                    <span>{NOT_COLLECTED}</span>
-                  ) : (
-                    <>
-                      <span>累计运行 {agent.totalRuns} 次</span>
-                      <span>累计 {formatTokens(agent.totalTokens)} tok</span>
-                      <span>
-                        最近运行{" "}
-                        {agent.lastRunAt === null
-                          ? "从未运行"
-                          : formatRelativeTime(agent.lastRunAt)}
-                      </span>
-                    </>
-                  )}
-                </div>
-                <div className={styles.rowActionsLeft}>
-                  <Button size="sm" variant="secondary" onClick={() => onEdit(agent)}>
-                    管理
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => onRotateKey(agent)}>
-                    密钥
-                  </Button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        <AgentCardList
+          agents={visible}
+          liveById={liveById}
+          onEdit={onEdit}
+          onRotateKey={onRotateKey}
+        />
       ) : (
-        <div className={styles.tableArea}>
-          <Table
-            columns={columns}
-            rows={visible}
-            rowKey={(agent) => agent.id}
-            onRowClick={onEdit}
-            fixedLayout
-          />
-        </div>
+        <AgentTable agents={visible} columns={columns} onEdit={onEdit} />
       )}
     </div>
   );

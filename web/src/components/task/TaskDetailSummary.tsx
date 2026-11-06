@@ -12,6 +12,7 @@ import {
   TASK_EVENT_LABEL,
   TASK_STAGE_LABEL,
 } from "../../shared/labels.js";
+import { agentMentionLabel } from "../../shared/agent-label.js";
 import { Badge } from "../ui/Badge.js";
 import { describeTaskEvent, latestEventReason } from "./task-event.js";
 import styles from "./task-drawer.module.css";
@@ -62,7 +63,6 @@ export function TaskDetailSummary({
   agentNames,
   now,
 }: TaskDetailSummaryProps) {
-  const assigneeName = agentNames.get(task.assignee);
   const last = events.at(-1);
   const terminal = TERMINAL_STATUSES.includes(task.status);
   const reason = task.status === "blocked" ? latestEventReason(events) : null;
@@ -73,12 +73,14 @@ export function TaskDetailSummary({
       <dl className={styles.summaryRows}>
         <SummaryRow label="项目">{task.project}</SummaryRow>
         <SummaryRow label="承接">
-          {assigneeName ?? task.assignee_label}
-          {assigneeName === undefined ? null : (
+          {agentMentionLabel(task.assignee, agentNames, task.assignee_label)}
+          {agentNames.has(task.assignee) ? (
             <span className={styles.inlineMono}>{task.assignee}</span>
-          )}
+          ) : null}
         </SummaryRow>
-        <SummaryRow label="下发">{task.assigner_label}</SummaryRow>
+        <SummaryRow label="下发">
+          {agentMentionLabel(task.assigner, agentNames, task.assigner_label)}
+        </SummaryRow>
         <SummaryRow label="阶段">{TASK_STAGE_LABEL[task.stage]}</SummaryRow>
         <SummaryRow label="轮次">
           第 {task.round} 轮
@@ -108,7 +110,9 @@ export function TaskDetailSummary({
           {terminal ? "已收尾" : formatCompactDuration(now - since)}
         </SummaryRow>
       </dl>
-      {last === undefined ? null : <p className={styles.hint}>{describeTaskEvent(last)}</p>}
+      {last === undefined ? null : (
+        <p className={styles.hint}>{describeTaskEvent(last, agentNames)}</p>
+      )}
 
       <div className={styles.inlineSection}>
         <h4 className={styles.inlineTitle}>关联凭证</h4>

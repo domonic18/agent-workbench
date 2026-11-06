@@ -10,6 +10,8 @@ export interface AgentSummary {
   project: string;
   displayName: string;
   feishuAppId: string | null;
+  /** Agent 自报的飞书 bot 名称;为空表示尚未回写,显示时回退 displayName */
+  feishuBotName: string | null;
   status: IdentityStatus;
   allowedTargets: string[];
   createdAt: number;
@@ -30,6 +32,8 @@ export interface AgentUsageLimit {
 /** 名册视图:身份档案 + 用量与在办聚合,供控制台 Agent 管理表格 */
 export interface AgentRosterSummary extends AgentSummary {
   machineHostname: string | null;
+  /** 机器展示名:控制台可改,空表示与 machineHostname 相同 */
+  machineDisplayName: string | null;
   totalRuns: number;
   totalTokens: number;
   openTasks: number;
@@ -77,6 +81,8 @@ export interface AgentDeletionPreview {
 export interface MachineSummary {
   id: string;
   hostname: string;
+  /** 展示名:控制台可改,默认等于 hostname */
+  displayName: string;
   os: string;
   collectorVersion: string;
   lastSeenAt: number | null;
@@ -85,13 +91,15 @@ export interface MachineSummary {
 }
 
 export interface CreateAgentInput {
-  /** 机器绑定 Agent 必填;机器无关 Agent 留空(改由 runtime 区分) */
+  /** 宿主机器:claude_code 必填;外部运行时可选(留空表示不绑定) */
   machineId?: string;
   runtime?: AgentRuntime;
   project: string;
   displayName: string;
   feishuAppId?: string;
   allowedTargets?: string[];
+  /** 路由 key:只有外部运行时可显式给出 */
+  key?: string;
 }
 
 export interface CreateMachineInput {
@@ -151,6 +159,18 @@ export function createMachine(input: CreateMachineInput): Promise<MachineSecret>
   });
 }
 
+/** 改机器展示名:hostname 是 enroll 去重键,不受影响 */
+export function updateMachine(
+  id: string,
+  input: { displayName: string },
+): Promise<{ machine: MachineSummary; replayed: boolean }> {
+  return api.patch<{ machine: MachineSummary; replayed: boolean }>(
+    `/api/machines/${encodeURIComponent(id)}`,
+    input,
+    { idempotencyKey: newIdempotencyKey() },
+  );
+}
+
 export function rotateAgentKey(id: string): Promise<{ secret: string }> {
   return api.post<{ secret: string }>(
     `/api/agents/${encodeURIComponent(id)}/rotate`,
@@ -194,6 +214,8 @@ export interface UpdateAgentInput {
   displayName?: string;
   project?: string;
   status?: IdentityStatus;
+  /** 宿主机器:null 表示解绑(只允许外部运行时) */
+  machineId?: string | null;
 }
 
 /** 改档案:改名 / 改项目 / 启停 */

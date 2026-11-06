@@ -19,6 +19,7 @@ const MACHINES = [
   {
     machineId: "mch_mac",
     hostname: "mac-box",
+    displayName: null,
     status: "active",
     lastSeenAt: 1_700_000_000_000,
     receivedAt: 1_700_000_000_000,
@@ -27,6 +28,7 @@ const MACHINES = [
   {
     machineId: "mch_mini",
     hostname: "mini-box",
+    displayName: null,
     status: "active",
     lastSeenAt: 1_700_000_000_000,
     receivedAt: 1_700_000_000_000,

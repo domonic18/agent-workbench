@@ -1,4 +1,5 @@
 import type { A2aMessage, A2aThread } from "../../api/tasks.js";
+import { agentMentionLabel } from "../../shared/agent-label.js";
 import { formatDateTime } from "../../shared/format.js";
 import {
   A2A_INTENT_LABEL,
@@ -19,7 +20,7 @@ export interface TaskA2aThreadsProps {
 
 export function TaskA2aThreads({ threads, loading, error, agentNames }: TaskA2aThreadsProps) {
   function agentLabel(id: string): string {
-    return agentNames.get(id) ?? id;
+    return agentMentionLabel(id, agentNames, id);
   }
 
   return (

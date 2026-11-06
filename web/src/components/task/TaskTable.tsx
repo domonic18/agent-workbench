@@ -76,11 +76,15 @@ export function TaskTable({ tasks, agentNames, search, now = Date.now() }: TaskT
       key: "assigner",
       header: "下发人",
       width: "116px",
-      render: (task) => (
-        <span className={styles.clip} title={task.assigner_label}>
-          {task.assigner_label}
-        </span>
-      ),
+      render: (task) => {
+        // 下发人也可能是 Agent,取不到名字时回退后端标签(系统派单为「aw-console」等)
+        const name = agentNames.get(task.assigner);
+        return (
+          <span className={styles.clip} title={task.assigner_label}>
+            {name ?? task.assigner_label}
+          </span>
+        );
+      },
     },
     {
       key: "assignee",
