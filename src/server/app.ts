@@ -17,6 +17,7 @@ import { registerA2aRoutes } from "./routes/a2a.js";
 import { registerAgentSelfRoutes } from "./routes/agent-self.js";
 import { registerAuditRoutes } from "./routes/audit.js";
 import { registerAuthRoutes } from "./routes/auth.js";
+import { registerArtifactRoutes } from "./routes/artifacts.js";
 import { registerAwNodeRoutes } from "./routes/aw-node.js";
 import { registerBootstrapRoutes } from "./routes/bootstrap.js";
 import { registerCapabilityRoutes } from "./routes/capabilities.js";
@@ -65,6 +66,10 @@ export interface BuildAppOptions {
   knowledgeDir?: string;
   /** 执行面安装脚本路径;存在时按 /artifacts/install.sh 匿名直读(新机器一键安装的取件口) */
   installScriptPath?: string;
+  /** 执行面产物镜像目录(aw-node 二进制 + checksums.txt);存在时按 /artifacts/:name 匿名直读 */
+  artifactDir?: string;
+  /** 对外可达的控制台地址;供站点展示给别的机器复制的下载地址 */
+  publicUrl?: string;
   /** 前端构建产物目录;存在 index.html 时才注册静态托管与 SPA 回退 */
   webRoot?: string;
   /** 来源白名单(只校验 Host);未注入时不做限制,供路由层测试使用 */
@@ -107,7 +112,12 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     registerIdentityRoutes(app, { db, ...timing });
     registerAgentSelfRoutes(app, { db, ...timing });
     registerOverviewRoutes(app, { db, ...timing });
-    registerBootstrapRoutes(app, { db, ...timing });
+    registerBootstrapRoutes(app, {
+      db,
+      ...timing,
+      ...(options.artifactDir === undefined ? {} : { artifactDir: options.artifactDir }),
+      ...(options.publicUrl === undefined ? {} : { publicUrl: options.publicUrl }),
+    });
     registerAwNodeRoutes(app, { db, ...timing });
     registerTaskRoutes(app, { db, ...timing, ...collab });
     registerTaskReadRoutes(app, { db, ...timing });
@@ -177,6 +187,9 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   if (options.installScriptPath !== undefined) {
     registerInstallScriptRoute(app, options.installScriptPath);
+  }
+  if (options.artifactDir !== undefined) {
+    registerArtifactRoutes(app, options.artifactDir);
   }
   if (options.webRoot !== undefined) {
     registerWebRoutes(app, options.webRoot);

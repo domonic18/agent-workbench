@@ -19,6 +19,8 @@ const envSchema = z.object({
   CONSOLE_INIT_PASSWORD: z.string().optional(),
   // 来源白名单只校验 Host(含端口),逗号分隔;留空 = 本机监听地址
   CONSOLE_ALLOWED_HOSTS: z.string().optional(),
+  // 对外可达的控制台地址(frp 公网入口);站点据此给出可复制到别的机器的下载地址
+  AW_PUBLIC_URL: z.string().optional(),
   FEISHU_APP_ID: z.string().optional(),
   FEISHU_APP_SECRET: z.string().optional(),
   // 仅白名单 open_id 可下指令,逗号分隔;空 = 全部拒绝(fail-closed)
@@ -64,6 +66,7 @@ export interface Config {
   embedding: EmbeddingConfig | undefined;
   consoleInitPassword: string | undefined;
   allowedHosts: string[];
+  publicUrl: string | undefined;
   feishu: FeishuConfig | undefined;
   githubWebhookSecret: string | undefined;
   teleport: TeleportConfig;
@@ -159,6 +162,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       parsed.data.HOST,
       parsed.data.PORT,
     ),
+    publicUrl: optionalText(parsed.data.AW_PUBLIC_URL),
     feishu: parseFeishu(parsed.data),
     githubWebhookSecret: optionalText(parsed.data.GITHUB_WEBHOOK_SECRET),
     teleport: {

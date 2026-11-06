@@ -27,6 +27,7 @@ import {
   startSession,
 } from "../middleware/session.js";
 import { domainError, invalid, invalidSchema } from "./http.js";
+import { listArtifacts } from "./artifacts.js";
 
 const confirmSchema = z.object({
   machineId: z.string().min(1),
@@ -44,6 +45,10 @@ const confirmSchema = z.object({
 
 export interface BootstrapRoutesOptions {
   db: Db;
+  /** 执行面产物镜像目录;存在时 /api/bootstrap/artifacts 列出可下载地址 */
+  artifactDir?: string;
+  /** 对外可达的控制台地址;站点据此给出可复制的下载地址 */
+  publicUrl?: string;
   now?: () => number;
 }
 
@@ -117,6 +122,13 @@ export function registerBootstrapRoutes(app: FastifyInstance, options: Bootstrap
       return rejected;
     }
     return statusService.getStatus();
+  });
+
+  app.get("/api/bootstrap/artifacts", async () => {
+    // 匿名可读:只暴露公开产物名、大小与校验和,不含任何凭据
+    const assets =
+      options.artifactDir === undefined ? [] : listArtifacts(options.artifactDir);
+    return { publicUrl: options.publicUrl ?? null, assets };
   });
 
   app.post(

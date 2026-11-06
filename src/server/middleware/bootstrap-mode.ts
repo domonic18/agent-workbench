@@ -8,6 +8,7 @@ const BOOTSTRAP_ALLOW = new Set([
   "/healthz",
   "/api/bootstrap/admin",
   "/api/bootstrap/status",
+  "/api/bootstrap/artifacts",
   "/api/aw-node/enroll",
 ]);
 
