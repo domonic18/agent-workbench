@@ -27,7 +27,8 @@ export function buildAgentColumns(options: AgentColumnOptions): TableColumn<Agen
           <span className={styles.identityName}>{agentDisplayName(agent)}</span>
           <span className={styles.identitySub}>
             {agent.project}
-            {agent.key === null ? "" : ` · ${agent.key}`}
+            {/* 路由 key 默认等于 cc-connect 项目名,重复时不再赘述 */}
+            {agent.key === null || agent.key === agent.project ? "" : ` · ${agent.key}`}
           </span>
         </div>
       ),

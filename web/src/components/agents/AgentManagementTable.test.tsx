@@ -221,6 +221,27 @@ describe("Agent 管理表格", () => {
     expect(screen.queryByText("cc-connect 项目名")).toBeNull();
   });
 
+  it("路由 key 与项目名相同时不重复显示", async () => {
+    vi.mocked(fetchAgents).mockResolvedValue([
+      agent({ project: "cc-sysdev", key: "cc-sysdev" }),
+    ]);
+    renderTable();
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getByText("cc-sysdev")).toBeTruthy();
+    expect(table.queryByText("cc-sysdev · cc-sysdev")).toBeNull();
+  });
+
+  it("路由 key 与项目名不同时两个都显示", async () => {
+    vi.mocked(fetchAgents).mockResolvedValue([
+      agent({ project: "a2a-real", key: "a2a-real-workbuddy" }),
+    ]);
+    renderTable();
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getByText("a2a-real · a2a-real-workbuddy")).toBeTruthy();
+  });
+
   it("机器列优先显示展示名", async () => {
     vi.mocked(fetchAgents).mockResolvedValue([
       agent({ machineHostname: "192.168.1.244", machineDisplayName: "工作室机" }),
