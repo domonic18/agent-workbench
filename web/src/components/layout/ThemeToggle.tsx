@@ -20,14 +20,14 @@ const LABEL: Record<ThemePreference, string> = {
   system: "跟随系统",
 };
 
-export function ThemeToggle() {
+export function ThemeToggle({ variant = "surface" }: { variant?: "surface" | "sidebar" }) {
   const { preference, resolved, setPreference } = useTheme();
   const Icon = ICON[preference];
 
   return (
     <button
       type="button"
-      className={styles.toggle}
+      className={`${styles.toggle} ${variant === "sidebar" ? styles.onDark : ""}`}
       title={`主题：${LABEL[preference]}（当前${resolved === "dark" ? "深色" : "浅色"}）`}
       aria-label={`切换主题，当前${LABEL[preference]}`}
       onClick={() => setPreference(NEXT[preference])}

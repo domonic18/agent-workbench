@@ -3,17 +3,12 @@ import { Suspense, useMemo } from "react";
 import { Outlet, useLocation } from "react-router";
 import { ApiError } from "../api/client.js";
 import { fetchAgents } from "../api/identity.js";
-import { useRealtimeStream } from "../api/stream.js";
 import { fetchTasks, readTaskFilters, type TaskFilters } from "../api/tasks.js";
 import { EmptyState } from "../components/ui/EmptyState.js";
-import { Badge } from "../components/ui/Badge.js";
 import { TaskFiltersForm } from "../components/task/TaskFilters.js";
 import { TaskTable } from "../components/task/TaskTable.js";
 import { useNow } from "../shared/useNow.js";
-import { REALTIME_LABEL, REALTIME_TONE } from "../shared/labels.js";
 import styles from "../components/task/task-list.module.css";
-
-const TASKS_SCOPES: readonly string[] = ["overview"];
 
 function toQuery(filters: TaskFilters) {
   return {
@@ -26,7 +21,6 @@ function toQuery(filters: TaskFilters) {
 export function TasksPage() {
   const location = useLocation();
   const now = useNow(30_000);
-  const realtime = useRealtimeStream(TASKS_SCOPES);
   const filters = readTaskFilters(new URLSearchParams(location.search));
   const query = toQuery(filters);
 
@@ -51,11 +45,7 @@ export function TasksPage() {
 
   return (
     <div className={styles.page}>
-      <TaskFiltersForm
-        statusSlot={
-          <Badge tone={REALTIME_TONE[realtime]} text={REALTIME_LABEL[realtime]} />
-        }
-      />
+      <TaskFiltersForm />
 
       {tasksQuery.isPending ? <p className={styles.loading}>加载中…</p> : null}
 

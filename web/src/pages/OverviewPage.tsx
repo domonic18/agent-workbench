@@ -3,25 +3,17 @@ import { useState } from "react";
 import { ApiError } from "../api/client.js";
 import { refreshBotNames } from "../api/bootstrap.js";
 import { fetchOverview } from "../api/overview.js";
-import { useRealtimeStream } from "../api/stream.js";
 import type { OverviewAgent } from "../api/types.js";
 import { AgentCards } from "../components/data/AgentCards.js";
 import { EmptyState } from "../components/ui/EmptyState.js";
 import { MetricCard } from "../components/data/MetricCard.js";
-import { Badge } from "../components/ui/Badge.js";
 import { AgentRegisterDialog } from "../components/identity/AgentRegisterDialog.js";
 import { AgentRotateDialog } from "../components/identity/AgentRotateDialog.js";
 import { MachineRegisterDialog } from "../components/identity/MachineRegisterDialog.js";
 import { ExecutionSetupPanel } from "../components/setup/ExecutionSetupPanel.js";
 import { formatExactTokens, formatTokens } from "../shared/format.js";
-import {
-  REALTIME_LABEL,
-  REALTIME_TONE,
-  VISIBILITY_NOTE,
-} from "../shared/labels.js";
+import { VISIBILITY_NOTE } from "../shared/labels.js";
 import styles from "./OverviewPage.module.css";
-
-const OVERVIEW_SCOPES: readonly string[] = ["overview"];
 
 function attentionRows(
   pendingApprovals: number,
@@ -43,7 +35,6 @@ function attentionRows(
 }
 
 export function OverviewPage() {
-  const realtime = useRealtimeStream(OVERVIEW_SCOPES);
   const [registerDialog, setRegisterDialog] = useState<"agent" | "machine" | null>(null);
   const [rotateAgent, setRotateAgent] = useState<OverviewAgent | null>(null);
   const [refreshingBot, setRefreshingBot] = useState<string | null>(null);
@@ -130,7 +121,6 @@ export function OverviewPage() {
                 </span>
               </div>
               <div className={styles.sectionActions}>
-                <Badge tone={REALTIME_TONE[realtime]} text={REALTIME_LABEL[realtime]} />
                 <button
                   type="button"
                   className={styles.action}

@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { RealtimeProvider } from "../api/stream.js";
 import type { TaskDto } from "../api/tasks.js";
 import { TasksPage } from "./TasksPage.js";
 
@@ -65,7 +66,10 @@ function renderPage(entry: string): void {
   render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[entry]}>
-        <TasksPage />
+        {/* overview 作用域的实时连接由外壳持有，页面测试里显式提供 */}
+        <RealtimeProvider>
+          <TasksPage />
+        </RealtimeProvider>
       </MemoryRouter>
     </QueryClientProvider>,
   );

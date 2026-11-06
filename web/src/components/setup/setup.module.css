@@ -3,16 +3,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg, #0e1116);
-  color: var(--text, #e6edf3);
+  background: var(--bg);
+  color: var(--text);
   padding: 24px;
 }
 
 .card {
   width: 100%;
   max-width: 640px;
-  background: var(--surface, #161b22);
-  border: 1px solid var(--border, #30363d);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 28px;
 }
@@ -23,7 +23,7 @@
 }
 
 .description {
-  color: var(--muted, #8b949e);
+  color: var(--muted);
   margin: 0 0 20px;
   font-size: 14px;
 }
@@ -38,30 +38,30 @@
   flex: 1;
   height: 4px;
   border-radius: 2px;
-  background: var(--border, #30363d);
+  background: var(--border);
 }
 
 .stepActive {
-  background: var(--accent, #2f81f7);
+  background: var(--accent);
 }
 
 .stepDone {
-  background: var(--ok, #3fb950);
+  background: var(--positive);
 }
 
 .label {
   display: block;
   font-size: 13px;
   margin: 14px 0 6px;
-  color: var(--muted, #8b949e);
+  color: var(--muted);
 }
 
 .input {
   width: 100%;
   padding: 9px 11px;
   border-radius: 8px;
-  border: 1px solid var(--border, #30363d);
-  background: var(--bg, #0e1116);
+  border: 1px solid var(--border);
+  background: var(--bg);
   color: inherit;
   font-size: 14px;
   box-sizing: border-box;
@@ -72,8 +72,8 @@
   min-height: 64px;
   padding: 9px 11px;
   border-radius: 8px;
-  border: 1px solid var(--border, #30363d);
-  background: var(--bg, #0e1116);
+  border: 1px solid var(--border);
+  background: var(--bg);
   color: inherit;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 13px;
@@ -87,7 +87,7 @@
   padding: 10px 14px;
   border-radius: 8px;
   border: none;
-  background: var(--accent, #2f81f7);
+  background: var(--accent);
   color: #fff;
   font-size: 14px;
   font-weight: 600;
@@ -101,8 +101,8 @@
 
 .buttonSecondary {
   background: transparent;
-  border: 1px solid var(--border, #30363d);
-  color: var(--text, #e6edf3);
+  border: 1px solid var(--border);
+  color: var(--text);
 }
 
 /* 独立次要按钮:不依附 .button,面板内直接使用 */
@@ -110,9 +110,9 @@
   margin-top: 10px;
   padding: 8px 12px;
   border-radius: 8px;
-  border: 1px solid var(--border, #30363d);
+  border: 1px solid var(--border);
   background: transparent;
-  color: var(--text, #e6edf3);
+  color: var(--text);
   font-size: 13px;
   cursor: pointer;
 }
@@ -123,20 +123,20 @@
 }
 
 .error {
-  color: var(--danger, #f85149);
+  color: var(--danger);
   font-size: 13px;
   margin-top: 12px;
 }
 
 .hint {
-  color: var(--muted, #8b949e);
+  color: var(--muted);
   font-size: 12px;
   margin-top: 6px;
 }
 
 .section {
   margin-top: 16px;
-  border: 1px solid var(--border, #30363d);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 14px;
 }
@@ -153,15 +153,15 @@
   flex-shrink: 0;
   padding: 3px 10px;
   border-radius: 6px;
-  border: 1px solid var(--border, #30363d);
+  border: 1px solid var(--border);
   background: transparent;
-  color: var(--text, #e6edf3);
+  color: var(--text);
   font-size: 12px;
   cursor: pointer;
 }
 
 .copyButton:hover {
-  border-color: var(--accent, #2f81f7);
+  border-color: var(--accent);
 }
 
 .artifactList {
@@ -176,7 +176,7 @@
   justify-content: space-between;
   gap: 10px;
   padding: 8px 0;
-  border-bottom: 1px solid var(--border, #30363d);
+  border-bottom: 1px solid var(--border);
 }
 
 .artifact:last-child {
@@ -191,7 +191,7 @@
 }
 
 .artifactLink {
-  color: var(--accent, #2f81f7);
+  color: var(--accent);
   font-size: 14px;
   text-decoration: none;
 }
@@ -220,7 +220,7 @@
   gap: 8px;
   padding: 6px 0;
   font-size: 14px;
-  border-bottom: 1px solid var(--border, #30363d);
+  border-bottom: 1px solid var(--border);
 }
 
 .badge {
@@ -231,23 +231,23 @@
 }
 
 .ok {
-  background: color-mix(in srgb, var(--ok, #3fb950) 18%, transparent);
-  color: var(--ok, #3fb950);
+  background: color-mix(in srgb, var(--positive) 18%, transparent);
+  color: var(--positive);
 }
 
 .fail {
-  background: color-mix(in srgb, var(--danger, #f85149) 18%, transparent);
-  color: var(--danger, #f85149);
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  color: var(--danger);
 }
 
 .neutral {
-  background: color-mix(in srgb, var(--muted, #8b949e) 18%, transparent);
-  color: var(--muted, #8b949e);
+  background: color-mix(in srgb, var(--muted) 18%, transparent);
+  color: var(--muted);
 }
 
 .evidence {
   margin: 6px 0 0;
   padding-left: 18px;
   font-size: 13px;
-  color: var(--muted, #8b949e);
+  color: var(--muted);
 }

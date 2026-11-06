@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { RealtimeStatus } from "../shared/labels.js";
 
 const CLIENT_ID_KEY = "aw_client_id";
@@ -122,4 +122,16 @@ export function useRealtimeStream(scopes: readonly string[]): RealtimeStatus {
   }, [queryClient, scopeKey]);
 
   return status;
+}
+
+/** overview 作用域的实时连接由外壳统一持有，避免每页各开一条 SSE */
+const RealtimeContext = createContext<RealtimeStatus>("connecting");
+
+export function RealtimeProvider({ children }: { children: ReactNode }) {
+  const status = useRealtimeStream(["overview"]);
+  return <RealtimeContext.Provider value={status}>{children}</RealtimeContext.Provider>;
+}
+
+export function useRealtimeStatus(): RealtimeStatus {
+  return useContext(RealtimeContext);
 }

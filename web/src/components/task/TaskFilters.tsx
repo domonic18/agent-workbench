@@ -1,11 +1,11 @@
-import { type FormEvent, type ReactNode, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { readTaskFilters, TASK_STATUSES } from "../../api/tasks.js";
 import { TASK_STATUS_LABEL } from "../../shared/labels.js";
 import styles from "./TaskFilters.module.css";
 
 /** 筛选条件只存 URL query,刷新与回退后保持一致(03 §3) */
-export function TaskFiltersForm({ statusSlot }: { statusSlot?: ReactNode }) {
+export function TaskFiltersForm() {
   const [searchParams, setSearchParams] = useSearchParams();
   const filters = readTaskFilters(searchParams);
   const [status, setStatus] = useState(filters.status ?? "");
@@ -80,7 +80,6 @@ export function TaskFiltersForm({ statusSlot }: { statusSlot?: ReactNode }) {
           更多筛选
         </button>
         <div className={styles.filterAside}>
-          {statusSlot}
           <span className={styles.sortHint}>
             默认按最后事件倒序
             <span className={styles.help} title="任务按最后事件时间倒序排列，点任一行查看轮次链。">

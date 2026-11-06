@@ -1,68 +1,46 @@
+import { BookOpen, LayoutGrid, ListChecks, ShieldCheck } from "lucide-react";
 import { Suspense } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { logout } from "../../api/auth.js";
+import { RealtimeProvider, useRealtimeStatus } from "../../api/stream.js";
+import { Badge } from "../ui/Badge.js";
+import { REALTIME_LABEL, REALTIME_TONE } from "../../shared/labels.js";
 import { ThemeToggle } from "./ThemeToggle.js";
 import styles from "./AppShell.module.css";
 
-function NavIcon({ name }: { name: "overview" | "tasks" | "auth" | "knowledge" }) {
-  const common = {
-    width: 14,
-    height: 14,
-    viewBox: "0 0 16 16",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: 1.5,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-    "aria-hidden": true,
-  };
-  switch (name) {
-    case "overview":
-      return (
-        <svg {...common}>
-          <rect x="2" y="2" width="5" height="5" rx="1.2" />
-          <rect x="9" y="2" width="5" height="5" rx="1.2" />
-          <rect x="2" y="9" width="5" height="5" rx="1.2" />
-          <rect x="9" y="9" width="5" height="5" rx="1.2" />
-        </svg>
-      );
-    case "tasks":
-      return (
-        <svg {...common}>
-          <path d="M5.5 4h8M5.5 8h8M5.5 12h8" />
-          <circle cx="2.5" cy="4" r="0.8" fill="currentColor" stroke="none" />
-          <circle cx="2.5" cy="8" r="0.8" fill="currentColor" stroke="none" />
-          <circle cx="2.5" cy="12" r="0.8" fill="currentColor" stroke="none" />
-        </svg>
-      );
-    case "auth":
-      return (
-        <svg {...common}>
-          <rect x="3" y="7" width="10" height="7" rx="1.6" />
-          <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
-        </svg>
-      );
-    case "knowledge":
-      return (
-        <svg {...common}>
-          <path d="M3 3.5A1.5 1.5 0 0 1 4.5 2H13v11H4.5A1.5 1.5 0 0 0 3 14.5z" />
-          <path d="M3 13.5A1.5 1.5 0 0 1 4.5 12H13" />
-        </svg>
-      );
-  }
-}
+const NAV = [
+  { to: "/overview", label: "总览", icon: LayoutGrid },
+  { to: "/tasks", label: "任务", icon: ListChecks },
+  { to: "/capabilities", label: "授权", icon: ShieldCheck },
+  { to: "/knowledge", label: "知识", icon: BookOpen },
+] as const;
 
-function pageTitle(pathname: string): string {
-  if (pathname.startsWith("/tasks")) {
-    return "任务";
-  }
-  if (pathname.startsWith("/capabilities")) {
-    return "授权";
-  }
-  if (pathname.startsWith("/knowledge")) {
-    return "知识";
-  }
-  return "总览";
+const PAGE_META: { path: string; title: string; description: string }[] = [
+  {
+    path: "/overview",
+    title: "总览",
+    description: "Agent 在线状态、当前任务，以及需要你看一眼的事项",
+  },
+  {
+    path: "/tasks",
+    title: "任务",
+    description: "工作台里正在流转与已收口的任务",
+  },
+  {
+    path: "/capabilities",
+    title: "授权",
+    description: "能力签发与委派白名单的授权事实",
+  },
+  {
+    path: "/knowledge",
+    title: "知识",
+    description: "人工采纳与待审阅的知识条目",
+  },
+];
+
+function pageMeta(pathname: string): { title: string; description: string } {
+  const matched = PAGE_META.find((item) => pathname.startsWith(item.path));
+  return matched ?? { title: "总览", description: "" };
 }
 
 function environment(): { label: string; local: boolean } {
@@ -72,9 +50,19 @@ function environment(): { label: string; local: boolean } {
 }
 
 export function AppShell() {
+  return (
+    <RealtimeProvider>
+      <Shell />
+    </RealtimeProvider>
+  );
+}
+
+function Shell() {
   const navigate = useNavigate();
   const location = useLocation();
   const env = environment();
+  const meta = pageMeta(location.pathname);
+  const realtime = useRealtimeStatus();
 
   async function handleLogout(): Promise<void> {
     try {
@@ -86,57 +74,50 @@ export function AppShell() {
 
   return (
     <div className={styles.shell}>
-      <nav className={styles.nav}>
+      <nav className={styles.nav} aria-label="主导航">
         <div className={styles.brand}>
-          <div className={styles.brandTitle}>智能体工作台</div>
-          <div className={styles.brandSub}>控制台 · v0.1</div>
+          <span className={styles.brandMark} aria-hidden="true">
+            AW
+          </span>
+          <span>
+            <span className={styles.brandTitle}>智能体工作台</span>
+            <span className={styles.brandSub}>Agent Workbench</span>
+          </span>
         </div>
+
         <div className={styles.links}>
-          <NavLink
-            to="/overview"
-            className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ""}`}
-          >
-            <span className={styles.icon}>
-              <NavIcon name="overview" />
-            </span>
-            总览
-          </NavLink>
-          <NavLink
-            to="/tasks"
-            className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ""}`}
-          >
-            <span className={styles.icon}>
-              <NavIcon name="tasks" />
-            </span>
-            任务
-          </NavLink>
-          <NavLink
-            to="/capabilities"
-            className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ""}`}
-          >
-            <span className={styles.icon}>
-              <NavIcon name="auth" />
-            </span>
-            授权
-          </NavLink>
-          <NavLink
-            to="/knowledge"
-            className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ""}`}
-          >
-            <span className={styles.icon}>
-              <NavIcon name="knowledge" />
-            </span>
-            知识
-          </NavLink>
+          {NAV.map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ""}`}
+              >
+                <Icon size={16} strokeWidth={1.8} aria-hidden="true" />
+                {item.label}
+              </NavLink>
+            );
+          })}
+        </div>
+
+        <div className={styles.navFooter}>
+          <span className={env.local ? styles.envLocal : styles.envTunnel}>{env.label}</span>
+          <div className={styles.footerRow}>
+            <span className={styles.version}>v0.1</span>
+            <ThemeToggle variant="sidebar" />
+          </div>
         </div>
       </nav>
 
       <div className={styles.body}>
         <header className={styles.topbar}>
-          <h1 className={styles.pageTitle}>{pageTitle(location.pathname)}</h1>
-          <span className={env.local ? styles.envLocal : styles.envTunnel}>{env.label}</span>
+          <div className={styles.heading}>
+            <h1 className={styles.pageTitle}>{meta.title}</h1>
+            <span className={styles.pageDescription}>{meta.description}</span>
+          </div>
           <div className={styles.topbarRight}>
-            <ThemeToggle />
+            <Badge tone={REALTIME_TONE[realtime]} text={REALTIME_LABEL[realtime]} />
             <span className={styles.user}>
               <span className={styles.avatar} aria-hidden="true">
                 管

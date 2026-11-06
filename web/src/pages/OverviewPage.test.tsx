@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { RealtimeProvider } from "../api/stream.js";
 import type { OverviewSnapshot } from "../api/types.js";
 import { OverviewPage } from "./OverviewPage.js";
 
@@ -51,7 +52,10 @@ function renderPage(): void {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <OverviewPage />
+      {/* overview 作用域的实时连接由外壳持有，页面测试里显式提供 */}
+      <RealtimeProvider>
+        <OverviewPage />
+      </RealtimeProvider>
     </QueryClientProvider>,
   );
 }
