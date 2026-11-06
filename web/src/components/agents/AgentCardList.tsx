@@ -4,7 +4,7 @@ import type { OverviewAgent } from "../../api/types.js";
 import { formatRelativeTime, formatTokens } from "../../shared/format.js";
 import { NOT_COLLECTED, RUNTIME_LABEL } from "../../shared/labels.js";
 import { agentDisplayName, hasCollector } from "../../shared/agent-label.js";
-import { RUNTIME_ICON } from "../../shared/runtime-icon.js";
+import { RuntimeIcon } from "../../shared/runtime-icon.js";
 import { Button } from "../ui/Button.js";
 import { Tooltip } from "../ui/Tooltip.js";
 import { statusBadges, taskMeta } from "./agent-rows.js";
@@ -33,7 +33,6 @@ export function AgentCardList({
         const live = liveById.get(agent.id);
         const title = live?.currentTaskTitle ?? null;
         const instruction = title === null && live?.running === true ? live.currentInstruction : null;
-        const RuntimeIcon = RUNTIME_ICON[agent.runtime];
         const machineName = agent.machineDisplayName ?? agent.machineHostname;
         return (
           <li key={agent.id} className={styles.card}>
@@ -49,7 +48,7 @@ export function AgentCardList({
                 <span className={styles.identitySub}>
                   {agent.project}
                   <Tooltip label={`运行时：${RUNTIME_LABEL[agent.runtime]}`}>
-                    <RuntimeIcon size={12} aria-hidden="true" />
+                    <RuntimeIcon runtime={agent.runtime} size={12} />
                   </Tooltip>
                 </span>
               </div>

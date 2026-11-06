@@ -9,7 +9,7 @@ import {
   RUNTIME_LABEL,
 } from "../../shared/labels.js";
 import { agentDisplayName, hasCollector } from "../../shared/agent-label.js";
-import { RUNTIME_ICON } from "../../shared/runtime-icon.js";
+import { RuntimeIcon } from "../../shared/runtime-icon.js";
 import { Button } from "../ui/Button.js";
 import { Table, type TableColumn } from "../ui/Table.js";
 import { Tooltip } from "../ui/Tooltip.js";
@@ -52,14 +52,11 @@ export function buildAgentColumns(options: AgentColumnOptions): TableColumn<Agen
       key: "runtime",
       width: "56px",
       header: "运行时",
-      render: (agent) => {
-        const Icon = RUNTIME_ICON[agent.runtime];
-        return (
-          <Tooltip label={RUNTIME_LABEL[agent.runtime]}>
-            <Icon size={16} aria-hidden="true" />
-          </Tooltip>
-        );
-      },
+      render: (agent) => (
+        <Tooltip label={RUNTIME_LABEL[agent.runtime]}>
+          <RuntimeIcon runtime={agent.runtime} size={16} />
+        </Tooltip>
+      ),
     },
     {
       key: "machine",
