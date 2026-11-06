@@ -13,6 +13,10 @@ import { mkdirSync, writeFileSync } from "node:fs";
 const scenarioIndex = process.argv.indexOf("--scenario");
 const scenario = scenarioIndex === -1 ? "s1" : process.argv[scenarioIndex + 1];
 const bundle = readBundle(scenario);
+// 接收端尚未就位时可放宽截止时间:死信巡检每 60s 一轮,deadline 过了未 ACK 即转死信
+const deadlineIndex = process.argv.indexOf("--deadline-minutes");
+const deadlineMinutes =
+  deadlineIndex === -1 ? bundle.deadlineMinutes : Number(process.argv[deadlineIndex + 1]);
 
 const CLAUDE_CANDIDATE_DIRS = ["/opt/homebrew/bin", "/usr/local/bin", join(homedir(), ".local/bin")];
 
@@ -35,7 +39,7 @@ if (cwd === undefined || !existsSync(cwd)) {
   throw new Error(`发起方 Agent ${bundle.sender.agentId} 的工作目录不可用:${cwd ?? "(未登记)"}`);
 }
 
-const deadline = new Date(Date.now() + bundle.deadlineMinutes * 60_000).toISOString();
+const deadline = new Date(Date.now() + deadlineMinutes * 60_000).toISOString();
 const prompt = senderPrompt({
   targetAgentId: bundle.receiver.agentId,
   title: bundle.title,
