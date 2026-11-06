@@ -9,7 +9,14 @@ import {
   formatRelativeTime,
   formatTokens,
 } from "../../shared/format.js";
-import { HEARTBEAT_LABEL, HEARTBEAT_TONE, RUNTIME_LABEL } from "../../shared/labels.js";
+import {
+  HEARTBEAT_LABEL,
+  HEARTBEAT_TONE,
+  NOT_COLLECTED,
+  RUNTIME_LABEL,
+  TASK_STAGE_LABEL,
+  TASK_STATUS_LABEL,
+} from "../../shared/labels.js";
 import { NARROW_QUERY, useMediaQuery } from "../../shared/useMediaQuery.js";
 import { Badge } from "../ui/Badge.js";
 import { Button } from "../ui/Button.js";
@@ -47,9 +54,16 @@ function taskMeta(live: OverviewAgent | undefined): string {
   if (live === undefined) {
     return "";
   }
-  const stage = live.currentTaskStage ?? "";
-  const status = live.currentTaskStatus ?? "";
-  return [stage, status].filter((part) => part !== "").join(" · ");
+  const stage = live.currentTaskStage;
+  const status = live.currentTaskStatus;
+  const parts = [];
+  if (stage !== null && stage !== undefined) {
+    parts.push(TASK_STAGE_LABEL[stage as keyof typeof TASK_STAGE_LABEL] ?? stage);
+  }
+  if (status !== null && status !== undefined) {
+    parts.push(TASK_STATUS_LABEL[status as keyof typeof TASK_STATUS_LABEL] ?? status);
+  }
+  return parts.join(" · ");
 }
 
 /** 状态列三段编码：启停 + 心跳 + 运行态，颜色之外都带文字 */
@@ -131,6 +145,7 @@ export function AgentManagementTable({
   const columns: TableColumn<AgentRosterSummary>[] = [
     {
       key: "agent",
+      width: "168px",
       header: "Agent",
       render: (agent) => (
         <div className={styles.identity}>
@@ -144,16 +159,19 @@ export function AgentManagementTable({
     },
     {
       key: "runtime",
+      width: "88px",
       header: "运行时",
       render: (agent) => RUNTIME_LABEL[agent.runtime],
     },
     {
       key: "machine",
+      width: "108px",
       header: "机器",
       render: (agent) => agent.machineHostname ?? "未绑定",
     },
     {
       key: "status",
+      width: "128px",
       header: "状态",
       render: (agent) => (
         <div className={styles.statusCell}>{statusBadges(agent, liveById.get(agent.id))}</div>
@@ -161,29 +179,50 @@ export function AgentManagementTable({
     },
     {
       key: "task",
+      width: "200px",
       header: "当前任务",
       render: (agent) => {
         const live = liveById.get(agent.id);
         const title = live?.currentTaskTitle ?? null;
-        const meta = taskMeta(live);
-        if (title === null) {
-          return <span className={styles.muted}>—</span>;
+        if (title !== null) {
+          const meta = taskMeta(live);
+          return (
+            <div className={styles.taskCell}>
+              <span className={styles.taskTitle} title={title}>
+                {title}
+              </span>
+              {meta === "" ? null : <span className={styles.taskMeta}>{meta}</span>}
+            </div>
+          );
+        }
+        // 未建单的运行会话没有任务标题，用最近一条指令回答「在忙什么」，比一句横杠有用
+        if (live?.running === true && live.currentInstruction !== null) {
+          return (
+            <div className={styles.taskCell}>
+              <span className={styles.taskTitle} title={live.currentInstruction}>
+                <span className={styles.instructionTag}>最近指令</span>
+                {live.currentInstruction}
+              </span>
+            </div>
+          );
         }
         return (
-          <div className={styles.taskCell}>
-            <span className={styles.taskTitle} title={title}>
-              {title}
-            </span>
-            {meta === "" ? null : <span className={styles.taskMeta}>{meta}</span>}
-          </div>
+          <span className={styles.muted}>
+            {live?.running === true ? "运行中 · 当前会话未关联任务" : "当前没有进行中的任务"}
+          </span>
         );
       },
     },
     {
       key: "todayTokens",
+      width: "84px",
       header: "今日 Token",
       align: "right",
       render: (agent) => {
+        // 机器无关的外部运行时没有 aw-node，Token 固定「未接入 / —」，不显示为 0
+        if (agent.machineId === null) {
+          return <span className={styles.muted}>{NOT_COLLECTED}</span>;
+        }
         const live = liveById.get(agent.id);
         if (live === undefined) {
           return <span className={styles.muted}>—</span>;
@@ -197,19 +236,29 @@ export function AgentManagementTable({
     },
     {
       key: "runs",
+      width: "88px",
       header: "累计运行",
       align: "right",
-      render: (agent) => (
-        <div>
-          <div>{agent.totalRuns} 次</div>
-          <div className={styles.taskMeta}>{formatTokens(agent.totalTokens)} tok</div>
-        </div>
-      ),
+      render: (agent) => {
+        if (agent.machineId === null) {
+          return <span className={styles.muted}>{NOT_COLLECTED}</span>;
+        }
+        return (
+          <div>
+            <div>{agent.totalRuns} 次</div>
+            <div className={styles.taskMeta}>{formatTokens(agent.totalTokens)} tok</div>
+          </div>
+        );
+      },
     },
     {
       key: "lastRun",
+      width: "88px",
       header: "最近运行",
       render: (agent) => {
+        if (agent.machineId === null) {
+          return <span className={styles.muted}>{NOT_COLLECTED}</span>;
+        }
         if (agent.lastRunAt === null) {
           return <span className={styles.muted}>从未运行</span>;
         }
@@ -222,6 +271,7 @@ export function AgentManagementTable({
     },
     {
       key: "actions",
+      width: "92px",
       header: "操作",
       align: "right",
       render: (agent) => (
@@ -339,6 +389,9 @@ export function AgentManagementTable({
         <ul className={styles.cardList} aria-label="Agent 卡片">
           {visible.map((agent) => {
             const live = liveById.get(agent.id);
+            const title = live?.currentTaskTitle ?? null;
+            const instruction =
+              title === null && live?.running === true ? live.currentInstruction : null;
             return (
               <li key={agent.id} className={styles.card}>
                 <div className={styles.cardTop}>
@@ -350,15 +403,40 @@ export function AgentManagementTable({
                   </div>
                   <div className={styles.statusCell}>{statusBadges(agent, live)}</div>
                 </div>
+                {title === null ? (
+                  instruction === null ? (
+                    <p className={styles.muted}>
+                      {live?.running === true
+                        ? "运行中 · 当前会话未关联任务"
+                        : "当前没有进行中的任务"}
+                    </p>
+                  ) : (
+                    <p className={styles.cardInstruction} title={instruction}>
+                      <span className={styles.instructionTag}>最近指令</span>
+                      {instruction}
+                    </p>
+                  )
+                ) : (
+                  <p className={styles.cardInstruction} title={title}>
+                    {title}
+                    {taskMeta(live) === "" ? "" : ` · ${taskMeta(live)}`}
+                  </p>
+                )}
                 <div className={styles.cardMeta}>
-                  <span>累计运行 {agent.totalRuns} 次</span>
-                  <span>累计 {formatTokens(agent.totalTokens)} tok</span>
-                  <span>
-                    最近运行{" "}
-                    {agent.lastRunAt === null
-                      ? "从未运行"
-                      : formatRelativeTime(agent.lastRunAt)}
-                  </span>
+                  {agent.machineId === null ? (
+                    <span>{NOT_COLLECTED}</span>
+                  ) : (
+                    <>
+                      <span>累计运行 {agent.totalRuns} 次</span>
+                      <span>累计 {formatTokens(agent.totalTokens)} tok</span>
+                      <span>
+                        最近运行{" "}
+                        {agent.lastRunAt === null
+                          ? "从未运行"
+                          : formatRelativeTime(agent.lastRunAt)}
+                      </span>
+                    </>
+                  )}
                 </div>
                 <div className={styles.rowActionsLeft}>
                   <Button size="sm" variant="secondary" onClick={() => onEdit(agent)}>
@@ -379,6 +457,7 @@ export function AgentManagementTable({
             rows={visible}
             rowKey={(agent) => agent.id}
             onRowClick={onEdit}
+            fixedLayout
           />
         </div>
       )}

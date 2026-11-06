@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fetchAgents, type AgentRosterSummary } from "../../api/identity.js";
+import type { OverviewAgent } from "../../api/types.js";
 import { AgentManagementTable } from "./AgentManagementTable.js";
 
 vi.mock("../../api/identity.js", () => ({
@@ -31,13 +32,35 @@ function agent(overrides: Partial<AgentRosterSummary> = {}): AgentRosterSummary 
   };
 }
 
-function renderTable(onEdit = vi.fn()): void {
+function renderTable(onEdit = vi.fn(), liveAgents: readonly OverviewAgent[] = []): void {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <AgentManagementTable liveAgents={[]} onEdit={onEdit} onRotateKey={vi.fn()} />
+      <AgentManagementTable liveAgents={liveAgents} onEdit={onEdit} onRotateKey={vi.fn()} />
     </QueryClientProvider>,
   );
+}
+
+function live(overrides: Partial<OverviewAgent> = {}): OverviewAgent {
+  return {
+    id: "agt_a",
+    displayName: "构建 Agent",
+    project: "aw",
+    machineId: "m1",
+    runtime: "claude_code",
+    machineHostname: "build-box",
+    machineLastSeenAt: 0,
+    heartbeat: "ok",
+    lastRunAt: null,
+    running: false,
+    currentTaskId: null,
+    currentTaskTitle: null,
+    currentTaskStage: null,
+    currentTaskStatus: null,
+    currentInstruction: null,
+    todayTokens: 0,
+    ...overrides,
+  };
 }
 
 describe("Agent 管理表格", () => {
@@ -125,5 +148,52 @@ describe("Agent 管理表格", () => {
     renderTable();
 
     expect(await screen.findByText("名册里还没有 Agent")).toBeTruthy();
+  });
+
+  it("未建单的运行会话用最近指令回答在忙什么", async () => {
+    vi.mocked(fetchAgents).mockResolvedValue([agent()]);
+    renderTable(vi.fn(), [live({ running: true, currentInstruction: "补充 K 线均线位" })]);
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getByText("最近指令")).toBeTruthy();
+    expect(table.getByText(/补充 K 线均线位/)).toBeTruthy();
+  });
+
+  it("已建单时显示任务标题与阶段状态", async () => {
+    vi.mocked(fetchAgents).mockResolvedValue([agent()]);
+    renderTable(
+      vi.fn(),
+      [
+        live({
+          running: true,
+          currentTaskId: "tsk_1",
+          currentTaskTitle: "实现接口契约",
+          currentTaskStage: "exec",
+          currentTaskStatus: "running",
+        }),
+      ],
+    );
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getByText("实现接口契约")).toBeTruthy();
+    expect(table.getByText("执行 · 进行中")).toBeTruthy();
+  });
+
+  it("运行中但没有指令时说明会话未关联任务", async () => {
+    vi.mocked(fetchAgents).mockResolvedValue([agent()]);
+    renderTable(vi.fn(), [live({ running: true })]);
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getByText("运行中 · 当前会话未关联任务")).toBeTruthy();
+  });
+
+  it("机器无关 Agent 的运行与 Token 显示未接入,不显示 0", async () => {
+    vi.mocked(fetchAgents).mockResolvedValue([
+      agent({ id: "agt_wb", machineId: null, machineHostname: null, runtime: "workbuddy" }),
+    ]);
+    renderTable();
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getAllByText("未接入 / —").length).toBe(3);
   });
 });

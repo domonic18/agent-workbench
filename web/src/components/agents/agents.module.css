@@ -39,13 +39,17 @@
 .identityName {
   font-weight: 600;
   color: var(--text);
-  overflow-wrap: anywhere;
+  /* 固定列宽下按词换行；anywhere 会把中文逐字断开 */
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .identitySub {
   font-size: var(--font-xs);
   color: var(--muted);
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .statusCell {
@@ -67,6 +71,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 未建单会话的最近指令:与任务标题同一行截断,标签不参与省略 */
+.instructionTag {
+  margin-right: var(--space-1);
+  font-weight: 600;
+  color: var(--muted);
 }
 
 .taskMeta {
@@ -122,6 +133,19 @@
   margin-top: var(--space-3);
   font-size: var(--font-xs);
   color: var(--muted);
+}
+
+/* 窄屏卡片上的当前任务/最近指令 */
+.cardInstruction {
+  margin: var(--space-3) 0 0;
+  font-size: var(--font-sm);
+  color: var(--text);
+  overflow-wrap: anywhere;
+  /* 指令可能很长，卡片上钳到三行，完整内容靠 title 提示 */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 @media (max-width: 767px) {
