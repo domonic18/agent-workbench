@@ -7,6 +7,7 @@ import {
   loadConfig,
   normalizeIngestUrl,
   type CollectorConfig,
+  type ConfigEnv,
 } from "./config.js";
 import { loadConfigSyncState } from "./config-sync.js";
 import { mergeExtraProjects, scanDiscovery } from "./discovery.js";
@@ -29,8 +30,18 @@ import {
   uninstall,
 } from "./launchd.js";
 import { createLogger } from "./log.js";
-import type { InstallOptions } from "./plist.js";
+import { readPlistEnv, type InstallOptions } from "./plist.js";
 import { loadState, sortedStreams, streamIdFor } from "./state.js";
+
+/**
+ * 诊断与状态命令要看的是「已安装服务在用的那套配置」,不是进程 env 的缺省值。
+ * 终端里跑 doctor 时进程 env 通常是空的,AW_INGEST_URL 会缺省回退到
+ * 127.0.0.1:8787,于是自检去检查一台根本没装控制台的机器——所以先回退到
+ * launchd plist 里的 EnvironmentVariables,进程 env 仍然优先。
+ */
+export function diagnosticsEnv(plistFile: string = plistPath(LABEL)): ConfigEnv {
+  return { ...readPlistEnv(plistFile), ...process.env };
+}
 
 function argValue(argv: string[], name: string): string | null {
   const index = argv.indexOf(name);
@@ -117,7 +128,7 @@ async function enrollCommand(argv: string[]): Promise<number> {
 }
 
 function status(argv: string[]): number {
-  const config = loadConfig({ requireAuth: false });
+  const config = loadConfig({ requireAuth: false, env: diagnosticsEnv() });
   const state = loadState(config.stateDir);
   const streams = sortedStreams(state);
   const counts = { ok: 0, unregistered: 0, ambiguous: 0, unattributed: 0 };
@@ -182,7 +193,7 @@ function status(argv: string[]): number {
 }
 
 async function doctor(): Promise<number> {
-  const config = loadConfig({ requireAuth: false });
+  const config = loadConfig({ requireAuth: false, env: diagnosticsEnv() });
   const credentials = loadCredentials(config.stateDir);
   const collectorId = config.collectorId !== "" ? config.collectorId : credentials?.machineId ?? "";
   const secret = config.secret !== "" ? config.secret : credentials?.secret ?? "";
