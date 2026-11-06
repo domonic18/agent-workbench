@@ -10,6 +10,7 @@ import {
   StepProjects,
 } from "../components/setup/SetupSteps.js";
 import { SetupStepper } from "../components/setup/SetupStepper.js";
+import { LogoIcon } from "../components/brand/LogoIcon.js";
 import { APP_NAME, APP_VERSION } from "../shared/app.js";
 import styles from "../components/setup/setup.module.css";
 
@@ -29,7 +30,7 @@ function Shell({ children }: { children: ReactNode }) {
       <div className={styles.shell}>
         <header className={styles.shellHead}>
           <span className={styles.shellMark} aria-hidden="true">
-            AW
+            <LogoIcon size={28} />
           </span>
           <span className={styles.shellTitle}>{APP_NAME}</span>
           <span className={styles.shellVersion}>{APP_VERSION}</span>

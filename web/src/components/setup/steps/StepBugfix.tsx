@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { ApiError } from "../../../api/client.js";
 import { completeSetup, type BootstrapStatus } from "../../../api/bootstrap.js";
 import { fetchAgents } from "../../../api/identity.js";
+import { Button } from "../../ui/Button.js";
+import { Field, Select } from "../../ui/Field.js";
 import { Feedback } from "../Feedback.js";
 import styles from "../setup.module.css";
 
@@ -60,24 +62,24 @@ export function StepBugfix({
           ))}
         </ul>
       </div>
-      <form onSubmit={(event) => void submit(event)}>
-        <label className={styles.label} htmlFor="primary">主责 Agent</label>
-        <select
-          id="primary"
-          className={styles.input}
-          value={primaryAgentId}
-          onChange={(event) => setPrimaryAgentId(event.target.value)}
-        >
-          <option value="">— 选择 —</option>
-          {activeAgents.map((agent) => (
-            <option key={agent.id} value={agent.id}>
-              {agent.displayName} ({agent.project})
-            </option>
-          ))}
-        </select>
-        <button className={styles.button} type="submit" disabled={pending}>
+      <form className={styles.form} onSubmit={(event) => void submit(event)}>
+        <Field label="主责 Agent" htmlFor="primary">
+          <Select
+            id="primary"
+            value={primaryAgentId}
+            onChange={(event) => setPrimaryAgentId(event.target.value)}
+          >
+            <option value="">— 选择 —</option>
+            {activeAgents.map((agent) => (
+              <option key={agent.id} value={agent.id}>
+                {agent.displayName} ({agent.project})
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Button type="submit" variant="primary" size="lg" loading={pending}>
           {pending ? "装配中…" : "确认并开始使用"}
-        </button>
+        </Button>
         <Feedback error={error} />
       </form>
     </div>

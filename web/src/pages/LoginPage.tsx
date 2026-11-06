@@ -4,7 +4,9 @@ import { LogIn, ShieldCheck } from "lucide-react";
 import { login } from "../api/auth.js";
 import { ApiError } from "../api/client.js";
 import { bootstrapStatus } from "../api/bootstrap.js";
+import { LogoIcon } from "../components/brand/LogoIcon.js";
 import { Button } from "../components/ui/Button.js";
+import { EmptyState } from "../components/ui/EmptyState.js";
 import { Field, Input } from "../components/ui/Field.js";
 import { APP_NAME, APP_NAME_EN, APP_VERSION } from "../shared/app.js";
 import styles from "./LoginPage.module.css";
@@ -74,7 +76,7 @@ export function LoginPage() {
       <section className={styles.brand} aria-label="产品介绍">
         <div className={styles.brandHead}>
           <span className={styles.brandMark} aria-hidden="true">
-            AW
+            <LogoIcon size={32} />
           </span>
           <span>
             <span className={styles.brandTitle}>{APP_NAME}</span>
@@ -114,16 +116,24 @@ export function LoginPage() {
               required
             />
           </Field>
-          {error === null ? null : (
+          {needsSetup ? (
+            <div role="alert">
+              <EmptyState
+                icon={<ShieldCheck size={28} aria-hidden="true" />}
+                title="控制台未初始化"
+                description="首次使用要先在 /setup 设置管理员口令并完成初始化，再回来登录。"
+                action={
+                  <Link className={styles.link} to="/setup">
+                    前往 /setup 完成初始化 →
+                  </Link>
+                }
+              />
+            </div>
+          ) : error === null ? null : (
             <p className={styles.error} role="alert">
               {error}
             </p>
           )}
-          {needsSetup ? (
-            <Link className={styles.link} to="/setup">
-              前往 /setup 完成初始化 →
-            </Link>
-          ) : null}
           <Button
             type="submit"
             variant="primary"

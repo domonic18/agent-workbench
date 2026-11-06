@@ -30,14 +30,11 @@
 .shellMark {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: var(--size-control-lg);
+  height: var(--size-control-lg);
   border-radius: var(--radius-md);
   background: var(--accent);
   color: var(--on-accent);
-  font-size: var(--font-xs);
-  font-weight: 700;
-  letter-spacing: 0.04em;
 }
 
 .shellTitle {
@@ -72,47 +69,12 @@
   font-size: var(--font-md);
 }
 
-.label {
-  display: block;
-  font-size: var(--font-sm);
-  margin: var(--space-3) 0 var(--space-2);
-  color: var(--muted);
-}
-
-.input {
-  width: 100%;
-  padding: 9px 11px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: inherit;
-  font-size: var(--font-md);
-  box-sizing: border-box;
-}
-
-.button {
-  margin-top: var(--space-5);
-  width: 100%;
-  padding: 10px 14px;
-  border-radius: var(--radius-md);
-  border: none;
-  background: var(--accent);
-  color: var(--on-accent);
-  font-size: var(--font-md);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* 独立次要按钮:不依附 .button,面板内直接使用 */
-.buttonSecondary {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text);
+/* 表单控件纵向排布：字段与主按钮统一间距，按钮占满卡片宽度 */
+.form {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-4);
 }
 
 .error {
@@ -138,7 +100,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: 6px 0;
+  padding: var(--space-1) 0;
   font-size: var(--font-md);
 }
 
@@ -152,36 +114,14 @@
   display: flex;
   align-items: baseline;
   gap: var(--space-2);
-  padding: 6px 0;
+  padding: var(--space-1) 0;
   font-size: var(--font-md);
   border-bottom: 1px solid var(--border);
 }
 
-.badge {
-  font-size: var(--font-xs);
-  padding: 1px var(--space-2);
-  border-radius: var(--radius-full);
-  flex-shrink: 0;
-}
-
-.ok {
-  background: var(--positive-soft);
-  color: var(--positive);
-}
-
-.fail {
-  background: var(--danger-soft);
-  color: var(--danger);
-}
-
-.neutral {
-  background: var(--muted-soft);
-  color: var(--muted);
-}
-
 .evidence {
   margin: var(--space-2) 0 0;
-  padding-left: 18px;
+  padding-left: var(--space-5);
   font-size: var(--font-sm);
   color: var(--muted);
 }

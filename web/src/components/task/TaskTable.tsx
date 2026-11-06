@@ -55,7 +55,7 @@ export function TaskTable({ tasks, agentNames, search, now = Date.now() }: TaskT
     {
       key: "task",
       header: "任务",
-      width: "290px",
+      width: "26%",
       render: (task) => (
         <>
           <Link
@@ -75,7 +75,7 @@ export function TaskTable({ tasks, agentNames, search, now = Date.now() }: TaskT
     {
       key: "assigner",
       header: "下发人",
-      width: "116px",
+      width: "10%",
       render: (task) => {
         // 下发人也可能是 Agent,取不到名字时回退后端标签(系统派单为「aw-console」等)
         const name = agentNames.get(task.assigner);
@@ -89,7 +89,7 @@ export function TaskTable({ tasks, agentNames, search, now = Date.now() }: TaskT
     {
       key: "assignee",
       header: "承接",
-      width: "150px",
+      width: "13%",
       render: (task) => {
         const name = agentNames.get(task.assignee);
         return (
@@ -105,7 +105,7 @@ export function TaskTable({ tasks, agentNames, search, now = Date.now() }: TaskT
     {
       key: "round",
       header: "轮次",
-      width: "68px",
+      width: "6%",
       render: (task) => (
         <>
           <div>第 {task.round} 轮</div>
@@ -118,13 +118,13 @@ export function TaskTable({ tasks, agentNames, search, now = Date.now() }: TaskT
     {
       key: "stage",
       header: "阶段",
-      width: "58px",
+      width: "6%",
       render: (task) => TASK_STAGE_LABEL[task.stage],
     },
     {
       key: "status",
       header: "状态",
-      width: "76px",
+      width: "8%",
       render: (task) => (
         <Badge tone={TASK_STATUS_TONE[task.status]} text={TASK_STATUS_LABEL[task.status]} />
       ),
@@ -132,7 +132,7 @@ export function TaskTable({ tasks, agentNames, search, now = Date.now() }: TaskT
     {
       key: "output",
       header: "产出",
-      width: "140px",
+      width: "15%",
       render: (task) => (
         <span className={styles.clipWide}>
           <OutputCell output={task.output} />
@@ -142,8 +142,9 @@ export function TaskTable({ tasks, agentNames, search, now = Date.now() }: TaskT
     {
       key: "duration",
       header: "耗时",
-      width: "64px",
+      width: "8%",
       align: "right",
+      nowrap: true,
       render: (task) => (
         <span title={formatDuration((task.ended_at ?? now) - task.created_at)}>
           {formatCompactDuration((task.ended_at ?? now) - task.created_at)}
@@ -153,8 +154,9 @@ export function TaskTable({ tasks, agentNames, search, now = Date.now() }: TaskT
     {
       key: "tokens",
       header: "Token",
-      width: "72px",
+      width: "8%",
       align: "right",
+      nowrap: true,
       render: (task) => (
         <span title={formatExactTokens(task.total_tokens)}>{formatTokens(task.total_tokens)}</span>
       ),
@@ -168,7 +170,7 @@ export function TaskTable({ tasks, agentNames, search, now = Date.now() }: TaskT
           columns={columns}
           rows={[...tasks]}
           rowKey={(task) => task.id}
-          minWidth="1034px"
+          minWidth="960px"
           fixedLayout
           onRowClick={(task) => navigate(taskUrl(task.id, search))}
         />

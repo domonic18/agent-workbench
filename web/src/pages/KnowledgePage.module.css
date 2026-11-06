@@ -1,5 +1,9 @@
+/* 知识页：视图标签 + 搜索 + 条目列表 */
+
 .page {
-  max-width: 1044px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
 }
 
 .search {
@@ -12,14 +16,6 @@
 .search input {
   flex: 1;
   min-width: 0;
-}
-
-.note {
-  margin: var(--space-6) 0 0;
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--border);
-  font-size: var(--font-xs);
-  color: var(--subtle);
 }
 
 @media (max-width: 767px) {

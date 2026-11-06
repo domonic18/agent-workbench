@@ -83,7 +83,3 @@
 .muted {
   composes: muted from "./task-shared.module.css";
 }
-
-.more {
-  composes: more from "./task-shared.module.css";
-}

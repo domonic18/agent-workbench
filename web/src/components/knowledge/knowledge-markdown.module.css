@@ -1,5 +1,8 @@
+/* 知识正文：markdown 排版；行长限在 --content-prose，长段落才好读 */
+
 .markdown {
-  font-size: 12.5px;
+  max-width: var(--content-prose);
+  font-size: var(--font-sm);
   line-height: 1.7;
   color: var(--text);
   overflow-wrap: anywhere;
@@ -9,25 +12,25 @@
 .markdown h2,
 .markdown h3,
 .markdown h4 {
-  margin: 18px 0 8px;
+  margin: var(--space-5) 0 var(--space-2);
   line-height: 1.35;
   color: var(--text);
 }
 
 .markdown h1 {
-  font-size: 18px;
+  font-size: var(--font-xl);
 }
 
 .markdown h2 {
-  font-size: 15.5px;
+  font-size: var(--font-lg);
 }
 
 .markdown h3 {
-  font-size: 13.5px;
+  font-size: var(--font-md);
 }
 
 .markdown h4 {
-  font-size: 12.5px;
+  font-size: var(--font-sm);
 }
 
 .markdown > :first-child {
@@ -40,12 +43,12 @@
 .markdown blockquote,
 .markdown pre,
 .markdown table {
-  margin: 0 0 12px;
+  margin: 0 0 var(--space-3);
 }
 
 .markdown ul,
 .markdown ol {
-  padding-left: 20px;
+  padding-left: var(--space-5);
 }
 
 .markdown a {
@@ -54,18 +57,18 @@
 }
 
 .markdown code {
-  padding: 1px 4px;
-  border-radius: 4px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-xs);
   background: var(--surface-2);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: var(--font-xs);
 }
 
 .markdown pre {
-  padding: 10px 12px;
+  padding: var(--space-3);
   overflow-x: auto;
   border: 1px solid var(--line-soft);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--surface-2);
 }
 
@@ -75,7 +78,7 @@
 }
 
 .markdown blockquote {
-  padding-left: 12px;
+  padding-left: var(--space-3);
   border-left: 3px solid var(--border);
   color: var(--text-secondary);
 }
@@ -83,16 +86,16 @@
 .markdown table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 11.5px;
+  font-size: var(--font-xs);
 }
 
 .markdown th,
 .markdown td {
-  padding: 6px 10px;
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--line-soft);
   text-align: left;
 }
 
 .markdown th {
-  background: var(--header-bg);
+  background: var(--surface-2);
 }

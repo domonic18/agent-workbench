@@ -9,6 +9,8 @@ export interface TableColumn<T> {
   width?: string;
   /** 数字与短标签列不折行 */
   nowrap?: boolean;
+  /** 实体名列（人名、Agent 名）：不用大写微标签样式 */
+  plain?: boolean;
 }
 
 export interface TableProps<T> {
@@ -60,7 +62,7 @@ export function Table<T>({
                 key={column.key}
                 scope="col"
                 style={column.width === undefined ? undefined : { width: column.width }}
-                className={`${ALIGN_CLASS[column.align ?? "left"]} ${column.nowrap === true ? styles.nowrap : ""}`}
+                className={`${ALIGN_CLASS[column.align ?? "left"]} ${column.nowrap === true ? styles.nowrap : ""} ${column.plain === true ? styles.plainColumn : ""}`}
                 data-align={column.align ?? "left"}
                 data-nowrap={column.nowrap === true ? "true" : undefined}
               >
@@ -78,7 +80,7 @@ export function Table<T>({
             >
               {columns.map((column, index) => {
                 const isRowHeader = rowHeader && index === 0;
-                const cellClass = `${ALIGN_CLASS[column.align ?? "left"]} ${column.nowrap === true ? styles.nowrap : ""}`;
+                const cellClass = `${ALIGN_CLASS[column.align ?? "left"]} ${column.nowrap === true ? styles.nowrap : ""} ${column.plain === true ? styles.plainColumn : ""}`;
                 if (isRowHeader) {
                   return (
                     <th

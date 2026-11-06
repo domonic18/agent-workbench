@@ -2,6 +2,8 @@ import { type FormEvent, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "../../../api/client.js";
 import { bootstrapAdmin } from "../../../api/bootstrap.js";
+import { Button } from "../../ui/Button.js";
+import { Field, Input } from "../../ui/Field.js";
 import { Feedback } from "../Feedback.js";
 import styles from "../setup.module.css";
 
@@ -32,28 +34,34 @@ export function StepAdmin() {
       <p className={styles.description}>
         输入本机启动输出的 bootstrap token 并设置管理员口令,即解锁完整控制台。空库与空知识将自动建好。
       </p>
-      <form onSubmit={(event) => void submit(event)}>
-        <label className={styles.label} htmlFor="token">bootstrap token</label>
-        <input
-          id="token"
-          className={styles.input}
-          value={token}
-          onChange={(event) => setToken(event.target.value)}
-          placeholder="从控制台启动日志复制"
-          autoComplete="off"
-        />
-        <label className={styles.label} htmlFor="password">管理员口令</label>
-        <input
-          id="password"
-          className={styles.input}
-          type="password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          autoComplete="new-password"
-        />
-        <button className={styles.button} type="submit" disabled={pending || token.trim() === "" || password === ""}>
+      <form className={styles.form} onSubmit={(event) => void submit(event)}>
+        <Field label="bootstrap token" htmlFor="token">
+          <Input
+            id="token"
+            value={token}
+            onChange={(event) => setToken(event.target.value)}
+            placeholder="从控制台启动日志复制"
+            autoComplete="off"
+          />
+        </Field>
+        <Field label="管理员口令" htmlFor="password">
+          <Input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            autoComplete="new-password"
+          />
+        </Field>
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          loading={pending}
+          disabled={token.trim() === "" || password === ""}
+        >
           {pending ? "初始化中…" : "设置口令并继续"}
-        </button>
+        </Button>
         <Feedback error={error} />
       </form>
     </div>

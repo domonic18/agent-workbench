@@ -126,6 +126,25 @@
   white-space: nowrap;
 }
 
+/* 表头对齐：th 的默认左对齐选择器权重更高，这里显式让出对齐权 */
+.table th.right {
+  text-align: right;
+}
+
+.table th.center {
+  text-align: center;
+}
+
+/* 实体名列：人名与 Agent 名不做大写微标签，字号回到正文 */
+.table th.plainColumn,
+.table td.plainColumn {
+  font-size: var(--font-sm);
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--text);
+}
+
 /* 指标卡 */
 .stat {
   padding: var(--space-4);

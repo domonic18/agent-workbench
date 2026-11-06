@@ -12,6 +12,8 @@ import { useProjectSelection } from "../machines/useProjectSelection.js";
 import { Badge } from "../ui/Badge.js";
 import { Button } from "../ui/Button.js";
 import { EmptyState } from "../ui/EmptyState.js";
+import { ErrorState } from "../ui/ErrorState.js";
+import { LoadingState } from "../ui/LoadingState.js";
 import { Panel } from "../ui/Panel.js";
 import { useToast } from "../ui/Toast.js";
 import type { Tone } from "../../shared/labels.js";
@@ -155,18 +157,25 @@ export function OnlineMachines() {
       title="已上线执行机"
       description="执行机 enroll 成功后开始上报心跳，这里按机器维度列出状态与发现到的项目。"
     >
-      {machines.isPending ? <p className={styles.hint}>读取执行机列表…</p> : null}
+      {machines.isPending ? <LoadingState label="读取执行机列表…" /> : null}
+
       {machines.isError ? (
-        <p className={styles.hint} role="alert">
-          读取执行机列表失败，稍后自动重试。
-        </p>
+        <ErrorState
+          message="读取执行机列表失败，稍后自动重试。"
+          onRetry={() => {
+            void machines.refetch();
+          }}
+        />
       ) : null}
-      {!machines.isPending && list.length === 0 ? (
+
+      {!machines.isPending && !machines.isError && list.length === 0 ? (
         <EmptyState
           title="还没有执行机上线"
           description="在目标机跑完安装命令并完成 enroll 后，这里会立刻出现该机器。"
         />
-      ) : (
+      ) : null}
+
+      {!machines.isPending && !machines.isError && list.length > 0 ? (
         <ul className={styles.machineList}>
           {list.map((machine) => (
             <MachineRow
@@ -178,7 +187,7 @@ export function OnlineMachines() {
             />
           ))}
         </ul>
-      )}
+      ) : null}
     </Panel>
   );
 }

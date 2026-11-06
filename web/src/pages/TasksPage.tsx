@@ -8,6 +8,7 @@ import { TaskFiltersForm } from "../components/task/TaskFilters.js";
 import { TaskTable } from "../components/task/TaskTable.js";
 import { AsyncSection } from "../components/ui/AsyncSection.js";
 import { EmptyState } from "../components/ui/EmptyState.js";
+import { PageFooter } from "../components/ui/PageFooter.js";
 import { useNow } from "../shared/useNow.js";
 import { agentNameMap } from "../shared/agent-label.js";
 import styles from "../components/task/task-list.module.css";
@@ -79,9 +80,9 @@ export function TasksPage() {
         )}
       </AsyncSection>
 
-      <p className={styles.note}>
+      <PageFooter>
         仅显示已自报的任务——Agent 判断不需要建单的活不会出现在这里。
-      </p>
+      </PageFooter>
 
       {/* 详情抽屉独立分包,加载时保留列表视图不闪烁 */}
       <Suspense fallback={null}>

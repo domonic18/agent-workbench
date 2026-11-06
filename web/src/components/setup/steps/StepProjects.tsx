@@ -4,6 +4,7 @@ import { ApiError } from "../../../api/client.js";
 import { confirmAgents, fetchDiscovery } from "../../../api/bootstrap.js";
 import { formatRelativeTime } from "../../../shared/format.js";
 import { useProjectSelection } from "../../machines/useProjectSelection.js";
+import { Button } from "../../ui/Button.js";
 import { Feedback } from "../Feedback.js";
 import styles from "../setup.module.css";
 
@@ -86,13 +87,16 @@ export function StepProjects() {
       {machines.length > 0 && pickedCount === 0 ? (
         <p className={styles.hint}>执行机尚未上报可确认的项目,请确认目标机已配置 cc-connect。</p>
       ) : null}
-      <button
-        className={styles.button}
-        onClick={() => void confirm()}
-        disabled={pending || pickedCount === 0}
-      >
-        {pending ? "确认中…" : confirmed ? "已确认,等待配置下发" : "确认项目与主责 Agent"}
-      </button>
+      <div className={styles.form}>
+        <Button
+          variant="primary"
+          size="lg"
+          onClick={() => void confirm()}
+          disabled={pending || pickedCount === 0}
+        >
+          {pending ? "确认中…" : confirmed ? "已确认,等待配置下发" : "确认项目与主责 Agent"}
+        </Button>
+      </div>
       {confirmed ? <p className={styles.hint}>aw-node 将自动拉取配置并回执,完成后进入下一步。</p> : null}
       <Feedback error={error} />
     </div>

@@ -1,11 +1,7 @@
-.page {
-  max-width: 1044px;
-}
+/* 任务页：筛选 + 列表 + 页脚说明 */
 
-.note {
-  margin: var(--space-6) 0 0;
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--border);
-  font-size: var(--font-xs);
-  color: var(--subtle);
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
 }

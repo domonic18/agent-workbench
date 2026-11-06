@@ -3,8 +3,9 @@ import { useMemo, useState } from "react";
 import { ApiError } from "../../api/client.js";
 import { fetchAgents, setAgentTargets, type AgentSummary } from "../../api/identity.js";
 import { agentDisplayName } from "../../shared/agent-label.js";
-import { EmptyState } from "../ui/EmptyState.js";
 import { Button } from "../ui/Button.js";
+import { EmptyState } from "../ui/EmptyState.js";
+import { Table, type TableColumn } from "../ui/Table.js";
 import styles from "./DelegationMatrix.module.css";
 
 function sameSet(a: readonly string[], b: readonly string[]): boolean {
@@ -68,6 +69,41 @@ export function DelegationMatrix() {
     }
   }
 
+  const columns: TableColumn<AgentSummary>[] = [
+    {
+      key: "corner",
+      header: "发起方 \\ 收件方",
+      plain: true,
+      width: "180px",
+      render: (initiator) => (
+        <span className={styles.rowHead} title={initiator.id}>
+          {agentDisplayName(initiator)}
+        </span>
+      ),
+    },
+    ...agents.map((recipient) => ({
+      key: recipient.id,
+      header: agentDisplayName(recipient),
+      plain: true,
+      align: "center" as const,
+      render: (initiator: AgentSummary) => {
+        const self = initiator.id === recipient.id;
+        const checked = !self && (selection[initiator.id] ?? []).includes(recipient.id);
+        return (
+          <span className={self ? styles.selfCell : styles.cell}>
+            <input
+              type="checkbox"
+              checked={checked}
+              disabled={self || pending}
+              onChange={() => toggle(initiator, recipient)}
+              aria-label={`${agentDisplayName(initiator)} 委派给 ${recipient.displayName}`}
+            />
+          </span>
+        );
+      },
+    })),
+  ];
+
   return (
     <section className={styles.section} aria-label="委派矩阵">
       <header className={styles.header}>
@@ -108,46 +144,15 @@ export function DelegationMatrix() {
             description="先注册 Agent，才能在这里配置谁能找谁。"
           />
         ) : (
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th scope="col" className={styles.corner}>
-                    发起方 \ 收件方
-                  </th>
-                  {agents.map((agent) => (
-                    <th key={agent.id} scope="col" title={agent.id}>
-                      {agentDisplayName(agent)}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {agents.map((initiator) => (
-                  <tr key={initiator.id}>
-                    <th scope="row" className={styles.rowHead} title={initiator.id}>
-                      {agentDisplayName(initiator)}
-                    </th>
-                    {agents.map((recipient) => {
-                      const self = initiator.id === recipient.id;
-                      const checked =
-                        !self && (selection[initiator.id] ?? []).includes(recipient.id);
-                      return (
-                        <td key={recipient.id} className={self ? styles.selfCell : styles.cell}>
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            disabled={self || pending}
-                            onChange={() => toggle(initiator, recipient)}
-                            aria-label={`${agentDisplayName(initiator)} 委派给 ${recipient.displayName}`}
-                          />
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className={styles.matrix}>
+            <Table
+              columns={columns}
+              rows={agents}
+              rowKey={(agent) => agent.id}
+              fixedLayout
+              rowHeader
+              minWidth={`${180 + agents.length * 64}px`}
+            />
           </div>
         )
       ) : null}

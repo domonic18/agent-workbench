@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { runPreflight, type BootstrapStatus } from "../../../api/bootstrap.js";
+import { Badge } from "../../ui/Badge.js";
 import styles from "../setup.module.css";
 
 export function StepDone({ status }: { status: BootstrapStatus }) {
@@ -18,13 +19,10 @@ export function StepDone({ status }: { status: BootstrapStatus }) {
       <ul className={styles.checklist}>
         {preflight.data?.items.map((item) => (
           <li key={item.key} className={styles.checkItem}>
-            <span
-              className={`${styles.badge} ${
-                item.status === "ok" ? styles.ok : item.status === "fail" ? styles.fail : styles.neutral
-              }`}
-            >
-              {item.status === "ok" ? "就绪" : item.status === "fail" ? "失败" : "未配置"}
-            </span>
+            <Badge
+              tone={item.status === "ok" ? "positive" : item.status === "fail" ? "danger" : "muted"}
+              text={item.status === "ok" ? "就绪" : item.status === "fail" ? "失败" : "未配置"}
+            />
             <span>
               {item.detail}
               {item.hint === undefined ? null : <span className={styles.hint}> — {item.hint}</span>}

@@ -1,6 +1,7 @@
 import type { TaskEventDto } from "../../api/tasks.js";
 import { formatDateTime } from "../../shared/format.js";
 import { TASK_EVENT_LABEL } from "../../shared/labels.js";
+import { Button } from "../ui/Button.js";
 import { describeTaskEvent } from "./task-event.js";
 import styles from "./task-timeline.module.css";
 
@@ -43,14 +44,9 @@ export function TaskTimeline({
         </ol>
       )}
       {hasMore ? (
-        <button
-          type="button"
-          className={styles.more}
-          disabled={loadingMore}
-          onClick={onLoadMore}
-        >
-          {loadingMore ? "加载中…" : "加载更多事件"}
-        </button>
+        <Button size="sm" loading={loadingMore} onClick={onLoadMore}>
+          加载更多事件
+        </Button>
       ) : null}
     </section>
   );

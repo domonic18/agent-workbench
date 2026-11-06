@@ -1,5 +1,9 @@
+/* 授权页：视图标签 + 卡片网格 */
+
 .page {
-  max-width: 1044px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
 }
 
 /* 授权卡片网格：宽屏并排，窄屏单列 */

@@ -15,6 +15,7 @@ import { Badge } from "../components/ui/Badge.js";
 import { Button } from "../components/ui/Button.js";
 import { EmptyState } from "../components/ui/EmptyState.js";
 import { Input } from "../components/ui/Field.js";
+import { PageFooter } from "../components/ui/PageFooter.js";
 import { Tabs } from "../components/ui/Tabs.js";
 import { useNow } from "../shared/useNow.js";
 import styles from "./KnowledgePage.module.css";
@@ -160,9 +161,9 @@ export function KnowledgePage() {
         }))}
       />
 
-      <p className={styles.note}>
+      <PageFooter>
         只有已生效条目参与 Agent 检索；候选必须逐条采纳，避免 Agent 自己决定知识库。
-      </p>
+      </PageFooter>
 
       <Outlet />
     </div>
