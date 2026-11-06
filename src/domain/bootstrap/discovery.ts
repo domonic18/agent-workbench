@@ -7,8 +7,8 @@ import {
   listActiveAgentProjects,
   listMachines,
   saveMachineDiscovery,
-  updateAgentFeishuBotByProject,
-} from "../../store/repositories/identity.js";
+} from "../../store/repositories/machine.js";
+import { updateAgentFeishuBotByProject } from "../../store/repositories/agent.js";
 import { BootstrapError } from "./errors.js";
 
 export type { DiscoveryReport } from "../../shared/aw-node-wire.js";

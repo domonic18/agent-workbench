@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createIdentityService } from "../../domain/identity/service.js";
 import { openDatabase, type Db } from "../../store/database.js";
-import { findAgentById } from "../../store/repositories/identity.js";
+import { findAgentById } from "../../store/repositories/agent.js";
 import { ensureConsoleCredential } from "../credential.js";
 import { buildApp } from "../app.js";
 

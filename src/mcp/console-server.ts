@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import type { AgentRecord } from "../store/repositories/identity.js";
+import type { AgentRecord } from "../store/repositories/agent.js";
 import type { ConsoleGateway } from "./console-gateway.js";
 import { CONSOLE_MCP_VERSION } from "./console-shared.js";
 

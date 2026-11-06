@@ -2,7 +2,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { decide, type RunContext, type UsageState } from "../domain/capability/gate.js";
 import { hashArgs } from "../shared/args-hash.js";
 import type { Db } from "../store/database.js";
-import type { AgentRecord } from "../store/repositories/identity.js";
+import type { AgentRecord } from "../store/repositories/agent.js";
 import { insertToolCallLog } from "../store/repositories/tool-call-log.js";
 import {
   errorResult,

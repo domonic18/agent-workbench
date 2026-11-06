@@ -7,7 +7,7 @@ import {
 export interface ConsoleGateway {
   listTools(): Tool[];
   callTool(
-    agent: import("../store/repositories/identity.js").AgentRecord,
+    agent: import("../store/repositories/agent.js").AgentRecord,
     name: string,
     args: Record<string, unknown>,
   ): Promise<CallToolResult>;

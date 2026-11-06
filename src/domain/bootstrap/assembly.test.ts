@@ -12,7 +12,7 @@ import {
   runPreflight,
 } from "./assembly.js";
 import { createIdentityService } from "../identity/service.js";
-import { touchMachineLastSeen } from "../../store/repositories/identity.js";
+import { touchMachineLastSeen } from "../../store/repositories/machine.js";
 import { findAssembly } from "../../store/repositories/assembly.js";
 import { openDatabase, type Db } from "../../store/database.js";
 

@@ -5,7 +5,7 @@ import type { A2aService } from "../../domain/a2a/types.js";
 import { A2A_PROTOCOL_VERSION } from "../../shared/constants.js";
 import { validateEnvelope } from "../../shared/protocol.js";
 import type { Db } from "../../store/database.js";
-import type { AgentRecord } from "../../store/repositories/identity.js";
+import type { AgentRecord } from "../../store/repositories/agent.js";
 import { requireAgentAuth } from "../middleware/agent-auth.js";
 import { requireIdempotencyKey } from "../middleware/session.js";
 import { announceAck, announceHandoff } from "../../domain/collab/announce.js";

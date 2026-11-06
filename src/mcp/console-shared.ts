@@ -9,7 +9,7 @@ import { WorkError } from "../domain/work/errors.js";
 import type { IngestResult, WorkRequest } from "../domain/work/contract.js";
 import type { WorkerService } from "../domain/work/worker-service.js";
 import type { Db } from "../store/database.js";
-import type { AgentRecord } from "../store/repositories/identity.js";
+import type { AgentRecord } from "../store/repositories/agent.js";
 
 export const CONSOLE_MCP_VERSION = "0.1.0";
 

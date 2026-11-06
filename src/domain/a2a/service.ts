@@ -15,7 +15,7 @@ import {
   maxRound,
   type A2aThreadRecord,
 } from "../../store/repositories/a2a.js";
-import { findAgentById, type AgentRecord } from "../../store/repositories/identity.js";
+import { findAgentById, type AgentRecord } from "../../store/repositories/agent.js";
 import {
   claimPullByMsgId,
   findOutboxByKey,

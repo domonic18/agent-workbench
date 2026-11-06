@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { openDatabase, type Db } from "../../store/database.js";
-import { insertMachine } from "../../store/repositories/identity.js";
+import { insertMachine } from "../../store/repositories/machine.js";
 import { createRevisionService } from "./service.js";
 
 const AT = 1_700_000_000_000;

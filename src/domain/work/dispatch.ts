@@ -1,5 +1,5 @@
 import type { Db } from "../../store/database.js";
-import { findAgentByKey } from "../../store/repositories/identity.js";
+import { findAgentByKey } from "../../store/repositories/agent.js";
 import { TASK_LIMITS } from "../../shared/constants.js";
 import { appendWorkItemEvent, insertWorkItem } from "../../store/repositories/work-item.js";
 import { insertWorkerInboxIfNew } from "../../store/repositories/work-inbox.js";

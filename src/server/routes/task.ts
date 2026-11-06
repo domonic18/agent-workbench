@@ -4,7 +4,7 @@ import { TaskError } from "../../domain/task/errors.js";
 import { createTaskService, type TaskService } from "../../domain/task/service.js";
 import { TASK_STAGES, TASK_STATUSES } from "../../shared/constants.js";
 import type { Db } from "../../store/database.js";
-import type { AgentRecord } from "../../store/repositories/identity.js";
+import type { AgentRecord } from "../../store/repositories/agent.js";
 import { requireAgentAuth } from "../middleware/agent-auth.js";
 import { requireIdempotencyKey } from "../middleware/session.js";
 import { announceTaskUpdate } from "../../domain/collab/announce.js";

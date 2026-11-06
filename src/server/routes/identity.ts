@@ -2,16 +2,26 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import { IdentityError } from "../../domain/identity/errors.js";
 import { createIdentityService, type IdentityService } from "../../domain/identity/service.js";
-import { AGENT_RUNTIMES, LIST_LIMITS, type AgentRuntime, type IdentityStatus } from "../../shared/constants.js";
+import {
+  AGENT_RUNTIMES,
+  LIST_LIMITS,
+  type AgentRuntime,
+  type IdentityStatus,
+} from "../../shared/constants.js";
 import { formatKeysetCursor, parseKeysetCursor } from "../../shared/cursor.js";
 import type { Db } from "../../store/database.js";
 import { parseJsonStringArray } from "../../store/json.js";
-import type { AgentRecord, MachineRecord } from "../../store/repositories/identity.js";
+import type { MachineRecord } from "../../store/repositories/machine.js";
+import type { AgentRecord } from "../../store/repositories/agent.js";
 import {
   listAgentRosterRows,
   type AgentRosterRow,
 } from "../../store/repositories/agent-roster.js";
-import { findUsageLimitByAgentId, findUsageLimitsByAgentIds, type UsageLimitRecord } from "../../store/repositories/usage-limit.js";
+import {
+  findUsageLimitByAgentId,
+  findUsageLimitsByAgentIds,
+  type UsageLimitRecord,
+} from "../../store/repositories/usage-limit.js";
 import { requireCsrf, requireIdempotencyKey, requireSession } from "../middleware/session.js";
 
 const machineCreateSchema = z.object({

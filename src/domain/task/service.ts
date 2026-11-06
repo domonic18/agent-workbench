@@ -6,7 +6,7 @@ import {
 } from "../../shared/constants.js";
 import { newPrefixedId } from "../../shared/ids.js";
 import type { Db } from "../../store/database.js";
-import { findAgentById } from "../../store/repositories/identity.js";
+import { findAgentById } from "../../store/repositories/agent.js";
 import {
   bindRunTaskIfEmpty,
   findLatestUnboundRunningRunByAgent,

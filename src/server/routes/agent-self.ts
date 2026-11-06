@@ -4,7 +4,7 @@ import type { Db } from "../../store/database.js";
 import {
   updateAgentFeishuBot,
   type AgentRecord,
-} from "../../store/repositories/identity.js";
+} from "../../store/repositories/agent.js";
 import { requireAgentAuth } from "../middleware/agent-auth.js";
 
 const feishuBotSchema = z.object({

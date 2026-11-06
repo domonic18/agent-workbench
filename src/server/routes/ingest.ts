@@ -8,7 +8,7 @@ import {
   listActiveAgentProjects,
   type MachineRecord,
   touchMachineLastSeen,
-} from "../../store/repositories/identity.js";
+} from "../../store/repositories/machine.js";
 import { requireMachineAuth } from "../middleware/machine-auth.js";
 
 const heartbeatSchema = z.object({

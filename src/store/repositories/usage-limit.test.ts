@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { openDatabase, type Db } from "../database.js";
-import { insertAgent, type NewAgent } from "./identity.js";
+import { insertAgent, type NewAgent } from "./agent.js";
 import {
   deleteUsageLimit,
   findUsageLimitByAgentId,

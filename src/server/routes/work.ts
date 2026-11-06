@@ -16,7 +16,7 @@ import {
 } from "../../shared/constants.js";
 import { parseJsonObject } from "../../shared/json.js";
 import type { Db } from "../../store/database.js";
-import type { AgentRecord } from "../../store/repositories/identity.js";
+import type { AgentRecord } from "../../store/repositories/agent.js";
 import type { WorkItemRecord } from "../../store/repositories/work-item.js";
 import type { UsageResolver } from "../../domain/usage/state.js";
 import { requireAgentAuth } from "../middleware/agent-auth.js";

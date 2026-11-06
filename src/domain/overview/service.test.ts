@@ -6,7 +6,8 @@ import {
 import { OVERVIEW_SCOPE } from "../../shared/scopes.js";
 import { openDatabase, type Db } from "../../store/database.js";
 import { insertCapability } from "../../store/repositories/capability.js";
-import { insertAgent, insertMachine } from "../../store/repositories/identity.js";
+import { insertMachine } from "../../store/repositories/machine.js";
+import { insertAgent } from "../../store/repositories/agent.js";
 import { currentRevision } from "../../store/repositories/revision.js";
 import {
   bindRunTaskIfEmpty,

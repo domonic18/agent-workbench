@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createIdentityService } from "../../domain/identity/service.js";
 import { openDatabase, type Db } from "../../store/database.js";
 import { hasIngestReceipt } from "../../store/repositories/ingest-receipt.js";
-import { findMachineById } from "../../store/repositories/identity.js";
+import { findMachineById } from "../../store/repositories/machine.js";
 import { findRunningRunForStream, listTimelineEventsByRun } from "../../store/repositories/run.js";
 import { ensureConsoleCredential } from "../credential.js";
 import { buildApp } from "../app.js";

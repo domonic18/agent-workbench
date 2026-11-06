@@ -9,7 +9,7 @@ import { createConsoleGateway } from "../../mcp/console-gateway.js";
 import { createConsoleTools } from "../../mcp/console-tools.js";
 import { handleConsoleMcp } from "../../mcp/console-server.js";
 import type { Db } from "../../store/database.js";
-import type { AgentRecord } from "../../store/repositories/identity.js";
+import type { AgentRecord } from "../../store/repositories/agent.js";
 import { requireAgentAuth } from "../middleware/agent-auth.js";
 
 export interface McpRoutesOptions {

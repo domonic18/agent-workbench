@@ -1,4 +1,4 @@
-import { findAgentById } from "../../store/repositories/identity.js";
+import { findAgentById } from "../../store/repositories/agent.js";
 import { findTaskById } from "../../store/repositories/task.js";
 import {
   findMessageById,

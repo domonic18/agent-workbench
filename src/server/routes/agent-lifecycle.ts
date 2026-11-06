@@ -11,7 +11,7 @@ import {
 } from "../../domain/security/idempotency.js";
 import { IDENTITY_STATUSES } from "../../shared/constants.js";
 import type { Db } from "../../store/database.js";
-import { findAgentById } from "../../store/repositories/identity.js";
+import { findAgentById } from "../../store/repositories/agent.js";
 import { requireCsrf, requireIdempotencyKey, requireSession } from "../middleware/session.js";
 import { sendError, toAgentDto, validationError } from "./identity.js";
 

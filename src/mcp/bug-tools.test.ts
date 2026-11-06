@@ -14,7 +14,7 @@ import {
   insertAgent,
   type AgentRecord,
   type NewAgent,
-} from "../store/repositories/identity.js";
+} from "../store/repositories/agent.js";
 import { claimPendingForAgent } from "../store/repositories/work-inbox.js";
 import { findWorkItemById } from "../store/repositories/work-item.js";
 import { createBugTools } from "./bug-tools.js";

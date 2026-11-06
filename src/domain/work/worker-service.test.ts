@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { WORK_INBOX } from "../../shared/constants.js";
 import { openDatabase, type Db } from "../../store/database.js";
-import { insertAgent } from "../../store/repositories/identity.js";
+import { insertAgent } from "../../store/repositories/agent.js";
 import { insertWorkItem, listWorkItemEvents } from "../../store/repositories/work-item.js";
 import {
   claimPendingForAgent,

@@ -8,10 +8,7 @@ import { consumeOneTimeToken } from "../../domain/bootstrap/one-time-token.js";
 import { IdentityError } from "../../domain/identity/errors.js";
 import { createIdentityService, type IdentityService } from "../../domain/identity/service.js";
 import type { Db } from "../../store/database.js";
-import {
-  touchMachineLastSeen,
-  type MachineRecord,
-} from "../../store/repositories/identity.js";
+import { touchMachineLastSeen, type MachineRecord } from "../../store/repositories/machine.js";
 import { requireMachineAuth } from "../middleware/machine-auth.js";
 import { requireIdempotencyKey } from "../middleware/session.js";
 import { domainError, invalidSchema } from "./http.js";

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { openDatabase, type Db } from "../../store/database.js";
-import { insertAgent, type NewAgent } from "../../store/repositories/identity.js";
+import { insertAgent, type NewAgent } from "../../store/repositories/agent.js";
 import { insertTokenUsage } from "../../store/repositories/token-usage.js";
 import { insertRun } from "../../store/repositories/run.js";
 import { upsertUsageLimit } from "../../store/repositories/usage-limit.js";

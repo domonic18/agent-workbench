@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { openDatabase, type Db } from "../../store/database.js";
-import { insertAgent, type NewAgent } from "../../store/repositories/identity.js";
+import { insertAgent, type NewAgent } from "../../store/repositories/agent.js";
 import { claimPendingForAgent } from "../../store/repositories/work-inbox.js";
 import { findWorkItemById, listWorkItemEvents } from "../../store/repositories/work-item.js";
 import type { WorkPolicy } from "../routing/policy.js";

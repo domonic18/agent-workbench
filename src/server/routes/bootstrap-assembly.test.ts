@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { confirmAgents, ackMachineConfig, pullMachineConfig } from "../../domain/bootstrap/config-delivery.js";
+import {
+  confirmAgents,
+  ackMachineConfig,
+  pullMachineConfig,
+} from "../../domain/bootstrap/config-delivery.js";
 import { createIdentityService } from "../../domain/identity/service.js";
-import { touchMachineLastSeen } from "../../store/repositories/identity.js";
+import { touchMachineLastSeen } from "../../store/repositories/machine.js";
 import { openDatabase, type Db } from "../../store/database.js";
 import { buildApp } from "../app.js";
 import { ensureConsoleCredential } from "../credential.js";

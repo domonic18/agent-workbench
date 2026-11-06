@@ -14,7 +14,7 @@ import {
   findAgentById,
   findAgentByMachineProject,
   type AgentRecord,
-} from "../../store/repositories/identity.js";
+} from "../../store/repositories/agent.js";
 import { IdentityError } from "./errors.js";
 
 export interface UpdateAgentInput {

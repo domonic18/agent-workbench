@@ -1,6 +1,6 @@
 import { enqueuePush } from "../../reliability/outbox.js";
 import type { Db } from "../../store/database.js";
-import { findAgentById } from "../../store/repositories/identity.js";
+import { findAgentById } from "../../store/repositories/agent.js";
 import { findWorkItemById } from "../../store/repositories/work-item.js";
 import { findActiveAssignee } from "../../store/repositories/work-inbox.js";
 import { findWorkTriggerById } from "../../store/repositories/work-trigger.js";

@@ -5,20 +5,22 @@ import type {
 import { newPrefixedId } from "../../shared/ids.js";
 import type { Db } from "../../store/database.js";
 import {
+  findMachineById,
+  consumeMachineBotRefresh,
+  requestMachineBotRefresh,
+  updateMachineConfigStatus,
+  type MachineConfigStatus,
+} from "../../store/repositories/machine.js";
+import {
   findAgentById,
   findAgentByKey,
   findAgentByMachineProject,
-  findMachineById,
   insertAgent,
   listAgentsByMachine,
   markAgentConfigAck,
-  consumeMachineBotRefresh,
-  requestMachineBotRefresh,
   rotateAgentDeliverySecret,
-  updateMachineConfigStatus,
   type AgentRecord,
-  type MachineConfigStatus,
-} from "../../store/repositories/identity.js";
+} from "../../store/repositories/agent.js";
 import { hashSecret, newSecret } from "../security/secrets.js";
 import { feishuBotsFromDiscovery } from "./discovery.js";
 import { BootstrapError } from "./errors.js";

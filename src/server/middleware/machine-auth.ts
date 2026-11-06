@@ -1,6 +1,6 @@
 import type { FastifyReply } from "fastify";
 import type { Db } from "../../store/database.js";
-import { findMachineById, type MachineRecord } from "../../store/repositories/identity.js";
+import { findMachineById, type MachineRecord } from "../../store/repositories/machine.js";
 import { verifySecret } from "../../domain/security/secrets.js";
 import { parseBearer } from "./bearer.js";
 import type { PreHandler } from "./session.js";

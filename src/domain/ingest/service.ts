@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { INGEST_REJECTED_KIND, INGEST_TOKEN_USAGE_KIND } from "../../shared/constants.js";
 import type { Db } from "../../store/database.js";
-import { findAgentByMachineProject } from "../../store/repositories/identity.js";
+import { findAgentByMachineProject } from "../../store/repositories/agent.js";
 import { hasIngestReceipt, insertIngestReceipt } from "../../store/repositories/ingest-receipt.js";
 import { createRunService, type RunService } from "../run/service.js";
 import { createTokenUsageService, type TokenUsageService } from "../usage/service.js";

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { Db } from "../../store/database.js";
 import { findAssembly } from "../../store/repositories/assembly.js";
-import { findAgentById, findAgentByKey } from "../../store/repositories/identity.js";
+import { findAgentById, findAgentByKey } from "../../store/repositories/agent.js";
 
 /**
  * Git 版本化工作策略(arch/01 §9.2、arch/02 §3.9):work_kind 与 RouteRule 的

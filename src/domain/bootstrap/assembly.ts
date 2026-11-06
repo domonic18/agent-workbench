@@ -1,9 +1,6 @@
 import type { Db } from "../../store/database.js";
-import {
-  findAgentById,
-  listAgents,
-  listMachines,
-} from "../../store/repositories/identity.js";
+import { listMachines } from "../../store/repositories/machine.js";
+import { findAgentById, listAgents } from "../../store/repositories/agent.js";
 import {
   findAssembly,
   insertAssembly,

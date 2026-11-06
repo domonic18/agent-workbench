@@ -4,7 +4,7 @@ import { newPrefixedId } from "../../shared/ids.js";
 import type { Db } from "../../store/database.js";
 import { findTaskOwnedBy } from "../../store/repositories/task.js";
 import { findKnowledgeEntryByPath, insertKnowledgeEntry } from "../../store/repositories/knowledge.js";
-import type { AgentRecord } from "../../store/repositories/identity.js";
+import type { AgentRecord } from "../../store/repositories/agent.js";
 import { KnowledgeError } from "./entry-service.js";
 import { isProtectedKnowledgePath, resolveEntryPath } from "./paths.js";
 

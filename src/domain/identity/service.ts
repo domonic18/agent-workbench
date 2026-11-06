@@ -2,22 +2,24 @@ import { EXTERNAL_RUNTIMES, IDENTITY_LIMITS, type AgentRuntime } from "../../sha
 import { newPrefixedId } from "../../shared/ids.js";
 import type { Db } from "../../store/database.js";
 import {
+  findMachineById,
+  insertMachine,
+  listMachines,
+  updateMachineSecretHash,
+  type MachineListQuery,
+  type MachineRecord,
+} from "../../store/repositories/machine.js";
+import {
   findAgentById,
   findAgentByKey,
   findAgentByMachineProject,
-  findMachineById,
   insertAgent,
-  insertMachine,
   listAgents,
-  listMachines,
   updateAgentAllowedTargets,
   updateAgentSecretHash,
-  updateMachineSecretHash,
   type AgentListQuery,
   type AgentRecord,
-  type MachineListQuery,
-  type MachineRecord,
-} from "../../store/repositories/identity.js";
+} from "../../store/repositories/agent.js";
 import { upsertUsageLimit } from "../../store/repositories/usage-limit.js";
 import { hashSecret, newSecret } from "../security/secrets.js";
 import { IdentityError } from "./errors.js";

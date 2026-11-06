@@ -10,7 +10,7 @@ import { createTaskService } from "../domain/task/service.js";
 import { createIngestService } from "../domain/work/ingest-service.js";
 import { createWorkerService } from "../domain/work/worker-service.js";
 import { openDatabase, type Db } from "../store/database.js";
-import type { AgentRecord } from "../store/repositories/identity.js";
+import type { AgentRecord } from "../store/repositories/agent.js";
 import { createConsoleGateway } from "./console-gateway.js";
 import { createConsoleTools } from "./console-tools.js";
 

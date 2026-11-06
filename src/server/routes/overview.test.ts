@@ -1,7 +1,8 @@
 import type { FastifyInstance, LightMyRequestResponse } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openDatabase, type Db } from "../../store/database.js";
-import { insertAgent, insertMachine } from "../../store/repositories/identity.js";
+import { insertMachine } from "../../store/repositories/machine.js";
+import { insertAgent } from "../../store/repositories/agent.js";
 import { buildApp } from "../app.js";
 import { ensureConsoleCredential } from "../credential.js";
 
