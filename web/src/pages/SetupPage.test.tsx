@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../api/client.js";
+import { ToastProvider } from "../components/ui/Toast.js";
 
 const bootstrap = await import("../api/bootstrap.js");
 vi.mock("../api/bootstrap.js", async (importOriginal) => {
@@ -12,7 +13,8 @@ vi.mock("../api/bootstrap.js", async (importOriginal) => {
     bootstrapStatus: vi.fn(),
     bootstrapAdmin: vi.fn(),
     issueEnrollToken: vi.fn(),
-    fetchDiscovery: vi.fn(),
+    fetchDiscovery: vi.fn(async () => ({ machines: [] })),
+    fetchArtifacts: vi.fn(async () => ({ publicUrl: null, assets: [] })),
     confirmAgents: vi.fn(),
     runPreflight: vi.fn(),
     completeSetup: vi.fn(),
@@ -30,7 +32,9 @@ function renderPage() {
   render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={["/setup"]}>
-        <SetupPage />
+        <ToastProvider>
+          <SetupPage />
+        </ToastProvider>
       </MemoryRouter>
     </QueryClientProvider>,
   );

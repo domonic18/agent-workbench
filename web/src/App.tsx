@@ -44,6 +44,10 @@ const SetupPage = lazy(async () => {
   const module = await import("./pages/SetupPage.js");
   return { default: module.SetupPage };
 });
+const OnboardingPage = lazy(async () => {
+  const module = await import("./pages/OnboardingPage.js");
+  return { default: module.OnboardingPage };
+});
 
 /** 任意 API 401 统一回登录页,并记住原路径(03 §3) */
 function UnauthorizedRedirect() {
@@ -101,6 +105,7 @@ export function App() {
                 <Route path=":id" element={<TaskDrawerRoute />} />
               </Route>
               <Route path="/capabilities" element={<CapabilitiesPage />} />
+              <Route path="/onboarding" element={<OnboardingPage />} />
               <Route path="/knowledge" element={<KnowledgePage />}>
                 <Route path=":id" element={<KnowledgeDetailRoute />} />
               </Route>

@@ -33,6 +33,11 @@ const PAGE_META: { path: string; title: string; description: string }[] = [
     description: "能力签发与委派白名单的授权事实",
   },
   {
+    path: "/onboarding",
+    title: "接入执行机",
+    description: "下载产物、安装 aw-node、签发令牌并确认执行机上线",
+  },
+  {
     path: "/knowledge",
     title: "知识",
     description: "人工采纳与待审阅的知识条目",

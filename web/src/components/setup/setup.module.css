@@ -90,20 +90,6 @@
   box-sizing: border-box;
 }
 
-.textarea {
-  width: 100%;
-  min-height: 64px;
-  padding: 9px 11px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: inherit;
-  font-family: var(--font-mono);
-  font-size: var(--font-sm);
-  box-sizing: border-box;
-  resize: vertical;
-}
-
 .button {
   margin-top: var(--space-5);
   width: 100%;
@@ -122,27 +108,11 @@
   cursor: not-allowed;
 }
 
+/* 独立次要按钮:不依附 .button,面板内直接使用 */
 .buttonSecondary {
   background: transparent;
   border: 1px solid var(--border);
   color: var(--text);
-}
-
-/* 独立次要按钮:不依附 .button,面板内直接使用 */
-.buttonGhost {
-  margin-top: var(--space-3);
-  padding: 8px 12px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text);
-  font-size: var(--font-sm);
-  cursor: pointer;
-}
-
-.buttonGhost:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .error {
@@ -162,69 +132,6 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: var(--space-4);
-}
-
-/* 标签与复制按钮同排:标签左、复制右 */
-.fieldHead {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
-
-.copyButton {
-  flex-shrink: 0;
-  padding: 3px 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text);
-  font-size: var(--font-xs);
-  cursor: pointer;
-}
-
-.copyButton:hover {
-  border-color: var(--accent);
-}
-
-.artifactList {
-  list-style: none;
-  padding: 0;
-  margin: var(--space-2) 0 0;
-}
-
-.artifact {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.artifact:last-child {
-  border-bottom: none;
-}
-
-.artifactInfo {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.artifactLink {
-  color: var(--accent);
-  font-size: var(--font-md);
-  text-decoration: none;
-  /* 下载入口是独立可点元素，窄屏按 44px 触达底线给 */
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-}
-
-.artifactLink:hover {
-  text-decoration: underline;
 }
 
 .project {

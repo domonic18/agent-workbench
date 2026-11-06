@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentRosterSummary } from "../api/identity.js";
 import { RealtimeProvider } from "../api/stream.js";
@@ -80,15 +81,23 @@ function fakeFetch(
   });
 }
 
+function LocationProbe() {
+  const location = useLocation();
+  return <span data-testid="pathname">{location.pathname}</span>;
+}
+
 function renderPage(): void {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
-    <QueryClientProvider client={client}>
-      {/* overview 作用域的实时连接由外壳持有，页面测试里显式提供 */}
-      <RealtimeProvider>
-        <OverviewPage />
-      </RealtimeProvider>
-    </QueryClientProvider>,
+    <MemoryRouter initialEntries={["/overview"]}>
+      <QueryClientProvider client={client}>
+        {/* overview 作用域的实时连接由外壳持有，页面测试里显式提供 */}
+        <RealtimeProvider>
+          <OverviewPage />
+          <LocationProbe />
+        </RealtimeProvider>
+      </QueryClientProvider>
+    </MemoryRouter>,
   );
 }
 
@@ -155,11 +164,14 @@ describe("总览页", () => {
     expect(FakeEventSource.lastUrl).toContain("client_id=");
   });
 
-  it("执行机接入面板默认展开,下载直链不藏在折叠区里", async () => {
+  it("提供接入执行机入口并跳到接入向导", async () => {
     vi.stubGlobal("fetch", fakeFetch(snapshot()));
     renderPage();
 
-    const disclosure = (await screen.findByText("添加执行机")).closest("details");
-    expect(disclosure?.open).toBe(true);
+    const entry = await screen.findByRole("button", { name: "接入执行机" });
+    entry.click();
+    await waitFor(() => {
+      expect(screen.getByTestId("pathname").textContent).toBe("/onboarding");
+    });
   });
 });

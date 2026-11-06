@@ -12,6 +12,14 @@ export function formatTokens(value: number): string {
   return formatExactTokens(value);
 }
 
+/** 字节体积口径：KB 起步，否则 MB 保留一位小数 */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
 function pad(value: number): string {
   return value.toString().padStart(2, "0");
 }
