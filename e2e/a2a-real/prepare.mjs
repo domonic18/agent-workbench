@@ -139,7 +139,7 @@ function bundleOf(scenario, sender, receiver, extra) {  const spec = SCENARIOS[s
     sender,
     receiver,
     mcp: { url: `${publicUrl}/mcp` },
-    protocolPrompt: receiverPrompt(spec.task),
+    protocolPrompt: receiverPrompt(),
     ...extra,
   };
 }
