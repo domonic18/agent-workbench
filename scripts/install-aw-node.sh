@@ -13,6 +13,7 @@ PROJECTS=""
 STATE_DIR="${AW_STATE_DIR:-$HOME/.aw-node}"
 BACKFILL=0
 YES=0
+SOURCE="auto"
 CLAUDE_DIR=""
 CC_DIR=""
 
@@ -26,6 +27,9 @@ usage() {
   --state-dir <path>    本地状态目录,默认 ~/.aw-node
   --backfill            首次安装时回读历史会话(默认从文件末尾开始)
   --version <tag>       指定 Release 版本(如 0.2.1),默认 latest
+  --source <auto|console|github>
+                        产物来源:auto 先取控制台镜像,取不到再回退 GitHub Release;
+                        console 只用控制台;github 只用 GitHub Release
   --claude-dir <path>   覆盖 Claude 数据目录
   --cc-connect-dir <p>  覆盖 cc-connect 数据目录
   --yes                 不询问确认(自动化/Agent 代跑)
@@ -42,6 +46,7 @@ while [ $# -gt 0 ]; do
     --state-dir) STATE_DIR="$2"; shift 2 ;;
     --backfill) BACKFILL=1; shift ;;
     --version) VERSION="$2"; shift 2 ;;
+    --source) SOURCE="$2"; shift 2 ;;
     --claude-dir) CLAUDE_DIR="$2"; shift 2 ;;
     --cc-connect-dir) CC_DIR="$2"; shift 2 ;;
     --yes) YES=1; shift ;;
@@ -68,14 +73,15 @@ case "$(uname -m)" in
 esac
 
 if [ "$VERSION" = "latest" ]; then
-  BASE="https://github.com/$REPO/releases/latest/download"
+  GITHUB_BASE="https://github.com/$REPO/releases/latest/download"
 else
   case "$VERSION" in
     collector-v*) ;;
     *) VERSION="collector-v$VERSION" ;;
   esac
-  BASE="https://github.com/$REPO/releases/download/$VERSION"
+  GITHUB_BASE="https://github.com/$REPO/releases/download/$VERSION"
 fi
+CONSOLE_BASE="$URL/artifacts"
 ASSET="aw-node-macos-$ARCH"
 
 if [ "$YES" != "1" ] && [ -r /dev/tty ]; then
@@ -91,11 +97,54 @@ TMPDIR_AW=$(mktemp -d "${TMPDIR:-/tmp}/aw-node.XXXXXX")
 cleanup() { rm -rf "$TMPDIR_AW"; }
 trap cleanup EXIT INT TERM
 
-echo "下载 $ASSET ($VERSION) ..."
-curl --fail --location --silent --show-error --retry 3 \
-  -o "$TMPDIR_AW/$ASSET" "$BASE/$ASSET"
-curl --fail --location --silent --show-error --retry 3 \
-  -o "$TMPDIR_AW/checksums.txt" "$BASE/checksums.txt"
+# 产物与校验和必须同源:混源比对会拿两套不同构建的摘要互校
+fetch_from() {
+  BASE="$1"
+  curl --fail --location --silent --show-error --retry 3 \
+    -o "$TMPDIR_AW/$ASSET" "$BASE/$ASSET" || return 1
+  curl --fail --location --silent --show-error --retry 3 \
+    -o "$TMPDIR_AW/checksums.txt" "$BASE/checksums.txt" || return 1
+  return 0
+}
+
+BASE=""
+case "$SOURCE" in
+  console)
+    echo "从控制台取件 $CONSOLE_BASE/$ASSET ..."
+    fetch_from "$CONSOLE_BASE" || {
+      echo "控制台没有该平台产物(缺 $ASSET 或 checksums.txt)" >&2
+      echo "改用 --source github 从 GitHub Release 取" >&2
+      exit 1
+    }
+    BASE="$CONSOLE_BASE"
+    ;;
+  github)
+    echo "从 GitHub Release 取件 $GITHUB_BASE/$ASSET ..."
+    fetch_from "$GITHUB_BASE" || {
+      echo "下载失败(产物或 checksums.txt 取不到)" >&2
+      exit 1
+    }
+    BASE="$GITHUB_BASE"
+    ;;
+  auto)
+    echo "从控制台取件 $CONSOLE_BASE/$ASSET ..."
+    if fetch_from "$CONSOLE_BASE"; then
+      BASE="$CONSOLE_BASE"
+    else
+      echo "控制台无产物,回退 GitHub Release ..."
+      fetch_from "$GITHUB_BASE" || {
+        echo "下载失败(控制台与 GitHub 都取不到产物)" >&2
+        exit 1
+      }
+      BASE="$GITHUB_BASE"
+    fi
+    ;;
+  *)
+    echo "未知 --source: $SOURCE(取 auto|console|github)" >&2
+    exit 2
+    ;;
+esac
+echo "来源 $BASE"
 
 EXPECTED=$(awk -v name="$ASSET" '$2 == name { print $1 }' "$TMPDIR_AW/checksums.txt")
 if [ -z "$EXPECTED" ]; then
