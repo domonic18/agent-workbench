@@ -251,7 +251,7 @@ export function AgentEditDialog({
         <h3 className={styles.sectionTitle}>危险操作</h3>
         <div className={styles.dangerZone}>
           <p className={styles.sectionHint}>
-            删除会级联清理该 Agent 的收件箱、A2A 线程、运行记录与 Token 账目，历史任务保留。
+            删除不可逆：会级联清理该 Agent 的收件箱、整条 A2A 线程、运行记录与 Token 账目，历史任务保留。
           </p>
           <Button
             size="sm"

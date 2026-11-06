@@ -217,6 +217,12 @@
 }
 
 /* 删除影响清单 */
+.dangerNote {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-sm);
+  color: var(--danger);
+}
+
 .impact {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

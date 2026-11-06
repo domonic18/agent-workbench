@@ -97,6 +97,16 @@ describe("删除 Agent 确认", () => {
     expect((confirm as HTMLButtonElement).disabled).toBe(false);
   });
 
+  it("写明删除不可逆,A2A 按整条线程口径计数", async () => {
+    vi.mocked(fetchAgents).mockResolvedValue([agent()]);
+    vi.mocked(fetchAgentDeleteImpact).mockResolvedValue(IMPACT);
+    renderDialog();
+
+    expect(await screen.findByText(/删除不可逆/)).toBeTruthy();
+    expect(screen.getByText("A2A 线程（整条）")).toBeTruthy();
+    expect(screen.getByText("A2A 消息（整条线程内）")).toBeTruthy();
+  });
+
   it("是默认 bug_fix 主责时必须先指定接替者", async () => {
     vi.mocked(fetchAgents).mockResolvedValue([agent()]);
     vi.mocked(fetchAgentDeleteImpact).mockResolvedValue({

@@ -21,8 +21,8 @@ export interface AgentDeleteDialogProps {
 
 const DESTROYED_LABELS: [keyof AgentDeletionPreview["impact"]["destroyed"], string][] = [
   ["workerInbox", "收件箱派工行"],
-  ["a2aThread", "A2A 线程"],
-  ["a2aMessage", "A2A 消息"],
+  ["a2aThread", "A2A 线程（整条）"],
+  ["a2aMessage", "A2A 消息（整条线程内）"],
   ["a2aDeadLetter", "投递死信"],
   ["outboxPull", "未终态投递"],
   ["agentRun", "运行记录"],
@@ -120,6 +120,9 @@ export function AgentDeleteDialog({
 
       {preview === undefined ? null : (
         <>
+          <p className={styles.dangerNote}>
+            删除不可逆：以下内容会随该 Agent 一起消失，界面上无法恢复。
+          </p>
           <div className={styles.impact}>
             <div className={styles.impactGroup}>
               <div className={styles.impactGroupTitle}>将被删除</div>
