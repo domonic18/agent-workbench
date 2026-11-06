@@ -228,7 +228,9 @@
   }
 
   .links {
-    flex: 1;
+    /* 导航独占一行：否则与品牌区、环境标签抢宽度，右侧的导航项会被截掉 */
+    flex: 1 0 100%;
+    order: 1;
     flex-direction: row;
     gap: var(--space-1);
     padding: var(--space-2) var(--space-3);
@@ -255,6 +257,8 @@
   }
 
   .navFooter {
+    order: 0;
+    margin-left: auto;
     padding: var(--space-2) var(--space-4);
   }
 

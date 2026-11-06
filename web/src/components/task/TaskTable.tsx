@@ -106,6 +106,7 @@ export function TaskTable({ tasks, agentNames, search, now = Date.now() }: TaskT
       key: "round",
       header: "轮次",
       width: "6%",
+      nowrap: true,
       render: (task) => (
         <>
           <div>第 {task.round} 轮</div>

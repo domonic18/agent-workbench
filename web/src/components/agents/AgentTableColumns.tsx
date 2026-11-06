@@ -28,7 +28,7 @@ export function buildAgentColumns(options: AgentColumnOptions): TableColumn<Agen
   return [
     {
       key: "agent",
-      width: "168px",
+      width: "154px",
       header: (
         <span className={styles.headerCell}>
           机器人
@@ -60,7 +60,7 @@ export function buildAgentColumns(options: AgentColumnOptions): TableColumn<Agen
     },
     {
       key: "machine",
-      width: "128px",
+      width: "96px",
       header: (
         <span className={styles.headerCell}>
           机器
@@ -77,7 +77,9 @@ export function buildAgentColumns(options: AgentColumnOptions): TableColumn<Agen
             {name === null || name === undefined ? (
               <span className={styles.muted}>未绑定</span>
             ) : (
-              name
+              <span className={styles.machineName} title={name}>
+                {name}
+              </span>
             )}
           </span>
         );
@@ -85,7 +87,7 @@ export function buildAgentColumns(options: AgentColumnOptions): TableColumn<Agen
     },
     {
       key: "status",
-      width: "128px",
+      width: "120px",
       header: "状态",
       render: (agent) => (
         <div className={styles.statusCell}>{statusBadges(agent, liveById.get(agent.id))}</div>
@@ -93,7 +95,7 @@ export function buildAgentColumns(options: AgentColumnOptions): TableColumn<Agen
     },
     {
       key: "task",
-      width: "200px",
+      width: "184px",
       header: "当前任务",
       render: (agent) => {
         const live = liveById.get(agent.id);
@@ -148,9 +150,10 @@ export function buildAgentColumns(options: AgentColumnOptions): TableColumn<Agen
     },
     {
       key: "runs",
-      width: "88px",
+      width: "100px",
       header: "累计运行",
       align: "right",
+      nowrap: true,
       render: (agent) => {
         if (!hasCollector(agent)) {
           return <span className={styles.muted}>{NOT_COLLECTED}</span>;
@@ -167,6 +170,7 @@ export function buildAgentColumns(options: AgentColumnOptions): TableColumn<Agen
       key: "lastRun",
       width: "88px",
       header: "最近运行",
+      nowrap: true,
       render: (agent) => {
         if (!hasCollector(agent)) {
           return <span className={styles.muted}>{NOT_COLLECTED}</span>;
@@ -179,7 +183,7 @@ export function buildAgentColumns(options: AgentColumnOptions): TableColumn<Agen
     },
     {
       key: "actions",
-      width: "92px",
+      width: "150px",
       header: "操作",
       align: "right",
       render: (agent) => (

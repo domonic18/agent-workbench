@@ -40,7 +40,16 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
+  max-width: 100%;
   color: var(--text-secondary);
+}
+
+/* 机器名可能是一整串 hostname：单元格内截断，不把行撑成两行 */
+.machineName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 表格内的身份单元格：显示名 + 项目/key 副行 */

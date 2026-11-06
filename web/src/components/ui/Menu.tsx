@@ -1,3 +1,4 @@
+import { Check } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import styles from "./overlays.module.css";
@@ -166,6 +167,11 @@ export function Menu({ label, trigger, items, align = "start" }: MenuProps) {
                       </span>
                     )}
                     {item.label}
+                    {item.checked === true ? (
+                      <span className={styles.menuItemCheck} aria-hidden="true">
+                        <Check size={14} />
+                      </span>
+                    ) : null}
                   </button>
                 ) : (
                   <div key={item.key} className={styles.menuHeading} role="presentation">

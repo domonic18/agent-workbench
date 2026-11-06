@@ -255,6 +255,13 @@
   color: var(--muted);
 }
 
+/* 单选态勾选标记：固定在右端，菜单文字仍左对齐 */
+.menuItemCheck {
+  display: inline-flex;
+  margin-left: auto;
+  color: var(--accent);
+}
+
 /* 提示气泡：触发元素 + 挂在 body 上的浮层 */
 .tooltipTrigger {
   display: inline-flex;
