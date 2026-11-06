@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { AgentRosterSummary } from "../api/identity.js";
 import { RealtimeProvider } from "../api/stream.js";
 import type { OverviewSnapshot } from "../api/types.js";
 import { OverviewPage } from "./OverviewPage.js";
@@ -35,17 +36,48 @@ function snapshot(overrides: Partial<OverviewSnapshot> = {}): OverviewSnapshot {
   };
 }
 
+function rosterAgent(overrides: Partial<AgentRosterSummary> = {}): AgentRosterSummary {
+  return {
+    id: "agt_a",
+    machineId: "m1",
+    runtime: "claude_code",
+    project: "aw",
+    displayName: "构建 Agent",
+    feishuAppId: null,
+    status: "active",
+    allowedTargets: [],
+    createdAt: 0,
+    updatedAt: 0,
+    key: null,
+    usageLimit: null,
+    machineHostname: "build-box",
+    totalRuns: 3,
+    totalTokens: 1200,
+    openTasks: 1,
+    lastRunAt: 1_699_999_999_000,
+    ...overrides,
+  };
+}
+
 function fakeResponse(body: unknown): Response {
   return { ok: true, status: 200, json: async () => body } as Response;
 }
 
-/** 按路径分派响应:总览快照与执行面产物清单形状不同 */
-function fakeFetch(body: unknown): ReturnType<typeof vi.fn> {
-  return vi.fn(async (input: RequestInfo | URL) =>
-    fakeResponse(String(input).includes("/api/bootstrap/artifacts")
-      ? { publicUrl: null, assets: [] }
-      : body),
-  );
+/** 按路径分派：总览快照、Agent 名册与执行面产物清单形状不同 */
+function fakeFetch(
+  body: unknown,
+  roster: AgentRosterSummary[] = [],
+): ReturnType<typeof vi.fn> {
+  return vi.fn(async (input: RequestInfo | URL) => {
+    const path = String(input);
+    if (path.includes("/api/bootstrap/artifacts")) {
+      return fakeResponse({ publicUrl: null, assets: [] });
+    }
+    if (path.includes("/api/agents")) {
+      return fakeResponse({ items: roster, nextCursor: null });
+    }
+    return fakeResponse(body);
+  });
 }
 
 function renderPage(): void {
@@ -71,11 +103,11 @@ describe("总览页", () => {
     localStorage.clear();
   });
 
-  it("无 Agent 时给排查空态并保留可见性说明", async () => {
+  it("名册为空时给引导空态并保留可见性说明", async () => {
     vi.stubGlobal("fetch", fakeFetch(snapshot()));
     renderPage();
 
-    expect(await screen.findByText("采集器未上报")).toBeTruthy();
+    expect(await screen.findByText("名册里还没有 Agent")).toBeTruthy();
     expect(screen.getByText(/控制台只看到自报的与自己的会话/)).toBeTruthy();
     expect(screen.getByText("Agent 在线")).toBeTruthy();
     expect(screen.getByText("今日 Token")).toBeTruthy();
@@ -84,7 +116,7 @@ describe("总览页", () => {
     expect(screen.getByRole("button", { name: "注册 Agent" })).toBeTruthy();
   });
 
-  it("订阅 overview 作用域并展示 Agent 行", async () => {
+  it("订阅 overview 作用域并把活体状态合并进管理表格", async () => {
     vi.stubGlobal(
       "fetch",
       fakeFetch(
@@ -110,13 +142,15 @@ describe("总览页", () => {
             },
           ],
         }),
+        [rosterAgent()],
       ),
     );
     renderPage();
 
-    expect((await screen.findAllByText("aw@build-box")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("构建 Agent")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("运行中").length).toBeGreaterThan(0);
     expect(screen.getAllByText("实现接口契约").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("启用").length).toBeGreaterThan(0);
     expect(FakeEventSource.lastUrl).toContain("scope=overview");
     expect(FakeEventSource.lastUrl).toContain("client_id=");
   });

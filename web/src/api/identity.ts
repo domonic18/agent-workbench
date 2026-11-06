@@ -171,6 +171,25 @@ export function setAgentTargets(
   );
 }
 
+export interface AgentUsageLimitInput {
+  dailyTokenLimit: number;
+  warnPercent?: number;
+  hardStop?: boolean;
+  isActive?: boolean;
+}
+
+/** 用量上限:达到日额度后的行为由 hardStop 决定(停摆或只告警) */
+export function setAgentUsageLimit(
+  id: string,
+  input: AgentUsageLimitInput,
+): Promise<{ agent: AgentSummary }> {
+  return api.put<{ agent: AgentSummary }>(
+    `/api/agents/${encodeURIComponent(id)}/usage-limit`,
+    input,
+    { idempotencyKey: newIdempotencyKey() },
+  );
+}
+
 export interface UpdateAgentInput {
   displayName?: string;
   project?: string;

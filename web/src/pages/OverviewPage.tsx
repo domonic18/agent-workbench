@@ -1,11 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
+import {
+  Activity,
+  CircleDollarSign,
+  Cpu,
+  ShieldAlert,
+  Users,
+} from "lucide-react";
 import { useState } from "react";
 import { ApiError } from "../api/client.js";
-import { refreshBotNames } from "../api/bootstrap.js";
 import { fetchOverview } from "../api/overview.js";
-import type { OverviewAgent } from "../api/types.js";
-import { AgentCards } from "../components/data/AgentCards.js";
-import { EmptyState } from "../components/ui/EmptyState.js";
+import { fetchAgents, type AgentRosterSummary } from "../api/identity.js";
+import { AgentDeleteDialog } from "../components/agents/AgentDeleteDialog.js";
+import { AgentEditDialog } from "../components/agents/AgentEditDialog.js";
+import { AgentManagementTable } from "../components/agents/AgentManagementTable.js";
 import { MetricCard } from "../components/data/MetricCard.js";
 import { AgentRegisterDialog } from "../components/identity/AgentRegisterDialog.js";
 import { AgentRotateDialog } from "../components/identity/AgentRotateDialog.js";
@@ -36,15 +43,16 @@ function attentionRows(
 
 export function OverviewPage() {
   const [registerDialog, setRegisterDialog] = useState<"agent" | "machine" | null>(null);
-  const [rotateAgent, setRotateAgent] = useState<OverviewAgent | null>(null);
-  const [refreshingBot, setRefreshingBot] = useState<string | null>(null);
-  const [refreshNotice, setRefreshNotice] = useState<string | null>(null);
+  const [rotateAgent, setRotateAgent] = useState<AgentRosterSummary | null>(null);
+  const [editingAgentId, setEditingAgentId] = useState<string | null>(null);
+  const [deletingAgentId, setDeletingAgentId] = useState<string | null>(null);
   const { data, isPending, isError, error, refetch } = useQuery({
     queryKey: ["overview"],
     queryFn: fetchOverview,
     retry: (count, caught) =>
       !(caught instanceof ApiError && caught.status === 401) && count < 2,
   });
+  const rosterQuery = useQuery({ queryKey: ["agents"], queryFn: fetchAgents });
 
   const agents = data?.agents ?? [];
   const online = agents.filter((agent) => agent.heartbeat === "ok").length;
@@ -52,22 +60,8 @@ export function OverviewPage() {
   const offline =
     (data?.metrics.heartbeatTimeouts ?? 0) +
     agents.filter((agent) => agent.heartbeat === "offline").length;
-
-  async function handleRefreshBotName(agent: OverviewAgent): Promise<void> {
-    if (agent.machineId === null || refreshingBot !== null) {
-      return;
-    }
-    setRefreshingBot(agent.machineId);
-    setRefreshNotice(null);
-    try {
-      await refreshBotNames(agent.machineId);
-      setRefreshNotice(`已请求刷新 ${agent.displayName} 的飞书 bot 名,约 1 分钟内生效`);
-    } catch (caught) {
-      setRefreshNotice(caught instanceof ApiError ? caught.message : "刷新请求失败");
-    } finally {
-      setRefreshingBot(null);
-    }
-  }
+  const roster = rosterQuery.data ?? [];
+  const disabledCount = roster.filter((agent) => agent.status === "disabled").length;
 
   return (
     <div className={styles.page}>
@@ -86,21 +80,31 @@ export function OverviewPage() {
         <>
           <section className={styles.metrics} aria-label="关键指标">
             <MetricCard
+              icon={<Users size={14} />}
               label="Agent 在线"
               value={`${online} / ${agents.length}`}
               sub={`${idle} 台空闲 · ${offline} 离线`}
             />
             <MetricCard
+              icon={<Cpu size={14} />}
+              label="Agent 名册"
+              value={String(roster.length)}
+              sub={disabledCount === 0 ? "全部启用" : `${disabledCount} 个已停用`}
+            />
+            <MetricCard
+              icon={<Activity size={14} />}
               label="运行中任务"
               value={String(data.metrics.runningTasks)}
               sub={`${data.metrics.pendingApprovals} 项待你批准`}
             />
             <MetricCard
+              icon={<ShieldAlert size={14} />}
               label="待你批准"
               value={String(data.metrics.pendingApprovals)}
               sub="未批准不可执行"
             />
             <MetricCard
+              icon={<CircleDollarSign size={14} />}
               label="今日 Token"
               value={formatTokens(data.metrics.todayTokens)}
               sub={`${formatExactTokens(data.metrics.todayTokens)} tok`}
@@ -111,14 +115,8 @@ export function OverviewPage() {
           <section className={styles.section}>
             <div className={styles.sectionHeader}>
               <div className={styles.sectionHeading}>
-                <h2 className={styles.sectionTitle}>Agent</h2>
-                <span className={styles.hint}>按状态排序：运行 → 等批准 → 等回应 → 空闲 → 离线</span>
-                <span
-                  className={styles.help}
-                  title="Agent 卡片按是否运行与心跳状态排序；点击「密钥」可轮换访问凭证。"
-                >
-                  ?
-                </span>
+                <h2 className={styles.sectionTitle}>Agent 管理</h2>
+                <span className={styles.hint}>名册里的每个 Agent 都在这里，可以改名、停用、调整白名单或删除</span>
               </div>
               <div className={styles.sectionActions}>
                 <button
@@ -137,19 +135,11 @@ export function OverviewPage() {
                 </button>
               </div>
             </div>
-            {refreshNotice === null ? null : <p className={styles.hint}>{refreshNotice}</p>}
-            {agents.length === 0 ? (
-              <EmptyState
-                title="采集器未上报"
-                description="没有在线 Agent 的上报数据。请确认采集器已启动，并完成机器登记。"
-              />
-            ) : (
-              <AgentCards
-                agents={agents}
-                onManageKey={setRotateAgent}
-                onRefreshBotName={(agent) => void handleRefreshBotName(agent)}
-              />
-            )}
+            <AgentManagementTable
+              liveAgents={agents}
+              onEdit={(agent) => setEditingAgentId(agent.id)}
+              onRotateKey={setRotateAgent}
+            />
           </section>
 
           <section className={styles.section}>
@@ -194,6 +184,23 @@ export function OverviewPage() {
           ) : null}
           {rotateAgent === null ? null : (
             <AgentRotateDialog agent={rotateAgent} onClose={() => setRotateAgent(null)} />
+          )}
+          {editingAgentId === null ? null : (
+            <AgentEditDialog
+              agentId={editingAgentId}
+              onClose={() => setEditingAgentId(null)}
+              onRequestDelete={(agentId) => {
+                setEditingAgentId(null);
+                setDeletingAgentId(agentId);
+              }}
+            />
+          )}
+          {deletingAgentId === null ? null : (
+            <AgentDeleteDialog
+              agentId={deletingAgentId}
+              onClose={() => setDeletingAgentId(null)}
+              onDeleted={() => setDeletingAgentId(null)}
+            />
           )}
         </>
       )}
