@@ -95,6 +95,12 @@ case "$(uname -m)" in
   *) ARCH="unsupported" ;;
 esac
 
+# /dev/tty 存在不等于可用:没有控制终端时(SSH 无头、Agent 代跑)打开会报
+# "Device not configured",必须在提示前先探一次能否真正打开。
+tty_usable() {
+  [ -r /dev/tty ] && [ -w /dev/tty ] && printf '' 2> /dev/null > /dev/tty
+}
+
 if [ "$MODE" = "upgrade" ]; then
   echo "模式:覆盖安装(复用 $CREDENTIALS_FILE 的机器凭据,不需要 enroll token)"
 else
@@ -132,13 +138,19 @@ fi
 CONSOLE_BASE="$URL/artifacts"
 ASSET="aw-node-macos-$ARCH"
 
-if [ "$YES" != "1" ] && [ -r /dev/tty ]; then
-  printf '将安装 %s 到 %s,继续? [y/N] ' "$ASSET" "$STATE_DIR" > /dev/tty
-  IFS= read -r ANSWER < /dev/tty || ANSWER=""
-  case "$ANSWER" in
-    y|Y|yes|YES) ;;
-    *) echo "已取消" >&2; exit 1 ;;
-  esac
+if [ "$YES" != "1" ]; then
+  if tty_usable; then
+    printf '将安装 %s 到 %s,继续? [y/N] ' "$ASSET" "$STATE_DIR" > /dev/tty
+    IFS= read -r ANSWER < /dev/tty || ANSWER=""
+    case "$ANSWER" in
+      y|Y|yes|YES) ;;
+      *) echo "已取消" >&2; exit 1 ;;
+    esac
+  else
+    echo "当前没有可交互的终端,无法确认安装。" >&2
+    echo "请在交互终端重跑,或加 --yes 表示已确认(自动化 / Agent 代跑)。" >&2
+    exit 1
+  fi
 fi
 
 TMPDIR_AW=$(mktemp -d "${TMPDIR:-/tmp}/aw-node.XXXXXX")
@@ -221,7 +233,7 @@ if [ "$BACKFILL" = "1" ]; then set -- "$@" --backfill; fi
 run_enroll() {
   if [ -n "${AW_ENROLL_TOKEN:-}" ]; then
     "$@"
-  elif [ -r /dev/tty ]; then
+  elif tty_usable; then
     printf 'enroll token(一次性,输入不显示): ' > /dev/tty
     OLD_STTY=$(stty -g < /dev/tty 2>/dev/null || true)
     if [ -n "$OLD_STTY" ]; then stty -echo < /dev/tty; fi
@@ -262,7 +274,7 @@ fi
 
 echo ""
 echo "自检:"
-AW_STATE_DIR="$STATE_DIR" "$TMPDIR_AW/$ASSET" doctor || echo "自检未全部通过,请查看上面的输出与 $STATE_DIR/aw-node.err"
+AW_STATE_DIR="$STATE_DIR" AW_INGEST_URL="$URL" "$TMPDIR_AW/$ASSET" doctor || echo "自检未全部通过,请查看上面的输出与 $STATE_DIR/aw-node.err"
 
 echo ""
 echo "完成。查看状态: ~/.local/bin/aw-node status"
