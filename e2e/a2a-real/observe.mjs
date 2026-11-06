@@ -31,7 +31,7 @@ assert(request.round === 1, "① request round=1", `round=${request.round}`);
 assert(request.ack_at !== null, "① request 已被接收方 ACK", `ack_at=${request.ack_at}`);
 
 const replies = query(
-  `SELECT id, thread_id, reply_to_msg_id, task_id, ack_at
+  `SELECT id, thread_id, reply_to_msg_id, task_id, ack_at, summary
      FROM a2a_message
     WHERE intent = 'reply' AND thread_id = '${request.thread_id}'
     ORDER BY created_at DESC`,
@@ -64,11 +64,23 @@ assert(
   `parent=${receiverTask.parent_task_id}`,
 );
 assert(receiverTask.status === "done", "② 接收方任务已 done", `status=${receiverTask.status}`);
+// 结论载体:自由文本结论落在回执 summary;task.output 是索引字段(kb_* 或 http(s)),不承载正文
+const outputRef = (receiverTask.output ?? "").trim();
+const conclusion = (reply.summary ?? "").trim();
 assert(
-  typeof receiverTask.output === "string" && receiverTask.output.length > 0,
-  "② 接收方任务有真实结论",
-  `output=${(receiverTask.output ?? "").slice(0, 80)}`,
+  conclusion.length > 0 || outputRef.length > 0,
+  "② 接收方产出真实结论",
+  outputRef.length > 0 ? `output=${outputRef.slice(0, 80)}` : `回执 summary=${conclusion.slice(0, 120)}`,
 );
+if (outputRef.length > 0) {
+  assert(
+    /^(kb_[A-Za-z0-9_-]+|https?:\/\/\S+)$/.test(outputRef),
+    "② 任务 output 是引用字段",
+    `output=${outputRef.slice(0, 80)}`,
+  );
+} else {
+  console.log("   注: task.output 为空——output 只接受 kb_*/http(s) 引用,自由文本结论落在回执 summary");
+}
 
 const senderTasks = query(
   `SELECT id, assignee, status, output FROM task WHERE id = '${request.task_id}'`,
@@ -107,5 +119,5 @@ ok("⑤ 工具调用分布", [...byAgent].map(([id, count]) => `${id}:${count}`)
 
 console.log("");
 console.log(`结论 ${scenario}:request=${request.id} 回执=${reply.id} 接收方任务=${receiverTask.id} 根任务=${senderTask.id}`);
-console.log(`接收方结论:${(receiverTask.output ?? "").slice(0, 300)}`);
+console.log(`接收方结论:${conclusion.slice(0, 300)}`);
 console.log(process.exitCode === 1 ? "OBSERVE FAILED" : "OBSERVE DONE");
