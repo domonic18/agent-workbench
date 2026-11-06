@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createAgent,
-  createMachine,
+  fetchAgentTimeline,
   fetchMachines,
   rotateAgentKey,
 } from "./identity.js";
@@ -22,7 +22,7 @@ describe("身份 API", () => {
     vi.unstubAllGlobals();
   });
 
-  it("注册 Agent 与机器时带幂等键与 CSRF 头", async () => {
+  it("注册 Agent 时带幂等键与 CSRF 头", async () => {
     fetchMock.mockResolvedValueOnce(fakeResponse({ agent: {}, secret: "s" }));
     await createAgent({ machineId: "m1", project: "aw", displayName: "构建" });
 
@@ -34,13 +34,16 @@ describe("身份 API", () => {
     });
     expect((agentInit.headers as Record<string, string>)["Idempotency-Key"]).toBeTruthy();
     expect(agentInit.body).toBe(JSON.stringify({ machineId: "m1", project: "aw", displayName: "构建" }));
+  });
 
-    fetchMock.mockResolvedValueOnce(fakeResponse({ machine: {}, secret: "s" }));
-    await createMachine({ id: "m1", hostname: "box", os: "macOS", collectorVersion: "0.1.0" });
+  it("对话流按 Agent id 转义并带 limit 与游标", async () => {
+    fetchMock.mockResolvedValueOnce(fakeResponse({ items: [], nextCursor: null }));
+    await fetchAgentTimeline("agt/a b", { limit: 50, cursor: "10:evt_1" });
 
-    const [machineUrl, machineInit] = fetchMock.mock.calls[1] as unknown as [string, RequestInit];
-    expect(machineUrl).toBe("/api/machines");
-    expect((machineInit.headers as Record<string, string>)["Idempotency-Key"]).toBeTruthy();
+    const [url] = fetchMock.mock.calls[0] as unknown as [string];
+    expect(url).toContain("/api/agents/agt%2Fa%20b/timeline");
+    expect(url).toContain("limit=50");
+    expect(url).toContain("cursor=10%3Aevt_1");
   });
 
   it("轮换密钥对 Agent id 做路径转义", async () => {

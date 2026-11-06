@@ -28,6 +28,21 @@
   color: var(--muted);
 }
 
+/* 列头：标题 + 说明气泡 */
+.headerCell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* 机器单元格：图标 + 机器名 */
+.machineCell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-secondary);
+}
+
 /* 表格内的身份单元格：显示名 + 项目/key 副行 */
 .identity {
   display: flex;
@@ -50,6 +65,20 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 卡片上的机器人名：点它打开详情抽屉 */
+.nameButton {
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nameButton:hover {
+  color: var(--accent);
 }
 
 .statusCell {
@@ -105,8 +134,19 @@
   display: block;
 }
 
+/* 视图切换按钮组 */
+.viewToggle {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.viewActive {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .cardList {
-  display: none;
+  display: flex;
   flex-direction: column;
   gap: var(--space-3);
   padding: var(--space-4);
@@ -149,19 +189,85 @@
 }
 
 @media (max-width: 767px) {
-  .tableArea {
-    display: none;
-  }
-
-  .cardList {
-    display: flex;
-  }
-
   /* 窄屏靠手指点，卡片动作按 44px 触达底线给 */
   .cardList .rowActionsLeft button {
     height: 44px;
     padding: 0 var(--space-4);
   }
+}
+
+/* 详情抽屉的键值网格 */
+.kvGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+@media (max-width: 767px) {
+  .kvGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.kvItem {
+  min-width: 0;
+}
+
+.kvLabel {
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+.kvValue {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+/* 抽屉里的任务列表：整行可点 */
+.taskList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.taskRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.taskRow:hover {
+  border-color: var(--accent-border);
+}
+
+.taskRowTitle {
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.taskRowMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-xs);
+  color: var(--muted);
 }
 
 /* 编辑抽屉 */

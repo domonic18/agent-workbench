@@ -12,12 +12,12 @@ import { ApiError } from "../api/client.js";
 import { fetchOverview } from "../api/overview.js";
 import { fetchAgents, type AgentRosterSummary } from "../api/identity.js";
 import { AgentDeleteDialog } from "../components/agents/AgentDeleteDialog.js";
+import { AgentDetailDialog } from "../components/agents/AgentDetailDialog.js";
 import { AgentEditDialog } from "../components/agents/AgentEditDialog.js";
 import { AgentManagementTable } from "../components/agents/AgentManagementTable.js";
 import { MetricCard } from "../components/data/MetricCard.js";
 import { AgentRegisterDialog } from "../components/identity/AgentRegisterDialog.js";
 import { AgentRotateDialog } from "../components/identity/AgentRotateDialog.js";
-import { MachineRegisterDialog } from "../components/identity/MachineRegisterDialog.js";
 import { formatExactTokens, formatTokens } from "../shared/format.js";
 import { VISIBILITY_NOTE } from "../shared/labels.js";
 import styles from "./OverviewPage.module.css";
@@ -43,8 +43,9 @@ function attentionRows(
 
 export function OverviewPage() {
   const navigate = useNavigate();
-  const [registerDialog, setRegisterDialog] = useState<"agent" | "machine" | null>(null);
+  const [registerDialog, setRegisterDialog] = useState<"agent" | null>(null);
   const [rotateAgent, setRotateAgent] = useState<AgentRosterSummary | null>(null);
+  const [detailAgentId, setDetailAgentId] = useState<string | null>(null);
   const [editingAgentId, setEditingAgentId] = useState<string | null>(null);
   const [deletingAgentId, setDeletingAgentId] = useState<string | null>(null);
   const { data, isPending, isError, error, refetch } = useQuery({
@@ -123,13 +124,6 @@ export function OverviewPage() {
                 <button
                   type="button"
                   className={styles.action}
-                  onClick={() => setRegisterDialog("machine")}
-                >
-                  机器登记
-                </button>
-                <button
-                  type="button"
-                  className={styles.action}
                   onClick={() => navigate("/onboarding")}
                 >
                   接入执行机
@@ -145,6 +139,7 @@ export function OverviewPage() {
             </div>
             <AgentManagementTable
               liveAgents={agents}
+              onOpenDetail={(agent) => setDetailAgentId(agent.id)}
               onEdit={(agent) => setEditingAgentId(agent.id)}
               onRotateKey={setRotateAgent}
             />
@@ -176,9 +171,13 @@ export function OverviewPage() {
           {registerDialog === "agent" ? (
             <AgentRegisterDialog onClose={() => setRegisterDialog(null)} />
           ) : null}
-          {registerDialog === "machine" ? (
-            <MachineRegisterDialog onClose={() => setRegisterDialog(null)} />
-          ) : null}
+          {detailAgentId === null ? null : (
+            <AgentDetailDialog
+              agentId={detailAgentId}
+              live={agents.find((agent) => agent.id === detailAgentId)}
+              onClose={() => setDetailAgentId(null)}
+            />
+          )}
           {rotateAgent === null ? null : (
             <AgentRotateDialog agent={rotateAgent} onClose={() => setRotateAgent(null)} />
           )}

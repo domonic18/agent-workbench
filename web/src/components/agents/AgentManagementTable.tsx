@@ -1,12 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
+import { LayoutGrid, Table } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ApiError } from "../../api/client.js";
 import { fetchAgents, type AgentRosterSummary } from "../../api/identity.js";
 import type { OverviewAgent } from "../../api/types.js";
 import { RUNTIME_LABEL } from "../../shared/labels.js";
+import { readPreference, writePreference } from "../../shared/preference.js";
 import { NARROW_QUERY, useMediaQuery } from "../../shared/useMediaQuery.js";
 import { Button } from "../ui/Button.js";
 import { EmptyState } from "../ui/EmptyState.js";
+import { IconButton } from "../ui/IconButton.js";
 import { Input, Select } from "../ui/Field.js";
 import { AgentCardList } from "./AgentCardList.js";
 import { AgentTable, buildAgentColumns } from "./AgentTableColumns.js";
@@ -15,11 +18,16 @@ import styles from "./agents.module.css";
 export interface AgentManagementTableProps {
   /** 总览投影的活体状态，按 id 与名册合并 */
   liveAgents: readonly OverviewAgent[];
+  /** 点机器人名/行打开详情抽屉 */
+  onOpenDetail: (agent: AgentRosterSummary) => void;
   onEdit: (agent: AgentRosterSummary) => void;
   onRotateKey: (agent: AgentRosterSummary) => void;
 }
 
 type StatusFilter = "all" | "active" | "disabled";
+type ViewMode = "list" | "card";
+
+const VIEW_STORAGE_KEY = "aw:agents-view";
 
 const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "all", label: "全部状态" },
@@ -45,6 +53,7 @@ function matches(agent: AgentRosterSummary, keyword: string): boolean {
 
 export function AgentManagementTable({
   liveAgents,
+  onOpenDetail,
   onEdit,
   onRotateKey,
 }: AgentManagementTableProps) {
@@ -52,6 +61,9 @@ export function AgentManagementTable({
   const [status, setStatus] = useState<StatusFilter>("all");
   const [runtime, setRuntime] = useState("all");
   const [machine, setMachine] = useState("all");
+  const [view, setView] = useState<ViewMode>(() =>
+    readPreference(VIEW_STORAGE_KEY, "list") === "card" ? "card" : "list",
+  );
   const narrow = useMediaQuery(NARROW_QUERY);
   const agentsQuery = useQuery({ queryKey: ["agents"], queryFn: fetchAgents });
 
@@ -104,6 +116,11 @@ export function AgentManagementTable({
     [liveById, onEdit, onRotateKey],
   );
 
+  function changeView(next: ViewMode): void {
+    setView(next);
+    writePreference(VIEW_STORAGE_KEY, next);
+  }
+
   if (agentsQuery.isPending) {
     return <p className={styles.muted}>加载中…</p>;
   }
@@ -131,7 +148,7 @@ export function AgentManagementTable({
             type="search"
             value={keyword}
             placeholder="搜索机器人名 / 项目 / key"
-            aria-label="搜索 Agent"
+            aria-label="搜索机器人"
             onChange={(event) => setKeyword(event.target.value)}
           />
         </div>
@@ -176,6 +193,24 @@ export function AgentManagementTable({
         <span className={styles.resultCount}>
           {visible.length} / {agents.length} 个 Agent
         </span>
+        <div className={styles.viewToggle} role="group" aria-label="显示方式">
+          <IconButton
+            size="sm"
+            label="列表视图"
+            aria-pressed={view === "list"}
+            icon={<Table size={14} />}
+            className={view === "list" ? styles.viewActive : undefined}
+            onClick={() => changeView("list")}
+          />
+          <IconButton
+            size="sm"
+            label="卡片视图"
+            aria-pressed={view === "card"}
+            icon={<LayoutGrid size={14} />}
+            className={view === "card" ? styles.viewActive : undefined}
+            onClick={() => changeView("card")}
+          />
+        </div>
       </div>
 
       {visible.length === 0 ? (
@@ -187,15 +222,16 @@ export function AgentManagementTable({
         ) : (
           <EmptyState title="没有匹配的 Agent" description="换个关键词，或清掉筛选条件再试。" />
         )
-      ) : narrow ? (
+      ) : narrow || view === "card" ? (
         <AgentCardList
           agents={visible}
           liveById={liveById}
+          onOpenDetail={onOpenDetail}
           onEdit={onEdit}
           onRotateKey={onRotateKey}
         />
       ) : (
-        <AgentTable agents={visible} columns={columns} onEdit={onEdit} />
+        <AgentTable agents={visible} columns={columns} onOpenDetail={onOpenDetail} />
       )}
     </div>
   );

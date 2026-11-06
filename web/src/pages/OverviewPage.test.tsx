@@ -123,7 +123,8 @@ describe("总览页", () => {
     expect(screen.getByText("Agent 在线")).toBeTruthy();
     expect(screen.getByText("今日 Token")).toBeTruthy();
     expect(screen.getByText("1.2M")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "机器登记" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "机器登记" })).toBeNull();
+    expect(screen.getByRole("button", { name: "接入执行机" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "注册 Agent" })).toBeTruthy();
   });
 

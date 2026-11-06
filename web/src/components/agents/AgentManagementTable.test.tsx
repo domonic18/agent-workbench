@@ -34,11 +34,20 @@ function agent(overrides: Partial<AgentRosterSummary> = {}): AgentRosterSummary 
   };
 }
 
-function renderTable(onEdit = vi.fn(), liveAgents: readonly OverviewAgent[] = []): void {
+function renderTable(
+  onEdit = vi.fn(),
+  liveAgents: readonly OverviewAgent[] = [],
+  onOpenDetail = vi.fn(),
+): void {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <AgentManagementTable liveAgents={liveAgents} onEdit={onEdit} onRotateKey={vi.fn()} />
+      <AgentManagementTable
+        liveAgents={liveAgents}
+        onOpenDetail={onOpenDetail}
+        onEdit={onEdit}
+        onRotateKey={vi.fn()}
+      />
     </QueryClientProvider>,
   );
 }
@@ -71,6 +80,7 @@ describe("Agent 管理表格", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    window.localStorage.clear();
   });
 
   it("渲染名册行：显示名、项目、机器、启停状态与累计运行", async () => {
@@ -104,7 +114,7 @@ describe("Agent 管理表格", () => {
     ]);
     renderTable();
 
-    const search = await screen.findByLabelText("搜索 Agent");
+    const search = await screen.findByLabelText("搜索机器人");
     fireEvent.change(search, { target: { value: "e2e" } });
 
     expect(screen.queryByText("构建 Agent")).toBeNull();
@@ -126,25 +136,38 @@ describe("Agent 管理表格", () => {
     expect(screen.getByText("测试 Agent")).toBeTruthy();
   });
 
-  it("点击行进入管理", async () => {
-    const onEdit = vi.fn();
+  it("点行打开机器人详情", async () => {
+    const onOpenDetail = vi.fn();
     vi.mocked(fetchAgents).mockResolvedValue([agent()]);
-    renderTable(onEdit);
+    renderTable(vi.fn(), [], onOpenDetail);
 
     fireEvent.click(await screen.findByText("构建 Agent"));
 
-    expect(onEdit).toHaveBeenCalledTimes(1);
-    expect(onEdit.mock.calls[0]?.[0]).toMatchObject({ id: "agt_a" });
+    expect(onOpenDetail).toHaveBeenCalledTimes(1);
+    expect(onOpenDetail.mock.calls[0]?.[0]).toMatchObject({ id: "agt_a" });
   });
 
   it("行内动作按钮不连带触发行点击", async () => {
     const onEdit = vi.fn();
+    const onOpenDetail = vi.fn();
     vi.mocked(fetchAgents).mockResolvedValue([agent()]);
-    renderTable(onEdit);
+    renderTable(onEdit, [], onOpenDetail);
 
     fireEvent.click(await screen.findByRole("button", { name: "密钥" }));
 
     expect(onEdit).not.toHaveBeenCalled();
+    expect(onOpenDetail).not.toHaveBeenCalled();
+  });
+
+  it("切到卡片视图后渲染卡片列表并记住偏好", async () => {
+    vi.mocked(fetchAgents).mockResolvedValue([agent()]);
+    renderTable();
+
+    fireEvent.click(await screen.findByRole("button", { name: "卡片视图" }));
+
+    expect(await screen.findByLabelText("机器人卡片")).toBeTruthy();
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(window.localStorage.getItem("aw:agents-view")).toBe("card");
   });
 
   it("名册为空时给引导空态", async () => {

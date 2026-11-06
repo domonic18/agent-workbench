@@ -102,20 +102,8 @@ export interface CreateAgentInput {
   key?: string;
 }
 
-export interface CreateMachineInput {
-  id: string;
-  hostname: string;
-  os: string;
-  collectorVersion: string;
-}
-
 export interface AgentSecret {
   agent: AgentSummary;
-  secret: string;
-}
-
-export interface MachineSecret {
-  machine: MachineSummary;
   secret: string;
 }
 
@@ -149,12 +137,6 @@ export function fetchAgents(): Promise<AgentRosterSummary[]> {
 
 export function createAgent(input: CreateAgentInput): Promise<AgentSecret> {
   return api.post<AgentSecret>("/api/agents", input, {
-    idempotencyKey: newIdempotencyKey(),
-  });
-}
-
-export function createMachine(input: CreateMachineInput): Promise<MachineSecret> {
-  return api.post<MachineSecret>("/api/machines", input, {
     idempotencyKey: newIdempotencyKey(),
   });
 }
@@ -227,6 +209,41 @@ export function updateAgent(
     `/api/agents/${encodeURIComponent(id)}`,
     input,
     { idempotencyKey: newIdempotencyKey() },
+  );
+}
+
+/** 对话流事件:kind 与 payload 由采集侧定义 */
+export interface AgentTimelineEntry {
+  id: string;
+  runId: string;
+  runProject: string;
+  runMachine: string;
+  kind: string;
+  occurredAt: number;
+  payload: Record<string, unknown>;
+}
+
+export interface AgentTimelinePage {
+  items: AgentTimelineEntry[];
+  /** 更早一页的游标；没有更多时为 null */
+  nextCursor: string | null;
+}
+
+/** 拉取 Agent 的对话流：时间正序的一页，cursor 指向更早的记录 */
+export function fetchAgentTimeline(
+  id: string,
+  query: { limit?: number; cursor?: string } = {},
+): Promise<AgentTimelinePage> {
+  const params = new URLSearchParams();
+  if (query.limit !== undefined) {
+    params.set("limit", String(query.limit));
+  }
+  if (query.cursor !== undefined) {
+    params.set("cursor", query.cursor);
+  }
+  const suffix = params.toString();
+  return api.get<AgentTimelinePage>(
+    `/api/agents/${encodeURIComponent(id)}/timeline${suffix === "" ? "" : `?${suffix}`}`,
   );
 }
 

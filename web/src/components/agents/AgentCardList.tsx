@@ -1,39 +1,56 @@
+import { Monitor } from "lucide-react";
 import type { AgentRosterSummary } from "../../api/identity.js";
 import type { OverviewAgent } from "../../api/types.js";
 import { formatRelativeTime, formatTokens } from "../../shared/format.js";
 import { NOT_COLLECTED, RUNTIME_LABEL } from "../../shared/labels.js";
 import { agentDisplayName, hasCollector } from "../../shared/agent-label.js";
+import { RUNTIME_ICON } from "../../shared/runtime-icon.js";
 import { Button } from "../ui/Button.js";
+import { Tooltip } from "../ui/Tooltip.js";
 import { statusBadges, taskMeta } from "./agent-rows.js";
 import styles from "./agents.module.css";
 
 export interface AgentCardListProps {
   agents: readonly AgentRosterSummary[];
   liveById: ReadonlyMap<string, OverviewAgent>;
+  /** 点机器人名打开详情抽屉 */
+  onOpenDetail: (agent: AgentRosterSummary) => void;
   onEdit: (agent: AgentRosterSummary) => void;
   onRotateKey: (agent: AgentRosterSummary) => void;
 }
 
-/** 窄屏卡片列表：表格转卡片，触达区不小于按钮默认尺寸 */
+/** 卡片列表：窄屏默认形态，也可由用户切换 */
 export function AgentCardList({
   agents,
   liveById,
+  onOpenDetail,
   onEdit,
   onRotateKey,
 }: AgentCardListProps) {
   return (
-    <ul className={styles.cardList} aria-label="Agent 卡片">
+    <ul className={styles.cardList} aria-label="机器人卡片">
       {agents.map((agent) => {
         const live = liveById.get(agent.id);
         const title = live?.currentTaskTitle ?? null;
         const instruction = title === null && live?.running === true ? live.currentInstruction : null;
+        const RuntimeIcon = RUNTIME_ICON[agent.runtime];
+        const machineName = agent.machineDisplayName ?? agent.machineHostname;
         return (
           <li key={agent.id} className={styles.card}>
             <div className={styles.cardTop}>
               <div className={styles.identity}>
-                <span className={styles.identityName}>{agentDisplayName(agent)}</span>
+                <button
+                  type="button"
+                  className={`${styles.identityName} ${styles.nameButton}`}
+                  onClick={() => onOpenDetail(agent)}
+                >
+                  {agentDisplayName(agent)}
+                </button>
                 <span className={styles.identitySub}>
-                  {agent.project} · {RUNTIME_LABEL[agent.runtime]}
+                  {agent.project}
+                  <Tooltip label={`运行时：${RUNTIME_LABEL[agent.runtime]}`}>
+                    <RuntimeIcon size={12} aria-hidden="true" />
+                  </Tooltip>
                 </span>
               </div>
               <div className={styles.statusCell}>{statusBadges(agent, live)}</div>
@@ -56,6 +73,10 @@ export function AgentCardList({
               </p>
             )}
             <div className={styles.cardMeta}>
+              <span className={styles.machineCell}>
+                <Monitor size={12} aria-hidden="true" />
+                {machineName ?? "未绑定"}
+              </span>
               {!hasCollector(agent) ? (
                 <span>{NOT_COLLECTED}</span>
               ) : (
