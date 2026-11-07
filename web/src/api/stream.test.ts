@@ -30,6 +30,7 @@ describe("实时订阅辅助", () => {
   it("scope 映射到查询键", () => {
     expect(queryKeyForScope("overview")).toEqual(["overview"]);
     expect(queryKeyForScope("task:tsk_1")).toEqual(["task", "tsk_1"]);
+    expect(queryKeyForScope("work_item:wim_1")).toEqual(["work-item", "wim_1"]);
     expect(queryKeyForScope("unknown")).toEqual([]);
   });
 
@@ -39,10 +40,19 @@ describe("实时订阅辅助", () => {
       { queryKey: ["tasks"], exact: false },
       // 名册精确匹配:前缀匹配会连带重取逐 Agent 的删除影响预览
       { queryKey: ["agents"], exact: true },
+      { queryKey: ["work-items"], exact: false },
     ]);
     expect(queryKeysForScope("task:tsk_1")).toEqual([
       { queryKey: ["task", "tsk_1"], exact: false },
     ]);
+    expect(queryKeysForScope("work_item:wim_1")).toEqual([
+      { queryKey: ["work-item", "wim_1"], exact: false },
+    ]);
     expect(queryKeysForScope("unknown")).toEqual([]);
+  });
+
+  it("详情键与列表键不串味", () => {
+    // ["work-item","wim_1"] 是详情前缀,不该命中列表的 ["work-items",...]
+    expect(queryKeyForScope("work_item:wim_1")[0]).not.toBe("work-items");
   });
 });

@@ -38,6 +38,9 @@ export function queryKeyForScope(scope: string): readonly unknown[] {
   if (scope.startsWith("task:")) {
     return ["task", scope.slice("task:".length)];
   }
+  if (scope.startsWith("work_item:")) {
+    return ["work-item", scope.slice("work_item:".length)];
+  }
   return [];
 }
 
@@ -64,6 +67,8 @@ export function queryKeysForScope(scope: string): readonly ScopeInvalidation[] {
       { queryKey: ["tasks"], exact: false },
       // 名册与逐 Agent 的删除影响预览共用 ["agents"] 前缀,精确匹配才不会重取已删 Agent 的预览
       { queryKey: ["agents"], exact: true },
+      // 工作事项列表挂在 overview 作用域上:事项投影一变,总览区块要跟着重取
+      { queryKey: ["work-items"], exact: false },
     ];
   }
   return [{ queryKey: key, exact: false }];

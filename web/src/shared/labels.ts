@@ -9,6 +9,9 @@ import type {
   TaskOrigin,
   TaskStage,
   TaskStatus,
+  WorkItemAttention,
+  WorkItemStage,
+  WorkItemStatus,
 } from "@shared/constants.js";
 import type { ChainRelation } from "../api/task-chain.js";
 import type { AgentRuntime, HeartbeatState } from "../api/types.js";
@@ -201,3 +204,87 @@ export const KNOWLEDGE_EMBEDDING_TONE: Record<KnowledgeEmbeddingStatus, Tone> = 
   ready: "positive",
   failed: "danger",
 };
+
+/** 工作事项:status 是生命周期,stage 是当前环节,attention 回答「是否需要人」 */
+export const WORK_ITEM_STATUS_LABEL: Record<WorkItemStatus, string> = {
+  open: "进行中",
+  done: "已完成",
+  cancelled: "已取消",
+};
+
+export const WORK_ITEM_STATUS_TONE: Record<WorkItemStatus, Tone> = {
+  open: "info",
+  done: "positive",
+  cancelled: "muted",
+};
+
+export const WORK_ITEM_STAGE_LABEL: Record<WorkItemStage, string> = {
+  intake: "接入",
+  align: "对齐",
+  execute: "执行",
+  review: "评审",
+  verify: "验证",
+  release: "发布",
+};
+
+export const WORK_ITEM_ATTENTION_LABEL: Record<WorkItemAttention, string> = {
+  none: "无需关注",
+  person: "需要人",
+  blocked: "阻塞",
+  acceptance: "待验收",
+  stalled: "异常停滞",
+};
+
+export const WORK_ITEM_ATTENTION_TONE: Record<WorkItemAttention, Tone> = {
+  none: "muted",
+  person: "danger",
+  blocked: "warning",
+  acceptance: "info",
+  stalled: "warning",
+};
+
+/** 注意力严重度:数字越小越靠前,列表据此把要人处理的事顶上去 */
+export const WORK_ITEM_ATTENTION_ORDER: Record<WorkItemAttention, number> = {
+  person: 0,
+  blocked: 1,
+  acceptance: 2,
+  stalled: 3,
+  none: 4,
+};
+
+/** 工作事项事件类型:自由文本,查不到时回退原值 */
+export const WORK_ITEM_EVENT_LABEL: Record<string, string> = {
+  routed: "已路由",
+  assigned: "已派工",
+  input: "续接输入",
+  accepted: "已接受",
+  returned: "已退回",
+  task_bound: "关联任务",
+  handback: "退回交回",
+  pr_linked: "关联 PR",
+  pr_closed: "PR 已关闭",
+  ci_result: "CI 结果",
+  acceptance_ready: "待验收",
+  ci_failed: "CI 失败",
+};
+
+/** 派工信箱状态:等待对象由 pending / claimed 的行推出 */
+export const WORKER_INBOX_STATUS_LABEL: Record<string, string> = {
+  pending: "待领取",
+  claimed: "已领取",
+  acked: "已确认",
+  handed_back: "已交回",
+  failed: "失败",
+};
+
+export const WORKER_INBOX_KIND_LABEL: Record<string, string> = {
+  assignment: "派工",
+  input: "续接输入",
+};
+
+/** 关联线程的订阅模式 */
+export const THREAD_MODE_LABEL: Record<string, string> = {
+  owner: "主责",
+  context: "上下文",
+};
+
