@@ -18,12 +18,14 @@ import { SecretReveal } from "./SecretReveal.js";
 
 export interface AgentRegisterDialogProps {
   onClose: () => void;
+  /** 注册成功后把明文密钥交出去,便于调用方接着渲染接入配置 */
+  onCreated?: (created: AgentSecret) => void;
 }
 
 /** 外部运行时:没有 aw-node,只登记归属机器 */
 const EXTERNAL_RUNTIMES: AgentRuntime[] = ["workbuddy", "codex", "deepseek"];
 
-export function AgentRegisterDialog({ onClose }: AgentRegisterDialogProps) {
+export function AgentRegisterDialog({ onClose, onCreated }: AgentRegisterDialogProps) {
   const machines = useQuery({ queryKey: ["machines"], queryFn: fetchMachines });
   const [runtime, setRuntime] = useState<AgentRuntime>("claude_code");
   const [machineId, setMachineId] = useState("");
@@ -73,7 +75,9 @@ export function AgentRegisterDialog({ onClose }: AgentRegisterDialogProps) {
       if (targets.length > 0) {
         input.allowedTargets = targets;
       }
-      setCreated(await createAgent(input));
+      const secret = await createAgent(input);
+      setCreated(secret);
+      onCreated?.(secret);
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "Agent 注册失败，请稍后再试");
     } finally {

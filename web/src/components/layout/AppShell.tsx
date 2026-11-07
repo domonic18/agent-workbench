@@ -1,4 +1,13 @@
-import { BookOpen, KeyRound, LayoutGrid, ListChecks, LogOut, ShieldCheck } from "lucide-react";
+import {
+  BookMarked,
+  BookOpen,
+  KeyRound,
+  LayoutGrid,
+  ListChecks,
+  LogOut,
+  Plug,
+  ShieldCheck,
+} from "lucide-react";
 import { Suspense, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { logout } from "../../api/auth.js";
@@ -26,6 +35,13 @@ const NAV_GROUPS = [
     items: [
       { to: "/capabilities", label: "授权", icon: ShieldCheck },
       { to: "/knowledge", label: "知识", icon: BookOpen },
+    ],
+  },
+  {
+    label: "接入",
+    items: [
+      { to: "/agent-access", label: "协作接入", icon: Plug },
+      { to: "/agent-guide", label: "Agent 手册", icon: BookMarked },
     ],
   },
 ] as const;
@@ -60,6 +76,16 @@ const PAGE_META: { path: string; title: string; description: string }[] = [
     path: "/knowledge",
     title: "知识",
     description: "人工采纳与待审阅的知识条目",
+  },
+  {
+    path: "/agent-access",
+    title: "协作接入",
+    description: "MCP 端点、Agent 名册与各客户端就绪配置",
+  },
+  {
+    path: "/agent-guide",
+    title: "Agent 手册",
+    description: "A2A 协作规范正文与可安装的 SKILL.md",
   },
 ];
 

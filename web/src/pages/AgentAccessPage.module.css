@@ -1,0 +1,7 @@
+/* 协作接入页：接入参数 + 名册 + 配置片段 */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}

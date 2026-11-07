@@ -10,9 +10,11 @@ import { SecretReveal } from "./SecretReveal.js";
 export interface AgentRotateDialogProps {
   agent: { id: string; displayName: string; project: string };
   onClose: () => void;
+  /** 轮换成功后回传明文密钥：调用方据此出配置片段 */
+  onRotated?: (secret: string) => void;
 }
 
-export function AgentRotateDialog({ agent, onClose }: AgentRotateDialogProps) {
+export function AgentRotateDialog({ agent, onClose, onRotated }: AgentRotateDialogProps) {
   const [secret, setSecret] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -23,6 +25,7 @@ export function AgentRotateDialog({ agent, onClose }: AgentRotateDialogProps) {
     try {
       const result = await rotateAgentKey(agent.id);
       setSecret(result.secret);
+      onRotated?.(result.secret);
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "密钥轮换失败，请稍后再试");
     } finally {
@@ -38,8 +41,8 @@ export function AgentRotateDialog({ agent, onClose }: AgentRotateDialogProps) {
             {agent.displayName}（{agent.project}，{agent.id}）
           </p>
           <p className={styles.warning}>
-            轮换后旧密钥立即失效。正在运行的 Agent 会断开，需要把新密钥写入其 MCP proxy
-            运行环境后重启。
+            轮换后旧密钥立即失效。正在用旧密钥连接的 Agent 会断开，需要把新密钥写进它的 MCP
+            客户端配置后重连。
           </p>
           {error === null ? null : (
             <p className={styles.error} role="alert">
@@ -63,7 +66,7 @@ export function AgentRotateDialog({ agent, onClose }: AgentRotateDialogProps) {
         <div className={styles.form}>
           <SecretReveal
             secret={secret}
-            note={`请把新密钥写入 ${agent.id} 的 MCP proxy 运行环境。`}
+            note={`请把新密钥写进 ${agent.id} 的 MCP 客户端配置；端点与鉴权头见「协作接入」页。`}
             hints={agentEnvHints(agent.id)}
           />
           <div className={styles.actions}>

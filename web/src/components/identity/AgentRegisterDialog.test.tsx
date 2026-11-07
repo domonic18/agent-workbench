@@ -73,7 +73,7 @@ describe("Agent 注册弹窗", () => {
       displayName: "构建 Agent",
       allowedTargets: ["agt_b", "agt_c"],
     });
-    expect(screen.getByText(/AW_AGENT_ID/)).toBeTruthy();
+    expect(screen.getByText(/Bearer/)).toBeTruthy();
     expect(screen.getByText(/关闭后不可再查看/)).toBeTruthy();
   });
 

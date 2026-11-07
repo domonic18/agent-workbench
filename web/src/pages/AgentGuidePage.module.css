@@ -1,0 +1,13 @@
+/* Agent 手册页：规范正文 + 工作区提示词 */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.prompts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
