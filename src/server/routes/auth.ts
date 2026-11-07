@@ -34,8 +34,7 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRoutesOpti
 
   app.post("/api/auth/login", async (request, reply) => {
     // 锁定期内不校验口令,避免用响应差异探测口令是否正确
-    const source = request.ip;
-    if (await lockout.isLocked(source)) {
+    if (await lockout.isLocked()) {
       return reply.code(429).send({
         error: {
           code: "RATE_LIMITED",
@@ -51,12 +50,12 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRoutesOpti
       });
     }
     if (!(await verifyConsolePassword(db, password))) {
-      await lockout.fail(source);
+      await lockout.fail();
       return reply.code(401).send({
         error: { code: "UNAUTHORIZED", message: "口令错误" },
       });
     }
-    await lockout.succeed(source);
+    await lockout.succeed();
     const { id, expiresAt } = await startSession(db, now);
     reply.header("set-cookie", sessionCookie(id));
     return { ok: true, expiresAt };
@@ -88,8 +87,7 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRoutesOpti
       if (!parsed.success) {
         return invalidSchema(reply, parsed.error);
       }
-      const source = request.ip;
-      if (await lockout.isLocked(source)) {
+      if (await lockout.isLocked()) {
         return reply.code(429).send({
           error: {
             code: "RATE_LIMITED",
@@ -98,14 +96,14 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRoutesOpti
         });
       }
       if (!(await verifyConsolePassword(db, parsed.data.currentPassword))) {
-        await lockout.fail(source);
+        await lockout.fail();
         // 会话本身有效,只是当前口令不对:回 422 而不是 401,免得前端把用户踢去登录页
         return invalid(reply, "当前口令不正确");
       }
       if (parsed.data.currentPassword === parsed.data.newPassword) {
         return invalid(reply, "新口令不能与当前口令相同");
       }
-      await lockout.succeed(source);
+      await lockout.succeed();
       await updateConsolePassword(db, parsed.data.newPassword);
       const currentSessionId = sessionIdFrom(request);
       if (currentSessionId === undefined) {
