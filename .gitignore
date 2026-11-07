@@ -25,6 +25,9 @@ coverage/
 *.tsbuildinfo
 .eslintcache
 
+# 单实例锁(运行时产物,内含本机主机名与 IP,不入库)
+console.lock
+
 # 本地容器配置(从 frpc.toml.example 复制)
 docker/frpc.toml
 
