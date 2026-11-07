@@ -26,12 +26,14 @@ export type KnowledgeErrorCode =
   | "NOT_FOUND"
   | "CONFLICT"
   | "PROTECTED"
+  | "VALIDATION_FAILED"
   | "KNOWLEDGE_FILE_MISSING";
 
 const ERROR_STATUS: Record<KnowledgeErrorCode, number> = {
   NOT_FOUND: 404,
   CONFLICT: 409,
   PROTECTED: 403,
+  VALIDATION_FAILED: 422,
   KNOWLEDGE_FILE_MISSING: 409,
 };
 

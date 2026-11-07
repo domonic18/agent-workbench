@@ -1,7 +1,8 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { KNOWLEDGE_LIMITS } from "../../shared/constants.js";
 import { openDatabase, type Db } from "../../store/database.js";
 import { insertTask } from "../../store/repositories/task.js";
 import { insertMachine } from "../../store/repositories/machine.js";
@@ -130,5 +131,50 @@ describe("writeKnowledgeCandidate", () => {
         { db, knowledgeDir: dir, now: () => NOW },
       ),
     ).rejects.toThrow(/越出知识目录/);
+  });
+
+  it("受保护文件的别名写法同样拒绝,index.md 不被写", async () => {
+    for (const path of ["index.md/", "index.md/.", "notes/../index.md", "./index.md"]) {
+      await expect(
+        writeKnowledgeCandidate(
+          { id: "agt_a" },
+          { taskId: "tsk_a", path, title: "T", content: "c" },
+          { db, knowledgeDir: dir, now: () => NOW },
+        ),
+      ).rejects.toMatchObject({ code: "PROTECTED" });
+    }
+    expect(existsSync(join(dir, "index.md"))).toBe(false);
+  });
+
+  it("别名路径绕过不了已存在检查,已采纳文件内容不被改写", async () => {
+    await writeKnowledgeCandidate(
+      { id: "agt_a" },
+      { taskId: "tsk_a", path: "notes/dup.md", title: "T", content: "原内容" },
+      { db, knowledgeDir: dir, now: () => NOW },
+    );
+    await expect(
+      writeKnowledgeCandidate(
+        { id: "agt_a" },
+        { taskId: "tsk_a", path: "./notes/dup.md", title: "T2", content: "改写" },
+        { db, knowledgeDir: dir, now: () => NOW },
+      ),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(readFileSync(join(dir, "notes/dup.md"), "utf8")).toBe("原内容");
+  });
+
+  it("正文超长拒绝,不落文件", async () => {
+    await expect(
+      writeKnowledgeCandidate(
+        { id: "agt_a" },
+        {
+          taskId: "tsk_a",
+          path: "notes/big.md",
+          title: "T",
+          content: "x".repeat(KNOWLEDGE_LIMITS.content + 1),
+        },
+        { db, knowledgeDir: dir, now: () => NOW },
+      ),
+    ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+    expect(existsSync(join(dir, "notes/big.md"))).toBe(false);
   });
 });
