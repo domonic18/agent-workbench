@@ -98,7 +98,7 @@ describe("a2a send", () => {
       toAgent: "agt_b",
       round: 1,
     });
-    expect(await findOutboxByKey(db, "idem-1")).toMatchObject({
+    expect(await findOutboxByKey(db, "a2a:agt_a:idem-1")).toMatchObject({
       channel: "pull",
       deliveryClass: "business",
       msgId: "msg_1",
@@ -158,6 +158,25 @@ describe("a2a send", () => {
 
     expect(again).toEqual(first);
     expect(await db.get("SELECT COUNT(*) AS n FROM a2a_message")).toEqual({ n: 1 });
+    await db.close();
+  });
+
+  it("不同 Agent 用同一裸幂等键互不顶掉,各自的消息都独立入箱", async () => {
+    const { db, service } = await prepare();
+    const first = await service.send(sendInput({ idempotencyKey: "shared-key" }));
+    const second = await service.send(
+      sendInput({
+        idempotencyKey: "shared-key",
+        fromAgentId: "agt_b",
+        taskId: "tsk_b",
+        to: "agt_a",
+      }),
+    );
+
+    expect(first.msgId).not.toBe(second.msgId);
+    expect(await db.get("SELECT COUNT(*) AS n FROM a2a_message")).toEqual({ n: 2 });
+    expect((await findOutboxByKey(db, "a2a:agt_a:shared-key"))?.msgId).toBe(first.msgId);
+    expect((await findOutboxByKey(db, "a2a:agt_b:shared-key"))?.msgId).toBe(second.msgId);
     await db.close();
   });
 
@@ -264,11 +283,11 @@ describe("a2a inbox", () => {
 
     const peeked = await service.inbox("agt_b", { peek: true });
     expect(peeked.items.map((item) => item.msg_id)).toEqual(["msg_1"]);
-    expect((await findOutboxByKey(db, "idem-1"))?.status).toBe("pending");
+    expect((await findOutboxByKey(db, "a2a:agt_a:idem-1"))?.status).toBe("pending");
 
     const claimed = await service.inbox("agt_b", { waitMs: 0 });
     expect(claimed.items.map((item) => item.msg_id)).toEqual(["msg_1"]);
-    expect((await findOutboxByKey(db, "idem-1"))?.status).toBe("claimed");
+    expect((await findOutboxByKey(db, "a2a:agt_a:idem-1"))?.status).toBe("claimed");
     await db.close();
   });
 
@@ -294,7 +313,7 @@ describe("a2a ack", () => {
     )) as { parentTaskId: string | null };
     expect(task.parentTaskId).toBe("tsk_a");
     expect((await findMessageById(db, "msg_1"))?.ackAt).toBe(NOW);
-    expect((await findOutboxByKey(db, "idem-1"))?.status).toBe("delivered");
+    expect((await findOutboxByKey(db, "a2a:agt_a:idem-1"))?.status).toBe("delivered");
 
     const event = (await db.get(
       "SELECT kind, payload_json AS payload FROM task_event WHERE task_id = 'tsk_b2'",

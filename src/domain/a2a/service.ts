@@ -125,7 +125,9 @@ export function createA2aService(deps: A2aServiceDeps): A2aService {
   }
 
   async function send(input: A2aSendInput): Promise<A2aSendResult> {
-    const existing = await findOutboxByKey(db, input.idempotencyKey);
+    // 幂等键按发送方命名空间:出箱键全局唯一,同名裸键会让两个 Agent 的消息互相顶掉
+    const outboxKey = `a2a:${input.fromAgentId}:${input.idempotencyKey}`;
+    const existing = await findOutboxByKey(db, outboxKey);
     if (existing !== undefined) {
       if (existing.msgId === null) {
         throw new A2aError("CONFLICT", "幂等键已被非 A2A 出箱行占用");
@@ -199,7 +201,7 @@ export function createA2aService(deps: A2aServiceDeps): A2aService {
         throw new Error(`A2A 消息落库后读不到: ${msgId}`);
       }
       const outbox = await enqueuePull(tx, {
-        idempotencyKey: input.idempotencyKey,
+        idempotencyKey: outboxKey,
         kind: "a2a_message",
         taskId: input.taskId,
         msgId,
