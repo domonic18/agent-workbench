@@ -1,0 +1,418 @@
+/* 基元层·控件类：按钮 / 输入 / 徽标 / 筛选胶囊 / 复制条
+ *
+ * 只引用 global.css 的令牌，不写死数值。
+ */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  white-space: nowrap;
+  transition:
+    background var(--duration-fast) var(--ease),
+    border-color var(--duration-fast) var(--ease),
+    color var(--duration-fast) var(--ease);
+}
+
+.button:disabled {
+  opacity: 0.55;
+}
+
+.sm {
+  height: var(--size-control-sm);
+  padding: 0 var(--space-3);
+  font-size: var(--font-sm);
+}
+
+.md {
+  height: var(--size-control-md);
+  padding: 0 var(--space-4);
+  font-size: var(--font-md);
+}
+
+.lg {
+  height: var(--size-control-lg);
+  padding: 0 var(--space-5);
+  font-size: var(--font-lg);
+}
+
+.primary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.secondary {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+}
+
+.ghost {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.ghost:hover:not(:disabled) {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.danger {
+  background: var(--danger);
+  color: #ffffff;
+}
+
+.danger:hover:not(:disabled) {
+  background: var(--danger);
+  filter: brightness(0.92);
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-control-md);
+  height: var(--size-control-md);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-secondary);
+  transition:
+    background var(--duration-fast) var(--ease),
+    border-color var(--duration-fast) var(--ease),
+    color var(--duration-fast) var(--ease);
+}
+
+.iconButton:hover:not(:disabled) {
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.iconButton:disabled {
+  opacity: 0.55;
+}
+
+/* 长得像按钮的链接：下载直链与站外链接要保留 a 标签语义 */
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+  transition:
+    background var(--duration-fast) var(--ease),
+    border-color var(--duration-fast) var(--ease),
+    color var(--duration-fast) var(--ease);
+}
+
+.iconButton.sm {
+  width: var(--size-control-sm);
+  height: var(--size-control-sm);
+}
+
+.iconButton.lg {
+  width: var(--size-touch);
+  height: var(--size-touch);
+}
+
+/* 无边框变体：放在标题栏等装饰性位置，hover 才显形 */
+.iconButtonGhost {
+  background: transparent;
+  border-color: transparent;
+}
+
+.iconButtonGhost:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent);
+}
+
+.spinner {
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.label {
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.required {
+  margin-left: var(--space-1);
+  color: var(--danger);
+}
+
+.hint {
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+.error {
+  font-size: var(--font-xs);
+  color: var(--danger);
+}
+
+.input,
+.textarea,
+.select {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--font-md);
+  transition:
+    border-color var(--duration-fast) var(--ease),
+    box-shadow var(--duration-fast) var(--ease);
+}
+
+.input,
+.select {
+  height: var(--size-control-md);
+  padding: 0 var(--space-3);
+}
+
+.textarea {
+  min-height: var(--size-textarea);
+  padding: var(--space-2) var(--space-3);
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.input:focus,
+.textarea:focus,
+.select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--subtle);
+}
+
+.input:disabled,
+.textarea:disabled,
+.select:disabled {
+  background: var(--surface-3);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.invalid,
+.invalid:focus {
+  border-color: var(--danger);
+  box-shadow: none;
+}
+
+.invalid:focus {
+  box-shadow: var(--danger-focus);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-xs);
+  line-height: var(--font-lg);
+  white-space: nowrap;
+}
+
+.tonePositive {
+  color: var(--positive);
+  background: var(--positive-soft);
+}
+
+.toneWarning {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.toneDanger {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.toneInfo {
+  color: var(--info);
+  background: var(--info-soft);
+}
+
+.toneMuted {
+  color: var(--muted);
+  background: var(--muted-soft);
+}
+
+.toneIcon {
+  display: inline-flex;
+}
+
+.toneIconPositive {
+  color: var(--positive);
+}
+
+.toneIconWarning {
+  color: var(--warning);
+}
+
+.toneIconDanger {
+  color: var(--danger);
+}
+
+.toneIconInfo {
+  color: var(--info);
+}
+
+.toneIconMuted {
+  color: var(--muted);
+}
+
+.copyField {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.copyValue {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--font-sm);
+  overflow-wrap: anywhere;
+}
+
+/* 命令块：等宽展示 + 一键复制 */
+.commandBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+
+.commandHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.commandLabel {
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.commandValue {
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: var(--font-sm);
+  line-height: 1.6;
+  color: var(--text);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* 块下方的补充说明 */
+.note {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+
+/* 状态筛选胶囊 */
+.chipGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.chip {
+  height: var(--size-control-sm);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.chip:hover {
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+.chipActive,
+.chipActive:hover {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+@media (max-width: 767px) {
+  .chip {
+    min-height: var(--size-touch);
+  }
+
+  .linkButton {
+    min-height: var(--size-touch);
+  }
+
+  .commandHead button,
+  .commandHead a {
+    width: 100%;
+  }
+
+  .commandHead {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

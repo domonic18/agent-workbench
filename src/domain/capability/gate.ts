@@ -1,0 +1,100 @@
+import { TOOL_GATE, type ToolLevel } from "../../shared/constants.js";
+
+/** 用量状态由宿主注入;M2-5 尚未接账本,一律 unlimited,但判定入口与顺序先固定(M4-1 只填数据) */
+export type UsageState =
+  | { kind: "unlimited" }
+  | { kind: "metered"; usedTokens: number; dailyLimit: number; hardStop: boolean }
+  | { kind: "unavailable"; reason: string };
+
+/** 已生效授权:点分工具名 + 对应 capability id(审计据此追到 ticket_id) */
+export interface Grant {
+  tool: string;
+  capabilityId: string;
+}
+
+export interface RunContext {
+  /** 执行面 proxy 带 run 上下文;控制台 /mcp 远程调用无 run,为 null(05 §6.4) */
+  runId: string | null;
+  agentId: string;
+  /** 审计落库前按工具参数抽取任务归属;无任务维度的调用(kb.search 等)为 null */
+  taskId: string | null;
+  workspaceRoot: string | null;
+  usage: UsageState;
+  /** 命中即放行,免去逐次审批;capabilityId 写入审计 */
+  grants: readonly Grant[];
+}
+
+export interface ToolCall {
+  /** 闸门侧统一用点分名,如 `task.create` / `fs.read` */
+  tool: string;
+  args: Readonly<Record<string, unknown>>;
+}
+
+export type Decision =
+  | { verdict: "allow"; level: ToolLevel; reason?: string; capabilityId?: string }
+  | { verdict: "deny"; level: ToolLevel; reason: string };
+
+const L0_TOOLS = new Set<string>(TOOL_GATE.l0);
+const L1_TOOLS = new Set<string>(TOOL_GATE.l1);
+
+/** 白名单之外一律 L2;不做「看起来无害」的猜测 */
+export function classifyTool(tool: string): ToolLevel {
+  if (L0_TOOLS.has(tool)) {
+    return "L0";
+  }
+  if (L1_TOOLS.has(tool)) {
+    return "L1";
+  }
+  return "L2";
+}
+
+function usageDecision(usage: UsageState, level: ToolLevel): Decision | undefined {
+  if (usage.kind === "unavailable") {
+    return {
+      verdict: "deny",
+      level,
+      reason: `今日用量读取失败(${usage.reason}),按已达上限处理;请稍后重试或联系控制台核对`,
+    };
+  }
+  if (usage.kind === "metered" && usage.hardStop && usage.usedTokens >= usage.dailyLimit) {
+    return {
+      verdict: "deny",
+      level,
+      reason: `今日 token 已用尽(${usage.usedTokens}/${usage.dailyLimit}),所有工具调用均停止;请等待次日或调整上限`,
+    };
+  }
+  return undefined;
+}
+
+/**
+ * 唯一判定实现(05 §6.3):用量硬停 → 能力/白名单 → 等级。
+ * L2 默认拒绝(05 §6.1):控制工具是封闭集合,清单外没有审批通道;
+ * 资源类常驻授权走能力申请(飞书卡片),与本闸门无关。任何异常都按 deny 处理,不允许 fail-open。
+ */
+export function decide(ctx: RunContext, call: ToolCall): Decision {
+  try {
+    const level = classifyTool(call.tool);
+    const stopped = usageDecision(ctx.usage, level);
+    if (stopped !== undefined) {
+      return stopped;
+    }
+    if (level === "L0" || level === "L1") {
+      return { verdict: "allow", level };
+    }
+    const grant = ctx.grants.find((entry) => entry.tool === call.tool);
+    if (grant !== undefined) {
+      return { verdict: "allow", level, reason: "命中已生效授权", capabilityId: grant.capabilityId };
+    }
+    return {
+      verdict: "deny",
+      level: "L2",
+      reason: `「${call.tool}」不在控制工具清单内,已拒绝;如属常驻资源需求,请在控制台申请能力授权`,
+    };
+  } catch (error) {
+    return {
+      verdict: "deny",
+      level: "L2",
+      reason: `判定异常,按拒绝处理:${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}

@@ -13,7 +13,6 @@ function makeEvent(overrides: Partial<InboundMessage> = {}): InboundMessage {
   return {
     eventId: "evt_1",
     eventType: "im.message.receive_v1",
-    token: "token",
     createTime: NOW,
     senderOpenId: "ou_allowed",
     senderType: "user",
@@ -28,9 +27,8 @@ function makeEvent(overrides: Partial<InboundMessage> = {}): InboundMessage {
 
 function makeDeps(overrides: Partial<InboundDeps> = {}): InboundDeps {
   return {
-    expectedToken: undefined,
     isAllowed: (openId) => openId === "ou_allowed",
-    claimEvent: vi.fn(() => true),
+    claimEvent: vi.fn(async () => true),
     reply: vi.fn(async () => undefined),
     onCommand: vi.fn(),
     log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -49,7 +47,7 @@ describe("handleInboundMessage", () => {
   });
 
   it("重复 event_id 直接跳过,不重复处理", async () => {
-    const deps = makeDeps({ claimEvent: vi.fn(() => false) });
+    const deps = makeDeps({ claimEvent: vi.fn(async () => false) });
 
     await expect(handleInboundMessage(deps, makeEvent(), NOW)).resolves.toBe("duplicate");
     expect(deps.onCommand).not.toHaveBeenCalled();
@@ -61,6 +59,17 @@ describe("handleInboundMessage", () => {
     await expect(handleInboundMessage(deps, makeEvent(), NOW)).resolves.toBe("denied");
     expect(deps.reply).toHaveBeenCalledWith(expect.objectContaining({ messageId: "om_1" }), DENIED_RECEIPT);
     expect(deps.claimEvent).not.toHaveBeenCalled();
+  });
+
+  it("机器人发送的消息直接忽略,不回执不认领", async () => {
+    const deps = makeDeps();
+
+    await expect(
+      handleInboundMessage(deps, makeEvent({ senderType: "app" }), NOW),
+    ).resolves.toBe("ignored");
+    expect(deps.reply).not.toHaveBeenCalled();
+    expect(deps.claimEvent).not.toHaveBeenCalled();
+    expect(deps.onCommand).not.toHaveBeenCalled();
   });
 
   it("缺 open_id 按非白名单处理", async () => {
@@ -95,15 +104,5 @@ describe("handleInboundMessage", () => {
     await expect(
       handleInboundMessage(future, makeEvent({ createTime: NOW + 5 * MINUTE_MS + 1 }), NOW),
     ).resolves.toBe("rejected");
-  });
-
-  it("配置了来源 token 时比对不符即丢弃", async () => {
-    const deps = makeDeps({ expectedToken: "expected" });
-
-    await expect(handleInboundMessage(deps, makeEvent(), NOW)).resolves.toBe("rejected");
-    expect(deps.claimEvent).not.toHaveBeenCalled();
-
-    const ok = makeDeps({ expectedToken: "token" });
-    await expect(handleInboundMessage(ok, makeEvent(), NOW)).resolves.toBe("handled");
   });
 });

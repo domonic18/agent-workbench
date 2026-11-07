@@ -13,7 +13,7 @@ function makeDeps(overrides: Partial<CardCallbackDeps> = {}) {
   };
   const deps: CardCallbackDeps = {
     isAllowed: (openId) => openId === "ou_1",
-    claimEvent: (eventId, eventType) => {
+    claimEvent: async (eventId, eventType) => {
       calls.claimed.push(`${eventId}:${eventType}`);
       return true;
     },
@@ -22,11 +22,11 @@ function makeDeps(overrides: Partial<CardCallbackDeps> = {}) {
         calls.approve.push([id, actor]);
         return { applied: true, capability: {} as never };
       },
-      reject(id, actor, reason) {
+      async reject(id, actor, reason) {
         calls.reject.push([id, actor, reason]);
         return { applied: true, capability: {} as never };
       },
-      find: () => undefined,
+      find: async () => undefined,
     },
     log: silentLogger,
     ...overrides,
@@ -152,7 +152,7 @@ describe("handleCardCallback", () => {
   });
 
   it("重复 event_id 幂等跳过", async () => {
-    const { deps, calls } = makeDeps({ claimEvent: () => false });
+    const { deps, calls } = makeDeps({ claimEvent: async () => false });
     const result = await handleCardCallback(deps, cardData());
     expect(result.outcome).toBe("duplicate");
     expect(calls.claimed).toHaveLength(0);
@@ -161,15 +161,15 @@ describe("handleCardCallback", () => {
 
   it("重复点击带上当前快照,供迟到重试刷新卡片", async () => {
     const { deps } = makeDeps({
-      claimEvent: () => false,
+      claimEvent: async () => false,
       service: {
         async approve() {
           throw new Error("重复事件不应调用服务");
         },
-        reject() {
+        async reject() {
           throw new Error("重复事件不应调用服务");
         },
-        find: () => ({ id: "cap_1", status: "rejected" }) as never,
+        find: async () => ({ id: "cap_1", status: "rejected" }) as never,
       },
     });
     const result = await handleCardCallback(deps, cardData());
@@ -215,10 +215,10 @@ describe("handleCardCallback", () => {
         async approve() {
           throw new CapabilityError("NOT_FOUND", "授权记录不存在");
         },
-        reject() {
+        async reject() {
           throw new CapabilityError("NOT_FOUND", "授权记录不存在");
         },
-        find: () => undefined,
+        find: async () => undefined,
       },
     });
     const result = await handleCardCallback(deps, cardData());

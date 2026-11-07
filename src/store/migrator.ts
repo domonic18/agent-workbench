@@ -13,8 +13,9 @@ export interface Migration {
 
 const MIGRATION_FILE = /^(\d{4})_([a-z0-9_]+)\.sql$/;
 
+/** PG 迁移目录(greenfield 合并基线) */
 export function defaultMigrationsDir(): string {
-  return fileURLToPath(new URL("./migrations/", import.meta.url));
+  return fileURLToPath(new URL("./migrations-pg/", import.meta.url));
 }
 
 /** 按版本号升序载入;版本重复或为空目录直接失败,不猜执行顺序。 */
@@ -53,26 +54,22 @@ export function loadMigrations(dir: string = defaultMigrationsDir()): Migration[
  * forward-only:已应用的迁移只校验不重跑,内容变了即启动失败(02 §7)。
  * 返回本次新应用的条数,重复启动返回 0。
  */
-export function runMigrations(db: Db, dir?: string): number {
+export async function runMigrations(db: Db, dir?: string): Promise<number> {
   const migrations = loadMigrations(dir);
 
-  db.exec(`
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS schema_migration (
       version INTEGER PRIMARY KEY,
       name TEXT NOT NULL,
       checksum TEXT NOT NULL,
-      applied_at INTEGER NOT NULL
+      applied_at BIGINT NOT NULL
     )
   `);
 
-  const appliedRows = db
-    .prepare("SELECT version, name, checksum FROM schema_migration")
-    .all() as { version: number; name: string; checksum: string }[];
-  const applied = new Map(appliedRows.map((row) => [row.version, row]));
-
-  const record = db.prepare(
-    "INSERT INTO schema_migration (version, name, checksum, applied_at) VALUES (?, ?, ?, ?)",
+  const appliedRows = await db.all<{ version: number; name: string; checksum: string }>(
+    "SELECT version, name, checksum FROM schema_migration",
   );
+  const applied = new Map(appliedRows.map((row) => [row.version, row]));
 
   let count = 0;
   for (const migration of migrations) {
@@ -85,10 +82,14 @@ export function runMigrations(db: Db, dir?: string): number {
       }
       continue;
     }
-    db.transaction(() => {
-      db.exec(migration.sql);
-      record.run(migration.version, migration.name, migration.checksum, Date.now());
-    })();
+    await db.transaction(async (tx) => {
+      // 迁移脚本含多语句 DDL,走 exec(无参数 simple 协议);记录与脚本同事务提交
+      await tx.exec(migration.sql);
+      await tx.run(
+        "INSERT INTO schema_migration (version, name, checksum, applied_at) VALUES (?, ?, ?, ?)",
+        migration.version, migration.name, migration.checksum, Date.now(),
+      );
+    });
     count += 1;
   }
   return count;

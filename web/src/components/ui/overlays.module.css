@@ -1,0 +1,294 @@
+/* 基元层·浮层类：遮罩 / 弹窗 / 抽屉 / 提示 / 轻提示
+ *
+ * 只引用 global.css 的令牌，不写死数值。
+ */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5);
+  background: var(--overlay);
+  animation: fade var(--duration) var(--ease);
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* 大弹窗在窄屏按抽屉处理：占满整屏，内容不被挤进窄条 */
+@media (max-width: 767px) {
+  .overlayWide {
+    padding: 0;
+  }
+
+  .dialog.lg,
+  .dialog.xl {
+    max-width: none;
+    height: 100%;
+    max-height: 100%;
+    border-radius: 0;
+    border: none;
+  }
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: 88vh;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  animation: rise var(--duration) var(--ease);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-2));
+  }
+}
+
+.dialog.sm {
+  max-width: var(--dialog-sm);
+}
+
+.dialog.md {
+  max-width: var(--dialog-md);
+}
+
+.dialog.lg {
+  max-width: var(--dialog-lg);
+}
+
+.dialog.xl {
+  max-width: var(--dialog-xl);
+}
+
+.dialogHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.dialogTitle {
+  margin: 0;
+  font-size: var(--font-lg);
+  font-weight: 700;
+}
+
+.dialogDescription {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+
+.dialogHeading {
+  min-width: 0;
+}
+
+.dialogHeaderExtra {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* 抽屉：贴右侧滑出，与居中弹窗共用焦点陷阱与滚动锁 */
+.overlayDrawer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  background: var(--overlay);
+  animation: fade var(--duration) var(--ease);
+}
+
+.dialogDrawer {
+  width: min(var(--drawer-w), 100%);
+  max-width: var(--drawer-w);
+  height: 100%;
+  max-height: 100%;
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+  border-right: none;
+}
+
+@media (max-width: 767px) {
+  .dialogDrawer {
+    max-width: none;
+    border-radius: 0;
+    border: none;
+  }
+}
+
+.dialogBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-5);
+}
+
+.dialogFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--line-soft);
+  background: var(--surface-2);
+}
+
+.toastViewport {
+  position: fixed;
+  right: var(--space-5);
+  bottom: var(--space-5);
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: var(--toast-w-min);
+  max-width: var(--toast-w-max);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  font-size: var(--font-sm);
+  animation: rise var(--duration) var(--ease);
+}
+
+.toastPositive {
+  border-color: var(--positive-border);
+  background: var(--positive-soft);
+  color: var(--positive);
+}
+
+.toastDanger {
+  border-color: var(--danger-border);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.toastInfo {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* 下拉菜单：非模态，挂在 body 上定位，不加遮罩 */
+.menuAnchor {
+  display: inline-flex;
+}
+
+.menu {
+  position: fixed;
+  z-index: 95;
+  min-width: var(--menu-w-min);
+  padding: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+}
+
+.menuHeading {
+  padding: var(--space-2) var(--space-3);
+  color: var(--muted);
+  font-size: var(--font-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: var(--font-sm);
+  text-align: left;
+}
+
+.menuItem:hover,
+.menuItem:focus-visible {
+  background: var(--surface-2);
+  outline: none;
+}
+
+.menuItemDanger {
+  color: var(--danger);
+}
+
+.menuItemDisabled {
+  color: var(--muted);
+  cursor: default;
+}
+
+.menuItemDisabled:hover {
+  background: transparent;
+}
+
+.menuItemIcon {
+  display: inline-flex;
+  color: var(--muted);
+}
+
+/* 单选态勾选标记：固定在右端，菜单文字仍左对齐 */
+.menuItemCheck {
+  display: inline-flex;
+  margin-left: auto;
+  color: var(--accent);
+}
+
+/* 提示气泡：触发元素 + 挂在 body 上的浮层 */
+.tooltipTrigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  cursor: help;
+}
+
+.tooltipTrigger:focus-visible {
+  outline: none;
+  border-radius: var(--radius-xs);
+  box-shadow: var(--focus-ring);
+}
+
+.tooltipBubble {
+  position: fixed;
+  z-index: 90;
+  width: max-content;
+  max-width: var(--tooltip-w-max);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--font-xs);
+  line-height: 1.6;
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+}

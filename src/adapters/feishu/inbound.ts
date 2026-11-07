@@ -3,7 +3,6 @@ import { FEISHU_EVENT_WINDOW } from "../../shared/constants.js";
 export interface InboundMessage {
   eventId: string;
   eventType: string;
-  token: string | undefined;
   createTime: number;
   senderOpenId: string | undefined;
   senderType: string;
@@ -14,7 +13,7 @@ export interface InboundMessage {
   content: string;
 }
 
-export type InboundOutcome = "handled" | "duplicate" | "denied" | "rejected";
+export type InboundOutcome = "handled" | "duplicate" | "denied" | "rejected" | "ignored";
 
 export interface InboundLogger {
   info(obj: Record<string, unknown>, msg: string): void;
@@ -23,9 +22,8 @@ export interface InboundLogger {
 }
 
 export interface InboundDeps {
-  expectedToken: string | undefined;
   isAllowed(openId: string): boolean;
-  claimEvent(eventId: string, eventType: string): boolean;
+  claimEvent(eventId: string, eventType: string): Promise<boolean>;
   /** 回执按事件时间决定引用原消息还是发新消息(见 reply.ts) */
   reply(event: InboundMessage, text: string): Promise<void>;
   /** M1.5-5 的指令解析入口;本阶段只记录,不产生任务 */
@@ -36,7 +34,7 @@ export interface InboundDeps {
 export const DENIED_RECEIPT = "无权限：仅白名单用户可向控制台下指令";
 
 /**
- * 入站顺序:时间窗 → 来源 token → 白名单 → event_id 去重 → 交给指令解析(01 §8.1)。
+ * 入站顺序:时间窗 → 白名单 → event_id 去重 → 交给指令解析(01 §8.1)。
  * 非白名单直接回执且不落库;白名单事件先认领 event_id,重复事件不再处理。
  */
 export async function handleInboundMessage(
@@ -53,9 +51,10 @@ export async function handleInboundMessage(
     return "rejected";
   }
 
-  if (deps.expectedToken !== undefined && event.token !== deps.expectedToken) {
-    deps.log.warn({ eventId: event.eventId }, "飞书事件来源 token 不符,丢弃");
-    return "rejected";
+  // 协作通知由各 Agent 的 bot 发到群里;机器人消息不能触发控制台指令或回执,否则互相刷屏
+  if (event.senderType === "app") {
+    deps.log.info({ eventId: event.eventId }, "忽略应用(机器人)发送的消息");
+    return "ignored";
   }
 
   const openId = event.senderOpenId;
@@ -69,7 +68,7 @@ export async function handleInboundMessage(
     return "denied";
   }
 
-  if (!deps.claimEvent(event.eventId, event.eventType)) {
+  if (!(await deps.claimEvent(event.eventId, event.eventType))) {
     deps.log.info({ eventId: event.eventId }, "重复飞书事件,跳过");
     return "duplicate";
   }

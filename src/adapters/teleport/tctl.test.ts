@@ -7,6 +7,7 @@ const config: TeleportConfig = {
   identityFile: "/run/teleport/admin-identity",
   botRole: "aw-ext",
   botMaxSessionTtl: "12h",
+  auditLogPath: undefined,
 };
 
 function runner(): CommandRunner & { run: ReturnType<typeof vi.fn> } {

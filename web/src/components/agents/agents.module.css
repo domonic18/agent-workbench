@@ -1,0 +1,422 @@
+/* Agent 管理区：工具条 / 管理表格 / 编辑抽屉 / 删除影响清单 */
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.searchWrap {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.select {
+  /* 基元默认 width:100%（表单里占满一行），工具条里要并排，须显式收窄 */
+  flex: 0 0 150px;
+  width: auto;
+  min-width: 130px;
+}
+
+.resultCount {
+  align-self: center;
+  margin-left: auto;
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+/* 列头：标题 + 说明气泡 */
+.headerCell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* 机器单元格：图标 + 机器名 */
+.machineCell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  color: var(--text-secondary);
+}
+
+/* 机器名可能是一整串 hostname：单元格内截断，不把行撑成两行 */
+.machineName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 表格内的身份单元格：显示名 + 项目/key 副行 */
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.identityName {
+  font-weight: 600;
+  color: var(--text);
+  /* 固定列宽下按词换行；anywhere 会把中文逐字断开 */
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.identitySub {
+  font-size: var(--font-xs);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 卡片上的机器人名：点它打开详情抽屉 */
+.nameButton {
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nameButton:hover {
+  color: var(--accent);
+}
+
+.statusCell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.taskCell {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  max-width: 280px;
+}
+
+.taskTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 未建单会话的最近指令:与任务标题同一行截断,标签不参与省略 */
+.instructionTag {
+  margin-right: var(--space-1);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.taskMeta {
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.rowActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* 窄屏：表格转卡片 */
+.tableArea {
+  display: block;
+}
+
+/* 视图切换按钮组 */
+.viewToggle {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.viewActive {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.cardList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.card {
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.cardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.cardMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+/* 窄屏卡片上的当前任务/最近指令 */
+.cardInstruction {
+  margin: var(--space-3) 0 0;
+  font-size: var(--font-sm);
+  color: var(--text);
+  overflow-wrap: anywhere;
+  /* 指令可能很长，卡片上钳到三行，完整内容靠 title 提示 */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+@media (max-width: 767px) {
+  /* 窄屏靠手指点，卡片动作按 44px 触达底线给 */
+  .cardList .rowActionsLeft button {
+    height: var(--size-touch);
+    padding: 0 var(--space-4);
+  }
+}
+
+/* 详情抽屉的键值网格 */
+.kvGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+@media (max-width: 767px) {
+  .kvGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.kvItem {
+  min-width: 0;
+}
+
+.kvLabel {
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+.kvValue {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+/* 抽屉里的任务列表：整行可点 */
+.taskList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.taskRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.taskRow:hover {
+  border-color: var(--accent-border);
+}
+
+.taskRowTitle {
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.taskRowMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+/* 编辑抽屉 */
+.section {
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.section:first-child {
+  padding-top: 0;
+}
+
+.section:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.sectionTitle {
+  margin: 0 0 var(--space-1);
+  font-size: var(--font-md);
+  font-weight: 700;
+}
+
+.sectionHint {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.fieldFull {
+  grid-column: 1 / -1;
+}
+
+.rowActionsLeft {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.targets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: 220px;
+  overflow-y: auto;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.targetRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-sm);
+}
+
+.dangerZone {
+  padding: var(--space-4);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-md);
+  background: var(--danger-soft);
+}
+
+.error {
+  margin: var(--space-3) 0 0;
+  font-size: var(--font-xs);
+  color: var(--danger);
+}
+
+/* 删除影响清单 */
+.dangerNote {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-sm);
+  color: var(--danger);
+}
+
+.impact {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+@media (max-width: 767px) {
+  .impact {
+    grid-template-columns: 1fr;
+  }
+}
+
+.impactGroup {
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.impactGroupTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  font-size: var(--font-sm);
+  font-weight: 700;
+}
+
+.impactList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+.impactList li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.impactCount {
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* 窄屏触达：委派白名单整行可点，行高按 44px 底线给 */
+@media (max-width: 767px) {
+  .targetRow {
+    min-height: var(--size-touch);
+  }
+}

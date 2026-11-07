@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { openDatabase } from "../store/database.js";
+import { ensureConsoleCredential } from "./credential.js";
 import { buildApp } from "./app.js";
 
 describe("buildApp", () => {
@@ -31,6 +33,26 @@ describe("buildApp", () => {
     await app.close();
   });
 
+  it("配置 allowedHosts 后,Host 不在白名单的请求被拒", async () => {
+    const app = buildApp({ logLevel: "silent", allowedHosts: ["127.0.0.1:8787"] });
+
+    const allowed = await app.inject({
+      method: "GET",
+      url: "/healthz",
+      headers: { host: "127.0.0.1:8787" },
+    });
+    expect(allowed.statusCode).toBe(200);
+
+    const denied = await app.inject({
+      method: "GET",
+      url: "/healthz",
+      headers: { host: "evil.example.com:8787" },
+    });
+    expect(denied.statusCode).toBe(403);
+
+    await app.close();
+  });
+
   it("未知路由返回 404 错误信封", async () => {
     const app = buildApp({ logLevel: "silent" });
     const response = await app.inject({ method: "GET", url: "/nope" });
@@ -41,5 +63,17 @@ describe("buildApp", () => {
     });
 
     await app.close();
+  });
+
+  it("只注入 db 时也注册身份与 A2A 路由(返回 401 而非 404)", async () => {
+    const db = await openDatabase();
+    await ensureConsoleCredential(db, "simple-123");
+    const app = buildApp({ logLevel: "silent", db });
+
+    expect((await app.inject({ method: "GET", url: "/api/machines" })).statusCode).toBe(401);
+    expect((await app.inject({ method: "GET", url: "/api/a2a/inbox" })).statusCode).toBe(401);
+
+    await app.close();
+    await db.close();
   });
 });

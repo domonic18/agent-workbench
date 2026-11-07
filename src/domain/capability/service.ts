@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import type { TeleportAdapter } from "../../adapters/teleport/tctl.js";
+import type { CapabilityTeleportPort } from "./ports.js";
 import { CAPABILITY_TIMEOUTS, type CapabilityAction } from "../../shared/constants.js";
 import type { Db } from "../../store/database.js";
 import { findTaskSummary } from "../../store/repositories/task.js";
@@ -18,14 +18,14 @@ import { deriveBotName } from "./identity.js";
 import { validateRequest, type CapabilityRequestInput } from "./request-validation.js";
 
 export interface CapabilityService {
-  request(input: CapabilityRequestInput): CapabilityRecord;
-  find(id: string): CapabilityRecord | undefined;
+  request(input: CapabilityRequestInput): Promise<CapabilityRecord>;
+  find(id: string): Promise<CapabilityRecord | undefined>;
   approve(id: string, actor: string): Promise<CapabilityDecision>;
-  reject(id: string, actor: string, reason?: string): CapabilityDecision;
-  revoke(id: string, actor: string, reason?: string): CapabilityDecision;
-  list(query: Parameters<typeof listCapabilities>[1]): CapabilityRecord[];
-  expireStalePending(): number;
-  reconcileStaleIssuing(): number;
+  reject(id: string, actor: string, reason?: string): Promise<CapabilityDecision>;
+  revoke(id: string, actor: string, reason?: string): Promise<CapabilityDecision>;
+  list(query: Parameters<typeof listCapabilities>[1]): Promise<CapabilityRecord[]>;
+  expireStalePending(): Promise<number>;
+  reconcileStaleIssuing(): Promise<number>;
 }
 
 export interface CapabilityDecision {
@@ -35,7 +35,7 @@ export interface CapabilityDecision {
 
 export interface CapabilityServiceDeps {
   db: Db;
-  teleport: TeleportAdapter;
+  teleport: CapabilityTeleportPort;
   now?: () => number;
   newId?: () => string;
   newTicketId?: () => string;
@@ -45,8 +45,8 @@ function defaultId(prefix: string): string {
   return `${prefix}_${randomBytes(8).toString("hex")}`;
 }
 
-function requireCapability(db: Db, id: string): CapabilityRecord {
-  const row = findCapability(db, id);
+async function requireCapability(db: Db, id: string): Promise<CapabilityRecord> {
+  const row = await findCapability(db, id);
   if (row === undefined) {
     throw new CapabilityError("NOT_FOUND", "授权记录不存在");
   }
@@ -59,17 +59,17 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
   const newId = deps.newId ?? (() => defaultId("cap"));
   const newTicketId = deps.newTicketId ?? (() => defaultId("tkt"));
 
-  function request(input: CapabilityRequestInput): CapabilityRecord {
+  async function request(input: CapabilityRequestInput): Promise<CapabilityRecord> {
     const { ttlSeconds, scopeJson } = validateRequest(input);
-    if (findTaskSummary(db, input.taskId) === undefined) {
+    if ((await findTaskSummary(db, input.taskId)) === undefined) {
       throw new CapabilityError("VALIDATION_FAILED", "授权必须挂到已存在的任务", [
         `taskId: ${input.taskId}`,
       ]);
     }
     const id = newId();
     const createdAt = now();
-    db.transaction(() => {
-      insertCapability(db, {
+    await db.transaction(async (tx) => {
+      await insertCapability(tx, {
         id,
         subject: input.subject,
         target: input.target.trim(),
@@ -79,27 +79,27 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
         taskId: input.taskId,
         createdAt,
       });
-      appendCapabilityAudit(db, {
+      await appendCapabilityAudit(tx, {
         capabilityId: id,
         action: "requested",
         actor: input.actor,
         detail: { target: input.target.trim(), action: input.action, ttlSeconds },
         occurredAt: createdAt,
       });
-    })();
+    });
     return requireCapability(db, id);
   }
 
   async function approve(id: string, actor: string): Promise<CapabilityDecision> {
-    const row = requireCapability(db, id);
+    const row = await requireCapability(db, id);
     if (row.status !== "pending") {
       return { applied: false, capability: row };
     }
 
     const ticketId = newTicketId();
     const approvedAt = now();
-    const moved = db.transaction(() => {
-      const applied = transitionCapability(db, {
+    const moved = await db.transaction(async (tx): Promise<boolean> => {
+      const applied = await transitionCapability(tx, {
         id,
         from: "pending",
         to: "issuing",
@@ -109,7 +109,7 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
       if (!applied) {
         return false;
       }
-      appendCapabilityAudit(db, {
+      await appendCapabilityAudit(tx, {
         capabilityId: id,
         action: "approved",
         actor,
@@ -117,9 +117,9 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
         occurredAt: approvedAt,
       });
       return true;
-    })();
+    });
     if (!moved) {
-      return { applied: false, capability: requireCapability(db, id) };
+      return { applied: false, capability: await requireCapability(db, id) };
     }
 
     // saga:改状态与签发分属两个事务域,签发结果决定 issuing 落到 active 还是 rejected
@@ -131,8 +131,8 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
       });
     } catch (error) {
       const failedAt = now();
-      db.transaction(() => {
-        const applied = transitionCapability(db, {
+      await db.transaction(async (tx) => {
+        const applied = await transitionCapability(tx, {
           id,
           from: "issuing",
           to: "rejected",
@@ -140,7 +140,7 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
         });
         // 对账可能已先把 issuing 收敛为 rejected;此时不再补记第二次迁移
         if (applied) {
-          appendCapabilityAudit(db, {
+          await appendCapabilityAudit(tx, {
             capabilityId: id,
             action: "issue_failed",
             actor,
@@ -148,7 +148,7 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
             occurredAt: failedAt,
           });
         }
-      })();
+      });
       throw new CapabilityError(
         "UPSTREAM_UNAVAILABLE",
         "Teleport 签发失败,授权已转「签发失败」,可重新提交申请",
@@ -156,8 +156,8 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
     }
 
     const issuedAt = now();
-    const activated = db.transaction(() => {
-      const applied = transitionCapability(db, {
+    const activated = await db.transaction(async (tx): Promise<boolean> => {
+      const applied = await transitionCapability(tx, {
         id,
         from: "issuing",
         to: "active",
@@ -166,7 +166,7 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
         expiresAt: issuedAt + row.ttlSeconds * 1000,
       });
       if (applied) {
-        appendCapabilityAudit(db, {
+        await appendCapabilityAudit(tx, {
           capabilityId: id,
           action: "issued",
           actor,
@@ -175,19 +175,19 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
         });
       }
       return applied;
-    })();
+    });
     // 对账可能在签发途中把 issuing 收敛为 rejected;此时不能再宣称已生效
-    return { applied: activated, capability: requireCapability(db, id) };
+    return { applied: activated, capability: await requireCapability(db, id) };
   }
 
-  function reject(id: string, actor: string, reason?: string): CapabilityDecision {
-    const row = requireCapability(db, id);
+  async function reject(id: string, actor: string, reason?: string): Promise<CapabilityDecision> {
+    const row = await requireCapability(db, id);
     if (row.status !== "pending") {
       return { applied: false, capability: row };
     }
     const decidedAt = now();
-    const applied = db.transaction(() => {
-      const moved = transitionCapability(db, {
+    const applied = await db.transaction(async (tx): Promise<boolean> => {
+      const moved = await transitionCapability(tx, {
         id,
         from: "pending",
         to: "rejected",
@@ -196,7 +196,7 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
       if (!moved) {
         return false;
       }
-      appendCapabilityAudit(db, {
+      await appendCapabilityAudit(tx, {
         capabilityId: id,
         action: "rejected",
         actor,
@@ -204,18 +204,18 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
         occurredAt: decidedAt,
       });
       return true;
-    })();
-    return { applied, capability: requireCapability(db, id) };
+    });
+    return { applied, capability: await requireCapability(db, id) };
   }
 
-  function revoke(id: string, actor: string, reason?: string): CapabilityDecision {
-    const row = requireCapability(db, id);
+  async function revoke(id: string, actor: string, reason?: string): Promise<CapabilityDecision> {
+    const row = await requireCapability(db, id);
     if (row.status !== "active") {
       return { applied: false, capability: row };
     }
     const revokedAt = now();
-    const applied = db.transaction(() => {
-      const moved = transitionCapability(db, {
+    const applied = await db.transaction(async (tx): Promise<boolean> => {
+      const moved = await transitionCapability(tx, {
         id,
         from: "active",
         to: "revoked",
@@ -225,7 +225,7 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
       if (!moved) {
         return false;
       }
-      appendCapabilityAudit(db, {
+      await appendCapabilityAudit(tx, {
         capabilityId: id,
         action: "revoked",
         actor,
@@ -233,27 +233,27 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
         occurredAt: revokedAt,
       });
       return true;
-    })();
-    return { applied, capability: requireCapability(db, id) };
+    });
+    return { applied, capability: await requireCapability(db, id) };
   }
 
   /** 待批超 24h 条件更新为 rejected(01 §9:每 10 分钟一次) */
-  function expireStalePending(): number {
+  async function expireStalePending(): Promise<number> {
     const at = now();
     let expired = 0;
-    for (const row of findStalePending(db, at - CAPABILITY_TIMEOUTS.pendingMs)) {
-      const applied = db.transaction(() => {
+    for (const row of await findStalePending(db, at - CAPABILITY_TIMEOUTS.pendingMs)) {
+      const applied = await db.transaction(async (tx): Promise<boolean> => {
         if (
-          !transitionCapability(db, {
+          !(await transitionCapability(tx, {
             id: row.id,
             from: "pending",
             to: "rejected",
             now: at,
-          })
+          }))
         ) {
           return false;
         }
-        appendCapabilityAudit(db, {
+        await appendCapabilityAudit(tx, {
           capabilityId: row.id,
           action: "rejected",
           actor: "system",
@@ -261,7 +261,7 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
           occurredAt: at,
         });
         return true;
-      })();
+      });
       if (applied) {
         expired += 1;
       }
@@ -270,22 +270,22 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
   }
 
   /** issuing 超 60s 的补偿出口固定为 rejected(05 §5:每 60s 一次) */
-  function reconcileStaleIssuing(): number {
+  async function reconcileStaleIssuing(): Promise<number> {
     const at = now();
     let reconciled = 0;
-    for (const row of findStaleIssuing(db, at - CAPABILITY_TIMEOUTS.issuingMs)) {
-      const applied = db.transaction(() => {
+    for (const row of await findStaleIssuing(db, at - CAPABILITY_TIMEOUTS.issuingMs)) {
+      const applied = await db.transaction(async (tx): Promise<boolean> => {
         if (
-          !transitionCapability(db, {
+          !(await transitionCapability(tx, {
             id: row.id,
             from: "issuing",
             to: "rejected",
             now: at,
-          })
+          }))
         ) {
           return false;
         }
-        appendCapabilityAudit(db, {
+        await appendCapabilityAudit(tx, {
           capabilityId: row.id,
           action: "reconciled",
           actor: "system",
@@ -293,7 +293,7 @@ export function createCapabilityService(deps: CapabilityServiceDeps): Capability
           occurredAt: at,
         });
         return true;
-      })();
+      });
       if (applied) {
         reconciled += 1;
       }

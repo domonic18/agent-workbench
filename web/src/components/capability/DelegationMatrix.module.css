@@ -1,0 +1,121 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.heading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-lg);
+  font-weight: 700;
+  color: var(--text);
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+
+/* 矩阵外框：横向滚动交给基元表格的内层容器 */
+.matrix {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+/* 行头：Agent 名过长时自身截断，不撑破固定列宽 */
+.rowHead {
+  display: block;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cell,
+.selfCell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-control-md);
+  height: var(--size-control-md);
+  border-radius: var(--radius-sm);
+}
+
+/* 自我委派恒不可选:置灰并给出视觉区分 */
+.selfCell {
+  background: var(--surface-3);
+}
+
+.cell input,
+.selfCell input {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+.selfCell input {
+  cursor: not-allowed;
+}
+
+.dirtyNote {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--warning);
+}
+
+.error {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--danger);
+}
+
+.loading {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--font-md);
+}
+
+.errorBox {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-md);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: var(--font-sm);
+}
+
+@media (max-width: 767px) {
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cell input,
+  .selfCell input {
+    width: 20px;
+    height: 20px;
+  }
+}

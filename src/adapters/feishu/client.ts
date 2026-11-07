@@ -17,7 +17,7 @@ export interface FeishuInbound {
 
 /**
  * 长连接订阅(01 §8.1):消息事件与卡片回调同走这一条应用凭据认证的 WebSocket,
- * 无需公网回调地址与 Verification Token;事件仍按时间窗、白名单与 event_id 校验。
+ * 无需公网回调地址;事件仍按时间窗、白名单与 event_id 校验。
  * 启动失败由调用方决定是否致命。
  */
 export async function startFeishuInbound(
@@ -50,11 +50,10 @@ export async function startFeishuInbound(
   );
 
   const isAllowed = (openId: string): boolean => allowed.has(openId);
-  const claimEvent = (eventId: string, eventType: string): boolean =>
+  const claimEvent = async (eventId: string, eventType: string): Promise<boolean> =>
     claimFeishuEvent(db, eventId, eventType);
 
   const deps = {
-    expectedToken: config.verificationToken,
     isAllowed,
     claimEvent,
     reply,

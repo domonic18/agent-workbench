@@ -1,23 +1,21 @@
 import type { FastifyInstance, LightMyRequestResponse } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { TaskTraits, TeleportAdapter } from "../../adapters/teleport/tctl.js";
-import { openDatabase } from "../../store/database.js";
-import { runMigrations } from "../../store/migrator.js";
+import { openDatabase, type Db } from "../../store/database.js";
 import { findCapability, listCapabilities } from "../../store/repositories/capability.js";
 import { buildApp } from "../app.js";
 import { ensureConsoleCredential } from "../credential.js";
 
 const PASSWORD = "secret123";
 
-function prepare() {
-  const db = openDatabase(":memory:");
-  runMigrations(db);
-  ensureConsoleCredential(db, PASSWORD);
-  db.prepare(
+async function prepare(): Promise<Db> {
+  const db = await openDatabase();
+  await ensureConsoleCredential(db, PASSWORD);
+  await db.run(
     `INSERT INTO task
        (id, title, assigner, assignee, project, stage, status, origin, created_at, updated_at)
      VALUES ('T-1', '任务', 'a', 'b', 'aw', 'exec', 'running', 'a2a', 0, 0)`,
-  ).run();
+  );
   return db;
 }
 
@@ -40,13 +38,13 @@ const createBody = {
 };
 
 describe("capabilities 路由", () => {
-  let db: ReturnType<typeof prepare>;
+  let db: Db;
   let app: FastifyInstance;
   let teleport: { calls: TaskTraits[]; adapter: TeleportAdapter };
   let cookie: string;
 
   beforeEach(async () => {
-    db = prepare();
+    db = await prepare();
     teleport = {
       calls: [],
       adapter: {
@@ -67,7 +65,7 @@ describe("capabilities 路由", () => {
 
   afterEach(async () => {
     await app.close();
-    db.close();
+    await db.close();
   });
 
   function write(url: string, key: string, payload?: Record<string, unknown>) {
@@ -138,7 +136,26 @@ describe("capabilities 路由", () => {
     const replay = await write("/api/capabilities", "k1", createBody);
     expect(replay.statusCode).toBe(201);
     expect((replay.json().capability as { id: string }).id).toBe(created.id);
-    expect(listCapabilities(db, { limit: 10 })).toHaveLength(1);
+    expect(await listCapabilities(db, { limit: 10 })).toHaveLength(1);
+  });
+
+  it("幂等键落库,重启后同键仍返回首次资源", async () => {
+    const first = await write("/api/capabilities", "k-persist", createBody);
+    const created = first.json().capability as { id: string };
+
+    await app.close();
+    app = buildApp({ logLevel: "silent", db, teleport: teleport.adapter });
+    const login = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { password: PASSWORD },
+    });
+    cookie = cookieOf(login);
+
+    const replay = await write("/api/capabilities", "k-persist", createBody);
+    expect(replay.statusCode).toBe(201);
+    expect((replay.json().capability as { id: string }).id).toBe(created.id);
+    expect(await listCapabilities(db, { limit: 10 })).toHaveLength(1);
   });
 
   it("非法字段返回 422 明细", async () => {
@@ -217,6 +234,56 @@ describe("capabilities 路由", () => {
     expect(badStatus.statusCode).toBe(422);
   });
 
+  it("三视图按状态集合返回,issuing 归入待批", async () => {
+    async function createId(key: string): Promise<string> {
+      const response = await write("/api/capabilities", key, createBody);
+      expect(response.statusCode).toBe(201);
+      return (response.json().capability as { id: string }).id;
+    }
+    async function viewIds(view: string): Promise<string[]> {
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/capabilities?view=${view}`,
+        headers: { cookie },
+      });
+      expect(response.statusCode).toBe(200);
+      return (response.json().items as { id: string }[]).map((item) => item.id).sort();
+    }
+
+    const pendingId = await createId("v1");
+
+    const activeId = await createId("v2");
+    await write(`/api/capabilities/${activeId}/approve`, "v3");
+
+    const revokedId = await createId("v4");
+    await write(`/api/capabilities/${revokedId}/approve`, "v5");
+    await write(`/api/capabilities/${revokedId}/revoke`, "v6");
+
+    const rejectedId = await createId("v7");
+    await write(`/api/capabilities/${rejectedId}/reject`, "v8");
+
+    const issuingId = await createId("v9");
+    await db.run("UPDATE capability SET status = 'issuing' WHERE id = ?", issuingId);
+
+    expect(await viewIds("pending")).toEqual([pendingId, issuingId].sort());
+    expect(await viewIds("active")).toEqual([activeId]);
+    expect(await viewIds("history")).toEqual([revokedId, rejectedId].sort());
+
+    const badView = await app.inject({
+      method: "GET",
+      url: "/api/capabilities?view=unknown",
+      headers: { cookie },
+    });
+    expect(badView.statusCode).toBe(422);
+
+    const both = await app.inject({
+      method: "GET",
+      url: "/api/capabilities?status=pending&view=pending",
+      headers: { cookie },
+    });
+    expect(both.statusCode).toBe(422);
+  });
+
   it("登出后会话失效", async () => {
     const logout = await app.inject({
       method: "POST",
@@ -236,7 +303,7 @@ describe("capabilities 路由", () => {
 
 describe("签发失败", () => {
   it("Teleport 失败返回 503 并把授权置为 rejected", async () => {
-    const db = prepare();
+    const db = await prepare();
     const failing: TeleportAdapter = {
       async applyTaskTraits() {
         throw new Error("tctl 退出码 1");
@@ -266,9 +333,9 @@ describe("签发失败", () => {
     });
     expect(approved.statusCode).toBe(503);
     expect(approved.json()).toMatchObject({ error: { code: "UPSTREAM_UNAVAILABLE" } });
-    expect(findCapability(db, id)?.status).toBe("rejected");
+    expect((await findCapability(db, id))?.status).toBe("rejected");
 
     await app.close();
-    db.close();
+    await db.close();
   });
 });

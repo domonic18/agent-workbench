@@ -25,12 +25,21 @@ coverage/
 *.tsbuildinfo
 .eslintcache
 
+# 单实例锁(运行时产物,内含本机主机名与 IP,不入库)
+console.lock
+
 # 本地容器配置(从 frpc.toml.example 复制)
 docker/frpc.toml
 
 # Teleport spike 生成的 CA/证书/身份,只在本机跑
 docker/spike/pki/
 docker/spike/out/
+
+# 浏览器自动化产物(Playwright MCP)
+.playwright-mcp/
+
+# cc-connect 桥的运行时附件目录(会话过程产物,不入库)
+.cc-connect/
 
 # IDE / 系统
 .DS_Store
@@ -42,3 +51,13 @@ docker/spike/out/
 
 # 真实基础设施信息只在本机(公开仓库内一律用占位符)
 docs/plan/*.local.md
+
+# 里程碑任务清单必须可入库(覆盖本机全局 *.md 忽略)
+!docs/plan/tasks/*.md
+
+# compose 插值密钥(2026-11-03 重基线)
+docker/.env
+
+# A2A 真机实测接入包:含 Agent Bearer 与一次性令牌,不入库
+e2e/a2a-real/out/
+e2e/a2a-real/.console-password

@@ -1,26 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { isDatabaseWritable, openDatabase } from "./database.js";
+import { openDatabase } from "./database.js";
+import { defaultMigrationsDir, loadMigrations } from "./migrator.js";
 
 describe("openDatabase", () => {
-  it("应用外键与忙等窗口", () => {
-    const db = openDatabase(":memory:");
+  it("建独立 PG 库并完成迁移,可执行查询", async () => {
+    const db = await openDatabase();
 
-    expect(db.pragma("foreign_keys", { simple: true })).toBe(1);
-    expect(db.pragma("busy_timeout", { simple: true })).toBe(5000);
-    db.close();
-  });
-});
-
-describe("isDatabaseWritable", () => {
-  it("可写库返回 true", () => {
-    const db = openDatabase(":memory:");
-    expect(isDatabaseWritable(db)).toBe(true);
-    db.close();
+    expect(await db.get("SELECT 1 AS ok")).toEqual({ ok: 1 });
+    const applied = await db.get<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM schema_migration",
+    );
+    expect(applied).toEqual({ n: loadMigrations(defaultMigrationsDir()).length });
+    await db.close();
   });
 
-  it("库已关闭返回 false", () => {
-    const db = openDatabase(":memory:");
-    db.close();
-    expect(isDatabaseWritable(db)).toBe(false);
+  it("每个句柄使用独立的随机库,互不可见", async () => {
+    const a = await openDatabase();
+    const b = await openDatabase();
+    await a.run(
+      "INSERT INTO machine (id, hostname, os, collector_version, collector_secret_hash, status, created_at) VALUES ('m-a', 'h', 'linux', '1', 'h', 'active', 0)",
+    );
+
+    expect(await a.get("SELECT COUNT(*) AS n FROM machine")).toEqual({ n: 1 });
+    expect(await b.get("SELECT COUNT(*) AS n FROM machine")).toEqual({ n: 0 });
+    await a.close();
+    await b.close();
   });
 });

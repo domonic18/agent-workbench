@@ -1,0 +1,132 @@
+/* 任务详情抽屉内部：摘要 / 轮次链分节
+ *
+ * 抽屉外壳（遮罩、标题栏、关闭、滚动）由 ui/Dialog 的 drawer 变体提供。
+ */
+
+.summary {
+  margin: 0;
+}
+
+.summaryRows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.summaryRow {
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: baseline;
+}
+
+.summaryLabel {
+  margin: 0;
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+.summaryValue {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.inlineMono {
+  margin-left: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--font-xs);
+  color: var(--subtle);
+}
+
+/* 摘要里的跳转入口:与正文同字号,靠颜色和下划线表明可点 */
+.linkButton {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: var(--font-xs);
+  text-align: left;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.linkButton:hover {
+  text-decoration: underline;
+}
+
+.inlineSection {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line-soft);
+}
+
+.sectionHeading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.inlineTitle {
+  margin: 0;
+  font-size: var(--font-md);
+  font-weight: 700;
+  color: var(--text);
+}
+
+.sectionHint {
+  font-size: var(--font-xs);
+  color: var(--subtle);
+}
+
+.capList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--font-xs);
+}
+
+.capItem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+}
+
+.mono {
+  composes: mono from "./task-shared.module.css";
+}
+
+.muted {
+  composes: muted from "./task-shared.module.css";
+}
+
+.output {
+  composes: output from "./task-shared.module.css";
+}
+
+.outputCode {
+  composes: outputCode from "./task-shared.module.css";
+}
+
+.loading {
+  composes: loading from "./task-shared.module.css";
+}
+
+.errorBox {
+  composes: errorBox from "./task-shared.module.css";
+}
+
+.hint {
+  composes: hint from "./task-shared.module.css";
+}

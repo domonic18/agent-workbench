@@ -4,10 +4,7 @@ WORKDIR /app
 RUN npm install -g pnpm@9.15.9
 
 FROM base AS deps
-# better-sqlite3 在 arm64 上没有预编译产物,会走 node-gyp 现场编译,需要 python3 + make + g++
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends python3 make g++ \
-  && rm -rf /var/lib/apt/lists/*
+# 依赖全为纯 JS(pg / fastify / zod),无 node-gyp 原生编译,不需要额外工具链
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY web/package.json web/
 COPY collector/package.json collector/
@@ -16,9 +13,10 @@ RUN pnpm install --frozen-lockfile
 FROM deps AS build
 COPY tsconfig.base.json tsconfig.json tsconfig.build.json ./
 COPY src ./src
+COPY web ./web
 RUN pnpm run build
 
-# 运行期只需生产依赖:Fastify / zod / better-sqlite3 都是运行时依赖,不能靠 dev 依赖撑
+# 运行期只需生产依赖:Fastify / zod / pg 都是运行时依赖,不能靠 dev 依赖撑
 FROM deps AS prod-deps
 RUN pnpm install --frozen-lockfile --prod
 
@@ -34,6 +32,8 @@ RUN groupadd --system --gid "${AW_GID}" aw \
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/package.json ./package.json
 COPY --from=prod-deps /app/node_modules ./node_modules
+# 执行面安装脚本由控制台下发(/artifacts/install.sh),脚本本身在仓库内
+COPY scripts/install-aw-node.sh ./scripts/install-aw-node.sh
 USER aw
 EXPOSE 8787
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

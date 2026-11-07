@@ -1,0 +1,272 @@
+/* 执行机接入向导：平台卡片 / 命令块 / 编号步骤 / 令牌面板 / 机器列表
+ *
+ * 尺度一律取 global.css 令牌，不写死数值。
+ */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.hint {
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+.strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* 平台卡片 */
+.platformGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-4);
+}
+
+.platformCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+
+.platformRecommended {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+}
+
+.platformHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.platformName {
+  font-size: var(--font-md);
+  font-weight: 700;
+  color: var(--text);
+}
+
+.platformMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+.checksum {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--font-xs);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+/* 次要外链与下载链接统一走 ui/LinkButton 基元 */
+
+.platformActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: auto;
+}
+
+/* 命令块样式已上移到 ui/controls.module.css（基元层跨页共用） */
+
+/* 编号步骤 */
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: onboarding-step;
+}
+
+.step {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.stepMarker {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: var(--size-icon-tile);
+  height: var(--size-icon-tile);
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--font-xs);
+  font-weight: 700;
+}
+
+.stepBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.stepTitle {
+  margin: 0;
+  font-size: var(--font-md);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.stepDesc {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+
+/* 令牌面板 */
+.tokenPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-lg);
+  background: var(--warning-soft);
+}
+
+.tokenValue {
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: var(--font-sm);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.countdown {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+}
+
+.countdownValue {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.countdownExpired {
+  font-size: var(--font-sm);
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* 机器列表 */
+.machineList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.machineRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.machineIdentity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.machineName {
+  font-size: var(--font-md);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.machineSub {
+  font-size: var(--font-xs);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.machineTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+/* 待登记项目：确认后由控制台建 Agent 并走配置下发 */
+.machineProjects {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1 0 100%;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+/* 登记按钮按内容宽度，不随卡片拉满 */
+.machineProjects > button {
+  align-self: flex-start;
+}
+
+.projectList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.projectCheck {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-sm);
+  color: var(--text);
+  cursor: pointer;
+}
+
+@media (max-width: 767px) {
+  .platformGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .platformActions button,
+  .platformActions a {
+    width: 100%;
+  }
+
+  /* 锚点是独立可点元素，不在全局控件触达规则覆盖范围内 */
+  .platformActions a {
+    min-height: var(--size-touch);
+  }
+}

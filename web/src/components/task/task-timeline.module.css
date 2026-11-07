@@ -1,0 +1,85 @@
+.section {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line-soft);
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: var(--font-sm);
+  font-weight: 700;
+  color: var(--text);
+}
+
+.caption {
+  margin-left: auto;
+  font-size: var(--font-xs);
+  color: var(--subtle);
+}
+
+.timeline {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.timelineItem {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0;
+  padding: var(--space-1) 0 var(--space-1) var(--space-4);
+  font-size: var(--font-xs);
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.timelineItem::before {
+  position: absolute;
+  top: var(--space-3);
+  left: 0;
+  width: var(--space-1);
+  height: var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--border);
+  content: "";
+}
+
+.timelineItem:first-child::before {
+  background: var(--accent);
+}
+
+.kind {
+  flex: 0 0 auto;
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+.time {
+  flex: 0 0 auto;
+  font-size: var(--font-xs);
+  color: var(--subtle);
+}
+
+.kind::after,
+.time::after {
+  content: " ·";
+}
+
+.desc {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.muted {
+  composes: muted from "./task-shared.module.css";
+}

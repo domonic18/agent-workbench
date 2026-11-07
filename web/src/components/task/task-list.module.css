@@ -1,0 +1,7 @@
+/* 任务页：筛选 + 列表 + 页脚说明 */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}

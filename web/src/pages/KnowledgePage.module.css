@@ -1,0 +1,25 @@
+/* 知识页：视图标签 + 搜索 + 条目列表 */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.search input {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 767px) {
+  .search {
+    flex-wrap: wrap;
+  }
+}

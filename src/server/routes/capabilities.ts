@@ -3,8 +3,10 @@ import { z } from "zod";
 import {
   CAPABILITY_STATUSES,
   CAPABILITY_TTL,
+  LIST_LIMITS,
   type CapabilityStatus,
 } from "../../shared/constants.js";
+import { parseJsonObject } from "../../shared/json.js";
 import type { Db } from "../../store/database.js";
 import type { CapabilityRecord } from "../../store/repositories/capability.js";
 import { CapabilityError } from "../../domain/capability/errors.js";
@@ -12,16 +14,30 @@ import {
   createCapabilityService,
   type CapabilityService,
 } from "../../domain/capability/service.js";
+import { createIdempotencyService } from "../../domain/security/idempotency.js";
 import type { TeleportAdapter } from "../../adapters/teleport/tctl.js";
 import {
   requireCsrf,
   requireIdempotencyKey,
   requireSession,
 } from "../middleware/session.js";
+import { parseKeysetCursor } from "./paging.js";
 
 const CONSOLE_ACTOR = "console";
-const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 200;
+/** 幂等键作用域:同键在不同接口下互不影响 */
+const CREATE_SCOPE = "capability.create";
+
+/** 授权屏三视图的 URL 口径(03 §4.3);issuing 归「待批」以免签发中掉出视野 */
+const CAPABILITY_VIEW_STATUSES = {
+  pending: ["pending", "issuing"],
+  active: ["active"],
+  history: ["expired", "revoked", "rejected"],
+} as const;
+type CapabilityView = keyof typeof CAPABILITY_VIEW_STATUSES;
+
+function isCapabilityView(value: string): value is CapabilityView {
+  return Object.hasOwn(CAPABILITY_VIEW_STATUSES, value);
+}
 
 const createSchema = z.object({
   subject: z.string(),
@@ -62,21 +78,13 @@ interface CapabilityDto {
   updatedAt: number;
 }
 
-function parseScope(scopeJson: string): unknown {
-  try {
-    return JSON.parse(scopeJson) as unknown;
-  } catch {
-    return {};
-  }
-}
-
 function toDto(row: CapabilityRecord): CapabilityDto {
   return {
     id: row.id,
     subject: row.subject,
     target: row.target,
     action: row.action,
-    scope: parseScope(row.scopeJson),
+    scope: parseJsonObject(row.scopeJson),
     ttlSeconds: row.ttlSeconds,
     status: row.status,
     ticketId: row.ticketId,
@@ -99,19 +107,6 @@ function sendError(reply: FastifyReply, error: CapabilityError): FastifyReply {
   });
 }
 
-function parseCursor(cursor: string): { createdAt: number; id: string } | undefined {
-  const index = cursor.indexOf(":");
-  if (index <= 0) {
-    return undefined;
-  }
-  const createdAt = Number(cursor.slice(0, index));
-  const id = cursor.slice(index + 1);
-  if (!Number.isInteger(createdAt) || id === "") {
-    return undefined;
-  }
-  return { createdAt, id };
-}
-
 export function registerCapabilityRoutes(
   app: FastifyInstance,
   options: CapabilityRoutesOptions,
@@ -120,14 +115,19 @@ export function registerCapabilityRoutes(
   const now = options.now ?? Date.now;
   const service =
     options.service ?? createCapabilityService({ db, teleport: options.teleport, now });
+  const idempotency = createIdempotencyService({ db, now });
   const session = requireSession(db, now);
   const writeGuards = [session, requireCsrf(), requireIdempotencyKey()];
-  // 申请接口的幂等键 → 首次生成的 capability id;M3-2 落库后改为持久化
-  const createdByKey = new Map<string, string>();
 
   app.get("/api/capabilities", { preHandler: session }, async (request, reply) => {
     const query = request.query as Record<string, unknown>;
     const status = typeof query.status === "string" ? query.status : undefined;
+    const view = typeof query.view === "string" ? query.view : undefined;
+    if (status !== undefined && view !== undefined) {
+      return reply.code(422).send({
+        error: { code: "VALIDATION_FAILED", message: "status 与 view 只能二选一" },
+      });
+    }
     if (status !== undefined && !CAPABILITY_STATUSES.includes(status as CapabilityStatus)) {
       return reply.code(422).send({
         error: {
@@ -136,25 +136,42 @@ export function registerCapabilityRoutes(
         },
       });
     }
-    const limitText = typeof query.limit === "string" ? Number(query.limit) : DEFAULT_LIMIT;
-    if (!Number.isInteger(limitText) || limitText < 1 || limitText > MAX_LIMIT) {
+    if (view !== undefined && !isCapabilityView(view)) {
       return reply.code(422).send({
-        error: { code: "VALIDATION_FAILED", message: `limit 必须为 1~${MAX_LIMIT} 的整数` },
+        error: {
+          code: "VALIDATION_FAILED",
+          message: `view 只接受 ${Object.keys(CAPABILITY_VIEW_STATUSES).join(" / ")}`,
+        },
       });
     }
+    const limitText = typeof query.limit === "string" ? Number(query.limit) : LIST_LIMITS.default;
+    if (!Number.isInteger(limitText) || limitText < 1 || limitText > LIST_LIMITS.max) {
+      return reply.code(422).send({
+        error: { code: "VALIDATION_FAILED", message: `limit 必须为 1~${LIST_LIMITS.max} 的整数` },
+      });
+    }
+    const parsed =
+      typeof query.cursor === "string" ? parseKeysetCursor(query.cursor) : undefined;
     const before =
-      typeof query.cursor === "string" ? parseCursor(query.cursor) : undefined;
+      parsed === undefined ? undefined : { createdAt: parsed.sort, id: parsed.id };
     if (typeof query.cursor === "string" && before === undefined) {
       return reply.code(422).send({
         error: { code: "VALIDATION_FAILED", message: "cursor 格式应为 <createdAt>:<id>" },
       });
     }
 
-    const rows = service.list({
-      ...(status === undefined ? {} : { status: status as CapabilityStatus }),
-      limit: limitText,
-      ...(before === undefined ? {} : { before }),
-    });
+    const rows =
+      view !== undefined && isCapabilityView(view)
+        ? await service.list({
+            statuses: CAPABILITY_VIEW_STATUSES[view],
+            limit: limitText,
+            ...(before === undefined ? {} : { before }),
+          })
+        : await service.list({
+            ...(status === undefined ? {} : { status: status as CapabilityStatus }),
+            limit: limitText,
+            ...(before === undefined ? {} : { before }),
+          });
     const items = rows.map(toDto);
     const last = rows.at(-1);
     return {
@@ -165,14 +182,13 @@ export function registerCapabilityRoutes(
   });
 
   app.post("/api/capabilities", { preHandler: writeGuards }, async (request, reply) => {
-    const key = request.headers["idempotency-key"];
-    if (typeof key === "string") {
-      const existing = createdByKey.get(key);
-      if (existing !== undefined) {
-        const previous = service.find(existing);
-        if (previous !== undefined) {
-          return reply.code(201).send({ capability: toDto(previous) });
-        }
+    // requireIdempotencyKey 已保证存在且非空
+    const key = request.headers["idempotency-key"] as string;
+    const existingId = await idempotency.find(CREATE_SCOPE, key);
+    if (existingId !== undefined) {
+      const previous = await service.find(existingId);
+      if (previous !== undefined) {
+        return reply.code(201).send({ capability: toDto(previous) });
       }
     }
 
@@ -191,10 +207,10 @@ export function registerCapabilityRoutes(
     }
 
     try {
-      const row = service.request({ ...parsed.data, actor: CONSOLE_ACTOR });
-      if (typeof key === "string") {
-        createdByKey.set(key, row.id);
-      }
+      // 建单与幂等键同事务:崩溃窗口内不会留下「已建单但重放又建一单」
+      const row = await idempotency.run(CREATE_SCOPE, key, () =>
+        service.request({ ...parsed.data, actor: CONSOLE_ACTOR }),
+      );
       if (options.onRequested !== undefined) {
         try {
           options.onRequested(row);
@@ -236,7 +252,7 @@ export function registerCapabilityRoutes(
       const parsed = decisionSchema.safeParse(request.body ?? {});
       const reason = parsed.success ? parsed.data.reason : undefined;
       try {
-        const result = service.reject(id, CONSOLE_ACTOR, reason);
+        const result = await service.reject(id, CONSOLE_ACTOR, reason);
         return { applied: result.applied, capability: toDto(result.capability) };
       } catch (error) {
         if (error instanceof CapabilityError) {
@@ -255,7 +271,7 @@ export function registerCapabilityRoutes(
       const parsed = decisionSchema.safeParse(request.body ?? {});
       const reason = parsed.success ? parsed.data.reason : undefined;
       try {
-        const result = service.revoke(id, CONSOLE_ACTOR, reason);
+        const result = await service.revoke(id, CONSOLE_ACTOR, reason);
         return { applied: result.applied, capability: toDto(result.capability) };
       } catch (error) {
         if (error instanceof CapabilityError) {

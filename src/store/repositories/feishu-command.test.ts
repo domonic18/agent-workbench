@@ -1,18 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { openDatabase } from "../database.js";
-import { runMigrations } from "../migrator.js";
+import { openDatabase, type Db } from "../database.js";
 import { recordFeishuCommand } from "./feishu-command.js";
 
-function prepare() {
-  const db = openDatabase(":memory:");
-  runMigrations(db);
-  return db;
+async function prepare(): Promise<Db> {
+  return openDatabase();
 }
 
 describe("recordFeishuCommand", () => {
-  it("落库解析结果与回执,原文超长截断", () => {
-    const db = prepare();
-    recordFeishuCommand(db, {
+  it("落库解析结果与回执,原文超长截断", async () => {
+    const db = await prepare();
+    await recordFeishuCommand(db, {
       eventId: "evt_1",
       openId: "ou_1",
       chatId: "oc_1",
@@ -23,10 +20,8 @@ describe("recordFeishuCommand", () => {
       createdAt: 1_700_000_000_000,
     });
 
-    const row = db
-      .prepare("SELECT event_id, command, outcome, length(raw_text) AS len FROM feishu_command")
-      .get();
+    const row = await db.get("SELECT event_id, command, outcome, length(raw_text) AS len FROM feishu_command");
     expect(row).toEqual({ event_id: "evt_1", command: null, outcome: "unsupported", len: 4000 });
-    db.close();
+    await db.close();
   });
 });

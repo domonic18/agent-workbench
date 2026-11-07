@@ -7,7 +7,7 @@ import {
   markDelivered,
   markFailed,
   markRetry,
-  reconcileStaleLeases,
+  markSending,
   type OutboxRecord,
 } from "../../store/repositories/outbox.js";
 import type { JobLogger } from "./reconcile.js";
@@ -36,26 +36,33 @@ async function deliverOne(
   // payload_json 由 enqueuePush 写入且受 CHECK(json_valid) 约束,按既定形状直接解析
   const payload = JSON.parse(row.payloadJson) as OutboxPushPayload;
 
+  // 进入发送即置 sending:此后租约过期只能转 uncertain,不能再静默重投
+  if (!(await markSending(db, row.id, row.leaseToken))) {
+    logger.warn({ outboxId: row.id }, "发件箱租约已失效,跳过本轮投递");
+    return;
+  }
+
   try {
     await sender.send(payload);
-    markDelivered(db, row.id, row.leaseToken);
+    await markDelivered(db, row.id, row.leaseToken);
     logger.info({ outboxId: row.id, attempts: row.attempts }, "发件箱投递成功");
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (row.attempts >= OUTBOX_TIMEOUTS.maxAttempts) {
-      markFailed(db, row.id, row.leaseToken, message);
+      await markFailed(db, row.id, row.leaseToken, message);
       logger.error({ outboxId: row.id, attempts: row.attempts, err: error }, "发件箱投递失败,已达重试上限");
     } else {
       const nextAt = at + retryDelayMs(row.attempts);
-      markRetry(db, row.id, row.leaseToken, nextAt, message);
+      await markRetry(db, row.id, row.leaseToken, nextAt, message);
       logger.warn({ outboxId: row.id, attempts: row.attempts, nextAt }, "发件箱投递失败,稍后重试");
     }
   }
 }
 
 /**
- * 跑一轮完整投递(01 §6 / §9):先回收过期租约,再逐条领取到期记录并同步发送。
+ * 跑一轮完整投递(01 §6 / §9):逐条领取到期的 push 记录并同步发送。
  * 全部错误按可重试处理,超过 attempts 上限才判 failed(通知类只重试、不围栏任务)。
+ * 过期租约回收由 outbox-reclaim 作业独立负责,pull 通道无 push worker 时同样生效。
  */
 export async function drainOutbox(
   db: Db,
@@ -63,18 +70,9 @@ export async function drainOutbox(
   logger: JobLogger,
   now: () => number = Date.now,
 ): Promise<void> {
-  try {
-    const reconciled = reconcileStaleLeases(db, now());
-    if (reconciled > 0) {
-      logger.info({ reconciled }, "发件箱过期租约回收");
-    }
-  } catch (error) {
-    logger.error({ err: error }, "发件箱租约回收失败");
-  }
-
   for (;;) {
     const at = now();
-    const row = claimDue(db, at, at + OUTBOX_TIMEOUTS.leaseMs);
+    const row = await claimDue(db, at, at + OUTBOX_TIMEOUTS.leaseMs);
     if (row === undefined) {
       return;
     }

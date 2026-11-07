@@ -1,0 +1,81 @@
+/* 列表与抽屉共用的展示原语;各模块以 composes 引用,避免两处漂移 */
+.label {
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--font-xs);
+  color: var(--subtle);
+}
+
+.muted {
+  color: var(--muted);
+  font-size: var(--font-xs);
+}
+
+.output {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  color: var(--accent);
+}
+
+.outputCode {
+  font-family: var(--font-mono);
+  font-size: var(--font-xs);
+}
+
+.section {
+  margin-bottom: var(--space-5);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: var(--font-md);
+  font-weight: 700;
+  color: var(--text);
+}
+
+.hint {
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-xs);
+  color: var(--subtle);
+}
+
+.kind {
+  font-weight: 600;
+}
+
+.time {
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+.loading {
+  color: var(--muted);
+  font-size: var(--font-sm);
+}
+
+.errorBox {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-md);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: var(--font-sm);
+}
+
+@media (max-width: 767px) {
+  .errorBox {
+    min-height: var(--size-touch);
+  }
+}

@@ -1,0 +1,34 @@
+import type { Db } from "../database.js";
+
+export interface LoginFailureRecord {
+  source: string;
+  failures: number;
+  lockedUntil: number | null;
+  updatedAt: number;
+}
+
+const COLUMNS = `
+  source, failures, locked_until AS "lockedUntil", updated_at AS "updatedAt"
+`;
+
+export async function findLoginFailure(db: Db, source: string): Promise<LoginFailureRecord | undefined> {
+  return (await db.get(`SELECT ${COLUMNS} FROM login_failure WHERE source = ?`, source)) as
+    | LoginFailureRecord
+    | undefined;
+}
+
+export async function upsertLoginFailure(db: Db, row: LoginFailureRecord): Promise<void> {
+  await db.run(
+    `INSERT INTO login_failure (source, failures, locked_until, updated_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(source) DO UPDATE SET
+       failures = excluded.failures,
+       locked_until = excluded.locked_until,
+       updated_at = excluded.updated_at`,
+    row.source, row.failures, row.lockedUntil, row.updatedAt,
+  );
+}
+
+export async function clearLoginFailures(db: Db, source: string): Promise<void> {
+  await db.run("DELETE FROM login_failure WHERE source = ?", source);
+}

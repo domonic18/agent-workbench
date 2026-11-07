@@ -1,0 +1,142 @@
+.threads {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.thread {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line-soft);
+}
+
+.thread:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+
+.threadHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.participants {
+  font-size: var(--font-xs);
+  color: var(--subtle);
+}
+
+/* 时间线竖轨：轨道与节点都用 space 刻度定位 */
+.messages {
+  position: relative;
+  padding-left: var(--space-4);
+}
+
+.messages::before {
+  position: absolute;
+  top: var(--space-1);
+  bottom: var(--space-1);
+  left: var(--space-1);
+  width: 1px;
+  background: var(--line-soft);
+  content: "";
+}
+
+.message {
+  position: relative;
+  padding-bottom: var(--space-2);
+}
+
+.message:last-child {
+  padding-bottom: 0;
+}
+
+.message::before {
+  position: absolute;
+  top: var(--space-1);
+  left: calc(-1 * var(--space-4));
+  width: var(--space-1);
+  height: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  content: "";
+}
+
+.message:first-child::before {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.messageStamp {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1);
+  font-size: var(--font-2xs);
+  color: var(--subtle);
+}
+
+.sep {
+  color: var(--border);
+}
+
+.messageFrom {
+  margin-top: 1px;
+  font-size: var(--font-xs);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.messageBody {
+  font-size: var(--font-xs);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.messageBody::before {
+  color: var(--muted);
+  content: "：";
+}
+
+.messageMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin-top: var(--space-1);
+  font-size: var(--font-2xs);
+  color: var(--muted);
+}
+
+.refs {
+  margin-top: var(--space-1);
+  font-size: var(--font-2xs);
+  color: var(--muted);
+}
+
+.refList {
+  margin: 0;
+  padding-left: var(--space-4);
+}
+
+.refItem {
+  margin-bottom: var(--space-1);
+}
+
+.threadMissing {
+  color: var(--warning);
+  font-size: var(--font-xs);
+}
+
+.loading {
+  composes: loading from "./task-shared.module.css";
+}
+
+.muted {
+  composes: muted from "./task-shared.module.css";
+}
+
+.outputCode {
+  composes: outputCode from "./task-shared.module.css";
+}

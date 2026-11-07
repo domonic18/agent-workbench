@@ -1,3 +1,4 @@
+import type { CapabilityTeleportPort, TaskTraits } from "../../domain/capability/ports.js";
 import type { TeleportConfig } from "../../config/env.js";
 import { renderBotManifest } from "./manifest.js";
 
@@ -11,16 +12,10 @@ export interface CommandRunner {
   run(command: string, args: readonly string[], input?: string): Promise<CommandResult>;
 }
 
-export interface TaskTraits {
-  botName: string;
-  taskId: string;
-  ticketId: string;
-}
+/** 兼容旧导出;新代码应使用 domain/capability/ports 的 CapabilityTeleportPort */
+export type TeleportAdapter = CapabilityTeleportPort;
 
-export interface TeleportAdapter {
-  /** 把任务与票据写进 bot traits;tbot 在下一个 renewal 周期内生效 */
-  applyTaskTraits(traits: TaskTraits): Promise<void>;
-}
+export type { TaskTraits };
 
 /**
  * 写入 traits 后不轮询等待:证书要等 tbot 下一次续期(05 §7 已知窗口),
@@ -29,7 +24,7 @@ export interface TeleportAdapter {
 export function createTeleportAdapter(
   config: TeleportConfig,
   runner: CommandRunner,
-): TeleportAdapter {
+): CapabilityTeleportPort {
   return {
     async applyTaskTraits({ botName, taskId, ticketId }) {
       const manifest = renderBotManifest({

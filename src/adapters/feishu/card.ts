@@ -1,5 +1,6 @@
 import type * as Lark from "@larksuiteoapi/node-sdk";
 import type { CapabilityStatus } from "../../shared/constants.js";
+import { parseJsonObject } from "../../shared/json.js";
 import type { CardCallbackResult, CapabilitySnapshot } from "./callback.js";
 import { ensureOk } from "./response.js";
 
@@ -79,14 +80,6 @@ interface StatusView {
   title: string;
   template: string;
   result: string;
-}
-
-function parseScope(scopeJson: string): unknown {
-  try {
-    return JSON.parse(scopeJson) as unknown;
-  } catch {
-    return {};
-  }
 }
 
 function statusView(input: ResolvedCardInput): StatusView {
@@ -193,7 +186,7 @@ function toResolvedInput(
     subject: capability.subject,
     target: capability.target,
     action: capability.action,
-    scope: parseScope(capability.scopeJson),
+    scope: parseJsonObject(capability.scopeJson),
     ttlSeconds: capability.ttlSeconds,
     taskId: capability.taskId,
     status: capability.status,
@@ -221,26 +214,32 @@ export function buildCardCallbackResponse(result: CardCallbackResult): CardCallb
 
 export interface CardTarget {
   chatId: string;
-  card: unknown;
+  /** 卡片与文本二选一;text 携带 uuid 供飞书侧幂等去重 */
+  card?: unknown;
+  text?: string;
+  uuid?: string;
 }
 
 export interface CardSender {
   send(target: CardTarget): Promise<void>;
 }
 
-/** 把发件箱载荷投递为 interactive 消息;业务状态由调用方的发件箱状态机维护 */
+/** 把发件箱载荷投递为卡片或文本播报;业务状态由调用方的发件箱状态机维护 */
 export function createCardSender(client: Lark.Client): CardSender {
   return {
     async send(target) {
+      const isText = target.text !== undefined;
       const response = await client.im.message.create({
         params: { receive_id_type: "chat_id" },
         data: {
           receive_id: target.chatId,
-          msg_type: "interactive",
-          content: JSON.stringify(target.card),
+          msg_type: isText ? "text" : "interactive",
+          content: isText ? JSON.stringify({ text: target.text }) : JSON.stringify(target.card),
+          // 飞书按 uuid 幂等去重,发件箱重试不会在群里刷出重复播报
+          ...(target.uuid === undefined ? {} : { uuid: target.uuid }),
         },
       });
-      ensureOk(response, "发送审批卡片");
+      ensureOk(response, isText ? "发送协作播报" : "发送审批卡片");
     },
   };
 }

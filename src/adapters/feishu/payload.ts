@@ -2,7 +2,6 @@ import type { InboundMessage } from "./inbound.js";
 
 interface ReceivePayload {
   event_id?: string;
-  token?: string;
   create_time?: string;
   event_type?: string;
   sender?: {
@@ -49,7 +48,6 @@ export function toInboundMessage(data: ReceivePayload): InboundMessage | undefin
     // event_id 在 SDK 类型里可空,退化为消息 ID 兜底才能保持去重
     eventId: data.event_id ?? `msg:${message.message_id}`,
     eventType: data.event_type ?? "im.message.receive_v1",
-    token: data.token,
     createTime,
     senderOpenId: data.sender?.sender_id?.open_id,
     senderType: data.sender?.sender_type ?? "",

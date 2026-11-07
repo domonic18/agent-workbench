@@ -13,6 +13,8 @@ export interface CommandHandlerDeps {
 /**
  * 白名单事件的指令入口:解析 → 执行 → 审计 → 回执。
  * 审计先于回执,回执失败不丢审计;任何分支都不建单(01 §8.1)。
+ * 控制台只响应显式斜杠命令:群里聊天消息不是命令,静默忽略,
+ * 否则每次发言都被回「不支持该指令」刷屏。
  */
 export function createCommandHandler(
   db: Db,
@@ -20,7 +22,12 @@ export function createCommandHandler(
 ): (event: InboundMessage) => Promise<void> {
   return async (event) => {
     const text = event.messageType === "text" ? extractText(event.content) : undefined;
-    const result = executeCommand(
+    if (text === undefined || !text.trimStart().startsWith("/")) {
+      deps.log.info({ eventId: event.eventId, chatId: event.chatId }, "非指令消息,已忽略");
+      return;
+    }
+
+    const result = await executeCommand(
       {
         listTasks: (limit) => listTaskSummaries(db, limit),
         findTask: (id) => findTaskSummary(db, id),
@@ -29,7 +36,7 @@ export function createCommandHandler(
     );
 
     try {
-      recordFeishuCommand(db, {
+      await recordFeishuCommand(db, {
         eventId: event.eventId,
         openId: event.senderOpenId ?? "",
         chatId: event.chatId,

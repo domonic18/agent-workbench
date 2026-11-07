@@ -1,20 +1,17 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { openDatabase } from "../store/database.js";
-import { runMigrations } from "../store/migrator.js";
+import { openDatabase, type Db } from "../store/database.js";
 import { enqueuePush } from "./outbox.js";
 
-function prepare() {
-  const db = openDatabase(":memory:");
-  runMigrations(db);
-  return db;
+async function prepare(): Promise<Db> {
+  return openDatabase();
 }
 
 describe("enqueuePush", () => {
-  it("入队一条 push/notification 记录并落地载荷", () => {
-    const db = prepare();
+  it("入队一条 push/notification 记录并落地载荷", async () => {
+    const db = await prepare();
     const card = { schema: "2.0" };
-    const row = enqueuePush(db, {
+    const row = await enqueuePush(db, {
       idempotencyKey: "cap:cap_1:requested",
       kind: "capability_approval",
       taskId: "T-1",
@@ -37,34 +34,34 @@ describe("enqueuePush", () => {
     expect(row.payloadHash).toBe(
       createHash("sha256").update(JSON.stringify({ chatId: "oc_1", card })).digest("hex"),
     );
-    db.close();
+    await db.close();
   });
 
-  it("同幂等键重复入队不新增行", () => {
-    const db = prepare();
+  it("同幂等键重复入队不新增行", async () => {
+    const db = await prepare();
     const input = {
       idempotencyKey: "cap:cap_1:requested",
       kind: "capability_approval",
       chatId: "oc_1",
       card: { a: 1 },
     };
-    const first = enqueuePush(db, input);
-    const second = enqueuePush(db, input);
+    const first = await enqueuePush(db, input);
+    const second = await enqueuePush(db, input);
 
     expect(second.id).toBe(first.id);
-    expect(db.prepare("SELECT COUNT(*) AS n FROM outbox").get()).toEqual({ n: 1 });
-    db.close();
+    expect(await db.get("SELECT COUNT(*) AS n FROM outbox")).toEqual({ n: 1 });
+    await db.close();
   });
 
-  it("缺省 taskId 记为 NULL", () => {
-    const db = prepare();
-    const row = enqueuePush(db, {
+  it("缺省 taskId 记为 NULL", async () => {
+    const db = await prepare();
+    const row = await enqueuePush(db, {
       idempotencyKey: "k",
       kind: "x",
       chatId: "oc_1",
       card: {},
     });
     expect(row.taskId).toBeNull();
-    db.close();
+    await db.close();
   });
 });

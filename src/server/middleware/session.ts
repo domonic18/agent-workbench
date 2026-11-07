@@ -42,11 +42,11 @@ export function clearSessionCookie(): string {
   return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
 }
 
-export function startSession(db: Db, now: () => number): { id: string; expiresAt: number } {
+export async function startSession(db: Db, now: () => number): Promise<{ id: string; expiresAt: number }> {
   const id = randomBytes(32).toString("base64url");
   const createdAt = now();
   const expiresAt = createdAt + SESSION_TTL_MS;
-  createSession(db, { id, createdAt, expiresAt });
+  await createSession(db, { id, createdAt, expiresAt });
   return { id, expiresAt };
 }
 
@@ -54,20 +54,20 @@ export function sessionIdFrom(request: FastifyRequest): string | undefined {
   return parseCookies(request.headers.cookie)[SESSION_COOKIE];
 }
 
-export function endSession(db: Db, id: string): void {
-  deleteSession(db, id);
+export async function endSession(db: Db, id: string): Promise<void> {
+  await deleteSession(db, id);
 }
 
 /** 未登录 / 过期统一 401,不区分「没带 cookie」与「会话失效」 */
 export function requireSession(db: Db, now: () => number): PreHandler {
   return async (request, reply) => {
     const id = sessionIdFrom(request);
-    if (id === undefined || findActiveSession(db, id, now()) === undefined) {
+    if (id === undefined || (await findActiveSession(db, id, now())) === undefined) {
       return reply
         .code(401)
         .send({ error: { code: "UNAUTHORIZED", message: "未登录或会话已过期" } });
     }
-    touchSession(db, id, now());
+    await touchSession(db, id, now());
     return undefined;
   };
 }
