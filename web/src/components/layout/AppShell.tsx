@@ -1,5 +1,5 @@
-import { BookOpen, LayoutGrid, ListChecks, LogOut, ShieldCheck } from "lucide-react";
-import { Suspense } from "react";
+import { BookOpen, KeyRound, LayoutGrid, ListChecks, LogOut, ShieldCheck } from "lucide-react";
+import { Suspense, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { logout } from "../../api/auth.js";
 import { RealtimeProvider, useRealtimeStatus } from "../../api/stream.js";
@@ -7,6 +7,7 @@ import { APP_NAME, APP_NAME_EN, APP_VERSION } from "../../shared/app.js";
 import { REALTIME_LABEL, REALTIME_TONE } from "../../shared/labels.js";
 import { useTheme } from "../../shared/theme.js";
 import { LogoIcon } from "../brand/LogoIcon.js";
+import { ChangePasswordDialog } from "../identity/ChangePasswordDialog.js";
 import { Badge } from "../ui/Badge.js";
 import { Menu, type MenuItem } from "../ui/Menu.js";
 import { ThemeToggle } from "./ThemeToggle.js";
@@ -88,6 +89,7 @@ function Shell() {
   const meta = pageMeta(location.pathname);
   const realtime = useRealtimeStatus();
   const { preference, setPreference } = useTheme();
+  const [passwordDialog, setPasswordDialog] = useState(false);
 
   async function handleLogout(): Promise<void> {
     try {
@@ -100,6 +102,14 @@ function Shell() {
   const menuItems: MenuItem[] = [
     { key: "account-heading", heading: "账号" },
     { key: "account-user", label: "管理员 · 本机", disabled: true },
+    {
+      key: "change-password",
+      label: "修改口令",
+      icon: <KeyRound size={14} aria-hidden="true" />,
+      onSelect: () => {
+        setPasswordDialog(true);
+      },
+    },
     { key: "appearance-heading", heading: "外观" },
     {
       key: "theme-system",
@@ -219,6 +229,10 @@ function Shell() {
           </Suspense>
         </main>
       </div>
+
+      {passwordDialog ? (
+        <ChangePasswordDialog onClose={() => setPasswordDialog(false)} />
+      ) : null}
     </div>
   );
 }
