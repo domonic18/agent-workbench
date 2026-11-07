@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "../ui/Button.js";
-import { CopyActionButton } from "./CopyBlock.js";
+import { CopyActionButton } from "../ui/CopyBlock.js";
+import uiStyles from "../ui/controls.module.css";
 import styles from "./onboarding.module.css";
 
 export interface EnrollTokenPanelProps {
@@ -50,8 +51,8 @@ export function EnrollTokenPanel({
 
   return (
     <div className={styles.tokenPanel}>
-      <div className={styles.commandHead}>
-        <span className={styles.commandLabel}>enroll token（一次性，有效期 15 分钟）</span>
+      <div className={uiStyles.commandHead}>
+        <span className={uiStyles.commandLabel}>enroll token（一次性，有效期 15 分钟）</span>
         <Button
           variant="primary"
           loading={pending}
@@ -64,7 +65,7 @@ export function EnrollTokenPanel({
       </div>
 
       {token === null ? (
-        <p className={styles.hintBlock}>
+        <p className={uiStyles.note}>
           令牌由控制台签发、只在目标机安装时输入一次。它只在本页显示一次，关闭页面后不再回显。
         </p>
       ) : expired ? (

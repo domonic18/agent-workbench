@@ -1,4 +1,4 @@
-/* 知识正文：markdown 排版；行长限在 --content-prose，长段落才好读 */
+/* Markdown 正文排版：知识正文与 Agent 手册共用；行长限在 --content-prose，长段落才好读 */
 
 .markdown {
   max-width: var(--content-prose);

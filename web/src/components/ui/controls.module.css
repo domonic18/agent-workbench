@@ -107,6 +107,23 @@
   opacity: 0.55;
 }
 
+/* 长得像按钮的链接：下载直链与站外链接要保留 a 标签语义 */
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+  transition:
+    background var(--duration-fast) var(--ease),
+    border-color var(--duration-fast) var(--ease),
+    color var(--duration-fast) var(--ease);
+}
+
 .iconButton.sm {
   width: var(--size-control-sm);
   height: var(--size-control-sm);
@@ -303,6 +320,52 @@
   overflow-wrap: anywhere;
 }
 
+/* 命令块：等宽展示 + 一键复制 */
+.commandBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+
+.commandHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.commandLabel {
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.commandValue {
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: var(--font-sm);
+  line-height: 1.6;
+  color: var(--text);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* 块下方的补充说明 */
+.note {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+
 /* 状态筛选胶囊 */
 .chipGroup {
   display: flex;
@@ -337,5 +400,19 @@
 @media (max-width: 767px) {
   .chip {
     min-height: var(--size-touch);
+  }
+
+  .linkButton {
+    min-height: var(--size-touch);
+  }
+
+  .commandHead button,
+  .commandHead a {
+    width: 100%;
+  }
+
+  .commandHead {
+    flex-direction: column;
+    align-items: stretch;
   }
 }

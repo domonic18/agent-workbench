@@ -1,9 +1,9 @@
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import { copyToClipboard } from "../../shared/clipboard.js";
-import { Button } from "../ui/Button.js";
-import { useToast } from "../ui/Toast.js";
-import styles from "./onboarding.module.css";
+import { Button } from "./Button.js";
+import { useToast } from "./Toast.js";
+import styles from "./controls.module.css";
 
 export interface CopyActionButtonProps {
   value: string;
@@ -11,6 +11,8 @@ export interface CopyActionButtonProps {
   /** 复制成功提示文案 */
   copiedText?: string;
   size?: "sm" | "md";
+  /** 内容还没到手时禁用，避免复制到空串 */
+  disabled?: boolean;
 }
 
 /** 行内复制按钮：复制成功走 toast 反馈，失败也要说清楚 */
@@ -19,6 +21,7 @@ export function CopyActionButton({
   label,
   copiedText = "已复制",
   size = "sm",
+  disabled = false,
 }: CopyActionButtonProps) {
   const toast = useToast();
   const [copied, setCopied] = useState(false);
@@ -38,6 +41,7 @@ export function CopyActionButton({
     <Button
       size={size}
       variant="secondary"
+      disabled={disabled}
       icon={copied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
       onClick={() => void handleCopy()}
     >
@@ -71,7 +75,7 @@ export function CopyBlock({
         <CopyActionButton value={value} label={copyLabel} copiedText={copiedText} />
       </div>
       <pre className={styles.commandValue}>{value}</pre>
-      {note === undefined ? null : <p className={styles.hintBlock}>{note}</p>}
+      {note === undefined ? null : <p className={styles.note}>{note}</p>}
     </div>
   );
 }

@@ -5,8 +5,9 @@ import { fetchArtifacts } from "../../api/bootstrap.js";
 import { formatBytes } from "../../shared/format.js";
 import { Badge } from "../ui/Badge.js";
 import { EmptyState } from "../ui/EmptyState.js";
+import { LinkButton } from "../ui/LinkButton.js";
 import { Panel } from "../ui/Panel.js";
-import { CopyActionButton, CopyBlock } from "./CopyBlock.js";
+import { CopyActionButton, CopyBlock } from "../ui/CopyBlock.js";
 import { artifactKeyOf, detectArtifactKey, GITHUB_RELEASE_BASE, type ArtifactKey } from "./platform.js";
 import styles from "./onboarding.module.css";
 
@@ -46,10 +47,9 @@ function PlatformCard({
         <code className={styles.checksum}>{sha256}</code>
       )}
       <div className={styles.platformActions}>
-        <a className={styles.downloadLink} href={url} download>
-          <Download size={15} aria-hidden="true" />
+        <LinkButton href={url} download icon={<Download size={15} aria-hidden="true" />}>
           下载
-        </a>
+        </LinkButton>
         <CopyActionButton value={url} label="复制直链" />
         {sha256 === null ? null : (
           <CopyActionButton value={sha256} label="复制校验和" />
@@ -121,14 +121,14 @@ export function DownloadStep({ origin }: DownloadStepProps) {
         />
         <div className={styles.platformActions}>
           <CopyActionButton value={checksumsUrl} label="复制校验和文件直链" />
-          <a
-            className={styles.linkSecondary}
+          <LinkButton
+            variant="secondary"
             href={`${GITHUB_RELEASE_BASE}/checksums.txt`}
             target="_blank"
             rel="noreferrer"
           >
             GitHub Release 兜底
-          </a>
+          </LinkButton>
         </div>
       </Panel>
     </div>

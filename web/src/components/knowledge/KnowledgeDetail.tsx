@@ -21,7 +21,7 @@ import { Badge } from "../ui/Badge.js";
 import { Button } from "../ui/Button.js";
 import { Dialog } from "../ui/Dialog.js";
 import { KnowledgeEditForm, type KnowledgeEditValues } from "./KnowledgeEditForm.js";
-import markdownStyles from "./knowledge-markdown.module.css";
+import markdownStyles from "../markdown/markdown.module.css";
 import styles from "./knowledge-detail.module.css";
 
 export interface KnowledgeDetailProps {

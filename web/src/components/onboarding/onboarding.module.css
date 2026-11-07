@@ -14,12 +14,6 @@
   color: var(--muted);
 }
 
-.hintBlock {
-  margin: 0;
-  font-size: var(--font-sm);
-  color: var(--muted);
-}
-
 .strong {
   color: var(--text);
   font-weight: 600;
@@ -76,47 +70,7 @@
   overflow-wrap: anywhere;
 }
 
-.downloadLink {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  height: var(--size-control-md);
-  padding: 0 var(--space-4);
-  border-radius: var(--radius-md);
-  background: var(--accent);
-  color: var(--on-accent);
-  font-size: var(--font-md);
-  font-weight: 600;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.downloadLink:hover {
-  background: var(--accent-hover);
-}
-
-/* 次要外链：兜底来源不是主路径，不跟主按钮抢注意力 */
-.linkSecondary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: var(--size-control-md);
-  padding: 0 var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  color: var(--text);
-  font-size: var(--font-sm);
-  font-weight: 600;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.linkSecondary:hover {
-  background: var(--surface-3);
-  border-color: var(--border-strong);
-}
+/* 次要外链与下载链接统一走 ui/LinkButton 基元 */
 
 .platformActions {
   display: flex;
@@ -125,44 +79,7 @@
   margin-top: auto;
 }
 
-/* 命令块 */
-.commandBlock {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface-2);
-}
-
-.commandHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.commandLabel {
-  font-size: var(--font-sm);
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.commandValue {
-  margin: 0;
-  padding: var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  font-family: var(--font-mono);
-  font-size: var(--font-sm);
-  line-height: 1.6;
-  color: var(--text);
-  overflow-x: auto;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
+/* 命令块样式已上移到 ui/controls.module.css（基元层跨页共用） */
 
 /* 编号步骤 */
 .steps {
@@ -344,20 +261,12 @@
   }
 
   .platformActions button,
-  .platformActions a,
-  .commandHead button,
-  .commandHead a {
+  .platformActions a {
     width: 100%;
   }
 
   /* 锚点是独立可点元素，不在全局控件触达规则覆盖范围内 */
-  .downloadLink,
-  .linkSecondary {
+  .platformActions a {
     min-height: var(--size-touch);
-  }
-
-  .commandHead {
-    flex-direction: column;
-    align-items: stretch;
   }
 }

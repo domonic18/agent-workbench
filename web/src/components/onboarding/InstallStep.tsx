@@ -1,5 +1,5 @@
 import { Panel } from "../ui/Panel.js";
-import { CopyBlock } from "./CopyBlock.js";
+import { CopyBlock } from "../ui/CopyBlock.js";
 import { EnrollTokenPanel } from "./EnrollTokenPanel.js";
 import type { EnrollTokenState } from "./useEnrollToken.js";
 import styles from "./onboarding.module.css";
