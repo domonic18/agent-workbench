@@ -79,6 +79,9 @@ function fakeFetch(
     if (path.includes("/api/agents")) {
       return fakeResponse({ items: roster, nextCursor: null });
     }
+    if (path.includes("/api/work-items")) {
+      return fakeResponse({ items: [], nextCursor: null });
+    }
     return fakeResponse(body);
   });
 }

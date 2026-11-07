@@ -53,6 +53,8 @@ export interface TaskDto {
   assignee_label: string;
   project: string;
   parent_task_id: string | null;
+  /** 所属工作事项(业务事项);null 表示该任务不挂在任何事项下 */
+  work_item_id: string | null;
   round: number;
   rework_count: number;
   stage: TaskStage;

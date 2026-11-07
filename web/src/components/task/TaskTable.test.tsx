@@ -14,6 +14,7 @@ function task(overrides: Partial<TaskDto> = {}): TaskDto {
     assignee_label: "agt_a",
     project: "aw",
     parent_task_id: null,
+    work_item_id: null,
     round: 1,
     rework_count: 0,
     stage: "exec",

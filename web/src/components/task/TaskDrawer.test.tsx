@@ -27,6 +27,7 @@ function task(overrides: Partial<TaskDto> = {}): TaskDto {
     assignee_label: "agt_a",
     project: "aw",
     parent_task_id: null,
+    work_item_id: null,
     round: 1,
     rework_count: 1,
     stage: "exec",
@@ -138,13 +139,21 @@ function stubApi(options: StubOptions = {}): void {
   vi.stubGlobal("fetch", fetchMock);
 }
 
-function renderDrawer(options: StubOptions = {}, onClose = vi.fn()): void {
+function renderDrawer(
+  options: StubOptions = {},
+  onClose = vi.fn(),
+  onOpenWorkItem = vi.fn(),
+): void {
   stubApi(options);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={["/tasks?project=aw"]}>
-        <TaskDrawer taskId={options.current?.id ?? "tsk_cur"} onClose={onClose} />
+        <TaskDrawer
+          taskId={options.current?.id ?? "tsk_cur"}
+          onClose={onClose}
+          onOpenWorkItem={onOpenWorkItem}
+        />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -199,5 +208,17 @@ describe("任务详情抽屉", () => {
 
     fireEvent.keyDown(document, { key: "Escape" });
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("未关联工作事项时明说,关联时给出可点入口", async () => {
+    renderDrawer({ current: task({ work_item_id: null }) });
+    expect(await screen.findByText("未关联工作事项")).toBeTruthy();
+
+    cleanup();
+    const onOpenWorkItem = vi.fn();
+    renderDrawer({ current: task({ work_item_id: "wim_1" }) }, vi.fn(), onOpenWorkItem);
+    const entry = await screen.findByRole("button", { name: "wim_1" });
+    fireEvent.click(entry);
+    expect(onOpenWorkItem).toHaveBeenCalledWith("wim_1");
   });
 });

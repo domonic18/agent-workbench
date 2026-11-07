@@ -41,6 +41,24 @@
   color: var(--subtle);
 }
 
+/* 摘要里的跳转入口:与正文同字号,靠颜色和下划线表明可点 */
+.linkButton {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: var(--font-xs);
+  text-align: left;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.linkButton:hover {
+  text-decoration: underline;
+}
+
 .inlineSection {
   margin-top: var(--space-5);
   padding-top: var(--space-4);

@@ -24,6 +24,8 @@ export interface TaskDetailSummaryProps {
   events: readonly TaskEventDto[];
   agentNames: ReadonlyMap<string, string>;
   now: number;
+  /** 跳到该任务所属的工作事项详情 */
+  onOpenWorkItem: (workItemId: string) => void;
 }
 
 const TERMINAL_STATUSES: readonly TaskDto["status"][] = ["done", "cancelled"];
@@ -62,11 +64,13 @@ export function TaskDetailSummary({
   events,
   agentNames,
   now,
+  onOpenWorkItem,
 }: TaskDetailSummaryProps) {
   const last = events.at(-1);
   const terminal = TERMINAL_STATUSES.includes(task.status);
   const reason = task.status === "blocked" ? latestEventReason(events) : null;
   const since = last?.occurred_at ?? task.updated_at;
+  const workItemId = task.work_item_id;
 
   return (
     <section className={styles.summary} aria-label="任务摘要">
@@ -82,6 +86,15 @@ export function TaskDetailSummary({
           {agentMentionLabel(task.assigner, agentNames, task.assigner_label)}
         </SummaryRow>
         <SummaryRow label="阶段">{TASK_STAGE_LABEL[task.stage]}</SummaryRow>
+        <SummaryRow label="所属工作事项">
+          {workItemId === null ? (
+            <span className={styles.muted}>未关联工作事项</span>
+          ) : (
+            <button type="button" className={styles.linkButton} onClick={() => onOpenWorkItem(workItemId)}>
+              {workItemId}
+            </button>
+          )}
+        </SummaryRow>
         <SummaryRow label="轮次">
           第 {task.round} 轮
           {task.rework_count > 0 ? ` · 返工 ${task.rework_count} 次` : ""}

@@ -22,6 +22,7 @@ function task(id: string, parentTaskId: string | null = null): TaskDto {
     assignee_label: "agt_a",
     project: "aw",
     parent_task_id: parentTaskId,
+    work_item_id: null,
     round: 1,
     rework_count: 0,
     stage: "intake",

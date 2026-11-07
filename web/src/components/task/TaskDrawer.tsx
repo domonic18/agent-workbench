@@ -29,13 +29,15 @@ import styles from "./task-drawer.module.css";
 export interface TaskDrawerProps {
   taskId: string;
   onClose: () => void;
+  /** 跳到该任务所属的工作事项详情 */
+  onOpenWorkItem: (workItemId: string) => void;
 }
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof ApiError ? error.message : fallback;
 }
 
-export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
+export function TaskDrawer({ taskId, onClose, onOpenWorkItem }: TaskDrawerProps) {
   const now = useNow(30_000);
   const realtime = useRealtimeStream([`task:${taskId}`]);
 
@@ -119,6 +121,7 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
             events={taskEvents}
             agentNames={agentNames}
             now={now}
+            onOpenWorkItem={onOpenWorkItem}
           />
 
           <section className={styles.inlineSection} aria-label="轮次链">

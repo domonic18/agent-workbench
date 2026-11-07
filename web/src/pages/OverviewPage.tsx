@@ -18,6 +18,7 @@ import { AgentDetailDialog } from "../components/agents/AgentDetailDialog.js";
 import { AgentEditDialog } from "../components/agents/AgentEditDialog.js";
 import { AgentManagementTable } from "../components/agents/AgentManagementTable.js";
 import { AgentRegisterDialog } from "../components/identity/AgentRegisterDialog.js";
+import { WorkItemSection } from "../components/work-item/WorkItemSection.js";
 import { AgentRotateDialog } from "../components/identity/AgentRotateDialog.js";
 import { Button } from "../components/ui/Button.js";
 import { EmptyState } from "../components/ui/EmptyState.js";
@@ -145,6 +146,8 @@ export function OverviewPage() {
               title={formatExactTokens(data.metrics.todayTokens)}
             />
           </section>
+
+          <WorkItemSection />
 
           <section className={styles.section}>
             <SectionHeader
