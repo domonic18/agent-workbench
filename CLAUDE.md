@@ -8,6 +8,7 @@
   - 产品形态是「控制台 + 飞书」双面并存：控制台管状态与权力，飞书管说话与拍板；控制台不承担 IM 功能
   - 事实源在控制台 PostgreSQL（work_item / work_trigger / worker_inbox / task / a2a_message / capability / agent_run）；WorkItem 的 Mandate 与 Task/Run 分离，Assignment/Input/Handback 不冒充 A2A；**不使用飞书黑板，不做投影**
   - 控制台容器内监听 `0.0.0.0:8787`，宿主机仅通过 `127.0.0.1:8787` 发布，不自己处理 TLS；提供 `/healthz`；经 frp 以 `aw.example.com` 暴露
+  - 会话 Cookie 的 `Secure` 标记**按请求逐次判断**（控制台当前无 TLS 终结点，一刀切加 `Secure` 会让明文链路的登录被浏览器拒收、静默失效）：`AW_TRUST_PROXY=1` 才采信可信代理（回环 / 私网网段）的 `X-Forwarded-Proto`；基础安全响应头（`nosniff` / `X-Frame-Options` / `Referrer-Policy` / `Permissions-Policy`）由应用统一下发，**HSTS 归 TLS 终结点**
   - frpc 两条独立规则：`aw.example.com → 8787`（http）、`tp.example.com:8443 → 443`（tcp，给 Teleport proxy；443 已被 frps 的 HTTPS vhost 占用），互不复用
   - 跨机：每台运行 Agent 的机器只跑一个 `aw-node`（采集 + Claude Code 调度），launchd 常驻，采集模块只经 `/api/ingest` 单向推送；无 aw-node 的外部运行时（WorkBuddy/Codex/DeepSeek harness）拿 Agent Bearer 直接打 `/mcp`、用官方 automations 轮询，首版 Run/对话/Token 显示「未接入 / —」；**`agent.machine_id` 语义是「宿主机器」**（外部运行时可绑可解绑，只登记归属）；**有没有过程数据看两个条件：`runtime='claude_code'` 且 `machine_id` 非空**，不是单看机器绑定；Teleport node agent 装目标机
   - 授权：SSH / 数据库访问走 Teleport CE + tbot 的 15 分钟短时证书，不自研证书签发；身份按 Agent 建 bot、任务以 trait `aw_task_id` 携带，证书扩展用 `external.*` 插值（`internal.*` 不插值）；Teleport CE 为 AGPL-3.0，独立容器运行，只经 API 调用

@@ -21,6 +21,8 @@ const envSchema = z.object({
   CONSOLE_ALLOWED_HOSTS: z.string().optional(),
   // 对外可达的控制台地址(frp 公网入口);站点据此给出可复制到别的机器的下载地址
   AW_PUBLIC_URL: z.string().optional(),
+  // 置于 TLS 反代之后才置 1:据此采信 X-Forwarded-Proto,会话 Cookie 才会带上 Secure
+  AW_TRUST_PROXY: z.string().optional(),
   FEISHU_APP_ID: z.string().optional(),
   FEISHU_APP_SECRET: z.string().optional(),
   // 仅白名单 open_id 可下指令,逗号分隔;空 = 全部拒绝(fail-closed)
@@ -67,6 +69,7 @@ export interface Config {
   consoleInitPassword: string | undefined;
   allowedHosts: string[];
   publicUrl: string | undefined;
+  trustProxy: boolean;
   feishu: FeishuConfig | undefined;
   githubWebhookSecret: string | undefined;
   teleport: TeleportConfig;
@@ -78,6 +81,22 @@ function optionalText(value: string | undefined): string | undefined {
   }
   const trimmed = value.trim();
   return trimmed === "" ? undefined : trimmed;
+}
+
+/** 布尔开关:留空为假;取值非法直接报错,避免打错字后静默失效 */
+function parseFlag(value: string | undefined, name: string): boolean {
+  const text = optionalText(value);
+  if (text === undefined) {
+    return false;
+  }
+  const normalized = text.toLowerCase();
+  if (normalized === "1" || normalized === "true") {
+    return true;
+  }
+  if (normalized === "0" || normalized === "false") {
+    return false;
+  }
+  throw new Error(`${name} 只能取 1/0 或 true/false,收到 ${text}`);
 }
 
 function parseOpenIds(value: string | undefined): string[] {
@@ -163,6 +182,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       parsed.data.PORT,
     ),
     publicUrl: optionalText(parsed.data.AW_PUBLIC_URL),
+    trustProxy: parseFlag(parsed.data.AW_TRUST_PROXY, "AW_TRUST_PROXY"),
     feishu: parseFeishu(parsed.data),
     githubWebhookSecret: optionalText(parsed.data.GITHUB_WEBHOOK_SECRET),
     teleport: {

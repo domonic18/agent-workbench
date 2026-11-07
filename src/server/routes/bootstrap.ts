@@ -20,6 +20,7 @@ import { CONSOLE_PASSWORD_MIN_LENGTH, ONE_TIME_TOKEN } from "../../shared/consta
 import type { Db } from "../../store/database.js";
 import { hasConsoleCredential, setConsolePassword } from "../credential.js";
 import {
+  isSecureRequest,
   requireCsrf,
   requireIdempotencyKey,
   requireSession,
@@ -100,7 +101,7 @@ export function registerBootstrapRoutes(app: FastifyInstance, options: Bootstrap
       });
     }
     const { id, expiresAt } = await startSession(db, now);
-    reply.header("set-cookie", sessionCookie(id));
+    reply.header("set-cookie", sessionCookie(id, isSecureRequest(request)));
     return { ok: true, expiresAt };
   });
 

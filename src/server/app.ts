@@ -17,6 +17,7 @@ import { healthPayload, type DatabaseStatus } from "../shared/health.js";
 import type { Db } from "../store/database.js";
 import { requireAllowedHost } from "./middleware/host.js";
 import { requireConsoleReadiness } from "./middleware/bootstrap-mode.js";
+import { securityHeaders } from "./middleware/security-headers.js";
 import { createApprovalNotifier } from "./notification/approval.js";
 import { registerA2aRoutes } from "./routes/a2a.js";
 import { registerAgentDetailRoutes } from "./routes/agent-detail.js";
@@ -85,13 +86,27 @@ export interface BuildAppOptions {
   webRoot?: string;
   /** 来源白名单(只校验 Host);未注入时不做限制,供路由层测试使用 */
   allowedHosts?: readonly string[];
+  /** 置于 TLS 反代之后时置 true:采信 X-Forwarded-Proto,会话 Cookie 才会带上 Secure */
+  trustProxy?: boolean;
   now?: () => number;
 }
+
+/**
+ * 可信代理网段:回环(宿主机上的 nginx)、链路本地与私网(容器网络里的 frpc)。
+ * 公网地址不在其中——直连来源伪造的转发头不采信。
+ */
+const TRUSTED_PROXY_RANGES = ["loopback", "linklocal", "uniquelocal"];
 
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const startedAt = options.startedAt ?? Date.now();
   const databaseStatus = options.databaseStatus ?? (() => "ok" as const);
-  const app = Fastify({ logger: { level: options.logLevel ?? "info" } });
+  const app = Fastify({
+    logger: { level: options.logLevel ?? "info" },
+    trustProxy: options.trustProxy === true ? TRUSTED_PROXY_RANGES : false,
+  });
+
+  // 安全响应头先挂:白名单拒绝、鉴权失败、404 也要带上
+  app.addHook("onRequest", securityHeaders());
 
   if (options.allowedHosts !== undefined) {
     app.addHook("onRequest", requireAllowedHost(options.allowedHosts));

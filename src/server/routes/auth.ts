@@ -8,6 +8,7 @@ import { createLoginLockoutGuard } from "../login-lockout.js";
 import {
   clearSessionCookie,
   endSession,
+  isSecureRequest,
   requireCsrf,
   requireIdempotencyKey,
   requireSession,
@@ -57,7 +58,7 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRoutesOpti
     }
     await lockout.succeed();
     const { id, expiresAt } = await startSession(db, now);
-    reply.header("set-cookie", sessionCookie(id));
+    reply.header("set-cookie", sessionCookie(id, isSecureRequest(request)));
     return { ok: true, expiresAt };
   });
 
@@ -69,7 +70,7 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRoutesOpti
       if (id !== undefined) {
         await endSession(db, id);
       }
-      reply.header("set-cookie", clearSessionCookie());
+      reply.header("set-cookie", clearSessionCookie(isSecureRequest(request)));
       return { ok: true };
     },
   );
