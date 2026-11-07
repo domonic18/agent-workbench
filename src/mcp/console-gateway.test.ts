@@ -13,12 +13,15 @@ import { openDatabase, type Db } from "../store/database.js";
 import type { AgentRecord } from "../store/repositories/agent.js";
 import { createConsoleGateway } from "./console-gateway.js";
 import { createConsoleTools } from "./console-tools.js";
+import type { ConsoleTool } from "./console-shared.js";
+import { renderAgentSkill } from "./agent-kit/render.js";
 
 interface Fixture {
   db: Db;
   agent: AgentRecord;
   gateway: ReturnType<typeof createConsoleGateway>;
   knowledgeDir: string;
+  tools: ConsoleTool[];
 }
 
 async function setup(resolveUsage?: (agentId: string) => Promise<UsageState>): Promise<Fixture> {
@@ -44,22 +47,23 @@ async function setup(resolveUsage?: (agentId: string) => Promise<UsageState>): P
   const tasks = createTaskService({ db, now: () => 0 });
   const a2a = createA2aService({ db, now: () => 0, waitMs: 0 });
   const workers = createWorkerService({ db, now: () => 0, sleep: async () => {} });
+  const tools = createConsoleTools({
+    db,
+    tasks,
+    a2a,
+    workers,
+    ingest: createIngestService({ db, now: () => 0 }).ingest,
+    now: () => 0,
+    knowledgeDir,
+    announce: { db },
+  });
   const gateway = createConsoleGateway({
     db,
-    tools: createConsoleTools({
-      db,
-      tasks,
-      a2a,
-      workers,
-      ingest: createIngestService({ db, now: () => 0 }).ingest,
-      now: () => 0,
-      knowledgeDir,
-      announce: { db },
-    }),
+    tools,
     now: () => 0,
     ...(resolveUsage === undefined ? {} : { resolveUsage }),
   });
-  return { db, agent: agentA.agent, gateway, knowledgeDir };
+  return { db, agent: agentA.agent, gateway, knowledgeDir, tools };
 }
 
 function textOf(result: CallToolResult): string {
@@ -74,7 +78,7 @@ function parse(result: CallToolResult): Record<string, unknown> {
 const DEADLINE = "2026-12-01T12:00:00Z";
 
 describe("console gateway", () => {
-  it("listTools 暴露 11 个裸名控制工具", async () => {
+  it("listTools 暴露 14 个裸名控制工具", async () => {
     const { db, gateway } = await setup();
     expect(gateway.listTools().map((tool) => tool.name)).toEqual([
       "task_create",
@@ -90,7 +94,17 @@ describe("console gateway", () => {
       "work_handback",
       "work_report",
       "work_decide",
+      "a2a_guide",
     ]);
+    await db.close();
+  });
+
+  it("手册速查表覆盖全部注册工具,工具改名不会漏", async () => {
+    const { db, tools } = await setup();
+    const skill = renderAgentSkill(tools);
+    for (const tool of tools) {
+      expect(skill).toContain(`\`${tool.name}\``);
+    }
     await db.close();
   });
 

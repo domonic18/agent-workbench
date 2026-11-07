@@ -53,11 +53,14 @@ if (
     "work_read",
     "work_ack",
     "work_handback",
+    "work_report",
+    "work_decide",
+    "a2a_guide",
   ])
 ) {
-  ok("tools/list 11 工具", names.join(","));
+  ok("tools/list 14 工具", names.join(","));
 } else {
-  fail("tools/list 11 工具", names.join(","));
+  fail("tools/list 14 工具", names.join(","));
 }
 
 // ③ tools/call task_create

@@ -251,12 +251,24 @@ export type ToolLevel = (typeof TOOL_LEVELS)[number];
 export const TOOL_VERDICTS = ["allow", "deny"] as const;
 export type ToolVerdict = (typeof TOOL_VERDICTS)[number];
 
+/** 远程 MCP 接入参数(01 §5.2):端点路径、鉴权头名与凭据格式;服务端、手册与前端共用一处 */
+export const MCP_ACCESS = {
+  path: "/mcp",
+  authHeader: "authorization",
+  bearerFormat: "Bearer {agentId}.{secret}",
+} as const;
+
+/** 按协议格式拼出完整的凭据头值;格式只在 MCP_ACCESS 里定义一次 */
+export function formatBearer(agentId: string, secret: string): string {
+  return MCP_ACCESS.bearerFormat.replace("{agentId}", agentId).replace("{secret}", secret);
+}
+
 /**
  * 分级白名单(05 §6.1):L0/L1 只收明确登记的点分名,清单外一律按 L2 默认拒绝。
  * 控制工具是封闭集合;资源类常驻授权走能力申请(飞书卡片),不经本清单。
  */
 export const TOOL_GATE = {
-  l0: ["kb.search", "a2a.inbox"],
+  l0: ["kb.search", "a2a.inbox", "guide.read"],
   l1: [
     "task.create",
     "task.update",

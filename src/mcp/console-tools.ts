@@ -28,6 +28,7 @@ import {
   type ConsoleToolDeps,
 } from "./console-shared.js";
 import { createBugTools } from "./bug-tools.js";
+import { createGuideTools } from "./agent-kit/guide-tool.js";
 import { createWorkTools } from "./work-tools.js";
 
 const MAX_INBOX_WAIT_S = A2A_INBOX.maxWaitMs / 1000;
@@ -329,7 +330,7 @@ function createKbTools(deps: ConsoleToolDeps): ConsoleTool[] {
   ];
 }
 
-/** 首版封闭集合(arch01 §5.2):13 个自有控制工具;启动即验闸门名登记,防枚举漂移 */
+/** 首版封闭集合(arch01 §5.2):14 个自有控制工具;启动即验闸门名登记,防枚举漂移 */
 export function createConsoleTools(deps: ConsoleToolDeps): ConsoleTool[] {
   const tools = [
     ...createTaskTools(deps),
@@ -337,6 +338,7 @@ export function createConsoleTools(deps: ConsoleToolDeps): ConsoleTool[] {
     ...createKbTools(deps),
     ...createWorkTools(deps),
     ...createBugTools(deps),
+    ...createGuideTools(deps),
   ];
   const known: readonly string[] = [...TOOL_GATE.l0, ...TOOL_GATE.l1];
   for (const tool of tools) {
