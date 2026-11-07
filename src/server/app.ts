@@ -2,12 +2,17 @@ import { readFileSync } from "node:fs";
 import Fastify, { type FastifyInstance } from "fastify";
 import type { TeleportAdapter } from "../adapters/teleport/tctl.js";
 import type { FeishuConfig } from "../config/env.js";
+import { createA2aService } from "../domain/a2a/service.js";
 import type { A2aService } from "../domain/a2a/types.js";
 import { createCapabilityService, type CapabilityService } from "../domain/capability/service.js";
 import type { KnowledgeEntryService } from "../domain/knowledge/entry-service.js";
 import type { KnowledgeIndexService } from "../domain/knowledge/index-service.js";
 import type { KnowledgeRebuilder } from "../domain/knowledge/rebuild.js";
+import { createTaskService } from "../domain/task/service.js";
 import { createUsageResolver, type UsageResolver } from "../domain/usage/state.js";
+import { createIngestService } from "../domain/work/ingest-service.js";
+import { createWorkerService } from "../domain/work/worker-service.js";
+import { createConsoleTools } from "../mcp/console-tools.js";
 import { healthPayload, type DatabaseStatus } from "../shared/health.js";
 import type { Db } from "../store/database.js";
 import { requireAllowedHost } from "./middleware/host.js";
@@ -15,6 +20,7 @@ import { requireConsoleReadiness } from "./middleware/bootstrap-mode.js";
 import { createApprovalNotifier } from "./notification/approval.js";
 import { registerA2aRoutes } from "./routes/a2a.js";
 import { registerAgentDetailRoutes } from "./routes/agent-detail.js";
+import { registerAgentKitRoutes } from "./routes/agent-kit.js";
 import { registerAgentLifecycleRoutes } from "./routes/agent-lifecycle.js";
 import { registerAgentSelfRoutes } from "./routes/agent-self.js";
 import { registerAuditRoutes } from "./routes/audit.js";
@@ -109,6 +115,8 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         ? {}
         : { collabChatId: options.feishu.collabChatId };
     const usageResolver: UsageResolver = createUsageResolver(timing);
+    // A2A 服务全局一份:HTTP 路由、/mcp 与死信回执唤醒长轮询必须共用同一实例
+    const a2aService: A2aService = options.a2a ?? createA2aService({ db, now: options.now ?? Date.now });
 
     registerAuthRoutes(app, { db, ...timing });
     registerAuditRoutes(app, { db, ...timing });
@@ -157,17 +165,35 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       db,
       ...timing,
       ...collab,
-      ...(options.a2a === undefined ? {} : { service: options.a2a }),
+      service: a2aService,
     });
 
-    // 远程 MCP 与业务 API 共进程同鉴权(arch01 §5.2);kb_write 需要知识目录,未注入不注册
+    // 远程 MCP 与业务 API 共进程同鉴权(arch01 §5.2);kb_write 需要知识目录,未注入不注册。
+    // Agent 接入材料与 /mcp 同生共死:它的速查表就是这份工具注册表的投影
     if (options.knowledgeDir !== undefined) {
-      registerMcpRoutes(app, {
+      // 工具注册表只构造一次:/mcp 与 Agent 手册的速查表共用同一份,工具改了表跟着改
+      const consoleTools = createConsoleTools({
         db,
-        knowledgeDir: options.knowledgeDir,
+        tasks: createTaskService({ db, now: options.now ?? Date.now }),
+        a2a: a2aService,
+        workers: createWorkerService({ db, now: options.now ?? Date.now, ...collab }),
+        ingest: createIngestService({ db, now: options.now ?? Date.now, ...collab }).ingest,
         ...timing,
-        ...collab,
-        ...(options.a2a === undefined ? {} : { a2a: options.a2a }),
+        knowledgeDir: options.knowledgeDir,
+        announce: {
+          db,
+          ...(options.feishu?.collabChatId === undefined
+            ? {}
+            : { chatId: options.feishu.collabChatId }),
+          ...timing,
+        },
+      });
+      registerMcpRoutes(app, { db, tools: consoleTools, ...timing, ...collab });
+      registerAgentKitRoutes(app, {
+        db,
+        tools: consoleTools,
+        ...timing,
+        ...(options.publicUrl === undefined ? {} : { publicUrl: options.publicUrl }),
       });
     }
 

@@ -1,25 +1,17 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { createA2aService } from "../../domain/a2a/service.js";
-import type { A2aService } from "../../domain/a2a/types.js";
-import { createTaskService } from "../../domain/task/service.js";
 import { createUsageResolver } from "../../domain/usage/state.js";
-import { createIngestService } from "../../domain/work/ingest-service.js";
-import { createWorkerService } from "../../domain/work/worker-service.js";
 import { createConsoleGateway } from "../../mcp/console-gateway.js";
-import { createConsoleTools } from "../../mcp/console-tools.js";
+import type { ConsoleTool } from "../../mcp/console-shared.js";
 import { handleConsoleMcp } from "../../mcp/console-server.js";
 import type { Db } from "../../store/database.js";
 import type { AgentRecord } from "../../store/repositories/agent.js";
+import { MCP_ACCESS } from "../../shared/constants.js";
 import { requireAgentAuth } from "../middleware/agent-auth.js";
 
 export interface McpRoutesOptions {
   db: Db;
-  /** 知识目录,kb_write 的 Markdown 真相源 */
-  knowledgeDir: string;
-  /** 复用启动方的 A2A 实例;缺省按 db 新建 */
-  a2a?: A2aService;
-  /** 协作播报群;留空则不入队播报 */
-  collabChatId?: string;
+  /** 工具注册表;由组合根构造一次,/mcp 与 Agent 手册共用 */
+  tools: readonly ConsoleTool[];
   now?: () => number;
 }
 
@@ -28,7 +20,7 @@ async function methodNotAllowed(_request: FastifyRequest, reply: FastifyReply): 
   return reply
     .code(405)
     .header("allow", "POST")
-    .send({ error: { code: "METHOD_NOT_ALLOWED", message: "/mcp 仅接受 POST" } });
+    .send({ error: { code: "METHOD_NOT_ALLOWED", message: `${MCP_ACCESS.path} 仅接受 POST` } });
 }
 
 /**
@@ -38,42 +30,22 @@ async function methodNotAllowed(_request: FastifyRequest, reply: FastifyReply): 
 export function registerMcpRoutes(app: FastifyInstance, options: McpRoutesOptions): void {
   const db = options.db;
   const now = options.now ?? Date.now;
-  const tasks = createTaskService({ db, now });
-  const a2a = options.a2a ?? createA2aService({ db, now });
-  const collab =
-    options.collabChatId === undefined ? {} : { collabChatId: options.collabChatId };
-  const workers = createWorkerService({ db, now, ...collab });
-  const ingest = createIngestService({ db, now, ...collab }).ingest;
-  const tools = createConsoleTools({
-    db,
-    tasks,
-    a2a,
-    workers,
-    ingest,
-    now,
-    knowledgeDir: options.knowledgeDir,
-    announce: {
-      db,
-      ...(options.collabChatId === undefined ? {} : { chatId: options.collabChatId }),
-      now,
-    },
-  });
   const usageResolver = createUsageResolver({ now });
   const gateway = createConsoleGateway({
     db,
-    tools,
+    tools: [...options.tools],
     now,
     log: app.log,
     resolveUsage: (agentId: string) => usageResolver.resolve(db, agentId),
   });
   const auth = requireAgentAuth(db);
 
-  app.post("/mcp", { preHandler: auth }, async (request, reply) => {
+  app.post(MCP_ACCESS.path, { preHandler: auth }, async (request, reply) => {
     const agent = request.agent as AgentRecord;
     reply.hijack();
     await handleConsoleMcp(gateway, agent, request.raw, reply.raw, request.body);
   });
 
-  app.get("/mcp", methodNotAllowed);
-  app.delete("/mcp", methodNotAllowed);
+  app.get(MCP_ACCESS.path, methodNotAllowed);
+  app.delete(MCP_ACCESS.path, methodNotAllowed);
 }

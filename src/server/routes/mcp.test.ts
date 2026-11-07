@@ -68,7 +68,7 @@ describe("远程 MCP /mcp 路由", () => {
     expect(response.statusCode).toBe(401);
   });
 
-  it("tools/list 返回 13 个裸名控制工具", async () => {
+  it("tools/list 返回 14 个裸名控制工具", async () => {
     fixture = await prepare();
     const response = await fixture.app.inject({
       method: "POST",
@@ -93,6 +93,7 @@ describe("远程 MCP /mcp 路由", () => {
       "work_handback",
       "work_report",
       "work_decide",
+      "a2a_guide",
     ]);
   });
 
