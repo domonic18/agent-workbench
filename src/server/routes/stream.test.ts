@@ -156,6 +156,17 @@ describe("stream 路由", () => {
     expect(badScope.statusCode).toBe(422);
   });
 
+  it("工作事项作用域可订阅", async () => {
+    const response = await connect("client_id=c1&scope=work_item:wim_1");
+    expect(response.status).toBe(200);
+    const sse = openSse(response);
+    expect(await sse.next()).toEqual({
+      event: "snapshot",
+      data: { scopes: [{ scope: "work_item:wim_1", revision: 0 }], at: AT },
+    });
+    await sse.close();
+  });
+
   it("首帧为 snapshot,水位变化推 delta", async () => {
     const response = await connect("client_id=c1&scope=overview");
     expect(response.status).toBe(200);

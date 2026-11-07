@@ -76,7 +76,7 @@ export function registerStreamRoutes(app: FastifyInstance, options: StreamRoutes
     }
     const scopes = parseScopes(query.scope);
     if (scopes === undefined) {
-      return invalid(reply, "scope 只接受 overview 或 task:<id>");
+      return invalid(reply, "scope 只接受 overview / task:<id> / work_item:<id>");
     }
     if (!registry.acquire(clientId)) {
       return reply.code(429).send({

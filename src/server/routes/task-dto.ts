@@ -13,6 +13,8 @@ export interface TaskDto {
   assignee_label: string;
   project: string;
   parent_task_id: string | null;
+  /** 所属工作事项(业务事项);null 表示该任务不挂在任何事项下 */
+  work_item_id: string | null;
   round: number;
   rework_count: number;
   stage: string;
@@ -52,6 +54,7 @@ export function toTaskDto(row: TaskRecord, labels?: Map<string, AgentLabel>): Ta
     assignee_label: labelFor(row.assignee, labels),
     project: row.project,
     parent_task_id: row.parentTaskId,
+    work_item_id: row.workItemId,
     round: row.round,
     rework_count: row.reworkCount,
     stage: row.stage,

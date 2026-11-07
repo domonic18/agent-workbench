@@ -76,6 +76,8 @@ describe("runMigrations", () => {
       { version: 11, name: "usage_limit" },
       { version: 12, name: "agent_tombstone" },
       { version: 13, name: "machine_display_name" },
+      { version: 14, name: "work_item_scope_revision" },
+      { version: 15, name: "work_item_association_scope_revision" },
     ]);
     await db.close();
   });
