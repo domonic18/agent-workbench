@@ -43,7 +43,9 @@ import {
 
 export interface TaskCreateInput {
   title: string;
+  /** 派工方:由路由从 Bearer 身份注入,模型自述一律丢弃 */
   assigner: string;
+  /** 调用方所属项目:由路由从 Bearer 身份注入,模型自述一律丢弃 */
   project: string;
   /** 由路由从 Bearer 身份注入,不接受请求体自述 */
   assignee: string;
@@ -100,7 +102,6 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
   async function create(input: TaskCreateInput): Promise<TaskRecord> {
     const title = requireText(input.title, "title", TASK_LIMITS.title);
     const assigner = requireText(input.assigner, "assigner", TASK_LIMITS.assigner);
-    const project = requireText(input.project, "project", TASK_LIMITS.project);
     const assignee = requireText(input.assignee, "assignee", TASK_LIMITS.assigner);
     const output = parseOutput(input.output);
     const deadlineAt = parseDeadline(input.deadlineAt);
@@ -109,14 +110,15 @@ export function createTaskService(deps: TaskServiceDeps): TaskService {
       input.workItemId === undefined || input.workItemId === null || input.workItemId === ""
         ? null
         : requireText(input.workItemId, "workItemId", TASK_LIMITS.assigner);
+    // 项目以权威来源为准:挂工作事项的任务归该事项的项目,其余归调用方自己的项目。
+    // 两者都由服务端判定,模型自述的 project 一律丢弃,免得任务漂到别的项目桶里。
+    let project = requireText(input.project, "project", TASK_LIMITS.project);
     if (workItemId !== null) {
       const item = await findWorkItemById(db, workItemId);
       if (item === undefined) {
         throw new TaskError("NOT_FOUND", `工作事项 ${workItemId} 不存在`);
       }
-      if (item.project !== project) {
-        throw new TaskError("VALIDATION_FAILED", "任务项目与工作事项项目不一致");
-      }
+      project = item.project;
       if (!(await hasActiveAssignment(db, workItemId, assignee))) {
         throw new TaskError("FORBIDDEN", "未持有该工作事项的有效 assignment,不能建关联任务");
       }

@@ -137,15 +137,13 @@ export const PROTOCOL_GUIDE = `# A2A 协作规范(agent-workbench 控制台)
 \`\`\`json
 {
   "title": "查清 X 的归属并给出结论",
-  "assigner": "<你的 agentId>",
-  "project": "<你的项目名>",
   "parentTaskId": null,
   "deadlineAt": null,
   "output": null
 }
 \`\`\`
 
-- \`assignee\` 由服务端按 Bearer 身份判定,请求体里写了也无效。
+- \`assignee\`、\`assigner\` 与 \`project\` 由服务端按 Bearer 身份判定,请求体里写了也无效。
 - 返回 201 与 \`{ "task": { "id": "..." } }\`,记下 \`id\` 当作后面的 \`task_id\`。
 
 ### 发消息(发起侧第二步)

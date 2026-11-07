@@ -129,6 +129,20 @@ describe("console gateway", () => {
     await db.close();
   });
 
+  it("task_create 丢弃模型自述的 assigner 与 project", async () => {
+    const { db, agent, gateway } = await setup();
+    const result = await gateway.callTool(agent, "task_create", {
+      title: "查日志",
+      assigner: "human",
+      project: "别人的项目",
+    });
+
+    const task = parse(result).task as Record<string, unknown>;
+    expect(task.assigner).toBe("agt_a");
+    expect(task.project).toBe(agent.project);
+    await db.close();
+  });
+
   it("task_update 的工具说明写明合法跃迁路径,Agent 才能自己关单", async () => {
     const { db, gateway } = await setup();
     const tool = gateway.listTools().find((entry) => entry.name === "task_update");
