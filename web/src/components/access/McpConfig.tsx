@@ -1,7 +1,12 @@
 import { MCP_ACCESS, formatBearer } from "@shared/constants.js";
 import { CopyBlock } from "../ui/CopyBlock.js";
 import { Panel } from "../ui/Panel.js";
-import { mcpServersSnippet } from "./snippets.js";
+import {
+  AGENT_SECRET_ENV,
+  exportSecretCommand,
+  mcpServersSnippet,
+  mcpServersSnippetWithEnv,
+} from "./snippets.js";
 import type { AgentCredentials } from "./types.js";
 import styles from "./access.module.css";
 
@@ -74,10 +79,12 @@ export function ConfigSnippets({ endpoint, credentials }: ConfigSnippetsProps) {
           <p className={styles.warning} role="alert">
             密钥只显示这一次，离开本页即不可再查看。已用旧密钥连着的 Agent 需要重新配置。
           </p>
+
+          <p className={styles.groupLabel}>明文版：直接贴进客户端，密钥会明文留在配置文件里</p>
           <CopyBlock
             label="Claude Code"
             value={`claude mcp add --transport http aw-console ${endpoint} --header "${MCP_ACCESS.authHeader}: ${bearerValue(credentials)}"`}
-            note="在装 Claude Code 的机器上执行；--header 可重复传多个头。"
+            note="在装 Claude Code 的机器上执行；--header 可重复传多个头。这条命令含明文密钥、会进 shell history，介意就用下面的 env 版。"
           />
           <CopyBlock
             label="通用 MCP 客户端"
@@ -88,6 +95,18 @@ export function ConfigSnippets({ endpoint, credentials }: ConfigSnippetsProps) {
             label="WorkBuddy（Connector 表单三件套）"
             value={`URL: ${endpoint}\nHeader 名: ${MCP_ACCESS.authHeader}\nHeader 值: ${bearerValue(credentials)}`}
             note="WorkBuddy 用表单填这三项，不吃命令行；传输方式选 Streamable HTTP。"
+          />
+
+          <p className={styles.groupLabel}>env 版：密钥只留在本机环境变量里，配置文件可进仓库</p>
+          <CopyBlock
+            label="通用 MCP 客户端（env 版）"
+            value={mcpServersSnippetWithEnv(endpoint, credentials.agentId)}
+            note={`支持 \${VAR} 展开的客户端用这份（Claude Code 的 .mcp.json / ~/.claude.json 都行）：连接时从环境变量 ${AGENT_SECRET_ENV} 取密钥，文件里不留明文。`}
+          />
+          <CopyBlock
+            label="设置环境变量"
+            value={exportSecretCommand(credentials.secret)}
+            note={`写进 shell profile（如 .zshrc），新开终端即生效。变量名固定为 ${AGENT_SECRET_ENV}，别把这一行提交进仓库。`}
           />
         </div>
       )}

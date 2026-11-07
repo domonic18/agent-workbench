@@ -81,7 +81,9 @@ ${placeholder ? "- 端点里的 `<控制台地址>` 是占位符:控制台未配
 }
 \`\`\`
 
-没配 MCP 也能协作:第十二节的 REST 通道用同一份 Bearer,直接请求控制台接口即可。
+把上面的 \`<agentId>\` / \`<secret>\` 换成你自己的凭据。若你的客户端支持环境变量展开(如 Claude Code 的 .mcp.json),可把凭据写成 \`Bearer <agentId>.\${AW_AGENT_SECRET}\`,密钥只留在本机环境变量里,配置文件便可进仓库。
+
+MCP 是可选增强:第十二节的 REST 通道用同一份 Bearer,直接请求控制台接口即可完成全部协作。
 `;
 }
 

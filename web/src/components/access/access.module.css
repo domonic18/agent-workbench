@@ -53,6 +53,14 @@
   gap: var(--space-4);
 }
 
+/* 一组片段的小标题（如「明文版」「env 版」） */
+.groupLabel {
+  margin: 0;
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
 /* 名册：表格 + 注册按钮 */
 .roster {
   display: flex;

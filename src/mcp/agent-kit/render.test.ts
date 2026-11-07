@@ -71,6 +71,12 @@ describe("Agent 手册渲染", () => {
     expect(guide).not.toContain("<控制台地址>");
   });
 
+  it("MCP 段写明可选增强与变量展开口径", () => {
+    const guide = renderAgentGuide(tools);
+    expect(guide).toContain("MCP 是可选增强");
+    expect(guide).toContain("${AW_AGENT_SECRET}");
+  });
+
   it("skill 是合法 frontmatter 加正文", () => {
     const skill = renderAgentSkill(tools);
     expect(skill.startsWith("---\nname: aw-a2a\n")).toBe(true);

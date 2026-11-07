@@ -104,6 +104,11 @@ describe("协作接入页", () => {
     expect(snippets[0]?.textContent).toContain("claude mcp add --transport http");
     expect(snippets[1]?.textContent).toContain("mcpServers");
     expect(snippets[2]?.textContent).toContain("Header 名: authorization");
+
+    // env 版：配置里只有变量名，密钥只在 export 那一行
+    const envSnippet = await screen.findByText(/Bearer agt_1\.\$\{AW_AGENT_SECRET\}/);
+    expect(envSnippet.textContent).not.toContain("s3cret");
+    expect(screen.getByText("export AW_AGENT_SECRET=s3cret")).toBeTruthy();
   });
 
   it("没有明文密钥时不出配置片段", async () => {
@@ -133,5 +138,9 @@ describe("协作接入页", () => {
     expect(dialog.textContent).toContain("https://aw.example.com/api/agent-enroll");
     expect(dialog.textContent).toContain("https://aw.example.com/api/agent-kit/guide");
     expect(dialog.textContent).toContain("https://aw.example.com/api/agent/peers");
+    // 第 4 步：MCP 配置由 Agent 自己写，附变量展开口径
+    expect(dialog.textContent).toContain("第 4 步");
+    expect(dialog.textContent).toContain("https://aw.example.com/mcp");
+    expect(dialog.textContent).toContain("${AW_AGENT_SECRET}");
   });
 });
