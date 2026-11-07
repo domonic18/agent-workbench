@@ -22,8 +22,9 @@ export interface LoginLockoutDeps {
 }
 
 /**
- * 登录失败锁定(01 §3):按来源连续失败计数,达到上限锁 10 分钟。
- * 只作用于登录接口;已登录会话不受影响。计数落库,重启不绕锁。
+ * 口令校验失败锁定(01 §3):按来源连续失败计数,达到上限锁 10 分钟。
+ * 作用于登录与改口令两步的口令校验;已登录会话本身不受影响,锁只挡住校验这一步。
+ * 计数落库,重启不绕锁。
  */
 export function createLoginLockoutGuard(deps: LoginLockoutDeps): LoginLockoutGuard {
   const { db } = deps;

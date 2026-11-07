@@ -16,9 +16,9 @@ import {
 } from "../../domain/bootstrap/config-delivery.js";
 import { listDiscoveryForConsole } from "../../domain/bootstrap/discovery.js";
 import { BootstrapError } from "../../domain/bootstrap/errors.js";
-import { ONE_TIME_TOKEN } from "../../shared/constants.js";
+import { CONSOLE_PASSWORD_MIN_LENGTH, ONE_TIME_TOKEN } from "../../shared/constants.js";
 import type { Db } from "../../store/database.js";
-import { hasConsoleCredential, MIN_PASSWORD_LENGTH, setConsolePassword } from "../credential.js";
+import { hasConsoleCredential, setConsolePassword } from "../credential.js";
 import {
   requireCsrf,
   requireIdempotencyKey,
@@ -71,9 +71,9 @@ export function registerBootstrapRoutes(app: FastifyInstance, options: Bootstrap
         error: { code: "VALIDATION_FAILED", message: "token 与 password 必填" },
       });
     }
-    if (password.length < MIN_PASSWORD_LENGTH) {
+    if (password.length < CONSOLE_PASSWORD_MIN_LENGTH) {
       return reply.code(422).send({
-        error: { code: "VALIDATION_FAILED", message: `口令至少 ${MIN_PASSWORD_LENGTH} 位` },
+        error: { code: "VALIDATION_FAILED", message: `口令至少 ${CONSOLE_PASSWORD_MIN_LENGTH} 位` },
       });
     }
     // 先消费令牌再查管理员:重放/过期一律按令牌语义 410,不泄漏初始化状态

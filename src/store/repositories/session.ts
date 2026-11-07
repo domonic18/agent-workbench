@@ -36,3 +36,9 @@ export async function touchSession(db: Db, id: string, now: number): Promise<voi
 export async function deleteSession(db: Db, id: string): Promise<void> {
   await db.run("DELETE FROM session WHERE id = ?", id);
 }
+
+/** 吊销除 keepId 外的全部会话:改口令后让其他设备重新登录,当前设备保留 */
+export async function deleteOtherSessions(db: Db, keepId: string): Promise<number> {
+  const result = await db.run("DELETE FROM session WHERE id <> ?", keepId);
+  return result.changes;
+}

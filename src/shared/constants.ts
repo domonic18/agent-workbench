@@ -196,11 +196,14 @@ export const KNOWLEDGE_INDEX = {
 /** 控制台会话寿命(01 §3 注:刻意收紧为 12 小时,不采纳需求的 7 天滑动) */
 export const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 
-/** 登录失败锁定(01 §3):连续 5 次锁 10 分钟,成功即清零;只作用于登录接口 */
+/** 登录失败锁定(01 §3):连续 5 次锁 10 分钟,成功即清零;作用于登录与改口令的口令校验 */
 export const LOGIN_LOCKOUT = {
   maxFailures: 5,
   lockMs: 10 * 60 * 1000,
 } as const;
+
+/** 管理员口令最小长度:后端校验与前端表单共用同一处,避免两侧各写一个数字 */
+export const CONSOLE_PASSWORD_MIN_LENGTH = 6;
 
 /** 飞书事件/卡片回调时间窗(01 §8):超过 24 小时或超前 5 分钟一律丢弃 */
 export const FEISHU_EVENT_WINDOW = {
