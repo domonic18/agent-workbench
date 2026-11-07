@@ -33,6 +33,9 @@ const AGENT = {
 function fakeFetch(): ReturnType<typeof vi.fn> {
   return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input);
+    if (path.includes("/enroll-token")) {
+      return json({ token: "ott_abc", expiresAt: 0, agentId: "agt_1" });
+    }
     if (path.includes("/rotate")) {
       return json({ secret: "s3cret" });
     }
@@ -109,5 +112,26 @@ describe("协作接入页", () => {
 
     expect(await screen.findByText("外接机器人")).toBeTruthy();
     expect(screen.queryByText(/Bearer agt_1\./)).toBeNull();
+  });
+
+  it("签发接入令牌后给出可交给 Agent 的令牌与接入步骤", async () => {
+    const fetcher = fakeFetch();
+    vi.stubGlobal("fetch", fetcher);
+    renderPage();
+
+    expect(await screen.findByText("外接机器人")).toBeTruthy();
+    expect(screen.getByText(/在上面的名册里点某个 Agent/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /签发接入令牌/ }));
+
+    await waitFor(() => {
+      const call = fetcher.mock.calls.find(([input]) => String(input).includes("/enroll-token"));
+      expect(call).toBeDefined();
+    });
+    // 令牌与接入步骤都在页面上
+    expect(await screen.findByText("ott_abc")).toBeTruthy();
+    const steps = await screen.findByText(/api\/agent-enroll/);
+    expect(steps.textContent).toContain("api/agent-kit/guide");
+    expect(steps.textContent).toContain("api/agent/peers");
   });
 });

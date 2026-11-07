@@ -1,6 +1,7 @@
 import { MCP_ACCESS, formatBearer } from "@shared/constants.js";
 import { CopyBlock } from "../ui/CopyBlock.js";
 import { Panel } from "../ui/Panel.js";
+import { mcpServersSnippet } from "./snippets.js";
 import type { AgentCredentials } from "./types.js";
 import styles from "./access.module.css";
 
@@ -80,19 +81,7 @@ export function ConfigSnippets({ endpoint, credentials }: ConfigSnippetsProps) {
           />
           <CopyBlock
             label="通用 MCP 客户端"
-            value={JSON.stringify(
-              {
-                mcpServers: {
-                  "aw-console": {
-                    type: "http",
-                    url: endpoint,
-                    headers: { [MCP_ACCESS.authHeader]: bearerValue(credentials) },
-                  },
-                },
-              },
-              null,
-              2,
-            )}
+            value={mcpServersSnippet(endpoint, bearerValue(credentials))}
             note="支持 mcpServers 配置的客户端直接用这份 JSON。"
           />
           <CopyBlock

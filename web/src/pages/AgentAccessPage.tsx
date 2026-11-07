@@ -5,18 +5,20 @@ import { fetchAgentKit } from "../api/agent-kit.js";
 import { ApiError } from "../api/client.js";
 import { fetchAgents } from "../api/identity.js";
 import { AgentRoster } from "../components/access/AgentRoster.js";
+import { EnrollGuide } from "../components/access/EnrollGuide.js";
 import { AccessParameters, ConfigSnippets } from "../components/access/McpConfig.js";
-import type { AgentCredentials } from "../components/access/types.js";
+import type { AgentCredentials, AgentEnrollGrant } from "../components/access/types.js";
 import { AsyncSection } from "../components/ui/AsyncSection.js";
 import { Panel } from "../components/ui/Panel.js";
 import styles from "./AgentAccessPage.module.css";
 
 /**
- * 协作接入：把「MCP 端点 + 凭据 + 客户端配置」一次性交给人，
- * 贴进 WorkBuddy / Claude Code 等运行时即可连上控制台。
+ * 协作接入：把「接入参数 + 凭据」一次性交给人。
+ * 两条路径并存——手工路径贴配置到客户端；自助路径只交一枚令牌，Agent 自己换密钥并按规范协作。
  */
 export function AgentAccessPage() {
   const [credentials, setCredentials] = useState<AgentCredentials | null>(null);
+  const [grant, setGrant] = useState<AgentEnrollGrant | null>(null);
 
   const kit = useQuery({
     queryKey: ["agent-kit"],
@@ -58,9 +60,15 @@ export function AgentAccessPage() {
           fetchingMore={false}
           onLoadMore={() => undefined}
         >
-          <AgentRoster agents={agents.data ?? []} onCredentials={setCredentials} />
+          <AgentRoster
+            agents={agents.data ?? []}
+            onCredentials={setCredentials}
+            onEnroll={setGrant}
+          />
         </AsyncSection>
       </Panel>
+
+      <EnrollGuide grant={grant} origin={origin} />
 
       <ConfigSnippets endpoint={endpoint} credentials={credentials} />
     </div>

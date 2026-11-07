@@ -161,6 +161,21 @@ export function rotateAgentKey(id: string): Promise<{ secret: string }> {
   );
 }
 
+/** 一次性接入令牌:Agent 拿它自助兑换密钥;明文只在这里出现一次 */
+export interface AgentEnrollToken {
+  token: string;
+  expiresAt: number;
+  agentId: string;
+}
+
+export function issueAgentEnrollToken(id: string): Promise<AgentEnrollToken> {
+  return api.post<AgentEnrollToken>(
+    `/api/agents/${encodeURIComponent(id)}/enroll-token`,
+    undefined,
+    { idempotencyKey: newIdempotencyKey() },
+  );
+}
+
 /** 委派白名单只走控制台会话;保存即对下一次 a2a.send 判定生效 */
 export function setAgentTargets(
   id: string,

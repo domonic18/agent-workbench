@@ -4,3 +4,11 @@ export interface AgentCredentials {
   displayName: string;
   secret: string;
 }
+
+/** 一次性接入令牌:人签发、Agent 兑换;只存在组件 state */
+export interface AgentEnrollGrant {
+  agentId: string;
+  displayName: string;
+  token: string;
+  expiresAt: number;
+}

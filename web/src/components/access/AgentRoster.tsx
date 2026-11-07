@@ -1,6 +1,7 @@
-import { KeyRound } from "lucide-react";
+import { KeyRound, Ticket } from "lucide-react";
 import { useState } from "react";
-import { type AgentRosterSummary } from "../../api/identity.js";
+import { ApiError } from "../../api/client.js";
+import { issueAgentEnrollToken, type AgentRosterSummary } from "../../api/identity.js";
 import { AgentRegisterDialog } from "../identity/AgentRegisterDialog.js";
 import { AgentRotateDialog } from "../identity/AgentRotateDialog.js";
 import { RUNTIME_LABEL } from "../../shared/labels.js";
@@ -8,7 +9,8 @@ import { NARROW_QUERY, useMediaQuery } from "../../shared/useMediaQuery.js";
 import { Badge } from "../ui/Badge.js";
 import { Button } from "../ui/Button.js";
 import { Table } from "../ui/Table.js";
-import type { AgentCredentials } from "./types.js";
+import { useToast } from "../ui/Toast.js";
+import type { AgentCredentials, AgentEnrollGrant } from "./types.js";
 import styles from "./access.module.css";
 
 export interface AgentRosterProps {
@@ -16,13 +18,50 @@ export interface AgentRosterProps {
   agents: AgentRosterSummary[];
   /** 拿到明文密钥后回调,页面据此渲染配置片段 */
   onCredentials: (credentials: AgentCredentials) => void;
+  /** 签发接入令牌后回调,页面据此渲染自助接入步骤 */
+  onEnroll: (grant: AgentEnrollGrant) => void;
 }
 
 /** Agent 名册:登记、查看与轮换密钥 */
-export function AgentRoster({ agents, onCredentials }: AgentRosterProps) {
+export function AgentRoster({ agents, onCredentials, onEnroll }: AgentRosterProps) {
   const [rotating, setRotating] = useState<AgentRosterSummary | null>(null);
   const [registering, setRegistering] = useState(false);
+  const [issuing, setIssuing] = useState<string | null>(null);
   const narrow = useMediaQuery(NARROW_QUERY);
+  const toast = useToast();
+
+  async function issueEnrollToken(agent: AgentRosterSummary): Promise<void> {
+    setIssuing(agent.id);
+    try {
+      const issued = await issueAgentEnrollToken(agent.id);
+      onEnroll({
+        agentId: issued.agentId,
+        displayName: agent.displayName,
+        token: issued.token,
+        expiresAt: issued.expiresAt,
+      });
+      toast.push(`已签发 ${agent.displayName} 的接入令牌`, "positive");
+    } catch (error) {
+      toast.push(
+        error instanceof ApiError ? error.message : "接入令牌签发失败",
+        "danger",
+      );
+    } finally {
+      setIssuing(null);
+    }
+  }
+
+  const enrollButton = (agent: AgentRosterSummary) => (
+    <Button
+      size="sm"
+      variant="secondary"
+      icon={<Ticket size={14} aria-hidden="true" />}
+      disabled={issuing === agent.id}
+      onClick={() => void issueEnrollToken(agent)}
+    >
+      签发接入令牌
+    </Button>
+  );
 
   return (
     <>
@@ -43,14 +82,17 @@ export function AgentRoster({ agents, onCredentials }: AgentRosterProps) {
                   <span>{agent.project}</span>
                   <code>{agent.id}</code>
                 </div>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  icon={<KeyRound size={14} aria-hidden="true" />}
-                  onClick={() => setRotating(agent)}
-                >
-                  轮换密钥
-                </Button>
+                <div className={styles.rowActions}>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    icon={<KeyRound size={14} aria-hidden="true" />}
+                    onClick={() => setRotating(agent)}
+                  >
+                    轮换密钥
+                  </Button>
+                  {enrollButton(agent)}
+                </div>
               </li>
             ))}
           </ul>
@@ -75,14 +117,17 @@ export function AgentRoster({ agents, onCredentials }: AgentRosterProps) {
                 key: "actions",
                 header: "操作",
                 render: (row) => (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    icon={<KeyRound size={14} aria-hidden="true" />}
-                    onClick={() => setRotating(row)}
-                  >
-                    轮换密钥
-                  </Button>
+                  <div className={styles.rowActions}>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      icon={<KeyRound size={14} aria-hidden="true" />}
+                      onClick={() => setRotating(row)}
+                    >
+                      轮换密钥
+                    </Button>
+                    {enrollButton(row)}
+                  </div>
                 ),
               },
             ]}

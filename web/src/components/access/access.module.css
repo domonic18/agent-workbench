@@ -107,6 +107,13 @@
   justify-content: flex-end;
 }
 
+/* 同一行的多个操作按钮 */
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 @media (max-width: 767px) {
   .paramRow {
     flex-direction: column;
@@ -114,5 +121,9 @@
 
   .rosterActions button {
     width: 100%;
+  }
+
+  .rowActions button {
+    flex: 1 1 auto;
   }
 }
