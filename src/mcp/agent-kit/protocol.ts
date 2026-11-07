@@ -1,3 +1,5 @@
+import { AGENT_REST } from "../../shared/constants.js";
+
 /**
  * A2A 协作规范正文(手写叙事):给 Agent 看的操作口径。
  *
@@ -8,7 +10,28 @@
 /** 协议正文;不含任何凭据,可安全下发给 Agent */
 export const PROTOCOL_GUIDE = `# A2A 协作规范(agent-workbench 控制台)
 
-你通过控制台的远程 MCP 使用 task / a2a / kb / work 四组工具与其他 Agent 协作。本规范只讲**怎么做**;每个工具的参数细节见该工具自己的说明,不确定就调 \`tools/list\` 看当前可用的工具与 schema。
+你通过控制台与其他 Agent 协作。你有两条通道,任选其一:
+
+- **REST 通道**:任何有 HTTP 能力的运行时都能用,直接请求控制台接口,凭据放在 \`authorization\` 头。格式见第十二节。
+- **MCP 通道**:可选。控制台把同一批能力做成 MCP 工具,你调工具即可,端点与配置见第十三节。
+
+第零节到第十一节讲**通用纪律**(两条通道完全一样),第十二节给 REST 通道的精确格式,末节是工具速查表。
+
+下文 \`$BASE\` 指控制台的地址(你连上控制台用的那个地址,不带尾斜杠)。协议正文里的路径都是相对的,接在 \`$BASE\` 后面即可。
+
+## 零、接入自检(先做完这三步,再谈协作)
+
+1. **确认你有凭据**:请求头 \`authorization: Bearer <agentId>.<secret>\`。没有凭据就没有委派通道——这时不要声称已经协作完成。
+2. **拉规范**:REST 通道 \`GET $BASE${AGENT_REST.guide}\`;MCP 通道调 \`a2a_guide\`。
+3. **查可委派目标**:REST 通道 \`GET $BASE${AGENT_REST.peers}\`,返回你的身份与「你能发给谁」(agent id、名字、项目)。**别靠猜 id 或读控制台源码找 id。**
+
+规范正文(本文件)与一份可直接安装的 Claude Code skill 是同一份内容:\`GET $BASE${AGENT_REST.skill}\` 返回 \`SKILL.md\`(YAML frontmatter + 规范正文 + 工具速查表)。运行时支持 skill 就装上它,规范会随会话自动加载,不必每次手动拉取。
+
+### 三条最容易犯的错
+
+- **不要用 IM 代替委派**:把需求发到飞书群、私聊或口头转述都不是委派。控制台只认 A2A 消息——不建任务、不发消息,就没有交接、没有回执、没有收口,出事也无从追责。要把活交出去,必须走第五、六节的步骤。
+- **没有凭据就说没接入**:按上面三步自检;拿不到就明确说「尚未接入控制台」,不要反复探索环境、读源码或猜协议。
+- **别用对方的白名单判断自己能不能发**:委派白名单属于**发起方**,见第八节。
 
 ## 一、身份与可见范围
 
@@ -81,7 +104,9 @@ export const PROTOCOL_GUIDE = `# A2A 协作规范(agent-workbench 控制台)
 
 ## 八、委派白名单
 
-- \`a2a_send\` 的 \`to\` 必须命中你的委派白名单。白名单是**单向**的:你能发给 B,不代表 B 能发给你。
+- 委派白名单属于**发起方**:你的白名单决定「你能发给谁」,跟对方的白名单没关系。
+- \`a2a_send\` 的 \`to\` 必须命中**你的**白名单。白名单是单向的:你能发给 B,不代表 B 能发给你——对方想回你,得对方自己把你加进它的白名单。
+- 不知道能发给谁:调 \`GET $BASE${AGENT_REST.peers}\`(返回你的身份与可达目标),或看控制台「授权」屏。
 - 被拒时错误里会带出「可达目标」列表,照那个列表选收件人,不要瞎猜 ID。
 
 ## 九、失败与死信
@@ -97,7 +122,75 @@ export const PROTOCOL_GUIDE = `# A2A 协作规范(agent-workbench 控制台)
 
 ## 十一、拿不准时的最短路径
 
-- 不知道该调哪个工具、消息怎么写:调 \`a2a_guide\` 重新拉本规范。
-- 不知道某个工具有哪些参数:调 \`tools/list\` 看本机工具与 schema。
-- 不知道自己能发给谁:看你的委派白名单(控制台「授权」屏可管理)。
+- 不知道规范怎么用:REST 通道 \`GET $BASE${AGENT_REST.guide}\`;MCP 通道调 \`a2a_guide\`。
+- 不知道某个工具有哪些参数:MCP 通道调 \`tools/list\` 看本机工具与 schema。
+- 不知道自己能给谁发:\`GET $BASE${AGENT_REST.peers}\`。
+
+## 十二、REST 通道:不配 MCP 也能协作
+
+前置条件:每个请求带 \`authorization: Bearer <agentId>.<secret>\`;写操作(POST / PUT / PATCH)还要带 \`Idempotency-Key\` 头(任意唯一字符串,重试同一次操作时复用同一个)。下文 \`$BASE\` 指控制台地址,不带尾斜杠。
+
+### 建任务(发起侧第一步)
+
+\`POST $BASE/api/tasks\`
+
+\`\`\`json
+{
+  "title": "查清 X 的归属并给出结论",
+  "assigner": "<你的 agentId>",
+  "project": "<你的项目名>",
+  "parentTaskId": null,
+  "deadlineAt": null,
+  "output": null
+}
+\`\`\`
+
+- \`assignee\` 由服务端按 Bearer 身份判定,请求体里写了也无效。
+- 返回 201 与 \`{ "task": { "id": "..." } }\`,记下 \`id\` 当作后面的 \`task_id\`。
+
+### 发消息(发起侧第二步)
+
+\`POST $BASE${AGENT_REST.a2aMessages}\`
+
+\`\`\`json
+{
+  "task_id": "<你刚建的任务 id>",
+  "to": "<目标 agent id>",
+  "intent": "request",
+  "summary": "要对方做什么",
+  "expect": "要对方交付什么",
+  "deadline": "2026-11-08T12:00:00Z"
+}
+\`\`\`
+
+- 首条消息不要带 \`thread_id\`;续同一话题才带服务端给的 \`thread_id\`,回执再带 \`reply_to\`。
+- \`intent\` 为 \`request\` / \`reply\` / \`escalate\` 时 \`deadline\` 必填(RFC3339),\`notify\` 可免。
+- 返回 201 与 \`{ "msg_id": "...", "thread_id": "...", "round": 1 }\`。
+
+### 拉收件箱(接收侧第一步)
+
+\`GET $BASE${AGENT_REST.a2aInbox}?wait=25s\`
+
+- \`wait\` 形如 \`25s\` 或 \`250ms\`,最长 30s;加 \`peek=1\` 只看不领(预检用)。
+- 返回 \`{ "items": [{ "msg_id", "thread_id", "task_id", "from", "intent", "summary", "expect", "deadline" }], "nextCursor": "..." }\`。
+- 拉到不等于送达:处理完必须 ACK。
+
+### 回执(接收侧第二步)
+
+\`POST $BASE${AGENT_REST.a2aInbox}/<msg_id>/ack\`
+
+\`\`\`json
+{ "task_id": "<你自己建的任务 id>" }
+\`\`\`
+
+- 接了 \`request\` / \`escalate\` 就带上自己新建的任务 id(这一步建立父子任务关系)。
+- 对 \`reply\` / \`notify\` 只 ACK,不要带 \`task_id\`,也不要再发回执。
+
+### 推进自己的任务
+
+\`PATCH $BASE/api/tasks/<task_id>\`,body 取 \`{ "status": "running" }\` 或 \`{ "status": "done", "output": "结论" }\`。
+
+### REST 通道不覆盖的能力
+
+知识库(\`kb_write\` / \`kb_search\`)与工作事项(\`work_*\`)只有 MCP 工具入口,没有等价的 REST 写接口;需要时用 MCP 通道。
 `;

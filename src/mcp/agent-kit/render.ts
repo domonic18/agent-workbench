@@ -59,12 +59,13 @@ function endpoint(publicUrl: string | undefined): string {
 }
 
 function accessSection(publicUrl: string | undefined): string {
-  return `## 十二、如何接入控制台 MCP
+  const placeholder = publicUrl === undefined || publicUrl === "";
+  return `## 十三、如何接入控制台 MCP
 
 - 端点:\`${endpoint(publicUrl)}\`——Streamable HTTP,只接受 POST(GET / DELETE 返回 405)
 - 鉴权头:\`${MCP_ACCESS.authHeader}: ${MCP_ACCESS.bearerFormat}\`
 - 凭据:控制台「协作接入」页可为每个 Agent 签发或轮换密钥,明文只显示一次
-- 客户端配置片段:
+${placeholder ? "- 端点里的 `<控制台地址>` 是占位符:控制台未配置对外地址,填你实际连控制台的地址(协议正文里的路径都是相对的,照原样接在后面即可)\n" : ""}- 客户端配置片段:
 
 \`\`\`json
 {
@@ -79,6 +80,8 @@ function accessSection(publicUrl: string | undefined): string {
   }
 }
 \`\`\`
+
+没配 MCP 也能协作:第十二节的 REST 通道用同一份 Bearer,直接请求控制台接口即可。
 `;
 }
 
@@ -87,7 +90,7 @@ function toolTableSection(summaries: readonly ToolSummary[]): string {
     (item) =>
       `| \`${item.name}\` | ${item.gate} | ${item.purpose} | ${item.required.join(", ") || "—"} | ${item.optional.join(", ") || "—"} |`,
   );
-  return `## 十三、工具速查表
+  return `## 十四、工具速查表
 
 | 工具 | 闸门 | 用途 | 必填参数 | 可选参数 |
 |---|---|---|---|---|

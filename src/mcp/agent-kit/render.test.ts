@@ -46,10 +46,23 @@ describe("Agent 手册渲染", () => {
 
   it("指南含规范正文、接入段与工具表", () => {
     const guide = renderAgentGuide(tools);
+    expect(guide).toContain("## 零、接入自检");
     expect(guide).toContain("## 五、接收侧六步");
-    expect(guide).toContain("## 十二、如何接入控制台 MCP");
+    expect(guide).toContain("## 十二、REST 通道");
+    expect(guide).toContain("## 十三、如何接入控制台 MCP");
     expect(guide).toContain("| `a2a_send` | L1 |");
     expect(guide).toContain("<控制台地址>/mcp");
+  });
+
+  it("REST 通道写明请求面,且强调别用 IM 代替委派", () => {
+    const guide = renderAgentGuide(tools);
+    expect(guide).toContain("/api/a2a/messages");
+    expect(guide).toContain("/api/a2a/inbox");
+    expect(guide).toContain("/api/agent/peers");
+    expect(guide).toContain("Idempotency-Key");
+    expect(guide).toContain("不要用 IM 代替委派");
+    // 白名单属于发起方:别用对方的名单判断自己能不能发
+    expect(guide).toContain("委派白名单属于**发起方**");
   });
 
   it("给了对外地址就把端点换成真值", () => {
