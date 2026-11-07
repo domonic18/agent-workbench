@@ -1,9 +1,11 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
+import { issueOneTimeToken } from "../../domain/bootstrap/one-time-token.js";
 import { IdentityError } from "../../domain/identity/errors.js";
 import { createIdentityService, type IdentityService } from "../../domain/identity/service.js";
 import {
   AGENT_RUNTIMES,
+  ONE_TIME_TOKEN,
   type AgentRuntime,
   type IdentityStatus,
 } from "../../shared/constants.js";
@@ -11,6 +13,7 @@ import { formatKeysetCursor } from "../../shared/cursor.js";
 import type { Db } from "../../store/database.js";
 import { parseJsonStringArray } from "../../store/json.js";
 import type { AgentRecord } from "../../store/repositories/agent.js";
+import { findAgentById } from "../../store/repositories/agent.js";
 import {
   listAgentRosterRows,
   type AgentRosterRow,
@@ -206,6 +209,26 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
       }
       throw error;
     }
+  });
+
+  /**
+   * 签发 Agent 接入令牌:人把一次性令牌交给 Agent,Agent 自行兑换密钥。
+   * 令牌不碰长期密钥,过期即失效;兑换时才轮换密钥,签发不影响在跑的 Agent。
+   */
+  app.post("/api/agents/:id/enroll-token", { preHandler: writeGuards }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if ((await findAgentById(db, id)) === undefined) {
+      return reply
+        .code(404)
+        .send({ error: { code: "NOT_FOUND", message: `Agent ${id} 未注册` } });
+    }
+    const issued = await issueOneTimeToken(db, {
+      purpose: "agent_enroll",
+      subjectId: id,
+      ttlMs: ONE_TIME_TOKEN.enrollTtlMs,
+      now,
+    });
+    return { token: issued.token, expiresAt: issued.expiresAt, agentId: id };
   });
 
   app.put("/api/agents/:id/targets", { preHandler: writeGuards }, async (request, reply) => {

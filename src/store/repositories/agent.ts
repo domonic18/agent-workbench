@@ -226,3 +226,15 @@ export async function listAgents(db: Db, query: AgentListQuery): Promise<AgentRe
     ...params,
   )) as AgentRecord[];
 }
+
+/** 按 id 批量取 Agent:委派白名单的可达目标用它渲染,不按创建顺序排 */
+export async function listAgentsByIds(db: Db, ids: readonly string[]): Promise<AgentRecord[]> {
+  if (ids.length === 0) {
+    return [];
+  }
+  const placeholders = ids.map(() => "?").join(", ");
+  return (await db.all(
+    `SELECT ${AGENT_COLUMNS} FROM agent WHERE id IN (${placeholders})`,
+    ...ids,
+  )) as AgentRecord[];
+}

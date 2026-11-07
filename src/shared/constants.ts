@@ -264,6 +264,19 @@ export function formatBearer(agentId: string, secret: string): string {
 }
 
 /**
+ * Agent 自助接入面(01 §5.2):不依赖 MCP 的 REST 通道,Bearer 直调。
+ * 只配了 Bearer 就能拿规范、查可委派目标、发消息与回执——MCP 是可选增强。
+ */
+export const AGENT_REST = {
+  guide: "/api/agent-kit/guide",
+  skill: "/api/agent-kit/skill",
+  peers: "/api/agent/peers",
+  enroll: "/api/agent-enroll",
+  a2aMessages: "/api/a2a/messages",
+  a2aInbox: "/api/a2a/inbox",
+} as const;
+
+/**
  * 分级白名单(05 §6.1):L0/L1 只收明确登记的点分名,清单外一律按 L2 默认拒绝。
  * 控制工具是封闭集合;资源类常驻授权走能力申请(飞书卡片),不经本清单。
  */
@@ -338,10 +351,11 @@ export const MACHINE_HEARTBEAT = {
 /** 内部记账伪模型:不是真实网关调用,不入 token_usage(02 §3.6) */
 export const SYNTHETIC_MODEL = "<synthetic>";
 
-/** 一次性令牌(01 §2 / 04 §密钥):bootstrap_admin 供 /setup 首次设置管理员,enroll 供安装脚本兑换机器密钥 */
+/** 一次性令牌(01 §2 / 04 §密钥):bootstrap_admin 供 /setup 首次设置管理员,enroll 供安装脚本兑换机器密钥,agent_enroll 供 Agent 自助兑换接入密钥 */
 export const ONE_TIME_TOKEN = {
   prefix: "ott_",
   adminTtlMs: 60 * 60 * 1000,
+  /** enroll 与 agent_enroll 共用同一档 TTL:够走完一次接入,也不至于长期有效 */
   enrollTtlMs: 15 * 60 * 1000,
 } as const;
 

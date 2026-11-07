@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { FastifyInstance, LightMyRequestResponse } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openDatabase, type Db } from "../../store/database.js";
+import { createIdentityService } from "../../domain/identity/service.js";
 import { buildApp } from "../app.js";
 import { ensureConsoleCredential } from "../credential.js";
 
@@ -83,5 +84,53 @@ describe("Agent 接入材料路由", () => {
     expect(response.headers["content-type"]).toContain("text/markdown");
     expect(response.headers["content-disposition"]).toContain("SKILL.md");
     expect(response.body.startsWith("---\nname: aw-a2a\n")).toBe(true);
+  });
+
+  it("Agent Bearer 也能取指南:自助接入的第一步", async () => {
+    const identity = createIdentityService({ db, newAgentId: () => "agt_k1", newSecret: () => "secret-k1" });
+    await identity.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
+    const { agent, secret } = await identity.registerAgent({
+      machineId: "m1",
+      project: "pa",
+      displayName: "接入方",
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/agent-kit/guide",
+      headers: { authorization: `Bearer ${agent.id}.${secret}` },
+    });
+    expect(response.statusCode).toBe(200);
+    const body = response.json() as { guide: string };
+    expect(body.guide).toContain("## 零、接入自检");
+    expect(body.guide).toContain("/api/agent/peers");
+  });
+
+  it("凭据错误时 401", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/agent-kit/guide",
+      headers: { authorization: "Bearer agt_none.wrong" },
+    });
+    expect(response.statusCode).toBe(401);
+  });
+
+  it("未配置对外地址时不按请求头生成地址:调用方不得决定 Agent 把凭据发给谁", async () => {
+    const plain = buildApp({ logLevel: "silent", db, knowledgeDir: mkdtempSync(join(tmpdir(), "aw-kit-")) });
+    await plain.ready();
+    try {
+      const response = await plain.inject({
+        method: "GET",
+        url: "/api/agent-kit/guide",
+        headers: { cookie, host: "evil.example.net", "x-forwarded-host": "evil.example.net" },
+      });
+      expect(response.statusCode).toBe(200);
+      const body = response.json() as { guide: string; publicUrl: string | null };
+      expect(body.publicUrl).toBeNull();
+      expect(body.guide).not.toContain("evil.example.net");
+      expect(body.guide).toContain("<控制台地址>");
+    } finally {
+      await plain.close();
+    }
   });
 });

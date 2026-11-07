@@ -20,8 +20,10 @@ import { requireConsoleReadiness } from "./middleware/bootstrap-mode.js";
 import { createApprovalNotifier } from "./notification/approval.js";
 import { registerA2aRoutes } from "./routes/a2a.js";
 import { registerAgentDetailRoutes } from "./routes/agent-detail.js";
+import { registerAgentEnrollRoutes } from "./routes/agent-enroll.js";
 import { registerAgentKitRoutes } from "./routes/agent-kit.js";
 import { registerAgentLifecycleRoutes } from "./routes/agent-lifecycle.js";
+import { registerAgentPeersRoutes } from "./routes/agent-peers.js";
 import { registerAgentSelfRoutes } from "./routes/agent-self.js";
 import { registerAuditRoutes } from "./routes/audit.js";
 import { registerAuthRoutes } from "./routes/auth.js";
@@ -125,6 +127,9 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     registerAgentLifecycleRoutes(app, { db, ...timing });
     registerAgentDetailRoutes(app, { db, ...timing });
     registerAgentSelfRoutes(app, { db, ...timing });
+    // Agent 自助接入面:换密钥与查可委派目标都不依赖 MCP,也不依赖工具注册表
+    registerAgentEnrollRoutes(app, { db, ...timing });
+    registerAgentPeersRoutes(app, { db, ...timing });
     registerOverviewRoutes(app, { db, ...timing });
     registerBootstrapRoutes(app, {
       db,
