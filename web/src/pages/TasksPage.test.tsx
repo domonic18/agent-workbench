@@ -58,6 +58,9 @@ function stubApi(items: TaskDto[]): ReturnType<typeof vi.fn> {
     if (path === "/api/agents") {
       return fakeResponse({ items: [], nextCursor: null });
     }
+    if (path.startsWith("/api/work-items")) {
+      return fakeResponse({ items: [], nextCursor: null });
+    }
     throw new Error(`unexpected ${path}`);
   });
   vi.stubGlobal("fetch", fetchMock);
@@ -119,6 +122,16 @@ describe("任务列表页", () => {
     expect(await screen.findByText("暂无任务记录")).toBeTruthy();
     expect(
       screen.getByText("Agent 尚未上报任务；未建单的工作不会出现在这里。"),
+    ).toBeTruthy();
+  });
+
+  it("任务屏同时给出工作事项区块", async () => {
+    stubApi([]);
+    renderPage("/tasks");
+
+    expect(await screen.findByRole("region", { name: "工作事项" })).toBeTruthy();
+    expect(
+      screen.getByText("仅展示已由触发事实路由出的工作事项——没被路由的活不会出现在这里。"),
     ).toBeTruthy();
   });
 });

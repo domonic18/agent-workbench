@@ -125,7 +125,7 @@ export interface WorkItemListQuery {
 }
 
 /**
- * 总览区块的筛选:URL 键是 `wi`(工作事项),不是接口参数名 `attention`,
+ * 工作事项区块的筛选:URL 键是 `wi`(工作事项),不是接口参数名 `attention`,
  * 两者同名不同义,别把查询串直接透给接口。
  */
 export function readWorkItemFilter(params: URLSearchParams): WorkItemAttention | null {

@@ -13,11 +13,12 @@ import { ChipGroup } from "../ui/Chip.js";
 import { EmptyState } from "../ui/EmptyState.js";
 import { ErrorState } from "../ui/ErrorState.js";
 import { LoadingState } from "../ui/LoadingState.js";
+import { PageFooter } from "../ui/PageFooter.js";
 import { SectionHeader } from "../ui/SectionHeader.js";
 import { WorkItemTable } from "./WorkItemTable.js";
 import styles from "./work-item-list.module.css";
 
-/** 首屏条数:总览页只要个位数的量,更多靠加载 */
+/** 首屏条数:先给一页,更多靠加载 */
 const PAGE_SIZE = 20;
 
 const FILTERS: { key: string; label: string }[] = [
@@ -40,7 +41,7 @@ function sortByAttention(items: readonly WorkItemListItem[]): WorkItemListItem[]
   });
 }
 
-/** 总览页的「工作事项」区块:服务端按注意力筛选,不是全量流水 */
+/** 任务屏的「工作事项」区块:服务端按注意力筛选,不是全量流水 */
 export function WorkItemSection() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -121,6 +122,8 @@ export function WorkItemSection() {
           </Button>
         </div>
       ) : null}
+
+      <PageFooter>仅展示已由触发事实路由出的工作事项——没被路由的活不会出现在这里。</PageFooter>
     </section>
   );
 }

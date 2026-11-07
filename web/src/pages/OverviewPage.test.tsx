@@ -79,9 +79,6 @@ function fakeFetch(
     if (path.includes("/api/agents")) {
       return fakeResponse({ items: roster, nextCursor: null });
     }
-    if (path.includes("/api/work-items")) {
-      return fakeResponse({ items: [], nextCursor: null });
-    }
     return fakeResponse(body);
   });
 }
@@ -129,6 +126,8 @@ describe("总览页", () => {
     expect(screen.queryByRole("button", { name: "机器登记" })).toBeNull();
     expect(screen.getByRole("button", { name: "接入执行机" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "注册 Agent" })).toBeTruthy();
+    // 总览只讲 Agent;任务与工作事项在任务屏
+    expect(screen.queryByRole("region", { name: "工作事项" })).toBeNull();
   });
 
   it("订阅 overview 作用域并把活体状态合并进管理表格", async () => {

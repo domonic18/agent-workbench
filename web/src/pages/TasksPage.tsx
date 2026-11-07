@@ -1,11 +1,12 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { Suspense, useMemo } from "react";
-import { Outlet, useLocation } from "react-router";
+import { useMemo } from "react";
+import { useLocation } from "react-router";
 import { ApiError } from "../api/client.js";
 import { fetchAgents } from "../api/identity.js";
 import { fetchTasks, readTaskFilters, type TaskFilters } from "../api/tasks.js";
 import { TaskFiltersForm } from "../components/task/TaskFilters.js";
 import { TaskTable } from "../components/task/TaskTable.js";
+import { WorkItemSection } from "../components/work-item/WorkItemSection.js";
 import { AsyncSection } from "../components/ui/AsyncSection.js";
 import { EmptyState } from "../components/ui/EmptyState.js";
 import { PageFooter } from "../components/ui/PageFooter.js";
@@ -84,10 +85,7 @@ export function TasksPage() {
         仅显示已自报的任务——Agent 判断不需要建单的活不会出现在这里。
       </PageFooter>
 
-      {/* 详情抽屉独立分包,加载时保留列表视图不闪烁 */}
-      <Suspense fallback={null}>
-        <Outlet />
-      </Suspense>
+      <WorkItemSection />
     </div>
   );
 }

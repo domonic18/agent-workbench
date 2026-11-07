@@ -8,7 +8,7 @@ export function WorkItemDrawerRoute() {
   const navigate = useNavigate();
   const location = useLocation();
   const workItemId = id ?? "";
-  const from = navFrom(location.state) ?? "/overview";
+  const from = navFrom(location.state) ?? "/tasks";
 
   const close = useCallback(() => {
     navigate(from, { replace: true });
