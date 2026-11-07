@@ -3,7 +3,7 @@
 ## 1. 项目概览
 
 - **愿景**: 把散落在飞书群、黑板表格、本地脚本里的多 Agent 协作，收进一个可看、可控、可计量的工作台——人能看清 Agent 在干什么，系统能拦住它不该干的事，账上能算清花了多少。
-- **架构**: Node.js + TypeScript + PostgreSQL（同机 Docker Compose，`pg_trgm` + `pgvector`）；控制台容器内监听 `0.0.0.0:8787`、宿主机仅 `127.0.0.1:8787` 暴露 + frp 公网穿透；四屏：总览 / 任务 / 授权 / 知识
+- **架构**: Node.js + TypeScript + PostgreSQL（同机 Docker Compose，`pg_trgm` + `pgvector`）；控制台容器内监听 `0.0.0.0:8787`、宿主机仅 `127.0.0.1:8787` 暴露 + frp 公网穿透；四屏：总览 / 任务 / 授权 / 知识，外加「接入」组两屏——协作接入（`/agent-access`：MCP 端点参数、Agent 名册、轮换密钥、客户端就绪配置片段）与 Agent 手册（`/agent-guide`：A2A 协作规范正文、工作区提示词、`SKILL.md` 下载）
 - **关键约束**:
   - 产品形态是「控制台 + 飞书」双面并存：控制台管状态与权力，飞书管说话与拍板；控制台不承担 IM 功能
   - 事实源在控制台 PostgreSQL（work_item / work_trigger / worker_inbox / task / a2a_message / capability / agent_run）；WorkItem 的 Mandate 与 Task/Run 分离，Assignment/Input/Handback 不冒充 A2A；**不使用飞书黑板，不做投影**
@@ -11,7 +11,7 @@
   - frpc 两条独立规则：`aw.example.com → 8787`（http）、`tp.example.com:8443 → 443`（tcp，给 Teleport proxy；443 已被 frps 的 HTTPS vhost 占用），互不复用
   - 跨机：每台运行 Agent 的机器只跑一个 `aw-node`（采集 + Claude Code 调度），launchd 常驻，采集模块只经 `/api/ingest` 单向推送；无 aw-node 的外部运行时（WorkBuddy/Codex/DeepSeek harness）拿 Agent Bearer 直接打 `/mcp`、用官方 automations 轮询，首版 Run/对话/Token 显示「未接入 / —」；**`agent.machine_id` 语义是「宿主机器」**（外部运行时可绑可解绑，只登记归属）；**有没有过程数据看两个条件：`runtime='claude_code'` 且 `machine_id` 非空**，不是单看机器绑定；Teleport node agent 装目标机
   - 授权：SSH / 数据库访问走 Teleport CE + tbot 的 15 分钟短时证书，不自研证书签发；身份按 Agent 建 bot、任务以 trait `aw_task_id` 携带，证书扩展用 `external.*` 插值（`internal.*` 不插值）；Teleport CE 为 AGPL-3.0，独立容器运行，只经 API 调用
-  - **三平面**：展示面（浏览器 B/S，不做任何约束判定）/ 控制面（策略、判定、审计、确定性 Router）/ 执行面（每台机一个 `aw-node`）。控制台经同一 HTTP 服务提供远程 Streamable HTTP MCP，只含 `task / a2a / kb / work` 控制工具，以 Agent Bearer 鉴权并由服务端校验归属，**不引入 run_token**；**本机第三方 MCP、Claude Code 原生工具与终端直跑均不在项目管控边界内**（2026-11-03 裁决）；一期不做 OS 级沙箱、托盘与进程急停
+  - **三平面**：展示面（浏览器 B/S，不做任何约束判定）/ 控制面（策略、判定、审计、确定性 Router）/ 执行面（每台机一个 `aw-node`）。控制台经同一 HTTP 服务提供远程 Streamable HTTP MCP，只含 `task / a2a / kb / work` 控制工具，以 Agent Bearer 鉴权并由服务端校验归属，**不引入 run_token**；**本机第三方 MCP、Claude Code 原生工具与终端直跑均不在项目管控边界内**（2026-11-03 裁决）；一期不做 OS 级沙箱、托盘与进程急停。**Agent 接入套件**（`src/mcp/agent-kit/`）：A2A 协作规范正文、工作区提示词与工具速查表由**同一套工具注册表**在服务端渲染（`GET /api/agent-kit/guide`、`/api/agent-kit/skill`），另注册只读工具 `a2a_guide` 让 Agent 自助拉规范；改工具不用改规范
   - 不重写 Agent 运行时（Claude Code / cc-connect 是资产）；Source Agent 只整理事实，业务路由只查 Thread owner 与 Git 版本化 RouteRule，未知或冲突交人，**一期不做在线 Slow Router**
   - 首个业务闭环使用真实 Bug：PR 关联且当前提交 CI 通过后进入待验收，**只有原 Bug 机器人的人工接受才完成**；退回到同一 WorkItem 返工，A2A ACK 只代表上游 Task 验收，生产发布始终单独确认
   - **首次使用必须自动装配**：无凭据仅开放 bootstrap mode，以一次性 bootstrap token 设置管理员口令；`/setup` 四步引导 + enroll token + aw-node 上报 cc-connect 发现 + `POST /api/aw-node/config` 轮换签发 secret（ACK 前重试可轮换，ACK 后不明文返回）+ 默认 `bug_fix` + 分项预检。用户只做必要授权、一次安装执行和一次确认，不要求手工编辑 RouteRule、Mandate、plist 或数据库配置；预检失败不就绪且不创建空 Assignment
