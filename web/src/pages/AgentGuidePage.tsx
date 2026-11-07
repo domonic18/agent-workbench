@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Download } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { AGENT_REST } from "@shared/constants.js";
 import { fetchAgentKit } from "../api/agent-kit.js";
 import { ApiError } from "../api/client.js";
 import { CopyActionButton, CopyBlock } from "../components/ui/CopyBlock.js";
@@ -38,6 +39,12 @@ export function AgentGuidePage() {
 
   return (
     <div className={styles.page}>
+      <p className={styles.hint}>
+        这一页是给人看的同一份内容。Agent 自己拉的是接口，不是这个网页：规范正文
+        <code> GET {AGENT_REST.guide}</code>（Bearer 鉴权，返回 JSON），可安装的 skill 是
+        <code> GET {AGENT_REST.skill}</code>（返回 SKILL.md）。两者内容与本页一致。
+      </p>
+
       <Panel
         title="A2A 协作规范"
         description="Agent 自己读的规范正文：角色、消息信封、回执纪律、任务状态机与工具速查表。"

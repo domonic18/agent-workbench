@@ -4,21 +4,25 @@ import { MCP_ACCESS } from "@shared/constants.js";
 import { fetchAgentKit } from "../api/agent-kit.js";
 import { ApiError } from "../api/client.js";
 import { fetchAgents } from "../api/identity.js";
+import { AccessPaths } from "../components/access/AccessPaths.js";
 import { AgentRoster } from "../components/access/AgentRoster.js";
-import { EnrollGuide } from "../components/access/EnrollGuide.js";
+import { EnrollDialog } from "../components/access/EnrollDialog.js";
 import { AccessParameters, ConfigSnippets } from "../components/access/McpConfig.js";
 import type { AgentCredentials, AgentEnrollGrant } from "../components/access/types.js";
 import { AsyncSection } from "../components/ui/AsyncSection.js";
+import { Button } from "../components/ui/Button.js";
 import { Panel } from "../components/ui/Panel.js";
+import { formatDateTime } from "../shared/format.js";
 import styles from "./AgentAccessPage.module.css";
 
 /**
  * 协作接入：把「接入参数 + 凭据」一次性交给人。
- * 两条路径并存——手工路径贴配置到客户端；自助路径只交一枚令牌，Agent 自己换密钥并按规范协作。
+ * 两条路径并存——手工路径贴配置到客户端；自助路径只交一段接入包，Agent 自己换密钥并按规范协作。
  */
 export function AgentAccessPage() {
   const [credentials, setCredentials] = useState<AgentCredentials | null>(null);
   const [grant, setGrant] = useState<AgentEnrollGrant | null>(null);
+  const [enrollOpen, setEnrollOpen] = useState(false);
 
   const kit = useQuery({
     queryKey: ["agent-kit"],
@@ -40,11 +44,13 @@ export function AgentAccessPage() {
 
   return (
     <div className={styles.page}>
+      <AccessPaths />
+
       <AccessParameters endpoint={endpoint} fallbackOrigin={publicUrl === null} />
 
       <Panel
         title="Agent 名册"
-        description="每个 Agent 一把密钥。轮换后旧密钥立即失效,正在连着的 Agent 需要重新配置。"
+        description="每个 Agent 一把密钥。「签发接入令牌」走自助路径，「轮换密钥」走手工路径。"
       >
         <AsyncSection
           pending={agents.isPending}
@@ -63,14 +69,30 @@ export function AgentAccessPage() {
           <AgentRoster
             agents={agents.data ?? []}
             onCredentials={setCredentials}
-            onEnroll={setGrant}
+            onEnroll={(issued) => {
+              setGrant(issued);
+              setEnrollOpen(true);
+            }}
           />
         </AsyncSection>
       </Panel>
 
-      <EnrollGuide grant={grant} origin={origin} />
+      {grant === null || enrollOpen ? null : (
+        <div className={styles.recentEnroll}>
+          <span>
+            已为 {grant.displayName} 签发接入令牌，有效期到 {formatDateTime(grant.expiresAt)}
+          </span>
+          <Button size="sm" variant="secondary" onClick={() => setEnrollOpen(true)}>
+            查看接入包
+          </Button>
+        </div>
+      )}
 
       <ConfigSnippets endpoint={endpoint} credentials={credentials} />
+
+      {grant !== null && enrollOpen ? (
+        <EnrollDialog grant={grant} origin={origin} onClose={() => setEnrollOpen(false)} />
+      ) : null}
     </div>
   );
 }
