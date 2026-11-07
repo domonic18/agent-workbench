@@ -18,7 +18,7 @@ interface Fixture {
 
 async function prepare(): Promise<Fixture> {
   const db = await openDatabase();
-  await ensureConsoleCredential(db, "secret123");
+  await ensureConsoleCredential(db, "secret1234567");
   const identity = createIdentityService({
     db,
     newAgentId: (() => {

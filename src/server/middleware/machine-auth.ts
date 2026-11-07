@@ -32,7 +32,7 @@ export function requireMachineAuth(db: Db): PreHandler {
     if (machine === undefined || machine.status !== "active") {
       return unauthorized(reply);
     }
-    if (!verifySecret(parts.secret, machine.collectorSecretHash)) {
+    if (!(await verifySecret(parts.secret, machine.collectorSecretHash))) {
       return unauthorized(reply);
     }
     request.machine = machine;

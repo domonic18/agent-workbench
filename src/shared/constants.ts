@@ -203,7 +203,7 @@ export const LOGIN_LOCKOUT = {
 } as const;
 
 /** 管理员口令最小长度:后端校验与前端表单共用同一处,避免两侧各写一个数字 */
-export const CONSOLE_PASSWORD_MIN_LENGTH = 6;
+export const CONSOLE_PASSWORD_MIN_LENGTH = 12;
 
 /** 飞书事件/卡片回调时间窗(01 §8):超过 24 小时或超前 5 分钟一律丢弃 */
 export const FEISHU_EVENT_WINDOW = {

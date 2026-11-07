@@ -45,7 +45,7 @@ describe("身份注册", () => {
     expect(machine.id).toBe("macmini-01");
     expect(secret).toBe("secret-1");
     expect(machine.collectorSecretHash).not.toBe(secret);
-    expect(verifySecret(secret, machine.collectorSecretHash)).toBe(true);
+    expect(await verifySecret(secret, machine.collectorSecretHash)).toBe(true);
     await db.close();
   });
 
@@ -77,7 +77,7 @@ describe("身份注册", () => {
       allowedTargets: ["agt_9", "agt_9", "agt_8"],
     });
     expect(agent.id).toBe("agt_1");
-    expect(verifySecret(secret, agent.secretHash as string)).toBe(true);
+    expect(await verifySecret(secret, agent.secretHash as string)).toBe(true);
     expect(JSON.parse(agent.allowedTargetsJson)).toEqual(["agt_9", "agt_8"]);
     await db.close();
   });
@@ -105,8 +105,8 @@ describe("身份注册", () => {
 
     const rotated = await service.rotateAgentSecret(first.agent.id);
     expect(rotated.secret).not.toBe(first.secret);
-    expect(verifySecret(first.secret, rotated.agent.secretHash as string)).toBe(false);
-    expect(verifySecret(rotated.secret, rotated.agent.secretHash as string)).toBe(true);
+    expect(await verifySecret(first.secret, rotated.agent.secretHash as string)).toBe(false);
+    expect(await verifySecret(rotated.secret, rotated.agent.secretHash as string)).toBe(true);
 
     const machine = await service.registerMachine({
       id: "m2",
@@ -115,9 +115,9 @@ describe("身份注册", () => {
       collectorVersion: "1",
     });
     const machineRotated = await service.rotateMachineSecret(machine.machine.id);
-    expect(verifySecret(machine.secret, machineRotated.machine.collectorSecretHash)).toBe(false);
+    expect(await verifySecret(machine.secret, machineRotated.machine.collectorSecretHash)).toBe(false);
     expect(
-      verifySecret(machineRotated.secret, machineRotated.machine.collectorSecretHash),
+      await verifySecret(machineRotated.secret, machineRotated.machine.collectorSecretHash),
     ).toBe(true);
     await db.close();
   });
@@ -209,7 +209,7 @@ describe("身份注册", () => {
     expect(agent.machineId).toBeNull();
     expect(agent.runtime).toBe("workbuddy");
     expect(secret).toBe("secret-1");
-    expect(verifySecret(secret, agent.secretHash as string)).toBe(true);
+    expect(await verifySecret(secret, agent.secretHash as string)).toBe(true);
     await db.close();
   });
 

@@ -129,13 +129,15 @@ export function createIdentityService(deps: IdentityServiceDeps): IdentityServic
       throw new IdentityError("CONFLICT", `机器 ${id} 已注册;重置密钥请走轮换接口`);
     }
     const secret = generateSecret();
+    // 哈希在事务外算:scrypt 是百毫秒级 CPU 计算,放进事务会把连接池的连接按住不放
+    const collectorSecretHash = await hashSecret(secret);
     await db.transaction(async (tx) => {
       await insertMachine(tx, {
         id,
         hostname,
         os,
         collectorVersion,
-        collectorSecretHash: hashSecret(secret),
+        collectorSecretHash,
         createdAt: now(),
       });
     });
@@ -215,6 +217,7 @@ export function createIdentityService(deps: IdentityServiceDeps): IdentityServic
 
     const id = newAgentId();
     const secret = generateSecret();
+    const secretHash = await hashSecret(secret);
     await db.transaction(async (tx) => {
       await insertAgent(tx, {
         id,
@@ -222,7 +225,7 @@ export function createIdentityService(deps: IdentityServiceDeps): IdentityServic
         runtime,
         project,
         displayName,
-        secretHash: hashSecret(secret),
+        secretHash,
         key: agentKey,
         mcpConfigJson: null,
         bootstrapStatus: "registered",
@@ -240,7 +243,7 @@ export function createIdentityService(deps: IdentityServiceDeps): IdentityServic
 
   async function rotateMachineSecret(id: string): Promise<RegisteredMachine> {
     const secret = generateSecret();
-    if (!(await updateMachineSecretHash(db, id, hashSecret(secret)))) {
+    if (!(await updateMachineSecretHash(db, id, await hashSecret(secret)))) {
       throw new IdentityError("NOT_FOUND", `机器 ${id} 未注册`);
     }
     const machine = await findMachineById(db, id);
@@ -252,9 +255,10 @@ export function createIdentityService(deps: IdentityServiceDeps): IdentityServic
 
   async function rotateAgentSecret(id: string): Promise<RegisteredAgent> {
     const secret = generateSecret();
+    const secretHash = await hashSecret(secret);
     const at = now();
     await db.transaction(async (tx): Promise<void> => {
-      if (!(await updateAgentSecretHash(tx, id, hashSecret(secret), at))) {
+      if (!(await updateAgentSecretHash(tx, id, secretHash, at))) {
         throw new IdentityError("NOT_FOUND", `Agent ${id} 未注册`);
       }
       // 轮换意味着凭据可能已泄露:在途的接入令牌一并作废,否则持有者可拿旧令牌再换一次密钥

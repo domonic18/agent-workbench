@@ -5,7 +5,7 @@ import { openDatabase, type Db } from "../../store/database.js";
 import { buildApp } from "../app.js";
 import { ensureConsoleCredential } from "../credential.js";
 
-const PASSWORD = "simple-123";
+const PASSWORD = "simple-123456";
 const WRITE_HEADERS = { "x-requested-with": "fetch", "idempotency-key": "test-key" };
 
 interface Fixture {
@@ -146,7 +146,7 @@ describe("配置下发链路:/api/bootstrap/agents → /api/aw-node/config → a
       "proj-a",
     )) as { secretHash: string; v: number; ack: number | null };
     expect(row.secretHash.startsWith("scrypt$")).toBe(true);
-    expect(verifySecret(agent.secret ?? "", row.secretHash)).toBe(true);
+    expect(await verifySecret(agent.secret ?? "", row.secretHash)).toBe(true);
     expect(row.v).toBe(1);
     expect(row.ack).toBeNull();
     expect(await machineStatus(f)).toEqual({ configStatus: "delivered" });
@@ -169,8 +169,8 @@ describe("配置下发链路:/api/bootstrap/agents → /api/aw-node/config → a
       'SELECT secret_hash AS "secretHash" FROM agent WHERE project = ?',
       "proj-a",
     )) as { secretHash: string };
-    expect(verifySecret(a.secret ?? "", row.secretHash)).toBe(false);
-    expect(verifySecret(b.secret ?? "", row.secretHash)).toBe(true);
+    expect(await verifySecret(a.secret ?? "", row.secretHash)).toBe(false);
+    expect(await verifySecret(b.secret ?? "", row.secretHash)).toBe(true);
     await f.db.close();
     await f.app.close();
   });
@@ -284,7 +284,7 @@ describe("配置下发链路:/api/bootstrap/agents → /api/aw-node/config → a
       'SELECT secret_hash AS "secretHash" FROM agent WHERE project = ?',
       "proj-manual",
     )) as { secretHash: string };
-    expect(verifySecret(manual.secret, row.secretHash)).toBe(true);
+    expect(await verifySecret(manual.secret, row.secretHash)).toBe(true);
     await f.db.close();
     await f.app.close();
   });

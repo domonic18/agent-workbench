@@ -33,7 +33,7 @@ export function requireAgentAuth(db: Db): PreHandler {
       return unauthorized(reply);
     }
     // bootstrap 确认的 Agent 在首次配置拉取前没有密钥;与不匹配同返回 401,不泄漏状态
-    if (agent.secretHash === null || !verifySecret(parts.secret, agent.secretHash)) {
+    if (agent.secretHash === null || !(await verifySecret(parts.secret, agent.secretHash))) {
       return unauthorized(reply);
     }
     request.agent = agent;

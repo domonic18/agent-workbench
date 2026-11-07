@@ -9,7 +9,7 @@ import { createStreamRegistry, type StreamRegistry } from "../stream/registry.js
 import { registerAuthRoutes } from "./auth.js";
 import { registerStreamRoutes } from "./stream.js";
 
-const PASSWORD = "secret123";
+const PASSWORD = "secret1234567";
 const AT = 1_700_000_000_000;
 
 interface SseFrame {

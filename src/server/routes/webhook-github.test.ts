@@ -5,7 +5,7 @@ import { openDatabase, type Db } from "../../store/database.js";
 import { buildApp } from "../app.js";
 import { ensureConsoleCredential } from "../credential.js";
 
-const PASSWORD = "secret123";
+const PASSWORD = "secret1234567";
 const NOW = 5_000;
 const SECRET = "github-webhook-secret";
 const ISSUE_URL = "https://github.com/octocat/demo/issues/12";

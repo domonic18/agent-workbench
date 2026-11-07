@@ -32,11 +32,11 @@ describe("修改管理员口令弹窗", () => {
     const onClose = vi.fn();
     renderDialog(onClose);
 
-    fill("secret123", "newsecret", "newsecret");
+    fill("secret123", "newsecret12345", "newsecret12345");
     fireEvent.click(screen.getByRole("button", { name: "修改口令" }));
 
     await waitFor(() => {
-      expect(changePassword).toHaveBeenCalledWith("secret123", "newsecret");
+      expect(changePassword).toHaveBeenCalledWith("secret123", "newsecret12345");
     });
     expect(await screen.findByText("口令已更新,已吊销 2 个其他设备的登录态")).toBeTruthy();
     expect(onClose).toHaveBeenCalled();
@@ -45,7 +45,7 @@ describe("修改管理员口令弹窗", () => {
   it("两次新口令不一致时本地拦下,不发请求", async () => {
     renderDialog();
 
-    fill("secret123", "newsecret", "other");
+    fill("secret123", "newsecret12345", "otherpassword");
     fireEvent.click(screen.getByRole("button", { name: "修改口令" }));
 
     expect(await screen.findByText("两次输入的新口令不一致")).toBeTruthy();
@@ -58,7 +58,7 @@ describe("修改管理员口令弹窗", () => {
     fill("secret123", "123", "123");
     fireEvent.click(screen.getByRole("button", { name: "修改口令" }));
 
-    expect(await screen.findByText("新口令至少 6 位")).toBeTruthy();
+    expect(await screen.findByText("新口令至少 12 位")).toBeTruthy();
     expect(changePassword).not.toHaveBeenCalled();
   });
 
@@ -68,7 +68,7 @@ describe("修改管理员口令弹窗", () => {
     );
     renderDialog();
 
-    fill("wrong", "newsecret", "newsecret");
+    fill("wrong", "newsecret12345", "newsecret12345");
     fireEvent.click(screen.getByRole("button", { name: "修改口令" }));
 
     expect(await screen.findByText("当前口令不正确")).toBeTruthy();

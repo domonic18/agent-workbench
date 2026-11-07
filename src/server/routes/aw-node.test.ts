@@ -5,7 +5,7 @@ import { openDatabase, type Db } from "../../store/database.js";
 import { buildApp } from "../app.js";
 import { ensureConsoleCredential } from "../credential.js";
 
-const PASSWORD = "simple-123";
+const PASSWORD = "simple-123456";
 
 interface Fixture {
   db: Db;

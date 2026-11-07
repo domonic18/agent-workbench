@@ -170,6 +170,18 @@ function mcpOf(agent: AgentRecord): { endpoint: string } {
 }
 
 /**
+ * 下发名单:只有本机 aw-node 接管的 Agent 才由控制台写进 claude.json。
+ * 外部运行时(WorkBuddy 等)即便登记了宿主机器,其配置由自己的客户端持有。
+ */
+function isDeliverable(agent: AgentRecord): boolean {
+  return (
+    agent.status === "active" &&
+    agent.bootstrapStatus === "confirmed" &&
+    agent.runtime === "claude_code"
+  );
+}
+
+/**
  * 控制台发起「刷新 bot 名」:记录请求时刻,aw-node 下次拉配置时下发 refresh_bot_names
  * 并清空标记。幂等——重复点击只是重置时刻,不累积。
  */
@@ -197,26 +209,30 @@ export async function pullMachineConfig(
   }
   const generateSecret = deps.newSecret ?? newSecret;
 
+  // 密钥哈希在事务外算:scrypt 是百毫秒级 CPU 计算,放进事务会把连接与事务一起按住,
+  // Agent 一多就把事务拖成长事务。事务内仍按权威名单复核,预读之后新出现的补算。
+  const prepared = new Map<string, { secret: string; hash: string }>();
+  for (const agent of await listAgentsByMachine(deps.db, input.machineId)) {
+    if (!isDeliverable(agent) || agent.configAckAt !== null) {
+      continue;
+    }
+    const secret = generateSecret();
+    prepared.set(agent.id, { secret, hash: await hashSecret(secret) });
+  }
+
   return deps.db.transaction(async (tx) => {
     const refreshBotNames = await consumeMachineBotRefresh(tx, input.machineId);
-    const agents = (await listAgentsByMachine(tx, input.machineId)).filter(
-      (agent) =>
-        agent.status === "active" &&
-        agent.bootstrapStatus === "confirmed" &&
-        // aw-node 只接管 claude_code:外部运行时(WorkBuddy 等)即便登记了宿主机器,
-        // 其配置由自己的客户端持有,不由本机写进 claude.json
-        agent.runtime === "claude_code",
-    );
+    const agents = (await listAgentsByMachine(tx, input.machineId)).filter(isDeliverable);
     const delivered: DeliveredAgentConfig[] = [];
     let rotatedAny = false;
 
     for (const agent of agents) {
       if (agent.configAckAt === null) {
-        const secret = generateSecret();
+        const plan = prepared.get(agent.id);
+        const secret = plan?.secret ?? generateSecret();
+        const hash = plan?.hash ?? (await hashSecret(secret));
         const version = agent.configVersion + 1;
-        if (
-          !(await rotateAgentDeliverySecret(tx, agent.id, hashSecret(secret), version, deps.now()))
-        ) {
+        if (!(await rotateAgentDeliverySecret(tx, agent.id, hash, version, deps.now()))) {
           throw new BootstrapError("NOT_FOUND", `Agent ${agent.id} 不存在`);
         }
         rotatedAny = true;

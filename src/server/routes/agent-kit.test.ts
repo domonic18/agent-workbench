@@ -8,7 +8,7 @@ import { createIdentityService } from "../../domain/identity/service.js";
 import { buildApp } from "../app.js";
 import { ensureConsoleCredential } from "../credential.js";
 
-const PASSWORD = "secret123";
+const PASSWORD = "secret1234567";
 
 function cookieOf(response: LightMyRequestResponse): string {
   const raw = response.headers["set-cookie"];

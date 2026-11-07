@@ -6,7 +6,7 @@ import { insertGap, type NewAuditGap } from "../../store/repositories/audit-reco
 import { buildApp } from "../app.js";
 import { ensureConsoleCredential } from "../credential.js";
 
-const PASSWORD = "secret123";
+const PASSWORD = "secret1234567";
 const teleport: TeleportAdapter = { async applyTaskTraits() {} };
 
 async function prepare(): Promise<Db> {

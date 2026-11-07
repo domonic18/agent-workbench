@@ -9,7 +9,7 @@ import { insertTokenUsage } from "../../store/repositories/token-usage.js";
 import { buildApp } from "../app.js";
 import { ensureConsoleCredential } from "../credential.js";
 
-const PASSWORD = "secret123";
+const PASSWORD = "secret1234567";
 
 const FEISHU = {
   appId: "cli_test",
