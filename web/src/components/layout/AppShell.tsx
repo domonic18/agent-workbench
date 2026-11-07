@@ -36,6 +36,11 @@ const PAGE_META: { path: string; title: string; description: string }[] = [
     description: "Agent 在线状态、当前任务，以及需要你看一眼的事项",
   },
   {
+    path: "/work-items",
+    title: "工作事项",
+    description: "业务事项的目标、状态、关联工作与永久时间线",
+  },
+  {
     path: "/tasks",
     title: "任务",
     description: "工作台里正在流转与已收口的任务",

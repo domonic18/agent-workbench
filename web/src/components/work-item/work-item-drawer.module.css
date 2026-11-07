@@ -1,0 +1,228 @@
+/* 工作事项详情抽屉内部：分节 / 键值网格 / 关联列表
+ *
+ * 抽屉外壳（遮罩、标题栏、关闭、滚动）由 ui/Dialog 的 drawer 变体提供。
+ */
+
+.block {
+  margin-bottom: var(--space-5);
+}
+
+.block:last-child {
+  margin-bottom: 0;
+}
+
+.blockTitle {
+  margin: 0 0 var(--space-1);
+  font-size: var(--font-md);
+  font-weight: 700;
+  color: var(--text);
+}
+
+.blockHint {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+/* 「标签 — 值」行 */
+.kvList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.kvRow {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: baseline;
+}
+
+.kvLabel {
+  margin: 0;
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+.kvValue {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+/* 结构化字段摊平后的网格 */
+.jsonGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+}
+
+.jsonRow {
+  min-width: 0;
+}
+
+.jsonKey {
+  margin: 0;
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+.jsonValue {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.jsonList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+}
+
+.jsonItem {
+  overflow-wrap: anywhere;
+}
+
+/* 关联工作分组 */
+.group {
+  margin-bottom: var(--space-4);
+}
+
+.group:last-child {
+  margin-bottom: 0;
+}
+
+.groupTitle {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.groupCount {
+  font-size: var(--font-xs);
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.linkList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.linkRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.linkTitle {
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.linkMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+.linkButton {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.linkButton:hover {
+  text-decoration: underline;
+}
+
+.external {
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+
+.empty {
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+
+.muted {
+  color: var(--muted);
+  font-size: var(--font-xs);
+}
+
+.errorBox {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-md);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: var(--font-sm);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--font-xs);
+  color: var(--subtle);
+}
+
+.waiting {
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 767px) {
+  .kvRow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1);
+  }
+
+  .jsonGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

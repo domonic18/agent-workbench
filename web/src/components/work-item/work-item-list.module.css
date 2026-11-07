@@ -1,0 +1,144 @@
+/* 工作事项区块：筛选条 + 列表 + 窄屏卡片 */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.count {
+  margin-left: auto;
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+.tableArea {
+  display: block;
+}
+
+.cards {
+  display: none;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.cardLink {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: var(--size-touch);
+  padding: var(--space-4);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.cardLink:active {
+  background: var(--accent-soft);
+}
+
+.cardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.cardTitle {
+  font-size: var(--font-md);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.cardMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--font-sm);
+}
+
+.cardMetaLabel {
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+.cardNext {
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.subline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  font-size: var(--font-xs);
+  color: var(--subtle);
+}
+
+.title {
+  color: var(--text);
+  font-weight: 600;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.rowLink {
+  display: block;
+  color: var(--text);
+  text-decoration: none;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.rowLink:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+/* 固定列宽表格下由单元格宽度决定截断位置 */
+.clip {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: var(--font-xs);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--font-xs);
+  color: var(--subtle);
+}
+
+@media (max-width: 767px) {
+  .tableArea {
+    display: none;
+  }
+
+  .cards {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+}

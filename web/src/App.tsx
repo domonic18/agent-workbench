@@ -16,10 +16,6 @@ import { ToastProvider } from "./components/ui/Toast.js";
 import { LoginPage } from "./pages/LoginPage.js";
 
 /** 路由级懒加载:首屏只带导航与登录,总览/任务/详情按需加载(03 §8) */
-const OverviewPage = lazy(async () => {
-  const module = await import("./pages/OverviewPage.js");
-  return { default: module.OverviewPage };
-});
 const TasksPage = lazy(async () => {
   const module = await import("./pages/TasksPage.js");
   return { default: module.TasksPage };
@@ -27,6 +23,14 @@ const TasksPage = lazy(async () => {
 const TaskDrawerRoute = lazy(async () => {
   const module = await import("./pages/TaskDrawerRoute.js");
   return { default: module.TaskDrawerRoute };
+});
+const OverviewLayout = lazy(async () => {
+  const module = await import("./pages/OverviewLayout.js");
+  return { default: module.OverviewLayout };
+});
+const WorkItemDrawerRoute = lazy(async () => {
+  const module = await import("./pages/WorkItemDrawerRoute.js");
+  return { default: module.WorkItemDrawerRoute };
 });
 const CapabilitiesPage = lazy(async () => {
   const module = await import("./pages/CapabilitiesPage.js");
@@ -100,7 +104,10 @@ export function App() {
           <Route path="/setup" element={<SetupPage />} />
           <Route element={<AppShell />}>
             <Route element={<BootstrapGuard />}>
-              <Route path="/overview" element={<OverviewPage />} />
+              <Route element={<OverviewLayout />}>
+                <Route path="/overview" element={null} />
+                <Route path="/work-items/:id" element={<WorkItemDrawerRoute />} />
+              </Route>
               <Route path="/tasks" element={<TasksPage />}>
                 <Route path=":id" element={<TaskDrawerRoute />} />
               </Route>
