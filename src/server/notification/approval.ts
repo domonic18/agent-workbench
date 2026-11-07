@@ -10,15 +10,18 @@ export interface ApprovalNotifierDeps {
   now?: () => number;
 }
 
-/** 授权申请落库后入队一张飞书审批卡片;幂等键 cap:{id}:requested 保证重复入队不重复发卡 */
+/**
+ * 授权申请落库后入队一张飞书审批卡片;幂等键 cap:{id}:requested 保证重复入队不重复发卡。
+ * 返回 Promise 而非 fire-and-forget:入队失败要能被调用方捕获,否则审批人永远收不到卡片。
+ */
 export function createApprovalNotifier(
   deps: ApprovalNotifierDeps,
-): ((record: CapabilityRecord) => void) | undefined {
+): ((record: CapabilityRecord) => Promise<void>) | undefined {
   const chatId = deps.approvalChatId;
   if (chatId === undefined) {
     return undefined;
   }
-  return (record) => {
+  return async (record) => {
     const card = buildApprovalCard({
       capabilityId: record.id,
       subject: record.subject,
@@ -28,7 +31,7 @@ export function createApprovalNotifier(
       taskId: record.taskId,
       scope: JSON.parse(record.scopeJson) as unknown,
     });
-    enqueuePush(deps.db, {
+    await enqueuePush(deps.db, {
       idempotencyKey: `cap:${record.id}:requested`,
       kind: "capability_approval",
       taskId: record.taskId,

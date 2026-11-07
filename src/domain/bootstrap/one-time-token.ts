@@ -1,8 +1,13 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { Db } from "../../store/database.js";
 import { ONE_TIME_TOKEN } from "../../shared/constants.js";
-
-export type OneTimeTokenPurpose = "bootstrap_admin" | "enroll" | "agent_enroll";
+import {
+  claimOneTimeToken,
+  findAgentEnrollSubject,
+  insertOneTimeToken,
+  oneTimeTokenExists,
+  type OneTimeTokenPurpose,
+} from "../../store/repositories/one-time-token.js";
 
 export interface IssueTokenInput {
   purpose: OneTimeTokenPurpose;
@@ -41,28 +46,14 @@ export async function issueOneTimeToken(db: Db, input: IssueTokenInput): Promise
   const now = (input.now ?? Date.now)();
   const token = mintTokenValue();
   const expiresAt = now + input.ttlMs;
-  await db.run(
-    "INSERT INTO one_time_token (token_hash, purpose, subject_id, expires_at, created_at) VALUES (?, ?, ?, ?, ?)",
-    hashToken(token), input.purpose, input.subjectId ?? null, expiresAt, now,
-  );
+  await insertOneTimeToken(db, {
+    tokenHash: hashToken(token),
+    purpose: input.purpose,
+    subjectId: input.subjectId ?? null,
+    expiresAt,
+    createdAt: now,
+  });
   return { token, expiresAt };
-}
-
-/**
- * 原子消费:UPDATE ... WHERE consumed_at IS NULL AND expires_at > now,
- * changes = 1 才算赢得令牌,并发双花只有一个成功。
- */
-async function claimToken(
-  db: Db,
-  hash: string,
-  purpose: OneTimeTokenPurpose,
-  now: number,
-): Promise<boolean> {
-  const changes = await db.run(
-    "UPDATE one_time_token SET consumed_at = ? WHERE token_hash = ? AND purpose = ? AND consumed_at IS NULL AND expires_at > ?",
-    now, hash, purpose, now,
-  );
-  return changes.changes === 1;
 }
 
 /**
@@ -71,14 +62,11 @@ async function claimToken(
 export async function consumeOneTimeToken(db: Db, input: ConsumeTokenInput): Promise<ConsumeResult> {
   const now = (input.now ?? Date.now)();
   const hash = hashToken(input.token);
-  if (await claimToken(db, hash, input.purpose, now)) {
+  if (await claimOneTimeToken(db, { tokenHash: hash, purpose: input.purpose, now })) {
     return { ok: true };
   }
-  const row = await db.get(
-    "SELECT 1 AS one FROM one_time_token WHERE token_hash = ? AND purpose = ?",
-    hash, input.purpose,
-  );
-  return { ok: false, reason: row === undefined ? "invalid" : "expired" };
+  const exists = await oneTimeTokenExists(db, { tokenHash: hash, purpose: input.purpose });
+  return { ok: false, reason: exists ? "expired" : "invalid" };
 }
 
 export type AgentEnrollConsumeResult =
@@ -95,15 +83,12 @@ export async function consumeAgentEnrollToken(
 ): Promise<AgentEnrollConsumeResult> {
   const now = (input.now ?? Date.now)();
   const hash = hashToken(input.token);
-  const row = await db.get<{ subjectId: string | null }>(
-    "SELECT subject_id AS \"subjectId\" FROM one_time_token WHERE token_hash = ? AND purpose = 'agent_enroll'",
-    hash,
-  );
-  if (row === undefined || row.subjectId === null || row.subjectId === "") {
+  const subjectId = await findAgentEnrollSubject(db, hash);
+  if (subjectId === null || subjectId === "") {
     return { ok: false, reason: "invalid" };
   }
-  if (!(await claimToken(db, hash, "agent_enroll", now))) {
+  if (!(await claimOneTimeToken(db, { tokenHash: hash, purpose: "agent_enroll", now }))) {
     return { ok: false, reason: "expired" };
   }
-  return { ok: true, agentId: row.subjectId };
+  return { ok: true, agentId: subjectId };
 }

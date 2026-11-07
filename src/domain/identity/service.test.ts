@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { verifySecret } from "../security/secrets.js";
+import {
+  consumeAgentEnrollToken,
+  issueOneTimeToken,
+} from "../bootstrap/one-time-token.js";
 import { openDatabase, type Db } from "../../store/database.js";
 import { IdentityError } from "./errors.js";
 import { createIdentityService, type IdentityService } from "./service.js";
@@ -115,6 +119,36 @@ describe("身份注册", () => {
     expect(
       verifySecret(machineRotated.secret, machineRotated.machine.collectorSecretHash),
     ).toBe(true);
+    await db.close();
+  });
+
+  it("轮换密钥作废该 Agent 在途的接入令牌,不影响他人", async () => {
+    const { db, service } = await prepare();
+    await service.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
+    const target = await service.registerAgent({ machineId: "m1", project: "aw", displayName: "A" });
+    const other = await service.registerAgent({ machineId: "m1", project: "pb", displayName: "B" });
+    const issued = async (agentId: string): Promise<string> =>
+      (
+        await issueOneTimeToken(db, {
+          purpose: "agent_enroll",
+          subjectId: agentId,
+          ttlMs: 60_000,
+          now: () => 1_000,
+        })
+      ).token;
+    const targetToken = await issued(target.agent.id);
+    const otherToken = await issued(other.agent.id);
+
+    await service.rotateAgentSecret(target.agent.id);
+
+    expect(await consumeAgentEnrollToken(db, { token: targetToken, now: () => 2_000 })).toEqual({
+      ok: false,
+      reason: "expired",
+    });
+    expect(await consumeAgentEnrollToken(db, { token: otherToken, now: () => 2_000 })).toEqual({
+      ok: true,
+      agentId: other.agent.id,
+    });
     await db.close();
   });
 

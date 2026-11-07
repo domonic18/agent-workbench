@@ -21,9 +21,10 @@ import {
   type AgentListQuery,
   type AgentRecord,
 } from "../../store/repositories/agent.js";
-import { upsertUsageLimit } from "../../store/repositories/usage-limit.js";
+import { voidPendingAgentEnrollTokens } from "../../store/repositories/one-time-token.js";
 import { hashSecret, newSecret } from "../security/secrets.js";
 import { IdentityError } from "./errors.js";
+import { setUsageLimit, type UsageLimitInput } from "./usage-limit.js";
 
 export interface RegisterMachineInput {
   id: string;
@@ -46,13 +47,6 @@ export interface RegisterAgentInput {
   displayName: string;
   feishuAppId?: string | null | undefined;
   allowedTargets?: string[] | undefined;
-}
-
-export interface UsageLimitInput {
-  dailyTokenLimit: number;
-  warnPercent?: number | undefined;
-  hardStop?: boolean | undefined;
-  isActive?: boolean | undefined;
 }
 
 export interface RegisteredMachine {
@@ -258,9 +252,14 @@ export function createIdentityService(deps: IdentityServiceDeps): IdentityServic
 
   async function rotateAgentSecret(id: string): Promise<RegisteredAgent> {
     const secret = generateSecret();
-    if (!(await updateAgentSecretHash(db, id, hashSecret(secret), now()))) {
-      throw new IdentityError("NOT_FOUND", `Agent ${id} 未注册`);
-    }
+    const at = now();
+    await db.transaction(async (tx): Promise<void> => {
+      if (!(await updateAgentSecretHash(tx, id, hashSecret(secret), at))) {
+        throw new IdentityError("NOT_FOUND", `Agent ${id} 未注册`);
+      }
+      // 轮换意味着凭据可能已泄露:在途的接入令牌一并作废,否则持有者可拿旧令牌再换一次密钥
+      await voidPendingAgentEnrollTokens(tx, { subjectId: id, now: at });
+    });
     const agent = await findAgentById(db, id);
     if (agent === undefined) {
       throw new Error(`Agent 轮换后读不到记录: ${id}`);
@@ -307,41 +306,13 @@ export function createIdentityService(deps: IdentityServiceDeps): IdentityServic
     return machine;
   }
 
-  async function setUsageLimit(id: string, input: UsageLimitInput): Promise<AgentRecord> {
-    if ((await findAgentById(db, id)) === undefined) {
-      throw new IdentityError("NOT_FOUND", `Agent ${id} 未注册`);
-    }
-    if (!Number.isInteger(input.dailyTokenLimit) || input.dailyTokenLimit < 0) {
-      throw new IdentityError("VALIDATION_FAILED", "dailyTokenLimit 必须是非负整数");
-    }
-    const warnPercent = input.warnPercent ?? 80;
-    if (!Number.isInteger(warnPercent) || warnPercent < 0 || warnPercent > 100) {
-      throw new IdentityError("VALIDATION_FAILED", "warnPercent 必须是 0~100 的整数");
-    }
-    const hardStop = input.hardStop ?? true;
-    const isActive = input.isActive ?? true;
-    await upsertUsageLimit(db, {
-      agentId: id,
-      dailyTokenLimit: input.dailyTokenLimit,
-      warnPercent,
-      hardStop,
-      isActive,
-      updatedAt: now(),
-    });
-    const agent = await findAgentById(db, id);
-    if (agent === undefined) {
-      throw new Error(`Agent 更新后读不到记录: ${id}`);
-    }
-    return agent;
-  }
-
   return {
     registerMachine,
     registerAgent,
     rotateMachineSecret,
     rotateAgentSecret,
     setAllowedTargets,
-    setUsageLimit,
+    setUsageLimit: (id, input) => setUsageLimit({ db, now }, id, input),
     renameMachine,
     listMachines: (query) => listMachines(db, query),
     listAgents: (query) => listAgents(db, query),

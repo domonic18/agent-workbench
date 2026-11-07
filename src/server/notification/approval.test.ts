@@ -32,8 +32,8 @@ describe("审批卡片通知", () => {
     });
 
     const notify = createApprovalNotifier({ db, approvalChatId: "oc_approval", now: () => 1_000 });
-    notify?.(record);
-    notify?.(record);
+    await notify?.(record);
+    await notify?.(record);
 
     const row = await findOutboxByKey(db, `cap:${record.id}:requested`);
     expect(row).toMatchObject({
