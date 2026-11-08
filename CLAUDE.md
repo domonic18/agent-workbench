@@ -16,6 +16,7 @@
   - **接入通道：REST 为主、MCP 可选**（2026-11-07 裁决）。协作不必先配 MCP：Bearer 直调的 REST 面已覆盖建任务、发消息、拉收件箱、回执，`kb_*` / `work_*` 无 REST 写面、只能走 MCP。人替 Agent 接入的完整路径：控制台签发**一次性接入令牌** → 只把令牌交给 Agent → Agent 自助兑换密钥（兑换才轮换旧密钥，签发不影响在跑的 Agent）→ 凭 Bearer 拉规范（`GET /api/agent-kit/guide`）与查可达目标（`GET /api/agent/peers`，白名单属发起方）→ 按规范委派；**人全程不改 Agent 客户端配置**。规范正文明确「不要用 IM 代替委派」：控制台只认 A2A 消息
   - 不重写 Agent 运行时（Claude Code / cc-connect 是资产）；Source Agent 只整理事实，业务路由只查 Thread owner 与 Git 版本化 RouteRule，未知或冲突交人，**一期不做在线 Slow Router**
   - 首个业务闭环使用真实 Bug：PR 关联且当前提交 CI 通过后进入待验收，**只有原 Bug 机器人的人工接受才完成**；退回到同一 WorkItem 返工，A2A ACK 只代表上游 Task 验收，生产发布始终单独确认
+  - **发布模型（2026-11-09 裁决，单栈一体）**：短期分支 + PR 合入 `main` 即自动发布——PR 三查（类型与 lint / 单元测试 / 迁移守卫 `scripts/check-migrations.ts`）全绿才可合并；合入后自托管 runner 构建并推送 TCR 不可变 tag（`main-<sha7>`，不推 latest），再部署到**专用部署目录**（仓库变量 `DEPLOY_PATH`，非 git 工作副本，compose 项目名 `agent-workbench` 延用旧栈数据卷）；部署唯一入口 `scripts/deploy.sh`（预检 → `.env` 轮转 → 换容器 → `.deploy-state` → 失败自动回滚 previous tag → 退出兜底镜像回收，保留最近 3 个 tag）。迁移 SQL 内嵌镜像、应用启动自跑（forward-only + checksum 锁），**回滚不回滚数据库**，新 DDL 必须旧代码可容忍。自托管 job（build/deploy/image-gc）**绝不跑 PR**。本地操作生产栈须 `make <target> DEPLOY_PATH=...`，**不要用仓库 compose 现场构建**（同项目名会把 CI 镜像换成本地构建）；详见 docs/deployment-runbook.md
   - **首次使用必须自动装配**：无凭据仅开放 bootstrap mode，以一次性 bootstrap token 设置管理员口令；`/setup` 四步引导 + enroll token + aw-node 上报 cc-connect 发现 + `POST /api/aw-node/config` 轮换签发 secret（ACK 前重试可轮换，ACK 后不明文返回）+ 默认 `bug_fix` + 分项预检。用户只做必要授权、一次安装执行和一次确认，不要求手工编辑 RouteRule、Mandate、plist 或数据库配置；预检失败不就绪且不创建空 Assignment
 
 ## 2. 项目结构
@@ -27,7 +28,7 @@
 - `collector/` aw-node 采集模块源码；与调度模块共同构建每机单一 aw-node 产物，与 `src/shared` 共享协议类型
 - `scripts/` 运维与工具脚本(备份等)
 - `e2e/` 端到端与冒烟测试;单元测试就近放在被测文件旁,不另设顶层单测目录
-- `docker/` 容器化(Dockerfile.console / docker-compose.yml / frpc.toml.example)
+- `docker/` 容器化(Dockerfile.console / docker-compose.yml 本地模板 / docker-compose.prod.yml 生产镜像化 / frpc.toml.example)
 - `workspace/` 宿主机持久化数据（PostgreSQL 数据与备份、采集缓冲），gitignore 不入库；新基线从空库与空知识目录开始，旧 SQLite 与旧知识文件只归档、不导入
 
 工程入口:pnpm workspace(根包 + `web/` + `collector/`)、TypeScript、ESLint、Vitest;命令统一走 `Makefile`,`make check` 是唯一质量闸门。
@@ -46,6 +47,7 @@
 | 授权与闸门（能力模型 / Teleport / 审批 / 自有控制工具策略） | docs/arch/05 |
 | 架构评审（历史缺口与裁决；旧方案可能已被新裁决 supersede） | docs/arch/06 |
 | 工程目录与维护约定 | docs/arch/07 |
+| 发布与回滚手册（流水线 / deploy.sh / 回滚 / 排障） | docs/deployment-runbook.md |
 | 里程碑任务清单（开工前看对应 Mx） | docs/plan/tasks/ |
 
 ## 3. 通用编码规范与 AI 指令
