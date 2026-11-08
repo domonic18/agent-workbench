@@ -1,0 +1,370 @@
+name: CI/CD
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 同 ref 串行不抢占:main 的部署链一旦起跑绝不被新事件取消;
+# PR 与 main 分属不同 ref 组,互不阻塞。代价是 PR 连续推送排队——单人多仓,可接受。
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # 仓库为 public:镜像仓库名是公有常量可留 YAML;命名空间与凭据走 secret,
+  # 部署目录走仓库变量(维护口径与 ai-invest 一致:变量=非密配置,secret=凭据)
+  TCR_REGISTRY: ccr.ccs.tencentyun.com
+  TCR_NAMESPACE: ${{ secrets.TCR_NAMESPACE }}
+  IMAGE_NAME: aw-console
+
+jobs:
+  # ---------------------------------------------------------------- 静态检查
+  check:
+    name: Check / 类型与 lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install / 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: Check / 类型检查 + lint
+        run: |
+          pnpm run typecheck
+          pnpm run typecheck:web
+          pnpm run lint
+
+  # ---------------------------------------------------------------- 单元测试
+  test:
+    name: Test / 单元测试
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        # 必须与生产同款:模型层依赖 pgvector 扩展;pg_trgm 是 contrib 自带
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: agent_workbench
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: agent_workbench
+        ports:
+          # 测试基座固定连 127.0.0.1:5433(与本地 compose 同端口),
+          # 口令从仓库根 docker/.env 读取,见下一步
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U agent_workbench -d agent_workbench"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install / 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: Write test credentials / 写测试口令
+        run: printf 'POSTGRES_PASSWORD=ci\n' > docker/.env
+
+      - name: Test / 跑全仓测试
+        run: |
+          pnpm run test
+          pnpm run test:web
+
+  # ---------------------------------------------------------------- 迁移守卫
+  migration-guard:
+    name: Migration Guard / 从零重放 + 幂等重放
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: agent_workbench
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: agent_workbench
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U agent_workbench -d agent_workbench"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install / 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: Write test credentials / 写测试口令
+        run: printf 'POSTGRES_PASSWORD=ci\n' > docker/.env
+
+      # 单实例部署没有旧版本兜底:迁移失败即控制台停机,
+      # 守卫在 CI 先拦一道(空库从零重放 + 二次重放断言 0 条新应用)
+      - name: Guard / 迁移守卫
+        run: pnpm exec tsx scripts/check-migrations.ts
+
+  # ---------------------------------------------------------------- 镜像构建
+  build:
+    name: Build / 构建并推送镜像
+    # 境内自托管 runner 构建并推 TCR(跨境 ubuntu-latest 推送链路边缘可用,
+    # ai-invest / trend-studio 已实测;同机 buildx 缓存常驻可复用)。
+    # 仓库是 public:PR(含 fork)绝不在自托管机上执行仓库代码——
+    # runner 持有 docker 与部署目录权限。构建只在 push main 与手动触发上跑,
+    # 手动触发是发布前的演练入口(只有有写权限的人能触发)。
+    runs-on: [self-hosted, macmini-agent-workbench]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    # 预算 = 构建 20 + 推送 35(三次 10 分钟看门狗上限)+ 收尾
+    timeout-minutes: 60
+    needs: [check, test, migration-guard]
+    steps:
+      - uses: actions/checkout@v4
+
+      # 常驻 buildx 构建器:buildkitd 配了国内 docker.io 镜像源,且构建缓存
+      # 跨 job 持久。不用 setup-buildx-action——它会另建临时 builder 顶掉选择
+      - name: Select builder / 选择构建器
+        run: docker buildx use ci-builder
+
+      - name: Preconditions / 前置校验
+        run: |
+          set -eu
+          [ -n "${{ env.TCR_NAMESPACE }}" ] || { echo "ERROR: 未配置仓库 secret TCR_NAMESPACE" >&2; exit 1; }
+          echo "镜像目标:${{ env.TCR_REGISTRY }}/${{ env.TCR_NAMESPACE }}/${{ env.IMAGE_NAME }}"
+
+      - name: Resolve tag / 解析镜像标签(main-<sha7>,不可变)
+        id: vars
+        run: |
+          sha_short="$(git rev-parse --short=7 "$GITHUB_SHA")"
+          echo "tag=main-$sha_short" >> "$GITHUB_OUTPUT"
+          echo "image=$TCR_REGISTRY/$TCR_NAMESPACE/$IMAGE_NAME:main-$sha_short" >> "$GITHUB_OUTPUT"
+
+      # id 供结论裁定用:登录失败属配置错误,不进重试(避免白建镜像且盖住真错)
+      - name: Login TCR / 登录镜像仓库
+        id: login
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.TCR_REGISTRY }}
+          username: ${{ secrets.TCR_USERNAME }}
+          password: ${{ secrets.TCR_PASSWORD }}
+
+      # 只构建不入库:load 进本地 docker,构建缓存留在构建机上,
+      # 推送交给后面的独立步骤——挂死时只需重推,不必重建。
+      # --provenance=false:TCR 不认 OCI attestation 附加清单
+      - name: Build / 本地构建镜像
+        id: build
+        timeout-minutes: 20
+        env:
+          IMAGE: ${{ steps.vars.outputs.image }}
+        run: |
+          set -euo pipefail
+          docker buildx build --builder ci-builder --platform linux/amd64 \
+            --file docker/Dockerfile.console --load --provenance=false \
+            --tag "$IMAGE" .
+
+      # 每次推送自带看门狗:跨境链路 docker push 会卡住不返回,也不认超时参数;
+      # runner 是 macOS(BSD userland),没有 GNU coreutils 的 timeout,
+      # 故用「后台进程 + 轮询 ps 状态」实现单次尝试的 600 秒上限,
+      # 超时就杀掉本次、进入下一次重试。没有这个上限,重试就是摆设。
+      - name: Push to TCR / 推送镜像
+        id: push
+        continue-on-error: true
+        timeout-minutes: 35
+        env:
+          IMAGE: ${{ steps.vars.outputs.image }}
+          PUSH_ATTEMPTS: 3
+          PUSH_DEADLINE_S: 600
+        run: |
+          set -euo pipefail
+
+          push_once() {
+            local image="$1" limit_s="$2" pid waited=0 stat
+            docker push "$image" &
+            pid=$!
+            while :; do
+              # 空 = 进程已不存在;Z = 僵尸(已退出待回收)——都算已结束
+              stat="$(ps -o stat= -p "$pid" 2>/dev/null || true)"
+              case "$stat" in
+                ""|Z*) break ;;
+              esac
+              if [ "$waited" -ge "$limit_s" ]; then
+                echo "[push] 单次推送超过 ${limit_s}s 仍无进展,终止本次尝试" >&2
+                kill -TERM "$pid" 2>/dev/null || true
+                sleep 2
+                kill -KILL "$pid" 2>/dev/null || true
+                wait "$pid" 2>/dev/null || true
+                return 124
+              fi
+              sleep 5
+              waited=$((waited + 5))
+            done
+            wait "$pid"
+          }
+
+          attempt=1
+          while [ "$attempt" -le "$PUSH_ATTEMPTS" ]; do
+            echo "[push] 第 $attempt/$PUSH_ATTEMPTS 次:$IMAGE"
+            if push_once "$IMAGE" "$PUSH_DEADLINE_S"; then
+              exit 0
+            fi
+            echo "[push] 第 $attempt 次失败" >&2
+            attempt=$((attempt + 1))
+            # 不用 `[ ... ] && sleep`:条件为假时整个 && 复合命令返回 1,
+            # set -e 下会把循环体当失败直接终止(最后一轮必踩)
+            if [ "$attempt" -le "$PUSH_ATTEMPTS" ]; then
+              sleep 10
+            fi
+          done
+          echo "[push] $PUSH_ATTEMPTS 次全部失败" >&2
+          exit 1
+
+      - name: Conclude build outcome / 构建推送结论裁定
+        if: always()
+        # 裁定顺序 = 登录 → 构建 → 推送:前一步失败时后一步的 outcome 是 skipped,
+        # 不按顺序判就会把「登录失败」报成「构建失败」,把真错盖住
+        env:
+          IMAGE: ${{ steps.vars.outputs.image }}
+        run: |
+          if [ "${{ steps.login.outcome }}" != "success" ]; then
+            echo "[FAIL] 镜像仓库登录失败(配置问题,重试无意义)" >&2
+            exit 1
+          fi
+          if [ "${{ steps.build.outcome }}" != "success" ]; then
+            echo "[FAIL] 镜像构建失败" >&2
+            exit 1
+          fi
+          if [ "${{ steps.push.outcome }}" = "success" ]; then
+            echo "[OK] 镜像推送成功:$IMAGE"
+          else
+            echo "[FAIL] 镜像推送失败(重试耗尽)" >&2
+            exit 1
+          fi
+
+  # ---------------------------------------------------------------- 生产发布
+  deploy:
+    name: Deploy / 发布本机生产栈
+    # 生产栈与 runner 同机:不走 SSH,自托管 job 直接执行;
+    # 部署串行不抢占——半途取消会留下换到一半的容器
+    runs-on: [self-hosted, macmini-agent-workbench]
+    needs: [build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    timeout-minutes: 30
+    concurrency:
+      group: aw-deploy
+      cancel-in-progress: false
+    env:
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # 变量缺失就明确失败,不带着半套配置继续发布
+      - name: Preconditions / 前置校验
+        run: |
+          set -eu
+          [ -n "$DEPLOY_PATH" ] || { echo "ERROR: 未配置仓库变量 DEPLOY_PATH" >&2; exit 1; }
+          [ -n "${{ env.TCR_NAMESPACE }}" ] || { echo "ERROR: 未配置仓库 secret TCR_NAMESPACE" >&2; exit 1; }
+          [ -d "$DEPLOY_PATH" ] || { echo "ERROR: 部署目录不存在:$DEPLOY_PATH" >&2; exit 1; }
+          [ -f "$DEPLOY_PATH/.env" ] || { echo "ERROR: $DEPLOY_PATH/.env 不存在(首次部署前须人工就位)" >&2; exit 1; }
+
+      - name: Resolve tag / 解析镜像标签
+        id: vars
+        run: echo "sha_short=$(git rev-parse --short=7 "$GITHUB_SHA")" >> "$GITHUB_OUTPUT"
+
+      - name: Snapshot state / 记录发布前现场
+        run: |
+          cd "$DEPLOY_PATH"
+          echo '--- 状态文件 ---'
+          cat .deploy-state 2>/dev/null || echo '(无)'
+          echo '--- 当前容器 ---'
+          docker compose -p agent-workbench --env-file .env --profile tunnel -f docker/docker-compose.prod.yml ps \
+            --format '{{.Service}} {{.Image}} {{.State}}' 2>/dev/null || true
+
+      # 同步资产与 git checkout 同 commit 等价;frpc.toml / .env / workspace/
+      # 是部署目录的本地状态,不由 CI 下发
+      - name: Sync deploy assets / 同步部署资产
+        run: |
+          set -eu
+          install -d "$DEPLOY_PATH/scripts" "$DEPLOY_PATH/docker"
+          install -m 755 scripts/deploy.sh "$DEPLOY_PATH/scripts/deploy.sh"
+          install -m 644 docker/docker-compose.prod.yml "$DEPLOY_PATH/docker/docker-compose.prod.yml"
+          printf '%s\n' "$GITHUB_SHA" > "$DEPLOY_PATH/.deploy-commit"
+          echo "--- 已同步:deploy.sh + docker-compose.prod.yml ---"
+
+      - name: Deploy / 发布(迁移随启动 → 换容器 → 健康检查 → 失败自动回滚)
+        env:
+          IMAGE_REPO: ${{ env.TCR_REGISTRY }}/${{ env.TCR_NAMESPACE }}/${{ env.IMAGE_NAME }}
+        run: |
+          cd "$DEPLOY_PATH"
+          bash scripts/deploy.sh --tag "main-${{ steps.vars.outputs.sha_short }}" --image-repo "$IMAGE_REPO"
+
+      - name: Verify / 核对发布结果
+        run: |
+          cd "$DEPLOY_PATH"
+          echo '--- 状态文件 ---'
+          cat .deploy-state
+          echo '--- 容器 ---'
+          docker compose -p agent-workbench --env-file .env --profile tunnel -f docker/docker-compose.prod.yml ps \
+            --format '{{.Service}} {{.Image}} {{.State}}'
+
+  # ---------------------------------------------------------------- 镜像回收
+  image-gc:
+    name: Image GC / 构建机镜像回收
+    # 与部署成败无关的清理入口:构建失败或发布中止都不该让镜像只增不减;
+    # 回收失败不判红(清理是维护动作,染红会把「部署成功」的结论搅浑)
+    runs-on: [self-hosted, macmini-agent-workbench]
+    needs: [deploy]
+    if: ${{ always() && !cancelled() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
+    timeout-minutes: 10
+    # 与 deploy 共组:回收与部署不同时动本地镜像
+    concurrency:
+      group: aw-deploy
+      cancel-in-progress: false
+    env:
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preconditions / 前置校验
+        run: |
+          set -eu
+          [ -n "$DEPLOY_PATH" ] || { echo "ERROR: 未配置仓库变量 DEPLOY_PATH" >&2; exit 1; }
+          [ -n "${{ env.TCR_NAMESPACE }}" ] || { echo "ERROR: 未配置仓库 secret TCR_NAMESPACE" >&2; exit 1; }
+          [ -d "$DEPLOY_PATH" ] || { echo "ERROR: 部署目录不存在:$DEPLOY_PATH" >&2; exit 1; }
+
+      - name: GC / 回收镜像(保留最新 3 个 tag)
+        env:
+          IMAGE_REPO: ${{ env.TCR_REGISTRY }}/${{ env.TCR_NAMESPACE }}/${{ env.IMAGE_NAME }}
+        run: |
+          set -eu
+          install -d "$DEPLOY_PATH/scripts"
+          install -m 755 scripts/deploy.sh "$DEPLOY_PATH/scripts/deploy.sh"
+          cd "$DEPLOY_PATH"
+          bash scripts/deploy.sh --gc-only --image-repo "$IMAGE_REPO" \
+            || echo "::warning::镜像回收失败,看步骤日志"
