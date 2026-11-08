@@ -201,8 +201,13 @@ describe("replaceBinary", () => {
     replaceBinary(target, source);
 
     expect(readFileSync(target, "utf8")).toBe("new-binary");
-    // inode 变了才说明是 unlink 后新建;原地覆盖会保留原 inode
-    expect(statSync(target).ino).not.toBe(before);
+    // inode 变了才说明是 unlink 后新建;原地覆盖会保留原 inode。
+    // 「新建必得新 inode」只在 APFS 成立(单调分配);ext4 删除后立即
+    // 新建会复用刚释放的 inode,该断言在 Linux CI 上必假——而 launchd
+    // 与代码签名约束本就是 macOS 专属,只在 darwin 上断言
+    if (process.platform === "darwin") {
+      expect(statSync(target).ino).not.toBe(before);
+    }
   });
 
   it("目标不存在时直接落盘", () => {
