@@ -297,6 +297,15 @@ jobs:
         id: vars
         run: echo "sha_short=$(git rev-parse --short=7 "$GITHUB_SHA")" >> "$GITHUB_OUTPUT"
 
+      # deploy.sh 内 docker pull 私有镜像(含回滚路径),登录态须在 job 内先行建立
+      # (与 ai-invest 同款:登录失败属配置错误,直接红,不带病部署)
+      - name: Login TCR / 登录镜像仓库
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.TCR_REGISTRY }}
+          username: ${{ secrets.TCR_USERNAME }}
+          password: ${{ secrets.TCR_PASSWORD }}
+
       - name: Snapshot state / 记录发布前现场
         run: |
           cd "$DEPLOY_PATH"
