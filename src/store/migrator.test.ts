@@ -79,6 +79,7 @@ describe("runMigrations", () => {
       { version: 14, name: "work_item_scope_revision" },
       { version: 15, name: "work_item_association_scope_revision" },
       { version: 16, name: "agent_enroll_token" },
+      { version: 17, name: "agent_run_end_reason" },
     ]);
     await db.close();
   });

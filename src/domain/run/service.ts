@@ -4,6 +4,7 @@ import type { Db } from "../../store/database.js";
 import {
   bindRunTaskIfEmpty,
   endRun,
+  findLatestRunForStream,
   findRunningRunForStream,
   insertRun,
   insertTimelineEvent,
@@ -99,8 +100,22 @@ export function createRunService(deps: RunServiceDeps): RunService {
 
       // 空闲 ≥30 分钟:旧 run 停在最后一次活动,新事件顶替(02 §3.2)
       if (run !== undefined && occurredAt - run.lastSeenAt >= RUN_IDLE_GAP_MS) {
-        await endRun(tx, run.id, run.lastSeenAt);
+        await endRun(tx, run.id, run.lastSeenAt, "idle_split");
         run = undefined;
+      }
+      if (run === undefined) {
+        // 迟到事件回填:流上最近 run 已收尾且事件发生在收尾时刻之前 → 落回原 run,
+        // 不误开新 run(单流内按 seq 顺序投递,常态到不了这里;进程退出宣告早于
+        // spool 末批事件时会命中,02 §3.2)
+        const latest = await findLatestRunForStream(tx, agentId, streamId);
+        if (
+          latest !== undefined &&
+          latest.status === "ended" &&
+          latest.endedAt !== null &&
+          occurredAt <= latest.endedAt
+        ) {
+          run = latest;
+        }
       }
       if (run === undefined) {
         const created = {
@@ -118,6 +133,7 @@ export function createRunService(deps: RunServiceDeps): RunService {
           status: "running",
           lastSeenAt: occurredAt,
           endedAt: null,
+          endReason: null,
         };
         startedRun = true;
       }
@@ -155,7 +171,7 @@ export function createRunService(deps: RunServiceDeps): RunService {
       return null;
     }
     const at = Math.max(run.lastSeenAt, endedAt ?? now());
-    await endRun(db, run.id, at);
+    await endRun(db, run.id, at, "process_exit");
     return run.id;
   }
 
