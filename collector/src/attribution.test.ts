@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   buildAttributionIndex,
   loadAttributionIndex,
+  overlayAttributionIndex,
   projectFromSessionFile,
 } from "./attribution.js";
 
@@ -73,5 +74,36 @@ describe("cc-connect 归因", () => {
   it("空索引 resolve 返回空数组", () => {
     const index = buildAttributionIndex(new Map());
     expect(index.resolve(UUID_A)).toEqual([]);
+  });
+});
+
+describe("本地登记叠加(派发会话归因)", () => {
+  it("extra 取活引用:登记后不重建索引也立即命中,不留档 3 跳 EOF 的窗口", () => {
+    const extra = new Map<string, ReadonlySet<string>>();
+    const index = overlayAttributionIndex(buildAttributionIndex(new Map()), extra);
+    expect(index.resolve(UUID_A)).toEqual([]);
+    extra.set(UUID_A, new Set(["p-dispatch"]));
+    expect(index.resolve(UUID_A)).toEqual(["p-dispatch"]);
+  });
+
+  it("与 cc-connect 索引合并,两边都命中时取并集", () => {
+    const base = buildAttributionIndex(new Map([[UUID_A, new Set(["proj-a"])]]));
+    const index = overlayAttributionIndex(
+      base,
+      new Map([[UUID_A, new Set(["p-dispatch"])]]),
+    );
+    expect(index.resolve(UUID_A)).toEqual(["p-dispatch", "proj-a"]);
+    expect(index.projects()).toEqual(["p-dispatch", "proj-a"]);
+    expect(index.sessionCount()).toBe(2);
+  });
+
+  it("未登记的会话照走 base,登记侧大小写不敏感", () => {
+    const base = buildAttributionIndex(new Map([[UUID_A, new Set(["proj-a"])]]));
+    const index = overlayAttributionIndex(
+      base,
+      new Map([[UUID_B.toUpperCase(), new Set(["p-dispatch"])]]),
+    );
+    expect(index.resolve(UUID_A)).toEqual(["proj-a"]);
+    expect(index.resolve(UUID_B)).toEqual(["p-dispatch"]);
   });
 });
