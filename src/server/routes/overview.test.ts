@@ -88,6 +88,29 @@ describe("overview 路由", () => {
       allowedTargetsJson: "[]",
       createdAt: AT,
     });
+    insertAgent(db, {
+      id: "a2",
+      machineId: null,
+      runtime: "workbuddy",
+      project: "p2",
+      displayName: "Agent Two",
+      secretHash: "h",
+      feishuAppId: null,
+      allowedTargetsJson: "[]",
+      createdAt: AT,
+    });
+    // 同机两条 running run(idle 窗口内):活跃会话按机器聚合成 2;窗口外的旧 run 不算
+    for (const run of [
+      { id: "run-live-1", seen: AT },
+      { id: "run-live-2", seen: AT - 60_000 },
+      { id: "run-stale", seen: AT - 31 * 60_000 },
+    ]) {
+      await db.run(
+        `INSERT INTO agent_run (id, agent_id, machine, project, stream_id, status, started_at, last_seen_at)
+         VALUES (?, 'a1', 'm1', 'p1', ?, 'running', ?, ?)`,
+        run.id, run.id, run.seen, run.seen,
+      );
+    }
 
     const response = await app.inject({
       method: "GET",
@@ -95,16 +118,21 @@ describe("overview 路由", () => {
       headers: { cookie },
     });
     expect(response.statusCode).toBe(200);
-    const body = response.json() as { revision: number; agents: unknown[] };
+    const body = response.json() as {
+      revision: number;
+      agents: Array<{ id: string; activeSessions: number | null }>;
+    };
     expect(body.revision).toBeGreaterThan(0);
-    expect(body.agents).toEqual([
-      expect.objectContaining({
-        id: "a1",
-        displayName: "Agent One",
-        heartbeat: "ok",
-        running: false,
-        todayTokens: 0,
-      }),
-    ]);
+    const byId = new Map(body.agents.map((agent) => [agent.id, agent]));
+    expect(byId.get("a1")).toMatchObject({
+      id: "a1",
+      displayName: "Agent One",
+      heartbeat: "ok",
+      running: true,
+      todayTokens: 0,
+      activeSessions: 2,
+    });
+    // 机器无关运行时没有本机会话概念,不显示数字
+    expect(byId.get("a2")?.activeSessions).toBeNull();
   });
 });
