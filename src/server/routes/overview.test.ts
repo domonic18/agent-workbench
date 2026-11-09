@@ -68,7 +68,7 @@ describe("overview 路由", () => {
   });
 
   it("返回 Agent 列表与心跳状态", async () => {
-    insertMachine(db, {
+    await insertMachine(db, {
       id: "m1",
       hostname: "host",
       os: "darwin",
