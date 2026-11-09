@@ -185,7 +185,8 @@ jobs:
           IMAGE: ${{ steps.vars.outputs.image }}
         run: |
           set -euo pipefail
-          docker buildx build --builder ci-builder --platform linux/amd64 \
+          # 构建机 = 部署机(ARM64 Mac mini):原生 arm64,不经 Rosetta
+          docker buildx build --builder ci-builder --platform linux/arm64 \
             --file docker/Dockerfile.console --load --provenance=false \
             --tag "$IMAGE" .
 
