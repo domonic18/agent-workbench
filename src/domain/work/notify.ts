@@ -33,6 +33,8 @@ export interface NotifyWorkEventInput {
   reason?: string | undefined;
   /** PR 链接;evidence 分支从事件 payload 直传,缺失则文案省略 */
   prUrl?: string | undefined;
+  /** accepted 的来源:true=PR 合并自动验收(合并即验收),false/缺省=work_decide 人工接受 */
+  auto?: boolean | undefined;
   now?: number | undefined;
 }
 
@@ -77,11 +79,9 @@ interface CardSpec {
   body: string;
 }
 
-/** 裁决口令:issue 编号齐全时带号,否则裸口令 */
-function verdictLine(issueNo: string | null): string {
-  const accept = issueNo === null ? "『接受』" : `『#${issueNo} 接受』`;
-  const returned = issueNo === null ? "『退回：理由』" : `『#${issueNo} 退回：理由』`;
-  return `在反馈渠道回复 ${accept} 收口,或 ${returned} 返工`;
+/** 裁决口令:issue 编号齐全时带号,否则裸口令;返工口令供待验收/退回场景共用 */
+function returnedLine(issueNo: string | null): string {
+  return issueNo === null ? "『退回：理由』" : `『#${issueNo} 退回：理由』`;
 }
 
 function buildCard(
@@ -91,6 +91,7 @@ function buildCard(
   assignee: string,
   reason: string | undefined,
   prUrl: string | undefined,
+  auto: boolean | undefined,
 ): CardSpec {
   // 卡片头是纯文本(不解析 markdown),正文是 markdown:同一名字两种转义
   const whoRaw = assignee === "" ? "接单机器人" : assignee;
@@ -121,7 +122,7 @@ function buildCard(
       return {
         title: `〔待验收〕${mdText(title)}`,
         template: "green",
-        body: `${item}\n${bug}${pr}**验收**:${verdictLine(issueNo)}`,
+        body: `${item}\n${bug}${pr}**验收**:在 GitHub 合并 PR 即自动收口;返工回复 ${returnedLine(issueNo)}`,
       };
     case "returned":
       return {
@@ -133,7 +134,7 @@ function buildCard(
       return {
         title: `〔已验收〕${mdText(title)}`,
         template: "indigo",
-        body: `${item}\n${bug}${pr}**状态**:人工接受,事项已收口`,
+        body: `${item}\n${bug}${pr}**状态**:${auto === true ? "PR 已合并,自动验收收口" : "人工接受,事项已收口"}`,
       };
   }
 }
@@ -159,6 +160,7 @@ export async function notifyWorkEvent(db: Db, input: NotifyWorkEventInput): Prom
     assignee,
     input.reason,
     input.prUrl,
+    input.auto,
   );
   await enqueuePush(db, {
     idempotencyKey: `work-notify:${input.eventId}`,

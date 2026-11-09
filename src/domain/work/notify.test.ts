@@ -142,7 +142,12 @@ async function notifyOne(
   fixture: Fixture,
   eventId: string,
   kind: WorkNotifyKind,
-  extra: { reason?: string | undefined; prUrl?: string | undefined; chatId?: string | undefined } = {},
+  extra: {
+    reason?: string | undefined;
+    prUrl?: string | undefined;
+    auto?: boolean | undefined;
+    chatId?: string | undefined;
+  } = {},
 ): Promise<OutboxPayload | undefined> {
   await notifyWorkEvent(fixture.db, {
     workItemId: fixture.workItemId,
@@ -152,6 +157,7 @@ async function notifyOne(
     now: 7_000,
     ...(extra.reason === undefined ? {} : { reason: extra.reason }),
     ...(extra.prUrl === undefined ? {} : { prUrl: extra.prUrl }),
+    ...(extra.auto === undefined ? {} : { auto: extra.auto }),
   });
   const row = await findOutboxByKey(fixture.db, `work-notify:${eventId}`);
   if (row === undefined) {
@@ -218,7 +224,7 @@ describe("工作事项通知线 notifyWorkEvent", () => {
     await fixture.db.close();
   });
 
-  it("acceptance_ready:正文含接受/退回口令", async () => {
+  it("acceptance_ready:正文引导合并即自动收口与退回口令", async () => {
     const fixture = await prepare();
     await acceptAssignment(fixture);
     const payload = await notifyOne(fixture, "wev_n5", "acceptance_ready", {
@@ -227,7 +233,7 @@ describe("工作事项通知线 notifyWorkEvent", () => {
     const card = readCard(payload);
     expect(card.template).toBe("green");
     expect(card.body).toContain("https://github.com/o/d/pull/96");
-    expect(card.body).toContain("#12 接受");
+    expect(card.body).toContain("合并 PR 即自动收口");
     expect(card.body).toContain("#12 退回：理由");
     await fixture.db.close();
   });
@@ -253,6 +259,16 @@ describe("工作事项通知线 notifyWorkEvent", () => {
     expect(card.template).toBe("indigo");
     expect(card.title).toContain("已验收");
     expect(card.body).toContain("已收口");
+    await fixture.db.close();
+  });
+
+  it("accepted:auto 时正文表明 PR 已合并自动验收", async () => {
+    const fixture = await prepare();
+    await acceptAssignment(fixture);
+    const payload = await notifyOne(fixture, "wev_n12", "accepted", { auto: true });
+    const card = readCard(payload);
+    expect(card.body).toContain("PR 已合并,自动验收收口");
+    expect(card.body).not.toContain("人工接受");
     await fixture.db.close();
   });
 
@@ -291,7 +307,7 @@ describe("工作事项通知线 notifyWorkEvent", () => {
     const payload = await notifyOne(fixture, "wev_n10", "acceptance_ready");
     const card = readCard(payload);
     expect(card.body).not.toContain("Bug #");
-    expect(card.body).toContain("『接受』");
+    expect(card.body).toContain("合并 PR 即自动收口");
     expect(card.body).toContain("『退回：理由』");
     await fixture.db.close();
   });
