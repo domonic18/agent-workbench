@@ -17,8 +17,9 @@ ENV_FILE=".env"
 COMPOSE_FILE="docker/docker-compose.prod.yml"
 STATE_FILE=".deploy-state"
 # 项目名沿用 agent-workbench:与旧栈共用 agent-workbench_postgres 数据卷,
-# 部署目录迁移不丢数据;--profile tunnel 把 frpc 纳入同栈管理
-COMPOSE="docker compose -p agent-workbench --env-file $ENV_FILE --profile tunnel -f $COMPOSE_FILE"
+# 部署目录迁移不丢数据;--remove-orphans 把已从 compose 移除的服务(如
+# 旧栈的 frpc)收走,运行面收敛到文件定义的两件套
+COMPOSE="docker compose -p agent-workbench --env-file $ENV_FILE -f $COMPOSE_FILE"
 
 IMAGE_REPO=""
 TAG=""
@@ -129,7 +130,7 @@ rollback() {
     echo "ERROR: 回滚镜像不可用(仓库与本地都拉不到)" >&2
     exit 1
   fi
-  if $COMPOSE up -d --wait --wait-timeout 180 --no-build --pull never; then
+  if $COMPOSE up -d --wait --wait-timeout 180 --no-build --pull never --remove-orphans; then
     write_state "$prev" "$prev" FAILED_ROLLED_BACK
     echo "[WARN] 已回滚到 $prev,保留失败现场(日志不删)" >&2
   else
@@ -164,12 +165,12 @@ do_deploy() {
   fi
 
   # 迁移随应用启动:起不来的根因多半在迁移,--wait 健康检查就是迁移闸门
-  if ! $COMPOSE up -d --wait --wait-timeout 180 --no-build --pull never; then
+  if ! $COMPOSE up -d --wait --wait-timeout 180 --no-build --pull never --remove-orphans; then
     rollback "$new_image" "$prev_image"
   fi
 
   running="$($COMPOSE ps --status running --format '{{.Service}}' | sort | tr '\n' ' ' | sed 's/ $//')"
-  expect="$(printf 'console\nfrpc\npostgres\n' | sort | tr '\n' ' ' | sed 's/ $//')"
+  expect="$(printf 'console\npostgres\n' | sort | tr '\n' ' ' | sed 's/ $//')"
   if [ "$running" != "$expect" ]; then
     echo "ERROR: 运行面不全: 实际[$running] 期望[$expect]" >&2
     rollback "$new_image" "$prev_image"

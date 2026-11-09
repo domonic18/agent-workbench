@@ -6,7 +6,7 @@
 
 - Node.js + TypeScript
 - PostgreSQL（控制台业务库，`pg_trgm` + `pgvector`）
-- 控制台：容器内监听 `0.0.0.0:8787`，宿主机仅通过 `127.0.0.1:8787` 暴露，经 frp 穿透访问
+- 控制台：容器内监听 `0.0.0.0:8787`，宿主机仅通过 `127.0.0.1:8787` 暴露；公网入口（TLS / 反代 / 域名）由部署环境自备
 
 ## 快速开始
 
@@ -39,7 +39,7 @@ make check
 docs/        文档中心（需求基准 / 架构终态 / 迭代计划 / 调研评估）
 web/         React SPA 源码，产物 dist/ 由后端同源托管
 collector/   aw-node 执行面源码（采集 + Claude Code 调度）
-docker/      容器化（Dockerfile.console / docker-compose.yml / frpc.toml.example）
+docker/      容器化（Dockerfile.console / docker-compose.yml / docker-compose.prod.yml）
 e2e/         端到端与冒烟测试
 scripts/     运维与工具脚本
 src/         服务端源码

@@ -313,10 +313,10 @@ jobs:
           echo '--- 状态文件 ---'
           cat .deploy-state 2>/dev/null || echo '(无)'
           echo '--- 当前容器 ---'
-          docker compose -p agent-workbench --env-file .env --profile tunnel -f docker/docker-compose.prod.yml ps \
+          docker compose -p agent-workbench --env-file .env -f docker/docker-compose.prod.yml ps \
             --format '{{.Service}} {{.Image}} {{.State}}' 2>/dev/null || true
 
-      # 同步资产与 git checkout 同 commit 等价;frpc.toml / .env / workspace/
+      # 同步资产与 git checkout 同 commit 等价;.env / workspace/
       # 是部署目录的本地状态,不由 CI 下发
       - name: Sync deploy assets / 同步部署资产
         run: |
@@ -340,7 +340,7 @@ jobs:
           echo '--- 状态文件 ---'
           cat .deploy-state
           echo '--- 容器 ---'
-          docker compose -p agent-workbench --env-file .env --profile tunnel -f docker/docker-compose.prod.yml ps \
+          docker compose -p agent-workbench --env-file .env -f docker/docker-compose.prod.yml ps \
             --format '{{.Service}} {{.Image}} {{.State}}'
 
   # ---------------------------------------------------------------- 镜像回收

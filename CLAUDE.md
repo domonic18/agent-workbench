@@ -3,13 +3,13 @@
 ## 1. 项目概览
 
 - **愿景**: 把散落在飞书群、黑板表格、本地脚本里的多 Agent 协作，收进一个可看、可控、可计量的工作台——人能看清 Agent 在干什么，系统能拦住它不该干的事，账上能算清花了多少。
-- **架构**: Node.js + TypeScript + PostgreSQL（同机 Docker Compose，`pg_trgm` + `pgvector`）；控制台容器内监听 `0.0.0.0:8787`、宿主机仅 `127.0.0.1:8787` 暴露 + frp 公网穿透；四屏：总览 / 任务 / 授权 / 知识，外加「接入」组两屏——协作接入（`/agent-access`：两种接入方式对照、接入参数、Agent 名册、轮换密钥、签发一次性接入令牌后**弹窗给出「接入包」**（控制台地址+令牌+三步命令一段文本，人整段粘给 Agent）、各客户端就绪配置片段——**明文版**（Claude Code / 通用 MCP / WorkBuddy）与 **env 版**（凭据写成 `${AW_AGENT_SECRET}`，给支持变量展开的客户端，配置文件可进仓库））与 Agent 手册（`/agent-guide`：A2A 协作规范正文、工作区提示词、`SKILL.md` 下载；页头提示 Agent 自己拉的是 `/api/agent-kit/guide` 接口而非网页）
+- **架构**: Node.js + TypeScript + PostgreSQL（同机 Docker Compose，`pg_trgm` + `pgvector`）；控制台容器内监听 `0.0.0.0:8787`、宿主机仅 `127.0.0.1:8787` 暴露（公网入口属部署环境，项目栈不含隧道）；四屏：总览 / 任务 / 授权 / 知识，外加「接入」组两屏——协作接入（`/agent-access`：两种接入方式对照、接入参数、Agent 名册、轮换密钥、签发一次性接入令牌后**弹窗给出「接入包」**（控制台地址+令牌+三步命令一段文本，人整段粘给 Agent）、各客户端就绪配置片段——**明文版**（Claude Code / 通用 MCP / WorkBuddy）与 **env 版**（凭据写成 `${AW_AGENT_SECRET}`，给支持变量展开的客户端，配置文件可进仓库））与 Agent 手册（`/agent-guide`：A2A 协作规范正文、工作区提示词、`SKILL.md` 下载；页头提示 Agent 自己拉的是 `/api/agent-kit/guide` 接口而非网页）
 - **关键约束**:
   - 产品形态是「控制台 + 飞书」双面并存：控制台管状态与权力，飞书管说话与拍板；控制台不承担 IM 功能
   - 事实源在控制台 PostgreSQL（work_item / work_trigger / worker_inbox / task / a2a_message / capability / agent_run）；WorkItem 的 Mandate 与 Task/Run 分离，Assignment/Input/Handback 不冒充 A2A；**不使用飞书黑板，不做投影**
-  - 控制台容器内监听 `0.0.0.0:8787`，宿主机仅通过 `127.0.0.1:8787` 发布，不自己处理 TLS；提供 `/healthz`；经 frp 以 `aw.example.com` 暴露
+  - 控制台容器内监听 `0.0.0.0:8787`，宿主机仅通过 `127.0.0.1:8787` 发布，不自己处理 TLS；提供 `/healthz`；**公网入口由部署环境自备**（2026-11-09 裁决：项目面向开源、不假设用户用 frp，compose 只起 console + postgres 两件套；当前实例经部署机上独立运维的 frpc + nginx 暴露，与仓库无关）
   - 会话 Cookie 的 `Secure` 标记**按请求逐次判断**（控制台自身走 http，一刀切加 `Secure` 会让明文链路的登录被浏览器拒收、静默失效）：`AW_TRUST_PROXY=1` 才采信可信代理（回环 / 私网网段）的 `X-Forwarded-Proto`；基础安全响应头（`nosniff` / `X-Frame-Options` / `Referrer-Policy` / `Permissions-Policy`）由应用统一下发，**HSTS 归 TLS 终结点**。公网入口的 nginx 已终止 TLS，但**尚未下发 `X-Forwarded-Proto`**，补上 `proxy_set_header X-Forwarded-Proto $scheme;` 后 `Secure` 自动生效（控制台侧不用再改）
-  - frpc 两条独立规则：`aw.example.com → 8787`（http）、`tp.example.com:8443 → 443`（tcp，给 Teleport proxy；443 已被 frps 的 HTTPS vhost 占用），互不复用
+  - **Teleport 占位（2026-11-09 裁决）**：暂不开工，优先优化 Agent 协作机制；原案的公网入口（`tp.example.com:8443 → 443` 独立 tcp，避开 frps HTTPS vhost 占用的 443）属部署环境细节，项目已不交付任何 frpc 配置
   - 跨机：每台运行 Agent 的机器只跑一个 `aw-node`（采集 + Claude Code 调度），launchd 常驻，采集模块只经 `/api/ingest` 单向推送；无 aw-node 的外部运行时（WorkBuddy/Codex/DeepSeek harness）拿 Agent Bearer 直接打 `/mcp`、用官方 automations 轮询，首版 Run/对话/Token 显示「未接入 / —」；**`agent.machine_id` 语义是「宿主机器」**（外部运行时可绑可解绑，只登记归属）；**有没有过程数据看两个条件：`runtime='claude_code'` 且 `machine_id` 非空**，不是单看机器绑定；Teleport node agent 装目标机
   - 授权：SSH / 数据库访问走 Teleport CE + tbot 的 15 分钟短时证书，不自研证书签发；身份按 Agent 建 bot、任务以 trait `aw_task_id` 携带，证书扩展用 `external.*` 插值（`internal.*` 不插值）；Teleport CE 为 AGPL-3.0，独立容器运行，只经 API 调用
   - **三平面**：展示面（浏览器 B/S，不做任何约束判定）/ 控制面（策略、判定、审计、确定性 Router）/ 执行面（每台机一个 `aw-node`）。控制台经同一 HTTP 服务提供远程 Streamable HTTP MCP，只含 `task / a2a / kb / work` 控制工具，以 Agent Bearer 鉴权并由服务端校验归属，**不引入 run_token**；**本机第三方 MCP、Claude Code 原生工具与终端直跑均不在项目管控边界内**（2026-11-03 裁决）；一期不做 OS 级沙箱、托盘与进程急停。**Agent 接入套件**（`src/mcp/agent-kit/`）：A2A 协作规范正文、工作区提示词与工具速查表由**同一套工具注册表**在服务端渲染（`GET /api/agent-kit/guide`、`/api/agent-kit/skill`，**控制台会话或 Agent Bearer 均可读**），另注册只读工具 `a2a_guide` 让 Agent 自助拉规范；改工具不用改规范
@@ -28,7 +28,7 @@
 - `collector/` aw-node 采集模块源码；与调度模块共同构建每机单一 aw-node 产物，与 `src/shared` 共享协议类型
 - `scripts/` 运维与工具脚本(备份等)
 - `e2e/` 端到端与冒烟测试;单元测试就近放在被测文件旁,不另设顶层单测目录
-- `docker/` 容器化(Dockerfile.console / docker-compose.yml 本地模板 / docker-compose.prod.yml 生产镜像化 / frpc.toml.example)
+- `docker/` 容器化(Dockerfile.console / docker-compose.yml 本地模板 / docker-compose.prod.yml 生产镜像化)
 - `workspace/` 宿主机持久化数据（PostgreSQL 数据与备份、采集缓冲），gitignore 不入库；新基线从空库与空知识目录开始，旧 SQLite 与旧知识文件只归档、不导入
 
 工程入口:pnpm workspace(根包 + `web/` + `collector/`)、TypeScript、ESLint、Vitest;命令统一走 `Makefile`,`make check` 是唯一质量闸门。

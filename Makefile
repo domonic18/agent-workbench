@@ -4,7 +4,7 @@
 # 换成本地构建的镜像。操作生产栈须显式给 DEPLOY_PATH:
 #   make logs DEPLOY_PATH=<部署目录>
 DEPLOY_PATH ?=
-COMPOSE_PROD = docker compose -p agent-workbench --env-file $(DEPLOY_PATH)/.env --profile tunnel -f $(DEPLOY_PATH)/docker/docker-compose.prod.yml
+COMPOSE_PROD = docker compose -p agent-workbench --env-file $(DEPLOY_PATH)/.env -f $(DEPLOY_PATH)/docker/docker-compose.prod.yml
 
 .PHONY: help install dev dev-web typecheck lint test check build up down logs restart backup deploy-guard
 

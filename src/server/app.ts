@@ -92,7 +92,7 @@ export interface BuildAppOptions {
 }
 
 /**
- * 可信代理网段:回环(宿主机上的 nginx)、链路本地与私网(容器网络里的 frpc)。
+ * 可信代理网段:回环(宿主机上的 nginx)、链路本地与私网(容器网络内的代理)。
  * 公网地址不在其中——直连来源伪造的转发头不采信。
  */
 const TRUSTED_PROXY_RANGES = ["loopback", "linklocal", "uniquelocal"];
