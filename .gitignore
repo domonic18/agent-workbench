@@ -28,9 +28,6 @@ coverage/
 # 单实例锁(运行时产物,内含本机主机名与 IP,不入库)
 console.lock
 
-# 本地容器配置(从 frpc.toml.example 复制)
-docker/frpc.toml
-
 # Teleport spike 生成的 CA/证书/身份,只在本机跑
 docker/spike/pki/
 docker/spike/out/

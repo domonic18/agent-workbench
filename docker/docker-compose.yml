@@ -64,21 +64,5 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
-  frpc:
-    image: snowdreamtech/frpc:0.61.1
-    profiles: ["tunnel"]
-    depends_on:
-      console:
-        condition: service_healthy
-    command: ["-c", "/etc/frp/frpc.toml"]
-    env_file:
-      - ../.env
-    volumes:
-      - ./frpc.toml:/etc/frp/frpc.toml:ro
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-    logging: *default-logging
-
 volumes:
   postgres:
