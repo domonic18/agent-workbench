@@ -10,7 +10,7 @@ import {
 import type { WorkPolicy } from "../routing/policy.js";
 import type { WorkRequest } from "./contract.js";
 import { createIngestService } from "./ingest-service.js";
-import { notifyWorkEvent, type WorkNotifyKind } from "./notify.js";
+import { notifyWorkEvent, announceHold, type WorkNotifyKind } from "./notify.js";
 
 const AGENT_KEY = "wb-primary";
 const AGENT_ID = "agt_w";
@@ -305,6 +305,69 @@ describe("工作事项通知线 notifyWorkEvent", () => {
       chatId: CHAT_ID,
     });
     expect(await findOutboxByKey(fixture.db, "work-notify:wev_ghost")).toBeUndefined();
+    await fixture.db.close();
+  });
+});
+
+describe("首次挂起播报 announceHold", () => {
+  it("卡片带机器人名、件数与原因;同键幂等;新租约周期可再播", async () => {
+    const fixture = await prepare();
+    await announceHold(fixture.db, {
+      agentId: AGENT_ID,
+      reason: "cwd_session_active",
+      heldRows: [{ id: "wib_h1", leaseToken: 0 }],
+      chatId: CHAT_ID,
+      now: 7_000,
+    });
+    const row = await findOutboxByKey(fixture.db, "work-hold:wib_h1@0");
+    expect(row).toBeDefined();
+    const payload = JSON.parse(row!.payloadJson) as OutboxPayload;
+    expect(payload.chatId).toBe(CHAT_ID);
+    const card = readCard(payload);
+    expect(card.title).toContain("挂起");
+    expect(card.title).toContain(ASSIGNEE_NAME);
+    expect(card.title).toContain("1 件");
+    expect(card.template).toBe("orange");
+    expect(card.body).toContain("有会话在写");
+    expect(card.body).toContain("自动恢复派发");
+
+    // 同一批重放:幂等只留一条
+    await announceHold(fixture.db, {
+      agentId: AGENT_ID,
+      reason: "cwd_session_active",
+      heldRows: [{ id: "wib_h1", leaseToken: 0 }],
+      chatId: CHAT_ID,
+      now: 8_000,
+    });
+    expect(await countOutbox(fixture)).toBe(1);
+
+    // 重投后再挂(租约 token 变化)产生新键,再播一条
+    await announceHold(fixture.db, {
+      agentId: AGENT_ID,
+      reason: "dirty_worktree",
+      heldRows: [{ id: "wib_h1", leaseToken: 2 }],
+      chatId: CHAT_ID,
+      now: 9_000,
+    });
+    expect(await countOutbox(fixture)).toBe(2);
+    await fixture.db.close();
+  });
+
+  it("群未配置或空批:不入队", async () => {
+    const fixture = await prepare();
+    await announceHold(fixture.db, {
+      agentId: AGENT_ID,
+      reason: "dirty_worktree",
+      heldRows: [],
+      chatId: CHAT_ID,
+    });
+    await announceHold(fixture.db, {
+      agentId: AGENT_ID,
+      reason: "dirty_worktree",
+      heldRows: [{ id: "wib_h2", leaseToken: 0 }],
+      chatId: undefined,
+    });
+    expect(await countOutbox(fixture)).toBe(0);
     await fixture.db.close();
   });
 });

@@ -65,6 +65,44 @@ export function buildAttributionIndex(entries: Map<string, Set<string>>): Attrib
   };
 }
 
+/**
+ * 在 cc-connect 索引之上叠加本地登记的会话归因(调度派发的 headless 会话)。
+ * extra 取活引用:会话落地后立刻登记也要立刻命中,走 TTL 刷新会把头一段事件判成
+ * unattributed、档 3 直接把断点跳到 EOF,这段数据就永远丢了。
+ */
+export function overlayAttributionIndex(
+  base: AttributionIndex,
+  extra: ReadonlyMap<string, ReadonlySet<string>>,
+): AttributionIndex {
+  return {
+    resolve(sessionId) {
+      const key = sessionId.toLowerCase();
+      const added = extra.get(key);
+      if (added === undefined) {
+        return base.resolve(sessionId);
+      }
+      const merged = new Set(base.resolve(sessionId));
+      for (const project of added) {
+        merged.add(project);
+      }
+      return [...merged].sort();
+    },
+    projects() {
+      const all = new Set(base.projects());
+      for (const projects of extra.values()) {
+        for (const project of projects) {
+          all.add(project);
+        }
+      }
+      return [...all].sort();
+    },
+    sessionCount() {
+      // 派发会话 id 由采集器自造,不会与 cc-connect 档案重叠,直接相加
+      return base.sessionCount() + extra.size;
+    },
+  };
+}
+
 export function loadAttributionIndex(ccConnectDir: string): AttributionIndex {
   const entries = new Map<string, Set<string>>();
   let files: string[];

@@ -147,6 +147,7 @@ describe("总览页", () => {
     machineDisplayName: null,
               machineLastSeenAt: 1_699_999_999_000,
               heartbeat: "ok",
+              activeSessions: 5,
               lastRunAt: null,
               running: true,
               currentTaskId: "tsk_1",
@@ -167,6 +168,9 @@ describe("总览页", () => {
     expect(screen.getAllByText("运行中").length).toBeGreaterThan(0);
     expect(screen.getAllByText("实现接口契约").length).toBeGreaterThan(0);
     expect(screen.getAllByText("启用").length).toBeGreaterThan(0);
+    // 活跃会话列:同机共享的本机会话数
+    expect(screen.getByText("活跃会话")).toBeTruthy();
+    expect(screen.getByText("5")).toBeTruthy();
     expect(FakeEventSource.lastUrl).toContain("scope=overview");
     expect(FakeEventSource.lastUrl).toContain("client_id=");
   });

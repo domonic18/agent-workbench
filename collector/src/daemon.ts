@@ -1,7 +1,11 @@
 import { statSync } from "node:fs";
 import { cpus } from "node:os";
 import { join } from "node:path";
-import { loadAttributionIndex, type AttributionIndex } from "./attribution.js";
+import {
+  loadAttributionIndex,
+  overlayAttributionIndex,
+  type AttributionIndex,
+} from "./attribution.js";
 import type { CollectorConfig } from "./config.js";
 import { ensureStateDirs } from "./config.js";
 import {
@@ -13,7 +17,8 @@ import {
   createConsoleClient,
   type ConsoleClient,
 } from "./http.js";
-import { createDispatchCycle, resolveClaudePath, type DispatchCycle } from "./dispatch.js";
+import { createDispatchCycle, type DispatchCycle } from "./dispatch.js";
+import { resolveClaudePath } from "./dispatch-session.js";
 import { createLogger, type Logger } from "./log.js";
 import { acquireLock, type SingleInstanceLock } from "./lock.js";
 import { createPusher, type Pusher } from "./push.js";
@@ -98,21 +103,34 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
   });
   // 调度模块:AW_DISPATCH_MS=0 关闭;claude 路径解析不到也不挂载,采集不受影响
   const claudePath = config.dispatchMs > 0 ? resolveClaudePath(config.dispatchClaude) : undefined;
+  /** 派发会话归因登记:活引用叠加进索引,登记即刻命中,不吃 60s 刷新 */
+  const dispatchSessions = new Map<string, Set<string>>();
   const dispatch: DispatchCycle | null =
     config.dispatchMs > 0 && claudePath !== undefined
       ? createDispatchCycle({
           baseUrl: config.baseUrl,
           stateDir: config.stateDir,
           claudeJsonPath: config.claudeJsonPath,
+          claudeDir: config.claudeDir,
           sessionTimeoutMs: config.sessionTimeoutMs,
           requestTimeoutMs: config.requestTimeoutMs,
           model: config.dispatchModel,
           claudePath,
+          busySessionWindowMs: config.busySessionWindowMs,
+          maxMachineSessions: config.maxMachineSessions,
+          dispatchBackoffRounds: config.dispatchBackoffRounds,
+          batchMaxItems: config.batchMaxItems,
+          attributeSession: (sessionId, project) => {
+            dispatchSessions.set(sessionId, new Set([project]));
+          },
           logger,
         })
       : null;
   let lock: SingleInstanceLock | null = null;
-  let index: AttributionIndex = loadAttributionIndex(config.ccConnectDir);
+  let index: AttributionIndex = overlayAttributionIndex(
+    loadAttributionIndex(config.ccConnectDir),
+    dispatchSessions,
+  );
   let indexAt = 0;
   let running = true;
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -129,7 +147,7 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
     if (at - indexAt < ATTRIBUTION_TTL_MS) {
       return;
     }
-    index = loadAttributionIndex(config.ccConnectDir);
+    index = overlayAttributionIndex(loadAttributionIndex(config.ccConnectDir), dispatchSessions);
     indexAt = at;
   }
 

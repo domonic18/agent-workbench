@@ -231,6 +231,26 @@ export async function listTasksByWorkItem(db: Db, workItemId: string): Promise<T
   )) as TaskRecord[];
 }
 
+/** 僵尸回收(M3.10-4):running 且超过时限未动的任务 */
+export async function listStaleRunningTasks(db: Db, updatedBefore: number): Promise<TaskRecord[]> {
+  return (await db.all(
+    `SELECT ${FULL_COLUMNS} FROM task
+      WHERE status = 'running' AND updated_at <= ?
+      ORDER BY created_at ASC, id ASC`,
+    updatedBefore,
+  )) as TaskRecord[];
+}
+
+/** 事项下存活(待处理/在跑)的任务数:僵尸回收后判断是否需要重排 */
+export async function countLiveTasksForWorkItem(db: Db, workItemId: string): Promise<number> {
+  const row = (await db.get(
+    `SELECT COUNT(*) AS n FROM task
+      WHERE work_item_id = ? AND status IN ('pending', 'running')`,
+    workItemId,
+  )) as { n: number };
+  return row.n;
+}
+
 /** 直接子任务 id:根任务收口时结论取自下游子任务的回执 */
 export async function listChildTaskIds(db: Db, parentId: string): Promise<string[]> {
   const rows = (await db.all("SELECT id FROM task WHERE parent_task_id = ?", parentId)) as {

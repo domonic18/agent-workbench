@@ -142,6 +142,7 @@ describe("工作事项详情抽屉", () => {
           taskId: null,
           leaseUntil: null,
           reason: null,
+          updatedAt: 1_700_000_000_000,
           createdAt: 1_700_000_000_000,
         },
       ],
@@ -150,6 +151,32 @@ describe("工作事项详情抽屉", () => {
 
     expect((await screen.findAllByText(/@小工/)).length).toBeGreaterThan(0);
     expect(screen.queryByText(/agt_a/)).toBeNull();
+  });
+
+  it("挂起行展示原因文案与挂起时长,不裸奔枚举值", async () => {
+    renderDrawer({
+      workItem: detail(),
+      tasks: [],
+      runs: [],
+      inbox: [
+        {
+          id: "inb_1",
+          kind: "assignment",
+          targetAgentId: "agt_a",
+          status: "pending",
+          taskId: null,
+          leaseUntil: null,
+          reason: "cwd_session_active",
+          updatedAt: Date.now() - 10 * 60_000,
+          createdAt: 1_700_000_000_000,
+        },
+      ],
+      threads: [],
+    });
+
+    expect(await screen.findByText(/挂起:工作区会话占用中/)).toBeTruthy();
+    expect(screen.getByText(/已挂起 10 分钟/)).toBeTruthy();
+    expect(screen.queryByText(/cwd_session_active/)).toBeNull();
   });
 
   it("点关联任务交给外部跳转", async () => {

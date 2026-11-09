@@ -3,15 +3,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { loadConfigSyncState, MCP_SERVER_NAME, saveConfigSyncState } from "./config-sync.js";
+import { createDispatchCycle } from "./dispatch.js";
 import {
   ALLOWED_TOOLS,
-  createDispatchCycle,
   DISPATCH_PROMPT,
-  WORK_DISPATCH_PROMPT,
-  resolveClaudePath,
-  type SessionOptions,
-} from "./dispatch.js";
+  workDispatchPrompt,
+} from "./dispatch-prompts.js";
+import { resolveClaudePath, type SessionOptions } from "./dispatch-session.js";
 import { createLogger } from "./log.js";
+import { claudeProjectDir } from "./session-activity.js";
 
 const dirs: string[] = [];
 
@@ -75,10 +75,15 @@ function cycleFor(
     baseUrl: "http://127.0.0.1:8787",
     stateDir: h.stateDir,
     claudeJsonPath: h.claudeJsonPath,
+    claudeDir: h.stateDir,
     sessionTimeoutMs: 60_000,
     requestTimeoutMs: 30_000,
     model: null,
     claudePath: "/opt/homebrew/bin/claude",
+    busySessionWindowMs: 15 * 60_000,
+    maxMachineSessions: 2,
+    dispatchBackoffRounds: 5,
+    batchMaxItems: 8,
     logger: createLogger({ level: "error" }),
     async peekInbox(bearer) {
       h.peeked.push(bearer);
@@ -162,7 +167,7 @@ describe("dispatch 调度循环", () => {
     await cycle.once();
 
     expect(h.sessions).toHaveLength(1);
-    expect(h.sessions[0]!.prompt).toBe(WORK_DISPATCH_PROMPT);
+    expect(h.sessions[0]!.prompt).toBe(workDispatchPrompt(8));
     expect(h.peeked).toEqual(["agt_a.sec-a"]);
     expect(h.workPeeked).toEqual(["agt_a.sec-a"]);
   });
@@ -178,19 +183,29 @@ describe("dispatch 调度循环", () => {
     expect(h.sessions[0]!.prompt).toBe(DISPATCH_PROMPT);
   });
 
-  it("工作提示词覆盖承接链与 PR 关键动作", () => {
+  it("工作提示词覆盖六条批次纪律,单批上限注入数值", () => {
+    const prompt = workDispatchPrompt(8);
     for (const token of [
       "work_inbox",
       "work_read",
       "task_create",
       "work_ack",
-      "Fixes #",
+      "fix: #<N>",
       "gh pr create",
+      "Fixes #<N>",
       "task_update",
       "work_handback",
+      "git status --porcelain",
+      "工作区被占用",
+      "留在收件箱等下一批",
+      "不因一件卡整批",
+      "最多 8 件",
     ]) {
-      expect(WORK_DISPATCH_PROMPT).toContain(token);
+      expect(prompt).toContain(token);
     }
+    // 上限来自配置注入,不是写死文案
+    expect(workDispatchPrompt(3)).toContain("最多 3 件");
+    expect(workDispatchPrompt(3)).not.toContain("最多 8 件");
   });
 
   it("a2a 探视失败时不吞掉 work 探视失败,单 Agent 失败仍隔离", async () => {
@@ -223,6 +238,39 @@ describe("dispatch 调度循环", () => {
     h.sessions[0]!.onExit({ code: 0, signal: null });
     await cycle.once();
     expect(h.sessions).toHaveLength(2);
+  });
+
+  it("起会话先登记归因再 spawn,会话 id 为合法 uuid 且每次不同", async () => {
+    const h = harness({ secret: "sec-a" });
+    h.pending.set("agt_a.sec-a", 1);
+    const order: string[] = [];
+    const cycle = cycleFor(h, {
+      attributeSession(sessionId, project) {
+        order.push(`attr:${sessionId}:${project}`);
+      },
+      spawnSession(session) {
+        order.push(`spawn:${session.sessionId}`);
+        h.sessions.push(session);
+        return {
+          kill(signal) {
+            h.killed.push(`${session.agentId}:${signal ?? "SIGTERM"}`);
+          },
+        };
+      },
+    });
+    await cycle.once();
+    h.sessions[0]!.onExit({ code: 0, signal: null });
+    await cycle.once();
+
+    expect(h.sessions).toHaveLength(2);
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+    expect(h.sessions[0]!.sessionId).toMatch(uuid);
+    expect(h.sessions[1]!.sessionId).toMatch(uuid);
+    expect(h.sessions[0]!.sessionId).not.toBe(h.sessions[1]!.sessionId);
+    expect(order[0]).toBe(`attr:${h.sessions[0]!.sessionId}:p`);
+    expect(order[1]).toBe(`spawn:${h.sessions[0]!.sessionId}`);
+    expect(order[2]).toBe(`attr:${h.sessions[1]!.sessionId}:p`);
+    expect(order[3]).toBe(`spawn:${h.sessions[1]!.sessionId}`);
   });
 
   it("无密钥的 Agent 跳过,不发起探视", async () => {
@@ -325,5 +373,133 @@ describe("dispatch 调度循环", () => {
     await cycle.once();
 
     expect(h.sessions).toHaveLength(1);
+  });
+});
+
+describe("派发闸门 G2/G3/G4 与退避", () => {
+  const UUID = "00000000-0000-0000-0000-000000000000";
+
+  function sampleWith(cwds: string[]): Map<string, number> {
+    return new Map(cwds.map((cwd) => [`${claudeProjectDir(cwd)}/${UUID}.jsonl`, Date.now()]));
+  }
+
+  it("G2:cwd 会话活跃挡下,工作派发上报挂起原因", async () => {
+    const h = harness({ secret: "sec-a" });
+    h.workPending.set("agt_a.sec-a", 1);
+    const holds: string[] = [];
+    const cycle = cycleFor(h, {
+      sampleSessions: () => sampleWith([h.stateDir]),
+      async reportHold(_baseUrl, _bearer, reason) {
+        holds.push(reason);
+      },
+    });
+    await cycle.once();
+    expect(h.sessions).toHaveLength(0);
+    expect(holds).toEqual(["cwd_session_active"]);
+  });
+
+  it("G3:脏工作区挡下并上报 dirty_worktree", async () => {
+    const h = harness({ secret: "sec-a" });
+    h.workPending.set("agt_a.sec-a", 1);
+    const holds: string[] = [];
+    const cycle = cycleFor(h, {
+      async probeDirty() {
+        return true;
+      },
+      async reportHold(_baseUrl, _bearer, reason) {
+        holds.push(reason);
+      },
+    });
+    await cycle.once();
+    expect(h.sessions).toHaveLength(0);
+    expect(holds).toEqual(["dirty_worktree"]);
+  });
+
+  it("a2a 派发被闸门挡下时不上报挂起原因", async () => {
+    const h = harness({ secret: "sec-a" });
+    h.pending.set("agt_a.sec-a", 1);
+    const holds: string[] = [];
+    const cycle = cycleFor(h, {
+      async probeDirty() {
+        return true;
+      },
+      async reportHold(_baseUrl, _bearer, reason) {
+        holds.push(reason);
+      },
+    });
+    await cycle.once();
+    expect(h.sessions).toHaveLength(0);
+    expect(holds).toEqual([]);
+  });
+
+  it("G4:机级活跃会话达到上限挡下(其他目录占满),不写挂起原因", async () => {
+    const h = harness({ secret: "sec-a" });
+    h.workPending.set("agt_a.sec-a", 1);
+    const holds: string[] = [];
+    const cycle = cycleFor(h, {
+      sampleSessions: () => sampleWith(["/other/one", "/other/two"]),
+      async reportHold(_baseUrl, _bearer, reason) {
+        holds.push(reason);
+      },
+    });
+    await cycle.once();
+    expect(h.sessions).toHaveLength(0);
+    expect(holds).toEqual([]);
+  });
+
+  it("闸门挡下 ≠ 取消:条件消失后下一轮照常派发", async () => {
+    const h = harness({ secret: "sec-a" });
+    h.workPending.set("agt_a.sec-a", 1);
+    let dirty = true;
+    const cycle = cycleFor(h, {
+      async probeDirty() {
+        return dirty;
+      },
+    });
+    await cycle.once();
+    expect(h.sessions).toHaveLength(0);
+    dirty = false;
+    await cycle.once();
+    expect(h.sessions).toHaveLength(1);
+  });
+
+  it("退避:连续被挡达到阈值后跳过探视", async () => {
+    const h = harness({ secret: "sec-a" });
+    h.workPending.set("agt_a.sec-a", 1);
+    const cycle = cycleFor(h, {
+      async probeDirty() {
+        return true;
+      },
+      dispatchBackoffRounds: 2,
+    });
+    await cycle.once();
+    await cycle.once();
+    const peekedAtBackoff = h.workPeeked.length;
+    await cycle.once();
+    expect(h.workPeeked.length).toBe(peekedAtBackoff);
+    expect(h.sessions).toHaveLength(0);
+  });
+
+  it("空闲轮清零退避计数,不会误触发", async () => {
+    const h = harness({ secret: "sec-a" });
+    let dirty = true;
+    const cycle = cycleFor(h, {
+      async probeDirty() {
+        return dirty;
+      },
+      dispatchBackoffRounds: 2,
+    });
+    // 挡一轮 → 空闲一轮(清零)→ 再挡一轮:计数未连续,仍可探视
+    h.workPending.set("agt_a.sec-a", 1);
+    await cycle.once();
+    h.workPending.clear();
+    dirty = false;
+    await cycle.once();
+    h.workPending.set("agt_a.sec-a", 1);
+    dirty = true;
+    await cycle.once();
+    const peeked = h.workPeeked.length;
+    await cycle.once();
+    expect(h.workPeeked.length).toBeGreaterThan(peeked);
   });
 });

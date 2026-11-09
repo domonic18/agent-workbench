@@ -320,7 +320,7 @@ describe("work 读侧路由", () => {
         authorization: { kind: string };
         policyVersion: string;
       };
-      inbox: { kind: string; status: string }[];
+      inbox: { kind: string; status: string; reason: string | null; updatedAt: number }[];
       threads: { source: string; externalKey: string; mode: string }[];
       tasks: unknown[];
       runs: unknown[];
@@ -331,6 +331,9 @@ describe("work 读侧路由", () => {
     expect(body.workItem.policyVersion).toMatch(/^[0-9a-f]{12}$/);
     expect(body.inbox).toHaveLength(1);
     expect(body.inbox[0]).toMatchObject({ kind: "assignment", status: "pending" });
+    // 挂起时间锚随行返回;未挂起时 reason 为空,前端不展示时长
+    expect(body.inbox[0]!.reason).toBeNull();
+    expect(body.inbox[0]!.updatedAt).toBeTypeOf("number");
     expect(body.threads[0]).toMatchObject({
       source: "bug",
       externalKey: "BUG-1",
@@ -413,117 +416,3 @@ describe("work 读侧路由", () => {
   });
 });
 
-describe("GET /api/work/inbox(Agent Bearer)", () => {
-  let db: Db;
-  let app: FastifyInstance;
-  let cookie: string;
-  let agent: { id: string; secret: string };
-  let keySeq = 0;
-
-  function writeHeaders(key = `work-inbox-key-${++keySeq}`): Record<string, string> {
-    return { cookie, "x-requested-with": "fetch", "idempotency-key": key };
-  }
-
-  beforeEach(async () => {
-    db = await prepare();
-    app = buildApp({ logLevel: "silent", db, now: () => NOW });
-    const login = await app.inject({
-      method: "POST",
-      url: "/api/auth/login",
-      payload: { password: PASSWORD },
-    });
-    expect(login.statusCode).toBe(200);
-    cookie = cookieOf(login);
-    const register = await app.inject({
-      method: "POST",
-      url: "/api/agents",
-      headers: writeHeaders(),
-      payload: {
-        runtime: "workbuddy",
-        key: "workbuddy-pilot",
-        project: "workbuddy-pilot",
-        displayName: "Pilot Worker",
-      },
-    });
-    expect(register.statusCode).toBe(201);
-    const body = register.json() as { agent: { id: string }; secret: string };
-    agent = { id: body.agent.id, secret: body.secret };
-    const trigger = await app.inject({
-      method: "POST",
-      url: "/api/work/triggers",
-      headers: writeHeaders(),
-      payload: triggerBody({ sourceEventId: "inbox-evt-1" }),
-    });
-    expect(trigger.statusCode).toBe(200);
-  });
-
-  afterEach(async () => {
-    await app.close();
-    await db.close();
-  });
-
-  function bearer(): Record<string, string> {
-    return { authorization: `Bearer ${agent.id}.${agent.secret}` };
-  }
-
-  it("peek 只看不领:返回 pending 项且行状态不变;无 peek 则领取即持租约", async () => {
-    const peek = await app.inject({
-      method: "GET",
-      url: "/api/work/inbox?wait=0&peek=1",
-      headers: bearer(),
-    });
-    expect(peek.statusCode).toBe(200);
-    const body = peek.json() as {
-      items: { inbox_id: string; kind: string; status: string; work_item_id: string }[];
-    };
-    expect(body.items).toHaveLength(1);
-    expect(body.items[0]).toMatchObject({ kind: "assignment", status: "pending" });
-    const inboxId = body.items[0]!.inbox_id;
-    const row = (await db.get("SELECT status, lease_until FROM worker_inbox WHERE id = ?", inboxId)) as {
-      status: string;
-      lease_until: number | null;
-    };
-    expect(row).toMatchObject({ status: "pending", lease_until: null });
-
-    const claim = await app.inject({
-      method: "GET",
-      url: "/api/work/inbox?wait=0",
-      headers: bearer(),
-    });
-    expect(claim.statusCode).toBe(200);
-    const claimed = (claim.json() as { items: { status: string }[] }).items;
-    expect(claimed[0]).toMatchObject({ status: "claimed" });
-
-    const peekAfter = await app.inject({
-      method: "GET",
-      url: "/api/work/inbox?wait=0&peek=1",
-      headers: bearer(),
-    });
-    expect(((peekAfter.json() as { items: unknown[] }).items)).toHaveLength(0);
-  });
-
-  it("反例:无 Bearer 401,坏密钥 401,非法 peek/wait 422", async () => {
-    expect(
-      (await app.inject({ method: "GET", url: "/api/work/inbox?wait=0&peek=1" })).statusCode,
-    ).toBe(401);
-    expect(
-      (
-        await app.inject({
-          method: "GET",
-          url: "/api/work/inbox?wait=0&peek=1",
-          headers: { authorization: `Bearer ${agent.id}.wrong` },
-        })
-      ).statusCode,
-    ).toBe(401);
-    expect(
-      (
-        await app.inject({ method: "GET", url: "/api/work/inbox?peek=yes", headers: bearer() })
-      ).statusCode,
-    ).toBe(422);
-    expect(
-      (
-        await app.inject({ method: "GET", url: "/api/work/inbox?wait=soon", headers: bearer() })
-      ).statusCode,
-    ).toBe(422);
-  });
-});

@@ -49,6 +49,8 @@ export interface AgentOverviewRow {
   machineHostname: string | null;
   machineDisplayName: string | null;
   machineLastSeenAt: number | null;
+  /** 本机活跃会话数(ingest 按机器聚合);无宿主机器为 null */
+  activeSessions: number | null;
   lastRunAt: number | null;
   running: number;
   currentTaskId: string | null;
@@ -84,6 +86,10 @@ export async function listAgentOverviewRows(
        m.hostname AS "machineHostname",
        m.display_name AS "machineDisplayName",
        m.last_seen_at AS "machineLastSeenAt",
+       CASE WHEN a.machine_id IS NULL THEN NULL ELSE (
+         SELECT COUNT(*) FROM agent_run r2
+          WHERE r2.machine = a.machine_id AND r2.status = 'running' AND r2.last_seen_at >= ?
+       ) END AS "activeSessions",
        lr."lastRunAt",
        CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS running,
        r.task_id AS "currentTaskId",
@@ -120,6 +126,6 @@ export async function listAgentOverviewRows(
      ) tok ON tok.agent_id = a.id
      WHERE a.status = 'active'
      ORDER BY (r.id IS NULL), r.last_seen_at DESC, a.id`,
-    window.idleSince, window.since,
+    window.idleSince, window.idleSince, window.since,
   )) as AgentOverviewRow[];
 }

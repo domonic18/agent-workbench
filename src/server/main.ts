@@ -29,6 +29,7 @@ import { startOutboxReclaimer } from "./jobs/outbox-reclaim.js";
 import { startCapabilityReconciler } from "./jobs/reconcile.js";
 import { startOutboxSender, type OutboxSender } from "./jobs/send-worker.js";
 import { startWorkInboxReclaimer } from "./jobs/work-reclaim.js";
+import { startZombieReclaimer } from "./jobs/zombie-reclaim.js";
 
 // 启动顺序(01 §2):env → 单实例锁 → 打开库 → 迁移与口令初始化 → 注册路由 → 监听。
 // 锁先于开库:第二个进程不能在第一个进程的库上跑迁移。
@@ -114,6 +115,13 @@ const outboxReclaimer = startOutboxReclaimer(db, app.log);
 // worker_inbox 过期租约回收(01 §10):只改状态不建行,重投不重复建 Task
 const workInboxReclaimer = startWorkInboxReclaimer(db, app.log);
 
+// 僵尸任务回收与派工停滞升级(M3.10-4):超时 running → blocked 按条件重排,pending 停滞升级
+const zombieReclaimer = startZombieReclaimer(
+  { db, now: Date.now, chatId: config.feishu?.collabChatId },
+  app.log,
+  { zombieMs: config.taskZombieMs, stallMs: config.assignmentStallMs },
+);
+
 // 死信巡检(01 §9):复用路由的 A2A 实例,回执落库后能直接唤醒发起方的长轮询
 const deadLetters = startDeadLetterSweeper(db, app.log, {
   wake: (agentId) => a2a.wake(agentId),
@@ -162,6 +170,7 @@ function shutdown(): void {
   reconciler.stop();
   outboxReclaimer.stop();
   workInboxReclaimer.stop();
+  zombieReclaimer.stop();
   auditReconciler?.stop();
   deadLetters.stop();
   ingestReceipts.stop();

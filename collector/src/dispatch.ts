@@ -1,123 +1,31 @@
-import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { homedir } from "node:os";
-import { delimiter, dirname, join } from "node:path";
+import type { WorkHoldReason } from "../../src/shared/constants.js";
 import {
   backfillAgentSecrets,
   loadConfigSyncState,
-  MCP_SERVER_NAME,
   saveConfigSyncState,
 } from "./config-sync.js";
+import {
+  BackoffTracker,
+  probeWorktreeDirty,
+  reportHoldToConsole,
+  runGates,
+  type GateDeps,
+} from "./dispatch-gates.js";
+import { DISPATCH_PROMPT, workDispatchPrompt } from "./dispatch-prompts.js";
+import {
+  spawnClaudeSession,
+  type SessionHandle,
+  type SessionOptions,
+} from "./dispatch-session.js";
 import { createLogger, type Logger } from "./log.js";
-
-/** 六步协议提示词:按收到消息的 intent 分支;变更需同步 docs/arch/04 */
-export const DISPATCH_PROMPT = `这是一次由执行面调度器发起的协作唤醒:你的 a2a 收件箱存在未处理消息。这不是群通知,群回复纪律(NOREPLY 抑制)不适用于本次会话;在没有完成下列步骤之前,禁止直接结束回合。
-按序完成:
-1) 调 a2a_inbox 拉取完整消息,记下 msg_id 与 thread_id;
-2) 按收到的 intent 分支:
-   - request / escalate:先 task_create 建「你自己名下」的下游任务,再 a2a_ack(msg_id=收到的消息, task_id=你的任务);
-   - reply / notify:只 a2a_ack(msg_id=收到的消息) 确认,不要 task_create;
-3) 只有 request / escalate 才执行消息要求的本职工作(读文件、查代码、写结论);reply 只需读懂结论;
-4) 只有 request / escalate 才 a2a_send 回执:task_id 用你自己的任务,必须带 thread_id 回原线程,intent=reply,reply_to=收到的 msg_id,结论写进 summary,deadline 必填;收到的是 reply 时不要再发回执——对回执再回执会形成乒乓,系统据此收口;
-5) 只有 request / escalate 才 task_update 推进自己名下任务:开工先 status=running,收尾 status=done——关单只需 status=done,stage 可停在任意阶段;stage 与 status 相互独立,不要把 review 直接跳到 closed(非法跃迁,会报错)。
-过程与结论只写进回执与任务字段。全部步骤完成后,最终回复用一句话概述处理结果(消息条数与任务 id)。`;
-
-/** 会话可用工具:读文件、查代码、跑命令,以及控制台 MCP(拉收件箱、建任务、回执) */
-export const ALLOWED_TOOLS = ["Read", "Grep", "Glob", "Bash", `mcp__${MCP_SERVER_NAME}`].join(",");
-
-/**
- * 工作唤醒提示词(M3.9-2):work 收件箱有待领取派工时使用,变更需同步 docs/arch/04。
- * 接受/验收是原 Bug 机器人的人工动作,不在本会话职责内;生产发布始终单独确认。
- */
-export const WORK_DISPATCH_PROMPT = `这是一次由执行面调度器发起的工作唤醒:你的工作收件箱(work_inbox)存在待领取派工。这不是群通知;在没有完成下列步骤之前,禁止直接结束回合。
-按序完成:
-1) work_inbox 领取全部待处理行,记下 inbox_id 与 work_item_id;
-2) 逐件处理:work_read 读事项 Mandate 与事件历史;task_create(带 work_item_id)建你名下的承接任务并记下 task_id;work_ack(inbox_id=派工行, task_id=承接任务)确认承接;
-3) 执行本职工作:按 expected_result 修复缺陷本身,不超出 Mandate 范围,不顺手重构;
-4) 修复完成后:git checkout -b 语义化分支并提交修改;gh pr create 提 PR,PR body 第一行写 "Fixes #<N>"(issue 编号从 Mandate 与事项引用/事件 payload 中取,取不到就回查 bug 反馈原文,不许猜);
-5) task_update 推进承接任务:开工先 status=running,收尾 status=done(关单只需 status=done,stage 与 status 相互独立),output 写清 PR URL 与修复摘要;
-6) 确实超出能力或范围的,work_handback(inbox_id, reason)说明理由,不要硬修;不要用 work_handback 替代失败后的重试。
-过程与结论只写进任务字段与 PR 描述。全部步骤完成后,最终回复用一句话概述(处理件数、任务 id、PR URL 或退回理由)。`;
-
-export interface SessionOptions {
-  agentId: string;
-  cwd: string;
-  /** 本次会话提示词:a2a 唤醒用 DISPATCH_PROMPT,工作唤醒用 WORK_DISPATCH_PROMPT */
-  prompt: string;
-  claudePath: string;
-  model: string | null;
-  timeoutMs: number;
-  onExit: (result: { code: number | null; signal: NodeJS.Signals | null }) => void;
-}
-
-/** 会话句柄:停机时终止在跑会话 */
-export interface SessionHandle {
-  kill(signal?: NodeJS.Signals): void;
-}
-
-export interface DispatchDeps {
-  /** 控制台根地址,用于探视 Agent 收件箱 */
-  baseUrl: string;
-  stateDir: string;
-  claudeJsonPath: string;
-  /** 会话超时;超时先 SIGTERM,再 SIGKILL */
-  sessionTimeoutMs: number;
-  /** HTTP 请求超时(含收件箱探视);与采集共用同一配置 */
-  requestTimeoutMs: number;
-  model: string | null;
-  /** claude 可执行文件;解析不到时调度不挂载 */
-  claudePath: string | undefined;
-  logger?: Logger;
-  /** 探视 a2a 收件箱待处理条数;默认走真实 HTTP */
-  peekInbox?: (bearer: string) => Promise<number>;
-  /** 探视 work 收件箱待领取派工条数;默认走真实 HTTP */
-  peekWorkInbox?: (bearer: string) => Promise<number>;
-  /** 起 headless 会话;默认 spawn claude CLI */
-  spawnSession?: (options: SessionOptions) => SessionHandle;
-}
-
-export interface DispatchCycle {
-  once(): Promise<void>;
-  stop(): void;
-}
-
-/** claude 候选目录:launchd 环境 PATH 极简,需按固定候选顺序兜底 */
-export const CLAUDE_CANDIDATE_DIRS = ["/opt/homebrew/bin", "/usr/local/bin", "~/.local/bin"];
-
-/**
- * 解析 claude 可执行文件:显式 env → 当前 PATH → 常见安装目录。
- * 解析不到返回 undefined(调度不挂载,采集不受影响)。
- */
-export function resolveClaudePath(
-  envHint: string | null,
-  pathEnv?: string,
-  candidateDirs: readonly string[] = CLAUDE_CANDIDATE_DIRS,
-): string | undefined {
-  if (envHint !== null) {
-    return existsSync(envHint) ? envHint : undefined;
-  }
-  const entries = (pathEnv ?? process.env.PATH ?? "").split(delimiter).filter((item) => item !== "");
-  const dirs = [
-    ...entries,
-    ...candidateDirs.map((item) => item.replace(/^~(?=\/)/, homedir())),
-  ];
-  for (const dir of dirs) {
-    const candidate = join(dir, "claude");
-    if (existsSync(candidate)) {
-      return candidate;
-    }
-  }
-  return undefined;
-}
-
-/** 子进程 PATH:注入 claude 与 node 所在目录,否则 shebang 解析 ENOENT */
-function childPath(claudePath: string): string {
-  return [
-    dirname(claudePath),
-    dirname(process.execPath),
-    process.env.PATH ?? "/usr/local/bin:/usr/bin:/bin",
-  ].join(delimiter);
-}
+import {
+  resolveSessionActivity,
+  sampleSessionFiles,
+  type SessionActivity,
+  type SessionSample,
+} from "./session-activity.js";
 
 /** 探视 a2a 收件箱待处理条数:只看不领,不占用消息租约 */
 async function fetchPendingCount(baseUrl: string, bearer: string, timeoutMs: number): Promise<number> {
@@ -149,60 +57,53 @@ async function fetchWorkPendingCount(
   return Array.isArray(body.items) ? body.items.length : 0;
 }
 
-/** 默认会话实现:spawn claude CLI,超时先 SIGTERM 再 SIGKILL */
-function spawnClaudeSession(options: SessionOptions): SessionHandle {
-  const child = spawn(
-    options.claudePath,
-    [
-      "-p",
-      options.prompt,
-      ...(options.model === null ? [] : ["--model", options.model]),
-      "--allowedTools",
-      ALLOWED_TOOLS,
-    ],
-    {
-      cwd: options.cwd,
-      env: { ...process.env, PATH: childPath(options.claudePath) },
-      stdio: ["ignore", "pipe", "pipe"],
-    },
-  );
+export interface DispatchDeps {
+  /** 控制台根地址,用于探视 Agent 收件箱与上报挂起原因 */
+  baseUrl: string;
+  stateDir: string;
+  claudeJsonPath: string;
+  /** Claude Code 配置根目录(~/.claude);G2/G4 会话活跃采样用 */
+  claudeDir: string;
+  /** 会话超时;超时先 SIGTERM,再 SIGKILL */
+  sessionTimeoutMs: number;
+  /** HTTP 请求超时(含收件箱探视);与采集共用同一配置 */
+  requestTimeoutMs: number;
+  model: string | null;
+  /** claude 可执行文件;解析不到时调度不挂载 */
+  claudePath: string | undefined;
+  /** G2 cwd 活跃会话判定窗口;窗口内新出现的会话文件视为开发进行中 */
+  busySessionWindowMs: number;
+  /** G4 机级活跃会话上限(含交互会话);达到后本轮全机不派发 */
+  maxMachineSessions: number;
+  /** 连续被挡 N 轮后探视退避 5min(退避 ≠ 放弃,条件消失照常放行) */
+  dispatchBackoffRounds: number;
+  /** 单批派工上限;注入工作提示词,超出部分留下一批 */
+  batchMaxItems: number;
+  logger?: Logger;
+  /** 探视 a2a 收件箱待处理条数;默认走真实 HTTP */
+  peekInbox?: (bearer: string) => Promise<number>;
+  /** 探视 work 收件箱待领取派工条数;默认走真实 HTTP */
+  peekWorkInbox?: (bearer: string) => Promise<number>;
+  /** 起 headless 会话;默认 spawn claude CLI */
+  spawnSession?: (options: SessionOptions) => SessionHandle;
+  /** G3 脏工作区探测;默认 git status --porcelain */
+  probeDirty?: (cwd: string, timeoutMs: number) => Promise<boolean | "unknown">;
+  /** 挂起原因上报;默认 POST /api/work/hold */
+  reportHold?: (
+    baseUrl: string,
+    bearer: string,
+    reason: WorkHoldReason,
+    timeoutMs: number,
+  ) => Promise<void>;
+  /** G2/G4 会话文件采样;默认扫 claudeDir/projects 下的会话 jsonl */
+  sampleSessions?: (claudeDir: string) => SessionSample;
+  /** 派发会话归因登记:daemon 注入本地注册表,采集才能把 headless 会话归到 Agent 项目 */
+  attributeSession?: (sessionId: string, project: string) => void;
+}
 
-  let stdout = "";
-  child.stdout?.on("data", (chunk: Buffer) => {
-    stdout = (stdout + chunk.toString("utf8")).slice(-2_000);
-  });
-  // stderr 继承到 aw-node 日志,便于排障会话启动失败
-  child.stderr?.pipe(process.stderr);
-
-  let killed = false;
-  let finished = false;
-  const timer = setTimeout(() => {
-    killed = true;
-    child.kill("SIGTERM");
-    setTimeout(() => child.kill("SIGKILL"), 5_000).unref();
-  }, options.timeoutMs);
-  timer.unref();
-
-  const finish = (code: number | null, signal: NodeJS.Signals | null): void => {
-    if (finished) {
-      return;
-    }
-    finished = true;
-    clearTimeout(timer);
-    options.onExit({ code, signal: killed ? "SIGTERM" : signal });
-    const summary = stdout.trim().split("\n").at(-1) ?? "";
-    if (summary !== "") {
-      process.stderr.write(`[${options.agentId}] ${summary.slice(0, 200)}\n`);
-    }
-  };
-
-  child.on("error", (error) => {
-    process.stderr.write(`[${options.agentId}] 会话启动失败: ${error.message}\n`);
-    finish(null, null);
-  });
-  child.on("close", (code, signal) => finish(code, signal));
-
-  return { kill: (signal?: NodeJS.Signals) => child.kill(signal) };
+export interface DispatchCycle {
+  once(): Promise<void>;
+  stop(): void;
 }
 
 export function createDispatchCycle(deps: DispatchDeps): DispatchCycle {
@@ -213,11 +114,25 @@ export function createDispatchCycle(deps: DispatchDeps): DispatchCycle {
     deps.peekWorkInbox ??
     ((bearer: string) => fetchWorkPendingCount(deps.baseUrl, bearer, deps.requestTimeoutMs));
   const startSession = deps.spawnSession ?? spawnClaudeSession;
+  const probeDirty = deps.probeDirty ?? probeWorktreeDirty;
+  const reportHold = deps.reportHold ?? reportHoldToConsole;
+  const sampleSessions = deps.sampleSessions ?? sampleSessionFiles;
+  const attributeSession = deps.attributeSession ?? (() => {});
+  /** 连续被挡退避 + 双采样基线:轮末换基线,两轮比 mtime 前进判「仍在写入」 */
+  const backoff = new BackoffTracker();
+  let prevSample: SessionSample | undefined;
   /** 同一 Agent 同时只允许一个会话 */
   const busy = new Set<string>();
+  const workPrompt = workDispatchPrompt(deps.batchMaxItems);
   const running = new Map<string, SessionHandle>();
 
-  async function checkAgent(agentId: string, cwd: string, bearer: string): Promise<void> {
+  async function checkAgent(
+    agentId: string,
+    project: string,
+    cwd: string,
+    bearer: string,
+    getActivity: () => SessionActivity,
+  ): Promise<void> {
     if (busy.has(agentId)) {
       return;
     }
@@ -228,24 +143,50 @@ export function createDispatchCycle(deps: DispatchDeps): DispatchCycle {
       // 双探视:a2a 待办优先(既有协作链不回归),无 a2a 才看 work 派工
       const pending = await peek(bearer);
       let prompt: string | null = null;
+      let isWorkDispatch = false;
       if (pending > 0) {
         prompt = DISPATCH_PROMPT;
       } else {
         const workPending = await peekWork(bearer);
         if (workPending > 0) {
-          prompt = WORK_DISPATCH_PROMPT;
+          prompt = workPrompt;
+          isWorkDispatch = true;
         }
       }
       if (prompt === null) {
+        backoff.recordIdle(agentId);
         return;
       }
       if (!existsSync(cwd)) {
         logger.warn("Agent 工作目录不存在,跳过调度", { agent: agentId });
         return;
       }
-      logger.info("收件箱有待处理消息,起会话", { agent: agentId, source: pending > 0 ? "a2a" : "work" });
+      // G2→G3→G4 闸门链:cwd 会话在写、脏工作区、机级上限,任一挡下本轮不派发
+      const gateDeps: GateDeps = {
+        activity: getActivity(),
+        probeDirty,
+        reportHold: (reason) => reportHold(deps.baseUrl, bearer, reason, deps.requestTimeoutMs),
+        maxMachineSessions: deps.maxMachineSessions,
+        requestTimeoutMs: deps.requestTimeoutMs,
+        logger,
+      };
+      const outcome = await runGates(gateDeps, { agentId, cwd, isWorkDispatch });
+      if (outcome !== "pass") {
+        const backoffTriggered = backoff.recordBlocked(agentId, Date.now(), deps.dispatchBackoffRounds);
+        logger.warn("派发闸门挡下,本轮不派发", { agent: agentId, outcome, backoffTriggered });
+        return;
+      }
+      backoff.recordIdle(agentId);
+      logger.info("收件箱有待处理消息,起会话", {
+        agent: agentId,
+        source: isWorkDispatch ? "work" : "a2a",
+      });
+      // 会话 id 先登记归因再 spawn:不给「会话已在写、归因还没接上」留窗口
+      const sessionId = randomUUID();
+      attributeSession(sessionId, project);
       const session: SessionOptions = {
         agentId,
+        sessionId,
         cwd,
         prompt,
         claudePath: deps.claudePath ?? "claude",
@@ -270,6 +211,16 @@ export function createDispatchCycle(deps: DispatchDeps): DispatchCycle {
   }
 
   async function once(): Promise<void> {
+    /** 本轮会话活跃判定:首个过闸门的 Agent 触发采样,同轮复用;空闲轮零 I/O */
+    let currSample: SessionSample | undefined;
+    let activity: SessionActivity | undefined;
+    const getActivity = (): SessionActivity => {
+      if (activity === undefined) {
+        currSample = sampleSessions(deps.claudeDir);
+        activity = resolveSessionActivity(prevSample, currSample, Date.now(), deps.busySessionWindowMs);
+      }
+      return activity;
+    };
     try {
       const state = loadConfigSyncState(deps.stateDir);
       if (backfillAgentSecrets(state, deps.claudeJsonPath, logger) > 0) {
@@ -279,8 +230,12 @@ export function createDispatchCycle(deps: DispatchDeps): DispatchCycle {
         if (agent.secret === undefined) {
           continue;
         }
+        // 退避期内不探视;到期自动恢复,条件消失照常放行
+        if (!backoff.eligible(agentId, Date.now())) {
+          continue;
+        }
         try {
-          await checkAgent(agentId, agent.cwd, `${agentId}.${agent.secret}`);
+          await checkAgent(agentId, agent.project, agent.cwd, `${agentId}.${agent.secret}`, getActivity);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           logger.warn("调度检查失败", { agent: agentId, error: message });
@@ -289,6 +244,11 @@ export function createDispatchCycle(deps: DispatchDeps): DispatchCycle {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       logger.warn("调度轮次异常,下轮重试", { error: message });
+    } finally {
+      // 轮末换基线;全轮未采样(空闲)则保留旧基线,mtime 对比仍单调
+      if (currSample !== undefined) {
+        prevSample = currSample;
+      }
     }
   }
 

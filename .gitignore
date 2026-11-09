@@ -35,6 +35,9 @@ docker/spike/out/
 # 浏览器自动化产物(Playwright MCP)
 .playwright-mcp/
 
+# archify 图示工具的工作目录(候选、渲染产物、校验回执,不入库)
+.archify/
+
 # cc-connect 桥的运行时附件目录(会话过程产物,不入库)
 .cc-connect/
 

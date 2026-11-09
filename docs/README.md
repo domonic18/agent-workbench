@@ -26,6 +26,10 @@
 | [05-授权与闸门设计.md](arch/05-授权与闸门设计.md) | 能力模型、Teleport、审批流、控制台自有控制工具判定、确定性路由授权与审计 | 做授权或路由权限时 |
 | [06-架构评审记录.md](arch/06-架构评审记录.md) | 历史评审与历轮裁决，含被 2026-11-03 新基线 supersede 的旧方案；仅供核对当时证据，不直接作为现行架构 | 进入编码前、核对设计依据或拆分任务时 |
 | [07-工程目录与维护约定评审.md](arch/07-工程目录与维护约定评审.md) | 目录组织/构建/docker/env/workspace 习惯对照与补齐清单 | 搭脚手架、改 Makefile 或 compose 前 |
+| [diagrams/](arch/diagrams/) | 架构图与流程图(自包含 HTML,双击即可打开,含明暗主题与动效);与分册正文同源维护,不另存 PNG | 想一眼看全链路运转路径、闸门决策流或某个场景时 |
+
+图示产出约定：用 `archify` skill 生成,工作目录 `.archify/` 属工具脚手架(不入库),
+交付物放 `docs/arch/diagrams/`,文件名带主题前缀(如 `dispatch-coordination-*.html`)。
 
 ### research/(调研评估)
 
@@ -43,11 +47,15 @@
 
 ### plan/(迭代计划 · 状态真相源)
 
+**只放计划安排**：接下来做什么、做到哪一步、验收怎么判。方案与裁决在 `arch/`，
+图示在 `arch/diagrams/`，外部文档快照在 `reference/`——三者都不进本目录。
+
 | 文档 | 说明 |
 |------|------|
 | [development-plan.md](plan/development-plan.md) | 里程碑与完成状态;**只在此维护状态,不回填过程** |
-| [tasks/](plan/tasks/) | 分里程碑任务清单(M0 / M1 / M1.5 / M2 / M2.5 / M3 / M3.5 / M3.8 / M3.9 / M4):任务、产出、依赖、验收点;不记进度 |
+| [tasks/](plan/tasks/) | 分里程碑任务清单(M0 / M1 / M1.5 / M2 / M2.5 / M3 / M3.5 / M3.8 / M3.9 / M3.10 / M4):任务、产出、依赖、验收点;不记进度 |
 | [acceptance/](plan/acceptance/) | 按任务落档的验收记录(样本、实跑结果、缺口);点时快照,不回填新结论 |
+| [resource-inventory.md](plan/resource-inventory.md) | 线上资源清单(主机、端口、容量、域名);只记事实不记密钥,真实值在 gitignored 的 `*.local.md` |
 
 ## 背景速览(新会话先看这里)
 

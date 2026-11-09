@@ -45,6 +45,7 @@ import { registerTaskReadRoutes } from "./routes/task-read.js";
 import { registerTaskRoutes } from "./routes/task.js";
 import { registerWebhookGithubRoutes } from "./routes/webhook-github.js";
 import { registerWorkRoutes } from "./routes/work.js";
+import { registerWorkAgentRoutes } from "./routes/work-agent.js";
 
 // dist/server 与 src/server 到仓库根同为两级,容器内亦然
 function readVersion(): string {
@@ -157,6 +158,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     registerTaskReadRoutes(app, { db, ...timing });
     registerTaskA2aRoutes(app, { db, ...timing });
     registerWorkRoutes(app, { db, ...timing, ...collab, usageResolver });
+    registerWorkAgentRoutes(app, { db, ...timing, ...collab });
     registerStreamRoutes(app, { db, ...timing });
     registerIngestRoutes(app, { db, ...timing });
     if (options.githubWebhookSecret !== undefined) {

@@ -9,6 +9,7 @@ import type {
   TaskOrigin,
   TaskStage,
   TaskStatus,
+  WorkHoldReason,
   WorkItemAttention,
   WorkItemStage,
   WorkItemStatus,
@@ -37,6 +38,10 @@ export const AGENT_COLUMN_HINT =
 /** 「机器」列的列头说明:机器的含义与外部运行时的差别 */
 export const MACHINE_COLUMN_HINT =
   "该 Agent 运行在哪台执行机上;外部运行时可以登记归属机器,但没有 aw-node 时过程数据未接入。";
+
+/** 「活跃会话」列的列头说明:会话数口径与派发闸门 G4 的机级上限一致 */
+export const SESSION_COLUMN_HINT =
+  "本机当前活跃的 Claude Code 会话数(仍在写的会话按运行计);同一台机上的 Agent 共享这个数字,与派发闸门的机级上限同口径。";
 
 /** 状态到文案/色调的映射只在这里维护,组件不自行判断业务枚举(03 §6) */
 export const HEARTBEAT_LABEL: Record<HeartbeatState, string> = {
@@ -266,6 +271,15 @@ export const WORK_ITEM_EVENT_LABEL: Record<string, string> = {
   ci_result: "CI 结果",
   acceptance_ready: "待验收",
   ci_failed: "CI 失败",
+  requeued: "已重排",
+  stalled: "已停滞",
+  orphaned: "承接方已删除",
+};
+
+/** 派发挂起原因:枚举与 collector 端 WORK_HOLD_REASONS 同源,文案口径对齐群播报 */
+export const WORK_HOLD_REASON_LABEL: Record<WorkHoldReason, string> = {
+  cwd_session_active: "工作区会话占用中",
+  dirty_worktree: "工作区有未提交改动",
 };
 
 /** 派工信箱状态:等待对象由 pending / claimed 的行推出 */
