@@ -19,7 +19,7 @@ const envSchema = z.object({
   CONSOLE_INIT_PASSWORD: z.string().optional(),
   // 来源白名单只校验 Host(含端口),逗号分隔;留空 = 本机监听地址
   CONSOLE_ALLOWED_HOSTS: z.string().optional(),
-  // 对外可达的控制台地址(frp 公网入口);站点据此给出可复制到别的机器的下载地址
+  // 对外可达的控制台地址(公网入口);站点据此给出可复制到别的机器的下载地址
   AW_PUBLIC_URL: z.string().optional(),
   // 置于 TLS 反代之后才置 1:据此采信 X-Forwarded-Proto,会话 Cookie 才会带上 Secure
   AW_TRUST_PROXY: z.string().optional(),
