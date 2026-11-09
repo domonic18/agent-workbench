@@ -26,6 +26,10 @@ main push     → 同上三查
   `--wait` 健康检查就是迁移闸门——迁移失败 = 新容器起不来 = 自动回滚。
 - 生产栈与 runner 同机（macmini）：deploy 不走 SSH，自托管 job 直接执行；
   因此无需 `DEPLOY_SSH_KEY` / `DEPLOY_KNOWN_HOSTS`。
+- **公网入口不在项目栈内**（2026-11-09 裁决：项目面向开源，不假设用户用
+  frp 这类隧道）：compose 只起 console + postgres 两件套，宿主机仅
+  `127.0.0.1:8787` 发布；TLS 终结与域名归部署环境自备——当前实例由部署机上
+  **独立运维的** frpc + nginx 提供入口，与本项目仓库无关。
 
 ## 2. 首次启用需要准备的东西
 
@@ -36,7 +40,7 @@ main push     → 同上三查
 | `DEPLOY_PATH` | GitHub Actions variable | 部署目录（本机绝对路径；不进 YAML、不进文档） |
 | 自托管 runner | `~/Workspace/actions-runner/<repo>/` | 名称 `macmini-agent-workbench`，带同名 label；注册与换版见运维手册 |
 | TCR 镜像 `aw-console` | TCR 个人版 | 与既有镜像同命名空间 |
-| 部署目录骨架 | `DEPLOY_PATH` | `.env`（POSTGRES_PASSWORD 等）、`docker/frpc.toml`（本机 gitignored 配置拷贝）、`workspace/`（从旧栈迁移）；compose 与 deploy.sh 由 CI 每次同步 |
+| 部署目录骨架 | `DEPLOY_PATH` | `.env`（POSTGRES_PASSWORD 等）、`workspace/`（从旧栈迁移）；compose 与 deploy.sh 由 CI 每次同步 |
 
 部署目录结构与仓库一致（compose 按 `../.env`、`../workspace` 相对寻址）：
 
@@ -48,7 +52,6 @@ main push     → 同上三查
   scripts/deploy.sh     # CI 每次发布同步
   docker/
     docker-compose.prod.yml   # CI 每次发布同步
-    frpc.toml           # 本机配置，不由 CI 下发
   workspace/            # 持久化数据（知识目录、制品、备份），从旧栈迁移
 ```
 
@@ -75,7 +78,8 @@ main push     → 同上三查
 4. **拉镜像**：拉取失败但本地已有同 tag 镜像时继续（回滚场景下仓库可能不可达）
 5. **换容器**：`compose up -d --wait --wait-timeout 180 --no-build --pull never`
    ——迁移随应用启动，健康检查（/healthz）即迁移闸门
-6. **核对运行面**：console / frpc / postgres 三服务必须都在 running
+6. **核对运行面**：console / postgres 两服务必须都在 running（`--remove-orphans`
+   会把已从 compose 移除的旧服务容器收走，运行面收敛到文件定义）
 7. **落状态**：写 `.deploy-state`（current/previous tag、时间、status=OK）
 8. **失败回滚**：任一步失败 → 恢复 `.env` 里的 previous IMAGE → 重新 pull + up +
    复查，状态置 `FAILED_ROLLED_BACK`（回滚本身再失败置 `FAILED_ROLLED_BACK_FAILED`），
