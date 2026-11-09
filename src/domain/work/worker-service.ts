@@ -1,5 +1,6 @@
 import { newPrefixedId } from "../../shared/ids.js";
-import { TASK_LIMITS, WORK_INBOX } from "../../shared/constants.js";import type { Db } from "../../store/database.js";
+import { TASK_LIMITS, WORK_INBOX, type WorkHoldReason } from "../../shared/constants.js";
+import type { Db } from "../../store/database.js";
 import { findTaskById } from "../../store/repositories/task.js";
 import {
   appendWorkItemEvent,
@@ -14,11 +15,12 @@ import {
   findInboxById,
   handbackInbox,
   hasOpenInboxForAgent,
+  markHeldForAgent,
   listPendingForAgent,
   type WorkerInboxRecord,
 } from "../../store/repositories/work-inbox.js";
 import { WorkError } from "./errors.js";
-import { notifyWorkEvent } from "./notify.js";
+import { announceHold, notifyWorkEvent } from "./notify.js";
 
 export interface WorkerInboxView {
   readonly inbox: WorkerInboxRecord;
@@ -37,6 +39,8 @@ export interface WorkerService {
   ack(agentId: string, inboxId: string, taskId: string | null): Promise<void>;
   /** 单事件退回:只释放该 Trigger 归属,不退订 Thread;理由落事项事件 */
   handback(agentId: string, inboxId: string, reason: string): Promise<void>;
+  /** 派发闸门挂起上报(M3.10):写 pending 行 reason 并对首次挂起群播报;重复上报幂等 */
+  reportHold(agentId: string, reason: WorkHoldReason): Promise<void>;
 }
 
 export interface WorkerServiceDeps {
@@ -211,5 +215,23 @@ export function createWorkerService(deps: WorkerServiceDeps): WorkerService {
     });
   }
 
-  return { read, inbox, ack, handback };
+  async function reportHold(agentId: string, reason: WorkHoldReason): Promise<void> {
+    // collector 每个被挡轮次都会上报;只在 reason NULL→值首跳时播报,重复上报不重复打扰
+    const at = now();
+    await db.transaction(async (tx) => {
+      const heldRows = await markHeldForAgent(tx, agentId, reason, at);
+      if (heldRows.length === 0) {
+        return;
+      }
+      await announceHold(tx, {
+        agentId,
+        reason,
+        heldRows,
+        chatId: deps.collabChatId,
+        now: at,
+      });
+    });
+  }
+
+  return { read, inbox, ack, handback, reportHold };
 }

@@ -85,7 +85,7 @@ export async function claimPendingForAgent(
   for (const candidate of candidates) {
     const updated = await db.run(
       `UPDATE worker_inbox
-          SET status = 'claimed', lease_token = lease_token + 1, lease_until = ?, updated_at = ?
+          SET status = 'claimed', lease_token = lease_token + 1, lease_until = ?, reason = NULL, updated_at = ?
         WHERE id = ? AND status = 'pending'`,
       leaseUntil,
       now,
@@ -117,7 +117,36 @@ export async function listPendingForAgent(
   )) as WorkerInboxRecord[];
 }
 
-/** claimed → acked:Assignment ACK 携带承接 Task;Input 仅消费。CAS 失败=租约过期已重投 */
+/** 首跳挂起的行:租约 token 进播报幂等键,同一行每个重投周期各播一次 */
+export interface HeldInboxRow {
+  id: string;
+  leaseToken: number;
+}
+
+/**
+ * 派发闸门挂起(M3.10,dispatch-coordination.md §3.1.5):collector 上报原因写 pending 行。
+ * 只写 NULL→值的首跳,由该转换承担「首次挂起」判定;领取时清空,重投后可再挂。
+ */
+export async function markHeldForAgent(
+  db: Db,
+  agentId: string,
+  reason: string,
+  now: number,
+): Promise<HeldInboxRow[]> {
+  return (await db.all(
+    `UPDATE worker_inbox
+        SET reason = ?, updated_at = ?
+      WHERE target_agent_id = ? AND status = 'pending' AND reason IS NULL
+      RETURNING id, lease_token AS "leaseToken"`,
+    reason,
+    now,
+    agentId,
+  )) as HeldInboxRow[];
+}
+
+/**
+ * claimed → acked:Assignment ACK 携带承接 Task;Input 仅消费。CAS 失败=租约过期已重投
+ */
 export async function ackInbox(
   db: Db,
   id: string,
@@ -194,6 +223,49 @@ export async function findActiveAssignee(
     workItemId,
   )) as { targetAgentId: string } | undefined;
   return row?.targetAgentId;
+}
+
+/** 僵尸回收重排(M3.10-4):最新一条已承接(acked)的 assignment 行 */
+export async function findLatestAckedAssignment(
+  db: Db,
+  workItemId: string,
+): Promise<WorkerInboxRecord | undefined> {
+  return (await db.get(
+    `SELECT ${FULL_COLUMNS} FROM worker_inbox
+      WHERE work_item_id = ? AND kind = 'assignment' AND status = 'acked'
+      ORDER BY created_at DESC, id DESC LIMIT 1`,
+    workItemId,
+  )) as WorkerInboxRecord | undefined;
+}
+
+/** acked → pending 重排:清租约与旧任务绑定,task_id 留空待新承接重新绑定 */
+export async function requeueAckedAssignment(db: Db, id: string, now: number): Promise<boolean> {
+  return (
+    (
+      await db.run(
+        `UPDATE worker_inbox
+            SET status = 'pending', lease_token = lease_token + 1, lease_until = NULL,
+                task_id = NULL, updated_at = ?
+          WHERE id = ? AND status = 'acked'`,
+        now,
+        id,
+      )
+    ).changes === 1
+  );
+}
+
+/**
+ * 派工停滞(M3.10-4):pending 超过时限的 assignment 所属事项 id(去重)。
+ * 以 updated_at 而非 created_at 计时:重排、被领取退回、挂起都会刷新 updated_at,
+ * 用 created_at 会把刚重排回 pending 的行按原始创建时间判成停滞。
+ */
+export async function listStalePendingWorkItemIds(db: Db, updatedBefore: number): Promise<string[]> {
+  const rows = (await db.all(
+    `SELECT DISTINCT work_item_id AS id FROM worker_inbox
+      WHERE status = 'pending' AND updated_at <= ?`,
+    updatedBefore,
+  )) as { id: string }[];
+  return rows.map((row) => row.id);
 }
 
 /** Agent 是否持有该事项的有效 assignment(claimed/acked):建关联任务的前置(arch/02 §3.1) */

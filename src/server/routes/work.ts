@@ -3,7 +3,6 @@ import { z } from "zod";
 import { createIngestService } from "../../domain/work/ingest-service.js";
 import { WorkIngestError } from "../../domain/work/contract.js";
 import { createWorkReadService, type WorkReadService } from "../../domain/work/read.js";
-import { createWorkerService } from "../../domain/work/worker-service.js";
 import { WorkError } from "../../domain/work/errors.js";
 import {
   LIST_LIMITS,
@@ -16,13 +15,10 @@ import {
 } from "../../shared/constants.js";
 import { parseJsonObject } from "../../shared/json.js";
 import type { Db } from "../../store/database.js";
-import type { AgentRecord } from "../../store/repositories/agent.js";
 import type { WorkItemRecord } from "../../store/repositories/work-item.js";
 import type { UsageResolver } from "../../domain/usage/state.js";
-import { requireAgentAuth } from "../middleware/agent-auth.js";
 import { requireCsrf, requireIdempotencyKey, requireSession } from "../middleware/session.js";
 import { invalid } from "./http.js";
-import { parseWaitMs } from "./a2a.js";
 import { parseKeysetCursor, parseLimit, parseSeq } from "./paging.js";
 
 /**
@@ -115,9 +111,7 @@ export function registerWorkRoutes(app: FastifyInstance, options: WorkRoutesOpti
       : { resolveUsage: (tx, agentId) => usageResolver.resolve(tx, agentId) }),
   }).ingest;
   const read = options.read ?? createWorkReadService({ db });
-  const workers = createWorkerService({ db, now, ...collab });
   const writeGuards = [requireSession(db, now), requireCsrf(), requireIdempotencyKey()];
-  const agentAuth = requireAgentAuth(db);
 
   app.post("/api/work/triggers", { preHandler: writeGuards }, async (request, reply) => {
     const parsed = triggerSchema.safeParse(request.body ?? {});
@@ -148,59 +142,6 @@ export function registerWorkRoutes(app: FastifyInstance, options: WorkRoutesOpti
       throw error;
     }
   });
-
-  app.get(
-    "/api/work/inbox",
-    { preHandler: agentAuth },
-    async (request, reply) => {
-      const agent = request.agent as AgentRecord;
-      const query = request.query as Record<string, unknown>;
-
-      let waitMs: number | undefined;
-      if (query.wait !== undefined) {
-        if (typeof query.wait !== "string") {
-          return invalid(reply, "wait 必须形如 25s 或 250ms");
-        }
-        waitMs = parseWaitMs(query.wait);
-        if (waitMs === undefined) {
-          return invalid(reply, "wait 必须形如 25s 或 250ms");
-        }
-      }
-
-      // peek 只看不领(照 a2a peek 先例):aw-node 调度器预检用,不占行租约
-      let peek: boolean | undefined;
-      if (query.peek !== undefined) {
-        if (query.peek !== "1" && query.peek !== "true") {
-          return invalid(reply, "peek 只能是 1 或 true");
-        }
-        peek = true;
-      }
-
-      try {
-        const views = await workers.inbox(agent.id, {
-          ...(waitMs === undefined ? {} : { waitMs }),
-          ...(peek === undefined ? {} : { peek }),
-        });
-        return {
-          items: views.map(({ inbox, workItem }) => ({
-            inbox_id: inbox.id,
-            kind: inbox.kind,
-            status: inbox.status,
-            trigger_id: inbox.triggerId,
-            lease_until: inbox.leaseUntil,
-            work_item_id: inbox.workItemId,
-            work_item_title: workItem.title,
-            created_at: inbox.createdAt,
-          })),
-        };
-      } catch (error) {
-        if (error instanceof WorkError) {
-          return reply.code(error.status).send({ error: { code: error.code, message: error.message } });
-        }
-        throw error;
-      }
-    },
-  );
 
   app.get("/api/work-items", { preHandler: requireSession(db, now) }, async (request, reply) => {
     const query = request.query as Record<string, unknown>;
@@ -303,6 +244,8 @@ export function registerWorkRoutes(app: FastifyInstance, options: WorkRoutesOpti
           taskId: row.taskId,
           leaseUntil: row.leaseUntil,
           reason: row.reason,
+          // 挂起行 updated_at 即挂起写入时刻,前端据此展示挂起时长
+          updatedAt: row.updatedAt,
           createdAt: row.createdAt,
         })),
         threads: result.threadLinks.map((link) => ({

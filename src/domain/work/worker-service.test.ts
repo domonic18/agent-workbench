@@ -303,3 +303,54 @@ describe("worker handback 与租约", () => {
     await db.close();
   });
 });
+
+async function outboxCount(db: Db): Promise<number> {
+  const row = (await db.get("SELECT COUNT(*) AS n FROM outbox")) as { n: number };
+  return row.n;
+}
+
+describe("worker reportHold(派发闸门挂起上报)", () => {
+  it("首跳写 reason 并播报一次;重复上报幂等;领取清空,重投后可再挂再播", async () => {
+    const { db } = await prepare();
+    let seq = 100;
+    const workers = createWorkerService({
+      db,
+      now: () => NOW,
+      newEventId: () => `wev_h${++seq}`,
+      collabChatId: "oc_collab_hold",
+    });
+    await seedItem(db, "wim_1");
+    await seedInbox(db, { id: "wib_1", workItemId: "wim_1", kind: "assignment" });
+
+    await workers.reportHold("agt_w", "cwd_session_active");
+    expect(await findInboxById(db, "wib_1")).toMatchObject({ reason: "cwd_session_active" });
+    expect(await outboxCount(db)).toBe(1);
+
+    // collector 每个被挡轮次都会上报:reason 已非 NULL,不重复写也不重复播
+    await workers.reportHold("agt_w", "cwd_session_active");
+    expect(await outboxCount(db)).toBe(1);
+
+    // 领取清空 reason;租约回收重投后可再挂,新租约周期再播一条
+    await workers.inbox("agt_w", {});
+    expect((await findInboxById(db, "wib_1"))?.reason).toBeNull();
+    await reclaimExpiredInbox(db, NOW + WORK_INBOX.leaseMs + 1);
+    await workers.reportHold("agt_w", "dirty_worktree");
+    expect(await findInboxById(db, "wib_1")).toMatchObject({
+      status: "pending",
+      reason: "dirty_worktree",
+    });
+    expect(await outboxCount(db)).toBe(2);
+    await db.close();
+  });
+
+  it("无可挂起的行(非本 Agent 或非 pending)是空操作", async () => {
+    const { db, workers } = await prepare();
+    await seedItem(db, "wim_1");
+    await seedInbox(db, { id: "wib_1", workItemId: "wim_1", kind: "assignment", target: "agt_x" });
+
+    await workers.reportHold("agt_w", "dirty_worktree");
+    expect((await findInboxById(db, "wib_1"))?.reason).toBeNull();
+    expect(await outboxCount(db)).toBe(0);
+    await db.close();
+  });
+});

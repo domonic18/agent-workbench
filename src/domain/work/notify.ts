@@ -2,8 +2,9 @@ import { enqueuePush } from "../../reliability/outbox.js";
 import type { Db } from "../../store/database.js";
 import { findAgentById } from "../../store/repositories/agent.js";
 import { findWorkItemById } from "../../store/repositories/work-item.js";
-import { findActiveAssignee } from "../../store/repositories/work-inbox.js";
+import { findActiveAssignee, type HeldInboxRow } from "../../store/repositories/work-inbox.js";
 import { findWorkTriggerById } from "../../store/repositories/work-trigger.js";
+import type { WorkHoldReason } from "../../shared/constants.js";
 import { mdText, statusCard } from "../collab/card.js";
 
 /**
@@ -166,5 +167,120 @@ export async function notifyWorkEvent(db: Db, input: NotifyWorkEventInput): Prom
     card: statusCard(spec),
     uuid: input.eventId,
     ...(input.now === undefined ? {} : { now: input.now }),
+  });
+}
+
+/** 挂起原因 → 群播报文案;枚举与 collector 端 WORK_HOLD_REASONS 同源 */
+const HOLD_REASON_TEXT: Record<WorkHoldReason, string> = {
+  cwd_session_active: "目标工作目录有会话在写,避免同仓互踩",
+  dirty_worktree: "目标工作区有未提交改动,先保护现场",
+};
+
+export interface AnnounceHoldInput {
+  agentId: string;
+  reason: WorkHoldReason;
+  /** 本次从 NULL→值首跳的 pending 行;租约 token 进幂等键,同一行每个重投周期各播一次 */
+  heldRows: HeldInboxRow[];
+  chatId: string | undefined;
+  now?: number | undefined;
+}
+
+/**
+ * 首次挂起播报(M3.10,dispatch-coordination.md §3.1.5):同一批行只播一次。
+ * 幂等键由 held 行 id 与租约 token 派生——重试重放同一批不重复入队。
+ */
+export async function announceHold(db: Db, input: AnnounceHoldInput): Promise<void> {
+  if (input.chatId === undefined || input.heldRows.length === 0) {
+    return;
+  }
+  const agent = await findAgentById(db, input.agentId);
+  const whoRaw = agent?.displayName ?? input.agentId;
+  const card = statusCard({
+    title: `〔挂起〕${whoRaw} 的 ${input.heldRows.length} 件派工已挂起`,
+    template: "orange",
+    body: `**原因**:${mdText(HOLD_REASON_TEXT[input.reason])}\n**状态**:条件消失后自动恢复派发,无需人工干预`,
+  });
+  await enqueuePush(db, {
+    idempotencyKey: `work-hold:${input.heldRows.map((row) => `${row.id}@${row.leaseToken}`).sort().join(",")}`,
+    kind: "work_notify",
+    chatId: input.chatId,
+    card,
+    uuid: input.heldRows[0]!.id,
+    ...(input.now === undefined ? {} : { now: input.now }),
+  });
+}
+
+/** 僵尸回收处置结果:重排 / 达上限停滞 / 无需重排 */
+export type ReclaimOutcome = "requeued" | "stalled" | "skipped";
+
+export interface AnnounceReclaimInput {
+  agentId: string;
+  taskId: string;
+  outcome: ReclaimOutcome;
+  /** 本次是第几次自动重排;仅 outcome=requeued 时展示 */
+  attempt: number;
+  chatId: string | undefined;
+  /** 触发回收的巡检时刻;进幂等键,同一任务每次被回收各播一条 */
+  now: number;
+}
+
+const RECLAIM_STATUS_TEXT: Record<ReclaimOutcome, string> = {
+  requeued: "已重排,闸门放行后自动重新领取派发",
+  stalled: "已达自动重排上限,标记停滞留人裁决",
+  skipped: "无需重排(事项已收口或另有任务在跑)",
+};
+
+/** 僵尸任务回收播报(M3.10-4,dispatch-coordination.md §3.3):running 超时 → blocked 时进群 */
+export async function announceTaskReclaimed(db: Db, input: AnnounceReclaimInput): Promise<void> {
+  if (input.chatId === undefined) {
+    return;
+  }
+  const agent = await findAgentById(db, input.agentId);
+  const whoRaw = agent?.displayName ?? input.agentId;
+  const attemptLine =
+    input.outcome === "requeued" ? `(第 ${input.attempt} 次)` : "";
+  const card = statusCard({
+    title: `〔回收〕${whoRaw} 的超时任务已回收`,
+    template: input.outcome === "stalled" ? "red" : "orange",
+    body: `**任务**:${mdText(input.taskId)}\n**状态**:${RECLAIM_STATUS_TEXT[input.outcome]}${attemptLine}`,
+  });
+  await enqueuePush(db, {
+    idempotencyKey: `work-reclaim:${input.taskId}@${input.now}`,
+    kind: "work_notify",
+    chatId: input.chatId,
+    card,
+    uuid: input.taskId,
+    now: input.now,
+  });
+}
+
+export interface AnnounceStallInput {
+  workItemId: string;
+  /** 触发升级的巡检时刻;进幂等键 */
+  now: number;
+  chatId: string | undefined;
+}
+
+/** 派工停滞升级播报(M3.10-4):assignment pending 超时无人领取,attention 置 stalled 时进群 */
+export async function announceAssignmentStalled(db: Db, input: AnnounceStallInput): Promise<void> {
+  if (input.chatId === undefined) {
+    return;
+  }
+  const item = await findWorkItemById(db, input.workItemId);
+  if (item === undefined) {
+    return;
+  }
+  const card = statusCard({
+    title: `〔停滞〕${mdText(item.title)}`,
+    template: "red",
+    body: `**事项**:${mdText(item.title)}\n**状态**:派工长时间无人领取,已标记停滞\n**裁决**:请在控制台重新派发或人工收口`,
+  });
+  await enqueuePush(db, {
+    idempotencyKey: `work-stall:${input.workItemId}@${input.now}`,
+    kind: "work_notify",
+    chatId: input.chatId,
+    card,
+    uuid: input.workItemId,
+    now: input.now,
   });
 }
