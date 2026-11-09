@@ -60,5 +60,5 @@
 ## 背景速览(新会话先看这里)
 
 - 项目来源:飞书《【项目】智能体工作台 · 立项书 · v0.2》(2026-10-29 立项,提出:诸葛东明,承办:随行-小W)
-- 核心决策:控制台 + 飞书双面并存;PostgreSQL 为业务事实源;控制台同一 HTTP 服务提供自有控制类 MCP，执行机每机仅一个 aw-node;本机第三方 MCP 与原生工具出界;Source 只整理事实，新工作按 `Thread owner → Git RouteRule → needs_person` 确定性分配;首次使用以无凭据 bootstrap mode、`/setup` 四步、一次性 enroll token、aw-node 上报发现和配置轮换签发与 ACK 完成自动装配，预检失败不就绪;真实 Bug 以 PR+CI 待验收并由原 Bug 机器人人工接受/退回
+- 核心决策:控制台 + 飞书双面并存;PostgreSQL 为业务事实源;控制台同一 HTTP 服务提供自有控制类 MCP，执行机每机仅一个 aw-node;本机第三方 MCP 与原生工具出界;Source 只整理事实，新工作按 `Thread owner → Git RouteRule → needs_person` 确定性分配;首次使用以无凭据 bootstrap mode、`/setup` 四步、一次性 enroll token、aw-node 上报发现和配置轮换签发与 ACK 完成自动装配，预检失败不就绪;真实 Bug 以 PR+CI 待验收、合并 PR 即自动验收收口(人工兜底接受/退回经原 Bug 机器人)
 - 当前阶段:以 [plan/development-plan.md](plan/development-plan.md) 为准（本文件不维护进度,避免出现第二份状态）

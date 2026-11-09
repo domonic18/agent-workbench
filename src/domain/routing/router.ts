@@ -45,6 +45,12 @@ export type RouteReason =
 
 export type RouteOutcome =
   | { readonly decision: "owner_continue"; readonly workItemId: string; readonly threadKey: string }
+  | {
+      /** github 批量 PR(一个 PR 多个 Fixes #N)命中多个 open 事项:逐事项扇出落证据/验收 */
+      readonly decision: "owner_continue_multi";
+      readonly workItemIds: readonly string[];
+      readonly threadKey: string;
+    }
   | { readonly decision: "assign"; readonly rule: RouteRule; readonly agentKey: string }
   | { readonly decision: "needs_person"; readonly reasonCode: RouteReason };
 
@@ -66,8 +72,20 @@ export function routeTrigger(
     (owner) => owner.itemStatus === "open" && triggerKeys.has(owner.threadKey),
   );
   const hadOwner = owners.some((owner) => triggerKeys.has(owner.threadKey));
-  const distinctItems = new Set(openOwners.map((owner) => owner.workItemId));
-  if (distinctItems.size > 1) {
+  const distinctItems = [...new Set(openOwners.map((owner) => owner.workItemId))];
+  if (distinctItems.length > 1) {
+    // github 批量 PR(多 Fixes #N)是多事项证据来源,扇出逐事项处理;
+    // 其余来源多 owner 语义不明,维持交人。
+    if (trigger.source === "github") {
+      const threadKey = openOwners[0]?.threadKey;
+      if (threadKey !== undefined) {
+        return {
+          decision: "owner_continue_multi",
+          workItemIds: distinctItems,
+          threadKey,
+        };
+      }
+    }
     return { decision: "needs_person", reasonCode: "owner_ambiguous" };
   }
   if (openOwners.length > 0) {

@@ -182,6 +182,30 @@ export function createIngestService(deps: IngestDeps) {
       let dispatched: DispatchOutcome;
       if (outcome.decision === "owner_continue") {
         dispatched = await dispatchOwnerContinue(tx, ctx, dispatchDeps, outcome);
+      } else if (outcome.decision === "owner_continue_multi") {
+        // github 批量 PR:同一触发命中多个 open 事项,同事务内逐事项走证据分支;
+        // 触发行的 work_item_id 投影取首个事项,完整清单在 accepted 事件里各自留痕
+        const firstItemId = outcome.workItemIds[0] ?? null;
+        const inboxIds: string[] = [];
+        for (const workItemId of outcome.workItemIds) {
+          const one = await dispatchOwnerContinue(tx, ctx, dispatchDeps, {
+            decision: "owner_continue",
+            workItemId,
+            threadKey: outcome.threadKey,
+          });
+          inboxIds.push(...one.newInboxIds);
+        }
+        dispatched = {
+          resolved: {
+            disposition: "continued",
+            reasonCode: null,
+            ruleId: null,
+            ruleVersion: null,
+            workItemId: firstItemId,
+            targetAgentId: null,
+          },
+          newInboxIds: inboxIds,
+        };
       } else if (outcome.decision === "assign") {
         dispatched = await dispatchAssign(tx, ctx, dispatchDeps, outcome);
       } else {

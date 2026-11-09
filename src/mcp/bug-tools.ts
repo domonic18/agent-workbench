@@ -12,10 +12,11 @@ import {
 
 /**
  * bug 机器人两工具(M3.9-2):work_report 建 Bug 单上报、work_decide 人工
- * 裁决回传。归属判定都在服务端:report 只收注册表内的项目;decide 只认
- * 上报该 Bug 的机器人(origin 触发 actor.agent_id === Bearer 身份),
- * 按 issue_ref 线程定位事项,不猜「最近」。幂等键:report 按 issue、
- * decide 按消息(退回可反复发生)。
+ * 裁决回传。2026-11-09 合并即验收后 work_decide 退化为人工兜底通道
+ * (自动验收以 PR 合并为准)。归属判定都在服务端:report 只收注册表内的
+ * 项目;decide 只认上报该 Bug 的机器人(origin 触发 actor.agent_id ===
+ * Bearer 身份),按 issue_ref 线程定位事项,不猜「最近」。幂等键:report
+ * 按 issue、decide 按消息(退回可反复发生)。
  */
 export function createBugTools(deps: ConsoleToolDeps): ConsoleTool[] {
   const now = deps.now ?? Date.now;
@@ -94,8 +95,8 @@ export function createBugTools(deps: ConsoleToolDeps): ConsoleTool[] {
       name: "work_decide",
       gateName: "work.decide",
       description:
-        "回传人工裁决:接受(accepted)即收口事项;退回(returned)使同一事项返工。" +
-        "只有上报该 Bug 的机器人可调用;退回必须给出 reason。",
+        "人工兜底裁决通道:接受(accepted)强制收口未被合并覆盖的停滞事项;退回(returned)使同一事项返工。" +
+        "自动验收以 PR 合并为准(merged 即收口)。只有上报该 Bug 的机器人可调用;退回必须给出 reason。",
       inputSchema: {
         type: "object",
         properties: {

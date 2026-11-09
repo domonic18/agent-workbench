@@ -75,9 +75,9 @@ describe("pull_request 归一化", () => {
     );
     expect(synced?.kind).toBe("pr.synchronized");
 
-    const closed = githubWebhookToWorkRequest("pull_request", "d-3", pullRequestPayload({ action: "closed", pull_request: { number: 12, url: PR_API_URL, html_url: `${REPO_URL}/pull/12`, body: "Fixes #12", head: { sha: "abc123" }, merged: true, updated_at: "2026-11-05T10:00:00Z" } }));
+    const closed = githubWebhookToWorkRequest("pull_request", "d-3", pullRequestPayload({ action: "closed", pull_request: { number: 12, url: PR_API_URL, html_url: `${REPO_URL}/pull/12`, body: "Fixes #12", head: { sha: "abc123" }, merged: true, merge_commit_sha: "msha789", updated_at: "2026-11-05T10:00:00Z" } }));
     expect(closed).toMatchObject({ kind: "pr.closed" });
-    expect(closed?.payload).toMatchObject({ merged: true });
+    expect(closed?.payload).toMatchObject({ merged: true, merge_commit_sha: "msha789" });
   });
 
   it("正文无关闭关键词时 threadRefs 为空;多个 Fixes 去重后全收", () => {

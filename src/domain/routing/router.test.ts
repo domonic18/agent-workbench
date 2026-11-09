@@ -64,6 +64,40 @@ describe("routeTrigger 五步链", () => {
     expect(outcome).toEqual({ decision: "needs_person", reasonCode: "owner_ambiguous" });
   });
 
+  it("多个 open owner 指向不同事项且来源 github:扇出逐事项", () => {
+    const outcome = routeTrigger(
+      policyFixture(),
+      trigger({ source: "github", kind: "pr.closed", threadKeys: ["bug|issue|1", "bug|issue|2"] }),
+      [owner(), owner({ threadKey: "bug|issue|2", workItemId: "wim_2" })],
+    );
+    expect(outcome).toEqual({
+      decision: "owner_continue_multi",
+      workItemIds: ["wim_1", "wim_2"],
+      threadKey: "bug|issue|1",
+    });
+  });
+
+  it("同一事项持有多个匹配线程时扇出去重", () => {
+    const outcome = routeTrigger(
+      policyFixture(),
+      trigger({
+        source: "github",
+        kind: "pr.closed",
+        threadKeys: ["github|pull_request|api-1", "bug|issue|2", "bug|issue|3"],
+      }),
+      [
+        owner({ threadKey: "github|pull_request|api-1" }),
+        owner({ threadKey: "bug|issue|2" }),
+        owner({ threadKey: "bug|issue|3", workItemId: "wim_2" }),
+      ],
+    );
+    expect(outcome).toEqual({
+      decision: "owner_continue_multi",
+      workItemIds: ["wim_1", "wim_2"],
+      threadKey: "github|pull_request|api-1",
+    });
+  });
+
   it("owner 事项已结束不续接:owner_closed", () => {
     const outcome = routeTrigger(
       policyFixture(),

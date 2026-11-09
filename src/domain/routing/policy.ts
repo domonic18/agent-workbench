@@ -36,7 +36,7 @@ export interface WorkPolicy {
 
 const BUG_FIX_MANDATE = {
   expectedResult:
-    "修复缺陷并提交 PR;PR head SHA 的必需 CI 全部通过后进入待验收,由原 Bug 机器人人工接受",
+    "修复缺陷并提交 PR;PR 合并即自动验收收口(人工可经 work_decide 干预)",
   scope:
     "以原始 Bug 反馈为范围修复缺陷本身,不含顺手重构;退回时在同一工作事项返工,生产发布另行人工确认",
 } as const;
@@ -44,7 +44,7 @@ const BUG_FIX_MANDATE = {
 const BUG_FIX_EVIDENCE = [
   "PR 链接与当前 head SHA",
   "必需 CI 全部通过的记录",
-  "原 Bug 机器人的接受回执",
+  "PR 合并事实(merged 回执)或人工接受回执",
 ] as const;
 
 /** 默认 bug_fix 装配定义(arch/01 §9.4):bootstrap 装配与 /setup 摘要复用同一来源 */

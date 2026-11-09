@@ -17,7 +17,54 @@ import { notifyWorkEvent } from "./notify.js";
  * 「接受/退回」,bot 经 work_decide 上报。接受即收口(done + acceptance_ref,
  * 停表 ended_at);退回不换事项——同一 WorkItem 回 execute,有活跃承接者才投
  * 返工 input 唤醒,否则确定性交人(owner_unassigned),不猜目标。
+ * 2026-11-09 起「合并即验收」:PR 合并自动收口走同一写路径(applyWorkItemAcceptance),
+ * work_decide 退化为人工兜底通道。
  */
+
+/**
+ * 验收收口共享写路径:work_decide 人工接受与 pr.closed merged 自动验收共用。
+ * 投影 done + acceptance_ref(收口触发 id)+ ended_at,落 accepted 事件与群通知。
+ */
+export async function applyWorkItemAcceptance(
+  db: Db,
+  ctx: DispatchContext,
+  deps: Pick<DispatchDeps, "newEventId" | "collabChatId">,
+  workItemId: string,
+  payload: Record<string, unknown>,
+  notifyExtra?: { auto?: boolean | undefined; prUrl?: string | undefined },
+): Promise<void> {
+  const item = await findWorkItemById(db, workItemId);
+  if (item !== undefined) {
+    await updateWorkItemProjection(db, {
+      id: item.id,
+      status: "done",
+      attention: "none",
+      acceptanceRef: ctx.triggerId,
+      nextAction: null,
+      endedAt: ctx.at,
+      updatedAt: ctx.at,
+    });
+  }
+  const eventId = deps.newEventId();
+  await appendWorkItemEvent(db, {
+    id: eventId,
+    workItemId,
+    kind: "accepted",
+    triggerId: ctx.triggerId,
+    evidenceRefsJson: ctx.refsJson,
+    payloadJson: JSON.stringify(payload),
+    occurredAt: ctx.at,
+  });
+  await notifyWorkEvent(db, {
+    workItemId,
+    eventId,
+    kind: "accepted",
+    chatId: deps.collabChatId,
+    prUrl: notifyExtra?.prUrl,
+    auto: notifyExtra?.auto,
+    now: ctx.at,
+  });
+}
 
 function textOf(payload: Record<string, unknown>, key: string): string | undefined {
   const value = payload[key];
@@ -92,34 +139,7 @@ export async function dispatchBugDecision(
   const reason = textOf(ctx.request.payload, "reason");
 
   if (ctx.request.kind === "accepted") {
-    if (item !== undefined) {
-      await updateWorkItemProjection(db, {
-        id: item.id,
-        status: "done",
-        attention: "none",
-        acceptanceRef: ctx.triggerId,
-        nextAction: null,
-        endedAt: ctx.at,
-        updatedAt: ctx.at,
-      });
-    }
-    const eventId = deps.newEventId();
-    await appendWorkItemEvent(db, {
-      id: eventId,
-      workItemId: outcome.workItemId,
-      kind: "accepted",
-      triggerId: ctx.triggerId,
-      evidenceRefsJson: ctx.refsJson,
-      payloadJson: JSON.stringify(ctx.request.payload),
-      occurredAt: ctx.at,
-    });
-    await notifyWorkEvent(db, {
-      workItemId: outcome.workItemId,
-      eventId,
-      kind: "accepted",
-      chatId: deps.collabChatId,
-      now: ctx.at,
-    });
+    await applyWorkItemAcceptance(db, ctx, deps, outcome.workItemId, ctx.request.payload);
     return {
       resolved: {
         disposition: "continued",

@@ -12,6 +12,7 @@ import {
   touchWorkThreadTrigger,
 } from "../../store/repositories/work-thread.js";
 import type { DispatchContext } from "./contract.js";
+import { applyWorkItemAcceptance } from "./decision.js";
 import type { DispatchDeps, DispatchOutcome, OwnerContinueOutcome } from "./dispatch.js";
 import { notifyWorkEvent } from "./notify.js";
 
@@ -22,6 +23,8 @@ import { notifyWorkEvent } from "./notify.js";
  * 订阅,让不带 PR 正文的 check_suite 也能沿该线程回流到同一事项。
  * 待验收判定口径(§9.4 ④):只有 PR 当前 head SHA 的 check_suite 全绿才进
  * acceptance;旧 SHA 绿、当前 SHA 红、自报完成都不算。
+ * 2026-11-09「合并即验收」:pr.closed 且 merged=true 直接走 applyWorkItemAcceptance
+ * 自动收口(人在 GitHub 点合并即拍板,不看 CI/attention);未合并关闭仍交人。
  */
 
 interface ValidationState {
@@ -91,6 +94,8 @@ export async function dispatchGithubEvidence(
   const eventKind =
     kind === "check.completed" ? "ci_result" : kind === "pr.closed" ? "pr_closed" : "pr_linked";
   let decidedKind: string | null = null;
+  // merged=true 的 accepted 事件与通知由 applyWorkItemAcceptance 落,尾部不再追加
+  let autoAccepted = false;
 
   if (item !== undefined) {
     if (kind === "pr.opened" || kind === "pr.synchronized") {
@@ -113,13 +118,30 @@ export async function dispatchGithubEvidence(
         });
       }
     } else if (kind === "pr.closed") {
-      const merged = payload["merged"] === true;
-      await updateWorkItemProjection(db, {
-        id: item.id,
-        attention: "stalled",
-        nextAction: `PR 已关闭(${merged ? "已合并" : "未合并"}):等待人工决定重开或收口`,
-        updatedAt: ctx.at,
-      });
+      if (payload["merged"] === true) {
+        // 合并即验收(2026-11-09 裁决):点合并即人工拍板,不看 CI/attention/stage
+        await applyWorkItemAcceptance(
+          db,
+          ctx,
+          deps,
+          outcome.workItemId,
+          {
+            merged: true,
+            merge_commit_sha: textOf(payload, "merge_commit_sha") ?? null,
+            pr_url: textOf(payload, "pr_url") ?? null,
+            pr_number: typeof payload["pr_number"] === "number" ? payload["pr_number"] : null,
+          },
+          { auto: true, prUrl: textOf(payload, "pr_url") },
+        );
+        autoAccepted = true;
+      } else {
+        await updateWorkItemProjection(db, {
+          id: item.id,
+          attention: "stalled",
+          nextAction: "PR 已关闭(未合并):等待人工决定重开或收口",
+          updatedAt: ctx.at,
+        });
+      }
     } else if (kind === "check.completed") {
       const headSha = textOf(payload, "head_sha");
       const conclusion = textOf(payload, "conclusion");
@@ -139,7 +161,7 @@ export async function dispatchGithubEvidence(
           stage: "review",
           attention: "acceptance",
           validationJson: JSON.stringify(validation),
-          nextAction: "等待原 Bug 机器人人工接受",
+          nextAction: "CI 已绿,PR 合并后自动收口",
           updatedAt: ctx.at,
         });
         decidedKind = "acceptance_ready";
@@ -158,34 +180,36 @@ export async function dispatchGithubEvidence(
     }
   }
 
-  const eventId = deps.newEventId();
-  const appendedKind = decidedKind ?? eventKind;
-  await appendWorkItemEvent(db, {
-    id: eventId,
-    workItemId: outcome.workItemId,
-    kind: appendedKind,
-    triggerId: ctx.triggerId,
-    evidenceRefsJson: ctx.refsJson,
-    payloadJson: JSON.stringify(payload),
-    occurredAt: ctx.at,
-  });
-  if (
-    appendedKind === "pr_linked" ||
-    appendedKind === "acceptance_ready" ||
-    appendedKind === "ci_failed"
-  ) {
-    // check.completed payload 不带 pr_url,待验收文案的 PR 链接从 validation 状态回读
-    const prUrl =
-      textOf(payload, "pr_url") ??
-      (item !== undefined ? (readValidation(item).prUrl ?? undefined) : undefined);
-    await notifyWorkEvent(db, {
+  if (!autoAccepted) {
+    const eventId = deps.newEventId();
+    const appendedKind = decidedKind ?? eventKind;
+    await appendWorkItemEvent(db, {
+      id: eventId,
       workItemId: outcome.workItemId,
-      eventId,
       kind: appendedKind,
-      chatId: deps.collabChatId,
-      prUrl,
-      now: ctx.at,
+      triggerId: ctx.triggerId,
+      evidenceRefsJson: ctx.refsJson,
+      payloadJson: JSON.stringify(payload),
+      occurredAt: ctx.at,
     });
+    if (
+      appendedKind === "pr_linked" ||
+      appendedKind === "acceptance_ready" ||
+      appendedKind === "ci_failed"
+    ) {
+      // check.completed payload 不带 pr_url,待验收文案的 PR 链接从 validation 状态回读
+      const prUrl =
+        textOf(payload, "pr_url") ??
+        (item !== undefined ? (readValidation(item).prUrl ?? undefined) : undefined);
+      await notifyWorkEvent(db, {
+        workItemId: outcome.workItemId,
+        eventId,
+        kind: appendedKind,
+        chatId: deps.collabChatId,
+        prUrl,
+        now: ctx.at,
+      });
+    }
   }
   return {
     resolved: {

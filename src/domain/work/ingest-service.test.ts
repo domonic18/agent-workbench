@@ -547,7 +547,7 @@ describe("github 待验收判定", () => {
       attention: "acceptance",
       status: "open",
     });
-    expect(item?.nextAction).toContain("人工接受");
+    expect(item?.nextAction).toContain("自动收口");
     expect(JSON.parse(item?.validationJson ?? "{}")).toMatchObject({
       prUrl: "https://github.com/octocat/demo/pull/12",
       headSha: "abc123",
@@ -612,7 +612,7 @@ describe("github 待验收判定", () => {
     await db.close();
   });
 
-  it("PR 关闭置 stalled:未合并与已合并都交人决定收口", async () => {
+  it("PR 关闭未合并置 stalled:交人决定重开或收口", async () => {
     const { db, service } = await prepare();
     await seedWithPr(service, "abc123");
 
@@ -630,6 +630,170 @@ describe("github 待验收判定", () => {
     expect(item?.nextAction).toContain("PR 已关闭");
     const events = await listWorkItemEvents(db, "wim_1");
     expect(events.at(-1)?.kind).toBe("pr_closed");
+    await db.close();
+  });
+
+  it("pr.closed merged=true 合并即验收:done 收口,accepted 事件带合并证据", async () => {
+    const { db, service } = await prepare();
+    await seedWithPr(service, "abc123");
+
+    const closed = await service.ingest(
+      githubRequest({
+        sourceEventId: "gh-pr-merged",
+        kind: "pr.closed",
+        payload: { ...prPayload("abc123"), merged: true, merge_commit_sha: "msha789" },
+      }),
+    );
+    expect(closed.trigger).toMatchObject({ disposition: "continued", workItemId: "wim_1" });
+
+    const item = await findWorkItemById(db, "wim_1");
+    expect(item).toMatchObject({ status: "done", attention: "none", nextAction: null });
+    expect(item?.acceptanceRef).toBe(closed.trigger.id);
+    expect(item?.endedAt).toBe(5_000);
+    const events = await listWorkItemEvents(db, "wim_1");
+    expect(events.map((event) => event.kind)).toEqual([
+      "routed",
+      "assigned",
+      "pr_linked",
+      "accepted",
+    ]);
+    expect(JSON.parse(events.at(-1)?.payloadJson ?? "{}")).toMatchObject({
+      merged: true,
+      merge_commit_sha: "msha789",
+      pr_url: "https://github.com/octocat/demo/pull/12",
+      pr_number: 12,
+    });
+    await db.close();
+  });
+
+  it("合并即验收不看 CI 与 attention:无 CI/待验收/阻塞三态都收口", async () => {
+    for (const phase of ["no-ci", "ci-green", "blocked"] as const) {
+      const { db, service } = await prepare();
+      await seedWithPr(service, "abc123");
+      if (phase === "ci-green") {
+        await service.ingest(
+          githubRequest({
+            sourceEventId: "gh-ci-green-c",
+            kind: "check.completed",
+            threadRefs: [
+              { source: "github", externalKind: "pull_request", externalKey: PR_API_URL },
+            ],
+            payload: checkPayload("abc123", "success"),
+          }),
+        );
+      }
+      if (phase === "blocked") {
+        await db.run("UPDATE work_item SET attention = 'blocked' WHERE id = 'wim_1'");
+      }
+      await service.ingest(
+        githubRequest({
+          sourceEventId: `gh-pr-merged-${phase}`,
+          kind: "pr.closed",
+          payload: { ...prPayload("abc123"), merged: true, merge_commit_sha: "msha789" },
+        }),
+      );
+      expect((await findWorkItemById(db, "wim_1"))?.status).toBe("done");
+      await db.close();
+    }
+  });
+
+  it("merged 收口的 delivery 重推幂等:replayed,accepted 不重复", async () => {
+    const { db, service } = await prepare();
+    await seedWithPr(service, "abc123");
+    const mergedReq = githubRequest({
+      sourceEventId: "gh-pr-merged",
+      kind: "pr.closed",
+      payload: { ...prPayload("abc123"), merged: true, merge_commit_sha: "msha789" },
+    });
+    await service.ingest(mergedReq);
+
+    const replay = await service.ingest(mergedReq);
+    expect(replay.replayed).toBe(true);
+    const events = await listWorkItemEvents(db, "wim_1");
+    expect(events.filter((event) => event.kind === "accepted")).toHaveLength(1);
+    await db.close();
+  });
+
+  it("收口后迟到的 check.completed:owner_closed 留痕,事项保持 done", async () => {
+    const { db, service } = await prepare();
+    await seedWithPr(service, "abc123");
+    await service.ingest(
+      githubRequest({
+        sourceEventId: "gh-pr-merged",
+        kind: "pr.closed",
+        payload: { ...prPayload("abc123"), merged: true, merge_commit_sha: "msha789" },
+      }),
+    );
+
+    const late = await service.ingest(
+      githubRequest({
+        sourceEventId: "gh-ci-late",
+        kind: "check.completed",
+        threadRefs: [
+          { source: "github", externalKind: "pull_request", externalKey: PR_API_URL },
+        ],
+        payload: checkPayload("abc123", "success"),
+      }),
+    );
+    expect(late.trigger).toMatchObject({
+      disposition: "needs_person",
+      reasonCode: "owner_closed",
+    });
+    const item = await findWorkItemById(db, "wim_1");
+    expect(item?.status).toBe("done");
+    expect(item?.attention).toBe("none");
+    const events = await listWorkItemEvents(db, "wim_1");
+    expect(events.map((event) => event.kind)).toEqual([
+      "routed",
+      "assigned",
+      "pr_linked",
+      "accepted",
+    ]);
+    await db.close();
+  });
+
+  it("批量 PR(多 Fixes)合并:两个 open 事项同触发双收口", async () => {
+    const { db, service } = await prepare();
+    const ISSUE_13_URL = "https://github.com/octocat/demo/issues/13";
+    await service.ingest(
+      request({
+        sourceEventId: "evt-1",
+        threadRefs: [{ source: "bug", externalKind: "issue", externalKey: ISSUE_URL }],
+      }),
+    );
+    await service.ingest(
+      request({
+        sourceEventId: "evt-2",
+        threadRefs: [{ source: "bug", externalKind: "issue", externalKey: ISSUE_13_URL }],
+      }),
+    );
+    const bothRefs = [
+      { source: "bug", externalKind: "issue", externalKey: ISSUE_URL },
+      { source: "bug", externalKind: "issue", externalKey: ISSUE_13_URL },
+    ];
+    await service.ingest(
+      githubRequest({
+        sourceEventId: "gh-pr-open-2",
+        threadRefs: bothRefs,
+        payload: prPayload("abc123"),
+      }),
+    );
+    const closed = await service.ingest(
+      githubRequest({
+        sourceEventId: "gh-pr-merged-2",
+        kind: "pr.closed",
+        threadRefs: bothRefs,
+        payload: { ...prPayload("abc123"), merged: true, merge_commit_sha: "msha789" },
+      }),
+    );
+    expect(closed.trigger).toMatchObject({ disposition: "continued", workItemId: "wim_1" });
+
+    expect((await findWorkItemById(db, "wim_1"))?.status).toBe("done");
+    expect((await findWorkItemById(db, "wim_2"))?.status).toBe("done");
+    for (const itemId of ["wim_1", "wim_2"]) {
+      const events = await listWorkItemEvents(db, itemId);
+      expect(events.filter((event) => event.kind === "accepted")).toHaveLength(1);
+    }
     await db.close();
   });
 

@@ -94,7 +94,12 @@ export function githubWebhookToWorkRequest(
         pr_api_url: prApiUrl,
         head_sha: headSha,
         title: text(pr.title) ?? null,
-        ...(action === "closed" ? { merged: pr.merged === true } : {}),
+        ...(action === "closed"
+          ? {
+              merged: pr.merged === true,
+              merge_commit_sha: text(pr.merge_commit_sha) ?? null,
+            }
+          : {}),
       },
       refs: [prUrl],
     };
