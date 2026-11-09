@@ -1,12 +1,13 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { newPrefixedId } from "../../shared/ids.js";
+import { KNOWLEDGE_LIMITS } from "../../shared/constants.js";
 import type { Db } from "../../store/database.js";
 import { findTaskOwnedBy } from "../../store/repositories/task.js";
 import { findKnowledgeEntryByPath, insertKnowledgeEntry } from "../../store/repositories/knowledge.js";
 import type { AgentRecord } from "../../store/repositories/agent.js";
 import { KnowledgeError } from "./entry-service.js";
-import { isProtectedKnowledgePath, resolveEntryPath } from "./paths.js";
+import { isProtectedKnowledgePath, normalizeKnowledgePath, resolveEntryPath } from "./paths.js";
 
 export interface KnowledgeCandidateInput {
   taskId: string;
@@ -40,18 +41,26 @@ export async function writeKnowledgeCandidate(
   if (path === "" || title === "" || content.trim() === "") {
     throw new KnowledgeError("CONFLICT", "path、title 与 content 均必填");
   }
-  if (isProtectedKnowledgePath(path)) {
+  // 越界先按原路径判:`../` 逃逸不能被归一化掩盖成目录内的另一个文件
+  const fullPath = resolveEntryPath(deps.knowledgeDir, path);
+  const normalizedPath = normalizeKnowledgePath(path);
+  if (isProtectedKnowledgePath(fullPath)) {
     throw new KnowledgeError("PROTECTED", `受保护文件只读: ${path}`);
+  }
+  if (content.length > KNOWLEDGE_LIMITS.content) {
+    throw new KnowledgeError(
+      "VALIDATION_FAILED",
+      `正文超长,上限 ${KNOWLEDGE_LIMITS.content} 字符`,
+    );
   }
   if ((await findTaskOwnedBy(deps.db, input.taskId, agent.id)) === undefined) {
     throw new KnowledgeError("CONFLICT", `任务 ${input.taskId} 不存在或不属于当前 Agent`);
   }
-  if ((await findKnowledgeEntryByPath(deps.db, path)) !== undefined) {
-    throw new KnowledgeError("CONFLICT", `知识路径已存在: ${path}`);
+  // 查重按归一化路径:同一文件的别名写法不能绕过「已存在」检查去覆盖别人已采纳的内容
+  if ((await findKnowledgeEntryByPath(deps.db, normalizedPath)) !== undefined) {
+    throw new KnowledgeError("CONFLICT", `知识路径已存在: ${normalizedPath}`);
   }
 
-  resolveEntryPath(deps.knowledgeDir, path); // 越界即抛
-  const fullPath = resolveEntryPath(deps.knowledgeDir, path);
   await mkdir(dirname(fullPath), { recursive: true });
   await writeFile(fullPath, content, "utf8");
 
@@ -59,7 +68,7 @@ export async function writeKnowledgeCandidate(
   const id = (deps.newId ?? (() => newPrefixedId("kb")))();
   await insertKnowledgeEntry(deps.db, {
     id,
-    path,
+    path: normalizedPath,
     title,
     summary: input.summary?.trim() ?? "",
     category: input.category?.trim() ?? "",
@@ -68,5 +77,5 @@ export async function writeKnowledgeCandidate(
     sourceAgentId: agent.id,
     createdAt: at,
   });
-  return { id, path };
+  return { id, path: normalizedPath };
 }

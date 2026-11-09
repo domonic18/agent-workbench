@@ -464,16 +464,14 @@ describe("task create 关联工作事项", () => {
     await db.close();
   });
 
-  it("事项不存在、项目不一致、未持 assignment 分别拒绝", async () => {
+  it("事项不存在、未持 assignment 拒绝;项目以事项为准", async () => {
     const { db, service } = await prepare();
     await seedWork(db);
 
     await expectCode(() => service.create(createInput({ workItemId: "wim_missing" })), "NOT_FOUND");
-    // wim_1 项目为 aw,任务报 demo 项目
-    await expectCode(
-      () => service.create(createInput({ project: "demo", workItemId: "wim_1" })),
-      "VALIDATION_FAILED",
-    );
+    // 项目由事项决定:自述的 demo 被忽略,落库是事项的 aw
+    const task = await service.create(createInput({ project: "demo", workItemId: "wim_1" }));
+    expect(task.project).toBe("aw");
     await db.run("UPDATE worker_inbox SET status = 'handed_back' WHERE id = 'wib_1'");
     await expectCode(() => service.create(createInput({ workItemId: "wim_1" })), "FORBIDDEN");
     await db.close();

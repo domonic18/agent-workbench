@@ -6,7 +6,7 @@ import { openDatabase, type Db } from "../../store/database.js";
 import { buildApp } from "../app.js";
 import { ensureConsoleCredential, hasConsoleCredential } from "../credential.js";
 
-const PASSWORD = "simple-123";
+const PASSWORD = "simple-123456";
 
 interface Fixture {
   db: Db;
@@ -172,7 +172,7 @@ describe("POST /api/bootstrap/admin", () => {
     const response = await fixture.app.inject({
       method: "POST",
       url: "/api/bootstrap/admin",
-      payload: { token, password: "another-456" },
+      payload: { token, password: "another-456789" },
     });
     expect(response.statusCode).toBe(409);
     await fixture.db.close();

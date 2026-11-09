@@ -6,6 +6,13 @@ export interface CredentialInit {
   created: boolean;
 }
 
+/** 口令长度下限:后端写入与前端表单共用同一处常量,避免两侧各写一个数字 */
+function assertPasswordLength(password: string): void {
+  if (password.length < CONSOLE_PASSWORD_MIN_LENGTH) {
+    throw new Error(`口令至少 ${CONSOLE_PASSWORD_MIN_LENGTH} 位`);
+  }
+}
+
 /** 首次启动把口令哈希写入库;已存在则忽略种子,不再改写。
  *  无种子且库中无凭据时不抛错——进入 bootstrap mode(01 §2),
  *  由调用方检查 hasConsoleCredential 决定是否签发一次性 bootstrap_admin token。 */
@@ -33,13 +40,11 @@ export async function hasConsoleCredential(db: Db): Promise<boolean> {
 
 /** 写入管理员口令哈希;仅 bootstrap mode 首次设置时调用,已存在则违反唯一主键 */
 export async function setConsolePassword(db: Db, password: string): Promise<void> {
-  if (password.length < CONSOLE_PASSWORD_MIN_LENGTH) {
-    throw new Error(`口令至少 ${CONSOLE_PASSWORD_MIN_LENGTH} 位`);
-  }
+  assertPasswordLength(password);
   const now = Date.now();
   await db.run(
     "INSERT INTO console_credential (id, password_hash, created_at, updated_at) VALUES (1, ?, ?, ?)",
-    hashSecret(password), now, now);
+    await hashSecret(password), now, now);
 }
 
 /**
@@ -47,13 +52,11 @@ export async function setConsolePassword(db: Db, password: string): Promise<void
  * 会话与口令哈希彼此独立:改口令不动 session 行,不会把在用设备踢下线。
  */
 export async function updateConsolePassword(db: Db, password: string): Promise<void> {
-  if (password.length < CONSOLE_PASSWORD_MIN_LENGTH) {
-    throw new Error(`口令至少 ${CONSOLE_PASSWORD_MIN_LENGTH} 位`);
-  }
+  assertPasswordLength(password);
   const now = Date.now();
   const result = await db.run(
     "UPDATE console_credential SET password_hash = ?, updated_at = ? WHERE id = 1",
-    hashSecret(password), now,
+    await hashSecret(password), now,
   );
   if (result.changes === 0) {
     throw new Error("控制台尚未初始化,无法修改口令");
@@ -65,5 +68,5 @@ export async function verifyConsolePassword(db: Db, password: string): Promise<b
   if (row === undefined) {
     return false;
   }
-  return verifySecret(password, row.password_hash);
+  return await verifySecret(password, row.password_hash);
 }

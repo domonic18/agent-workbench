@@ -9,7 +9,7 @@ import { insertTokenUsage } from "../../store/repositories/token-usage.js";
 import { buildApp } from "../app.js";
 import { ensureConsoleCredential } from "../credential.js";
 
-const PASSWORD = "secret123";
+const PASSWORD = "secret1234567";
 
 const FEISHU = {
   appId: "cli_test",
@@ -385,8 +385,21 @@ describe("task 路由", () => {
       expect(response.statusCode).toBe(200);
       const item = response.json().items[0];
       expect(item.assignee_label).toBe("小工");
-      // 下发人是「console」这种非 Agent 值,原样透出
-      expect(item.assigner_label).toBe("console");
+      // 下发人恒为 Bearer 身份(assigner 由服务端注入),展示同一个机器人名
+      expect(item.assigner_label).toBe("小工");
+    });
+
+    it("请求体自述的 assigner 与 project 一律忽略", async () => {
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/tasks",
+        headers: headers("agt_a"),
+        payload: { title: "整理契约", assigner: "human", project: "别人的项目" },
+      });
+      expect(response.statusCode).toBe(201);
+      const task = response.json().task as { assigner: string; project: string };
+      expect(task.assigner).toBe("agt_a");
+      expect(task.project).toBe("pa");
     });
 
     it("详情一次返回任务、授权摘要与 token 汇总", async () => {

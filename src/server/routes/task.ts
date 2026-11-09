@@ -12,8 +12,6 @@ import { sendError, toTaskDto } from "./task-dto.js";
 
 const createSchema = z.object({
   title: z.string(),
-  assigner: z.string(),
-  project: z.string(),
   deadlineAt: z.number().nullish(),
   output: z.string().nullish(),
   parentTaskId: z.string().nullish(),
@@ -64,8 +62,13 @@ export function registerTaskRoutes(app: FastifyInstance, options: TaskRoutesOpti
         return validationError(reply, parsed.error);
       }
       try {
-        // assignee 恒取 Bearer 身份,请求体自述的 agent_id/assignee 一律忽略
-        const task = await service.create({ ...parsed.data, assignee: agent.id });
+        // assignee / assigner / project 恒取 Bearer 身份,请求体自述的一律忽略
+        const task = await service.create({
+          ...parsed.data,
+          assignee: agent.id,
+          assigner: agent.id,
+          project: agent.project,
+        });
         return reply.code(201).send({ task: toTaskDto(task) });
       } catch (error) {
         if (error instanceof TaskError) {

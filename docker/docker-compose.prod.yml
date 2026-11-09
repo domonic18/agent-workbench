@@ -1,0 +1,75 @@
+# 生产部署专用(由 scripts/deploy.sh 驱动):console 一律用 TCR 不可变 tag 镜像,
+# IMAGE 由 deploy.sh 写入部署目录 .env,不现场构建。
+# 本地开发继续用 docker-compose.yml(make up);项目名保持 agent-workbench,
+# 与旧栈共用 agent-workbench_postgres 数据卷,部署目录迁移不丢数据。
+name: agent-workbench
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: agent_workbench
+      POSTGRES_USER: agent_workbench
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD 必填(.env)}
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5433:5432"
+    # Docker 默认 /dev/shm 只有 64MB,PG 每个后端进程要占 32MB 共享段;
+    # 单测并发建库打满后报 "could not resize shared memory segment",后端被信号杀导致整库进恢复
+    shm_size: 512mb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agent_workbench -d agent_workbench"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
+    restart: unless-stopped
+    logging: *default-logging
+    # 02 §1:仅内部网络 + 宿主机回环,不暴露公网;5433 供本机单测/开发连接
+
+  console:
+    image: ${IMAGE:?IMAGE 必填(.env,由 deploy.sh 写入)}
+    env_file:
+      - ../.env
+    environment:
+      HOST: 0.0.0.0
+      DATABASE_URL: postgres://agent_workbench:${POSTGRES_PASSWORD}@postgres:5432/agent_workbench
+      # 仅空库首次启动需要;口令哈希落库后可留空(01 §2)
+      CONSOLE_INIT_PASSWORD: ${CONSOLE_INIT_PASSWORD:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8787:8787"
+    volumes:
+      - ../workspace:/app/workspace
+    # 健康检查内置于镜像(Dockerfile.console HEALTHCHECK → /healthz);
+    # 迁移随应用启动,健康检查即迁移闸门(deploy.sh 的 --wait 依赖它)
+    restart: unless-stopped
+    logging: *default-logging
+
+  frpc:
+    image: snowdreamtech/frpc:0.61.1
+    profiles: ["tunnel"]
+    depends_on:
+      console:
+        condition: service_healthy
+    command: ["-c", "/etc/frp/frpc.toml"]
+    env_file:
+      - ../.env
+    volumes:
+      - ./frpc.toml:/etc/frp/frpc.toml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    logging: *default-logging
+
+volumes:
+  postgres:

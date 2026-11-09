@@ -32,6 +32,15 @@ describe("cookie 与会话", () => {
     expect(clearSessionCookie()).toContain("Max-Age=0");
   });
 
+  it("Secure 只在加密信道下发,清 cookie 时与原 cookie 保持一致", () => {
+    expect(sessionCookie("abc", true)).toBe(
+      `${SESSION_COOKIE}=abc; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_TTL_MS / 1000}; Secure`,
+    );
+    expect(sessionCookie("abc", false)).not.toContain("Secure");
+    expect(clearSessionCookie(true)).toContain("; Secure");
+    expect(clearSessionCookie(false)).not.toContain("Secure");
+  });
+
   it("会话按库中 expires_at 过期", async () => {
     const db = await prepare();
     let clock = 1_000;

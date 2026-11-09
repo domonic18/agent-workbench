@@ -4,7 +4,7 @@ import { openDatabase, type Db } from "../../store/database.js";
 import { buildApp } from "../app.js";
 import { ensureConsoleCredential } from "../credential.js";
 
-const PASSWORD = "secret123";
+const PASSWORD = "secret1234567";
 
 async function prepare(): Promise<Db> {
   const db = await openDatabase();

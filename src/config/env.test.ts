@@ -14,6 +14,7 @@ describe("loadConfig", () => {
       embedding: undefined,
       feishu: undefined,
       allowedHosts: ["127.0.0.1:8787"],
+      trustProxy: false,
       teleport: {
         tctlPath: "tctl",
         identityFile: undefined,
@@ -96,5 +97,14 @@ describe("loadConfig", () => {
       appSecret: "secret",
       allowedOpenIds: ["ou_a", "ou_b"],
     });
+  });
+
+  it("可信代理开关只认明确取值,写错直接报错", () => {
+    expect(loadConfig({}).trustProxy).toBe(false);
+    expect(loadConfig({ AW_TRUST_PROXY: "" }).trustProxy).toBe(false);
+    expect(loadConfig({ AW_TRUST_PROXY: "1" }).trustProxy).toBe(true);
+    expect(loadConfig({ AW_TRUST_PROXY: "true" }).trustProxy).toBe(true);
+    expect(loadConfig({ AW_TRUST_PROXY: "false" }).trustProxy).toBe(false);
+    expect(() => loadConfig({ AW_TRUST_PROXY: "yes-please" })).toThrow(/AW_TRUST_PROXY/);
   });
 });

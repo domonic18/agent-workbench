@@ -40,7 +40,7 @@ export function AgentRoster({ agents, onCredentials, onEnroll }: AgentRosterProp
         token: issued.token,
         expiresAt: issued.expiresAt,
       });
-      toast.push(`已签发 ${agent.displayName} 的接入令牌`, "positive");
+      toast.push(`已为 ${agent.displayName} 生成接入包`, "positive");
     } catch (error) {
       toast.push(
         error instanceof ApiError ? error.message : "接入令牌签发失败",

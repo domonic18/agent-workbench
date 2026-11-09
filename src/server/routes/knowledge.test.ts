@@ -15,7 +15,7 @@ import { insertKnowledgeEntry } from "../../store/repositories/knowledge.js";
 import { buildApp } from "../app.js";
 import { ensureConsoleCredential } from "../credential.js";
 
-const PASSWORD = "secret123";
+const PASSWORD = "secret1234567";
 const RESULT: KnowledgeRebuildResult = { indexed: 0, skipped: 0, failed: 0, missing: 0 };
 
 function cookieOf(response: LightMyRequestResponse): string {

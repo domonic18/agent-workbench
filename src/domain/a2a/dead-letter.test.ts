@@ -78,7 +78,7 @@ describe("a2a 死信巡检", () => {
 
     expect(result).toEqual({ deadLettered: 1, senders: ["agt_a"] });
     expect(woken).toEqual(["agt_a"]);
-    expect((await findOutboxByKey(db, "idem-1"))?.status).toBe("failed");
+    expect((await findOutboxByKey(db, "a2a:agt_a:idem-1"))?.status).toBe("failed");
     expect(await findDeadLetterByMsgId(db, "msg_1")).toMatchObject({
       fromAgent: "agt_a",
       toAgent: "agt_b",
@@ -123,7 +123,7 @@ describe("a2a 死信巡检", () => {
 
     expect(result).toEqual({ deadLettered: 0, senders: [] });
     expect(await findDeadLetterByMsgId(db, "msg_1")).toBeUndefined();
-    expect((await findOutboxByKey(db, "idem-acked"))?.status).toBe("delivered");
+    expect((await findOutboxByKey(db, "a2a:agt_a:idem-acked"))?.status).toBe("delivered");
     expect(await db.get("SELECT COUNT(*) AS n FROM a2a_dead_letter")).toEqual({ n: 0 });
     await db.close();
   });

@@ -5,3 +5,18 @@
   flex-direction: column;
   gap: var(--space-5);
 }
+
+/* 最近一次签发的接入令牌：关掉弹窗后还能再打开 */
+.recentEnroll {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+}

@@ -11,9 +11,9 @@ export interface LoginLockoutGuard {
    * 当前是否处于锁定期;锁过期、或失败计数已超出一个窗口未活动时顺手清零,
    * 让「连续失败」只在一个窗口内累积。
    */
-  isLocked(source: string): Promise<boolean>;
-  fail(source: string): Promise<void>;
-  succeed(source: string): Promise<void>;
+  isLocked(): Promise<boolean>;
+  fail(): Promise<void>;
+  succeed(): Promise<void>;
 }
 
 export interface LoginLockoutDeps {
@@ -22,16 +22,24 @@ export interface LoginLockoutDeps {
 }
 
 /**
- * 口令校验失败锁定(01 §3):按来源连续失败计数,达到上限锁 10 分钟。
- * 作用于登录与改口令两步的口令校验;已登录会话本身不受影响,锁只挡住校验这一步。
- * 计数落库,重启不绕锁。
+ * 单一全局桶:frp 把所有外部来源收敛到同一个出口 IP,按来源分桶等于没分——
+ * 真按 IP 分,换个出口就能重新开始猜。索性只留一个桶,口令猜测定次全局封顶。
+ *
+ * 代价是攻击者能锁住所有人的登录入口(可用性 DoS);换取的是猜测定次有硬上限。
+ * 已登录的会话不受影响,锁定只挡口令校验这一步。
+ */
+export const LOGIN_LOCKOUT_BUCKET = "global";
+
+/**
+ * 口令校验失败锁定(01 §3):连续失败计数达到上限锁 10 分钟。
+ * 作用于登录与改口令两步的口令校验;计数落库,重启不绕锁。
  */
 export function createLoginLockoutGuard(deps: LoginLockoutDeps): LoginLockoutGuard {
   const { db } = deps;
   const now = deps.now ?? Date.now;
 
-  async function isLocked(source: string): Promise<boolean> {
-    const row = await findLoginFailure(db, source);
+  async function isLocked(): Promise<boolean> {
+    const row = await findLoginFailure(db, LOGIN_LOCKOUT_BUCKET);
     if (row === undefined) {
       return false;
     }
@@ -40,26 +48,31 @@ export function createLoginLockoutGuard(deps: LoginLockoutDeps): LoginLockoutGua
       if (row.lockedUntil > at) {
         return true;
       }
-      await clearLoginFailures(db, source);
+      await clearLoginFailures(db, LOGIN_LOCKOUT_BUCKET);
       return false;
     }
     if (row.updatedAt + LOGIN_LOCKOUT.lockMs <= at) {
-      await clearLoginFailures(db, source);
+      await clearLoginFailures(db, LOGIN_LOCKOUT_BUCKET);
     }
     return false;
   }
 
-  async function fail(source: string): Promise<void> {
+  async function fail(): Promise<void> {
     const at = now();
-    const current = await findLoginFailure(db, source);
+    const current = await findLoginFailure(db, LOGIN_LOCKOUT_BUCKET);
     const failures = (current?.failures ?? 0) + 1;
     const lockedUntil =
       failures >= LOGIN_LOCKOUT.maxFailures ? at + LOGIN_LOCKOUT.lockMs : null;
-    await upsertLoginFailure(db, { source, failures, lockedUntil, updatedAt: at });
+    await upsertLoginFailure(db, {
+      source: LOGIN_LOCKOUT_BUCKET,
+      failures,
+      lockedUntil,
+      updatedAt: at,
+    });
   }
 
-  async function succeed(source: string): Promise<void> {
-    await clearLoginFailures(db, source);
+  async function succeed(): Promise<void> {
+    await clearLoginFailures(db, LOGIN_LOCKOUT_BUCKET);
   }
 
   return { isLocked, fail, succeed };

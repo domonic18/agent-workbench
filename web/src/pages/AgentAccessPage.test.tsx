@@ -104,6 +104,11 @@ describe("协作接入页", () => {
     expect(snippets[0]?.textContent).toContain("claude mcp add --transport http");
     expect(snippets[1]?.textContent).toContain("mcpServers");
     expect(snippets[2]?.textContent).toContain("Header 名: authorization");
+
+    // env 版：配置里只有变量名，密钥只在 export 那一行
+    const envSnippet = await screen.findByText(/Bearer agt_1\.\$\{AW_AGENT_SECRET\}/);
+    expect(envSnippet.textContent).not.toContain("s3cret");
+    expect(screen.getByText("export AW_AGENT_SECRET=s3cret")).toBeTruthy();
   });
 
   it("没有明文密钥时不出配置片段", async () => {
@@ -114,13 +119,13 @@ describe("协作接入页", () => {
     expect(screen.queryByText(/Bearer agt_1\./)).toBeNull();
   });
 
-  it("签发接入令牌后给出可交给 Agent 的令牌与接入步骤", async () => {
+  it("签发接入令牌后弹出接入包:一段文本含地址、令牌与三步命令", async () => {
     const fetcher = fakeFetch();
     vi.stubGlobal("fetch", fetcher);
     renderPage();
 
     expect(await screen.findByText("外接机器人")).toBeTruthy();
-    expect(screen.getByText(/在上面的名册里点某个 Agent/)).toBeTruthy();
+    expect(screen.getByText(/自助接入（推荐）/)).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: /签发接入令牌/ }));
 
@@ -128,10 +133,14 @@ describe("协作接入页", () => {
       const call = fetcher.mock.calls.find(([input]) => String(input).includes("/enroll-token"));
       expect(call).toBeDefined();
     });
-    // 令牌与接入步骤都在页面上
-    expect(await screen.findByText("ott_abc")).toBeTruthy();
-    const steps = await screen.findByText(/api\/agent-enroll/);
-    expect(steps.textContent).toContain("api/agent-kit/guide");
-    expect(steps.textContent).toContain("api/agent/peers");
+    const dialog = await screen.findByRole("dialog", { name: /接入包已生成/ });
+    expect(dialog.textContent).toContain("ott_abc");
+    expect(dialog.textContent).toContain("https://aw.example.com/api/agent-enroll");
+    expect(dialog.textContent).toContain("https://aw.example.com/api/agent-kit/guide");
+    expect(dialog.textContent).toContain("https://aw.example.com/api/agent/peers");
+    // 第 4 步：MCP 配置由 Agent 自己写，附变量展开口径
+    expect(dialog.textContent).toContain("第 4 步");
+    expect(dialog.textContent).toContain("https://aw.example.com/mcp");
+    expect(dialog.textContent).toContain("${AW_AGENT_SECRET}");
   });
 });

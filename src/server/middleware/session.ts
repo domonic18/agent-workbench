@@ -33,13 +33,23 @@ export function parseCookies(header: string | undefined): Record<string, string>
   return cookies;
 }
 
-export function sessionCookie(id: string): string {
-  const maxAge = Math.floor(SESSION_TTL_MS / 1000);
-  return `${SESSION_COOKIE}=${id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;
+/**
+ * 本次请求是否走加密信道。
+ * 控制台当前没有 TLS 终结点(frp 明文转发),此时加 Secure 会被浏览器直接拒收,
+ * 登录会静默失效——所以 Secure 只能逐请求按实际协议判断,不能按部署一刀切。
+ * request.protocol 在 trustProxy 打开且对端是可信代理时采信 X-Forwarded-Proto。
+ */
+export function isSecureRequest(request: FastifyRequest): boolean {
+  return request.protocol === "https";
 }
 
-export function clearSessionCookie(): string {
-  return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
+export function sessionCookie(id: string, secure = false): string {
+  const maxAge = Math.floor(SESSION_TTL_MS / 1000);
+  return `${SESSION_COOKIE}=${id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure ? "; Secure" : ""}`;
+}
+
+export function clearSessionCookie(secure = false): string {
+  return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure ? "; Secure" : ""}`;
 }
 
 export async function startSession(db: Db, now: () => number): Promise<{ id: string; expiresAt: number }> {

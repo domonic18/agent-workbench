@@ -6,7 +6,7 @@ import { insertOutbox } from "../../store/repositories/outbox.js";
 import { buildApp } from "../app.js";
 import { ensureConsoleCredential } from "../credential.js";
 
-const PASSWORD = "secret123";
+const PASSWORD = "secret1234567";
 const AT = 1_700_000_000_000;
 
 function cookieOf(response: LightMyRequestResponse): string {

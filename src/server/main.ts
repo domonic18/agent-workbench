@@ -89,6 +89,7 @@ const app = buildApp({
   knowledgeIndexer,
   knowledgeEntries,
   allowedHosts: config.allowedHosts,
+  trustProxy: config.trustProxy,
   // src/server 与 dist/server 到仓库根同为两级目录
   installScriptPath: fileURLToPath(new URL("../../scripts/install-aw-node.sh", import.meta.url)),
   // 执行面产物镜像:宿主机 workspace/artifacts(容器内同路径),缺失时只影响取件口

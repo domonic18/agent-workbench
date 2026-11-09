@@ -5,7 +5,7 @@ import { insertTask } from "../../store/repositories/task.js";
 import { buildApp } from "../app.js";
 import { ensureConsoleCredential } from "../credential.js";
 
-const PASSWORD = "secret123";
+const PASSWORD = "secret1234567";
 const NOW = 5_000;
 
 async function prepare(): Promise<Db> {

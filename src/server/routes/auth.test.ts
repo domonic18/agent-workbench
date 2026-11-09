@@ -5,7 +5,7 @@ import { openDatabase, type Db } from "../../store/database.js";
 import { buildApp } from "../app.js";
 import { ensureConsoleCredential } from "../credential.js";
 
-const PASSWORD = "secret123";
+const PASSWORD = "secret1234567";
 
 function cookieOf(response: LightMyRequestResponse): string {
   const raw = response.headers["set-cookie"];
@@ -110,7 +110,7 @@ describe("管理员口令修改", () => {
       method: "POST",
       url: "/api/auth/password",
       headers: { "x-requested-with": "fetch", "idempotency-key": "pw-anon" },
-      payload: { currentPassword: PASSWORD, newPassword: "newsecret" },
+      payload: { currentPassword: PASSWORD, newPassword: "newsecret12345" },
     });
     expect(anonymous.statusCode).toBe(401);
 
@@ -118,13 +118,13 @@ describe("管理员口令修改", () => {
       method: "POST",
       url: "/api/auth/password",
       headers: changeHeaders(),
-      payload: { currentPassword: PASSWORD, newPassword: "newsecret" },
+      payload: { currentPassword: PASSWORD, newPassword: "newsecret12345" },
     });
     expect(noKey.statusCode).toBe(422);
   });
 
   it("当前口令不对回 422,旧口令仍能登录", async () => {
-    const response = await changePassword("wrong-pass", "newsecret");
+    const response = await changePassword("wrong-pass", "newsecret12345");
     expect(response.statusCode).toBe(422);
     expect(response.json()).toMatchObject({ error: { code: "VALIDATION_FAILED" } });
 
@@ -149,7 +149,7 @@ describe("管理员口令修改", () => {
     });
     const otherCookie = cookieOf(other);
 
-    const response = await changePassword(PASSWORD, "newsecret");
+    const response = await changePassword(PASSWORD, "newsecret12345");
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ ok: true, revokedSessions: 1 });
 
@@ -173,7 +173,7 @@ describe("管理员口令修改", () => {
     const newLogin = await app.inject({
       method: "POST",
       url: "/api/auth/login",
-      payload: { password: "newsecret" },
+      payload: { password: "newsecret12345" },
     });
     expect(newLogin.statusCode).toBe(200);
   });

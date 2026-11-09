@@ -10,7 +10,7 @@ import { openDatabase, type Db } from "../../store/database.js";
 import { buildApp } from "../app.js";
 import { ensureConsoleCredential } from "../credential.js";
 
-const PASSWORD = "simple-123";
+const PASSWORD = "simple-123456";
 const MACHINE_ID = "m-bootstrap-complete-1";
 const WRITE_HEADERS = { "x-requested-with": "fetch", "idempotency-key": "complete-key" };
 

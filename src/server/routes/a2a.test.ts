@@ -23,7 +23,7 @@ interface Fixture {
 
 async function prepare(): Promise<Fixture> {
   const db = await openDatabase();
-  await ensureConsoleCredential(db, "simple-123");
+  await ensureConsoleCredential(db, "simple-123456");
   const ids = ["agt_a", "agt_b", "agt_c"];
   const secrets = ["secret-a", "secret-b", "secret-c"];
   let idSeq = 0;
