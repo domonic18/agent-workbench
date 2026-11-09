@@ -200,6 +200,46 @@ export async function listWorkItemEvents(
   )) as WorkItemEventRecord[];
 }
 
+/** 事件计数(M3.10-4):自动重排次数以 kind='requeued' 的事件数为准 */
+export async function countWorkItemEvents(
+  db: Db,
+  workItemId: string,
+  kind: string,
+): Promise<number> {
+  const row = (await db.get(
+    "SELECT COUNT(*) AS n FROM work_item_event WHERE work_item_id = ? AND kind = ?",
+    workItemId,
+    kind,
+  )) as { n: number };
+  return row.n;
+}
+
+/**
+ * attention 单向置位(M3.10-4):已处于目标值的事项不再重复置位。
+ * 返回 false = 原本就是该值,调用方据此跳过播报,防巡检逐轮刷屏。
+ */
+export async function markWorkItemAttention(
+  db: Db,
+  id: string,
+  attention: WorkItemAttention,
+  nextAction: string,
+  now: number,
+): Promise<boolean> {
+  return (
+    (
+      await db.run(
+        `UPDATE work_item SET attention = ?, next_action = ?, updated_at = ?
+          WHERE id = ? AND attention <> ?`,
+        attention,
+        nextAction,
+        now,
+        id,
+        attention,
+      )
+    ).changes === 1
+  );
+}
+
 export interface WorkItemProjectionPatch {
   id: string;
   status?: WorkItemStatus;

@@ -33,6 +33,10 @@ const envSchema = z.object({
   FEISHU_COLLAB_CHAT_ID: z.string().optional(),
   // GitHub Webhook 验签密钥(X-Hub-Signature-256);留空不注册 /api/webhooks/github
   GITHUB_WEBHOOK_SECRET: z.string().optional(),
+  // 僵尸任务判定时限(M3.10-4):running 且超过该时长未动 → blocked + 按条件重排
+  AW_TASK_ZOMBIE_HOURS: z.coerce.number().int().min(1).max(168).default(2),
+  // 派工停滞升级时限:assignment pending 超过该时长 → attention=stalled + 播报
+  AW_ASSIGNMENT_STALL_HOURS: z.coerce.number().int().min(1).max(720).default(24),
   // 授权签发(05 §4):只经 tctl 写入 bot traits,真实证书由 tbot 持有
   TELEPORT_TCTL_PATH: z.string().min(1).default("tctl"),
   TELEPORT_IDENTITY_FILE: z.string().optional(),
@@ -72,6 +76,10 @@ export interface Config {
   trustProxy: boolean;
   feishu: FeishuConfig | undefined;
   githubWebhookSecret: string | undefined;
+  /** 僵尸任务判定时限(毫秒) */
+  taskZombieMs: number;
+  /** 派工停滞升级时限(毫秒) */
+  assignmentStallMs: number;
   teleport: TeleportConfig;
 }
 
@@ -185,6 +193,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     trustProxy: parseFlag(parsed.data.AW_TRUST_PROXY, "AW_TRUST_PROXY"),
     feishu: parseFeishu(parsed.data),
     githubWebhookSecret: optionalText(parsed.data.GITHUB_WEBHOOK_SECRET),
+    taskZombieMs: parsed.data.AW_TASK_ZOMBIE_HOURS * 3_600_000,
+    assignmentStallMs: parsed.data.AW_ASSIGNMENT_STALL_HOURS * 3_600_000,
     teleport: {
       tctlPath: parsed.data.TELEPORT_TCTL_PATH,
       identityFile: optionalText(parsed.data.TELEPORT_IDENTITY_FILE),

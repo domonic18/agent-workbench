@@ -15,6 +15,8 @@ describe("loadConfig", () => {
       feishu: undefined,
       allowedHosts: ["127.0.0.1:8787"],
       trustProxy: false,
+      taskZombieMs: 2 * 3_600_000,
+      assignmentStallMs: 24 * 3_600_000,
       teleport: {
         tctlPath: "tctl",
         identityFile: undefined,
