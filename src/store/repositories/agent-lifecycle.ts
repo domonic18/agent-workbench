@@ -1,5 +1,7 @@
+import { randomUUID } from "node:crypto";
 import type { IdentityStatus } from "../../shared/constants.js";
 import type { Db } from "../database.js";
+import { appendWorkItemEvent } from "./work-item.js";
 
 /** Agent 档案可改字段;密钥与路由 key 不由控制台会话改写 */
 export interface AgentProfilePatch {
@@ -161,8 +163,40 @@ export async function deleteAgentCascade(
   agentId: string,
   deletedAt: number,
 ): Promise<void> {
-  // 派工信箱的 target_agent_id 是 NOT NULL,只能删
+  // 派工信箱的 target_agent_id 是 NOT NULL,只能删;先记下受影响的 open 事项,
+  // 删除后兜底:失去全部投递行的 open 事项标 attention=person,否则永久饿死无人可见
+  const orphanCandidates = (await db.all(
+    `SELECT DISTINCT i.id FROM work_item i
+       JOIN worker_inbox w ON w.work_item_id = i.id
+      WHERE w.target_agent_id = ? AND i.status = 'open'`,
+    agentId,
+  )) as { id: string }[];
   await db.run("DELETE FROM worker_inbox WHERE target_agent_id = ?", agentId);
+  for (const candidate of orphanCandidates) {
+    const remaining = await db.get(
+      "SELECT 1 FROM worker_inbox WHERE work_item_id = ? LIMIT 1",
+      candidate.id,
+    );
+    if (remaining !== undefined) {
+      continue;
+    }
+    await db.run(
+      `UPDATE work_item
+          SET attention = 'person', next_action = '承接 Agent 已删除,待人工重新派发', updated_at = ?
+        WHERE id = ?`,
+      deletedAt,
+      candidate.id,
+    );
+    await appendWorkItemEvent(db, {
+      id: randomUUID(),
+      workItemId: candidate.id,
+      kind: "orphaned",
+      triggerId: null,
+      evidenceRefsJson: "[]",
+      payloadJson: JSON.stringify({ deleted_agent: agentId }),
+      occurredAt: deletedAt,
+    });
+  }
   // 触发事实与知识条目的引用可空:保留事实本身,只断开指向
   await db.run("UPDATE work_trigger SET target_agent_id = NULL WHERE target_agent_id = ?", agentId);
   await db.run("UPDATE knowledge_entry SET source_agent_id = NULL WHERE source_agent_id = ?", agentId);

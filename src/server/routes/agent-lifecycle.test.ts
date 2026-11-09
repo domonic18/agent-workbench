@@ -300,11 +300,48 @@ describe("Agent 生命周期路由", () => {
     // 追加式审计与任务保留
     expect(await db.get("SELECT id FROM tool_call_log WHERE agent_id = 'a1'")).toBeDefined();
     expect(await db.get("SELECT id FROM task WHERE assignee = 'a1'")).toBeDefined();
+    // 孤儿事项兜底(M3.10-4):唯一投递行被删的 open 事项标记需人,不再无声饿死
+    const orphan = await db.get<{ attention: string; nextAction: string | null }>(
+      'SELECT attention, next_action AS "nextAction" FROM work_item WHERE id = \'wi1\'',
+    );
+    expect(orphan?.attention).toBe("person");
+    expect(orphan?.nextAction).toContain("已删除");
+    const orphanEvent = await db.get<{ kind: string }>(
+      "SELECT kind FROM work_item_event WHERE work_item_id = 'wi1'",
+    );
+    expect(orphanEvent?.kind).toBe("orphaned");
     // 墓碑留名
     const tomb = await db.get<{ displayName: string }>(
       'SELECT display_name AS "displayName" FROM agent_tombstone WHERE id = \'a1\'',
     );
     expect(tomb?.displayName).toBe("Agent One");
+  });
+
+  it("删除只孤儿化失去全部投递行的事项:仍有他 Agent 的行不标记", async () => {
+    await seedRelations();
+    await insertWorkerInboxIfNew(db, {
+      id: "in2",
+      kind: "assignment",
+      workItemId: "wi1",
+      triggerId: "wt1",
+      targetAgentId: "a2",
+      idempotencyKey: "ib-2",
+      payloadJson: "{}",
+      createdAt: AT,
+    });
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/api/agents/a1",
+      headers: writeHeaders(),
+    });
+    expect(response.statusCode).toBe(200);
+    const item = await db.get<{ attention: string }>(
+      'SELECT attention FROM work_item WHERE id = \'wi1\'',
+    );
+    expect(item?.attention).toBe("none");
+    expect(
+      await db.get("SELECT kind FROM work_item_event WHERE work_item_id = 'wi1' AND kind = 'orphaned'"),
+    ).toBeUndefined();
   });
 
   it("删除后任务列表显示「已删除 Agent X」", async () => {
