@@ -7,6 +7,7 @@ import {
   MACHINE_COLUMN_HINT,
   NOT_COLLECTED,
   RUNTIME_LABEL,
+  SESSION_COLUMN_HINT,
 } from "../../shared/labels.js";
 import { agentDisplayName, hasCollector } from "../../shared/agent-label.js";
 import { RuntimeIcon } from "../../shared/runtime-icon.js";
@@ -22,7 +23,7 @@ export interface AgentColumnOptions {
   onRotateKey: (agent: AgentRosterSummary) => void;
 }
 
-/** 宽屏表格的列定义：Agent / 运行时 / 机器 / 状态 / 当前任务 / 今日 Token / 累计运行 / 最近运行 / 操作 */
+/** 宽屏表格的列定义：Agent / 运行时 / 机器 / 活跃会话 / 状态 / 当前任务 / 今日 Token / 累计运行 / 最近运行 / 操作 */
 export function buildAgentColumns(options: AgentColumnOptions): TableColumn<AgentRosterSummary>[] {
   const { liveById, onEdit, onRotateKey } = options;
   return [
@@ -81,6 +82,34 @@ export function buildAgentColumns(options: AgentColumnOptions): TableColumn<Agen
                 {name}
               </span>
             )}
+          </span>
+        );
+      },
+    },
+    {
+      key: "sessions",
+      width: "76px",
+      header: (
+        <span className={styles.headerCell}>
+          活跃会话
+          <Tooltip label={SESSION_COLUMN_HINT}>
+            <CircleHelp size={13} aria-hidden="true" />
+          </Tooltip>
+        </span>
+      ),
+      align: "right",
+      render: (agent) => {
+        if (!hasCollector(agent)) {
+          return <span className={styles.muted}>{NOT_COLLECTED}</span>;
+        }
+        const live = liveById.get(agent.id);
+        if (live === undefined || live.activeSessions === null) {
+          return <span className={styles.muted}>—</span>;
+        }
+        // 同机共享一个数字;0 是真实空闲,不用占位符掩盖
+        return (
+          <span className={live.activeSessions === 0 ? styles.muted : undefined}>
+            {live.activeSessions}
           </span>
         );
       },

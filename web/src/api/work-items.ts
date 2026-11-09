@@ -72,6 +72,8 @@ export interface WorkItemInboxLink {
   taskId: string | null;
   leaseUntil: number | null;
   reason: string | null;
+  /** 挂起行的 updated_at 即挂起写入时刻,用于展示挂起时长 */
+  updatedAt: number;
   createdAt: number;
 }
 

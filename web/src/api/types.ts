@@ -25,6 +25,8 @@ export interface OverviewAgent {
   machineDisplayName: string | null;
   machineLastSeenAt: number | null;
   heartbeat: HeartbeatState;
+  /** 本机活跃会话数(ingest 按机器聚合,与派发闸门 G4 同口径);机器无关运行时为 null */
+  activeSessions: number | null;
   lastRunAt: number | null;
   running: boolean;
   currentTaskId: string | null;

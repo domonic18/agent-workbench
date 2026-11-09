@@ -64,6 +64,7 @@ function live(overrides: Partial<OverviewAgent> = {}): OverviewAgent {
     machineDisplayName: null,
     machineLastSeenAt: 0,
     heartbeat: "ok",
+    activeSessions: null,
     lastRunAt: null,
     running: false,
     currentTaskId: null,
@@ -221,7 +222,8 @@ describe("Agent 管理表格", () => {
     renderTable();
 
     const table = within(await screen.findByRole("table"));
-    expect(table.getAllByText("未接入 / —").length).toBe(3);
+    // 活跃会话 / 累计运行 / 最近运行 / 今日 Token 四列都标未接入
+    expect(table.getAllByText("未接入 / —").length).toBe(4);
   });
 
   it("外部运行时绑了机器也没有过程数据,仍显示未接入", async () => {
@@ -231,7 +233,7 @@ describe("Agent 管理表格", () => {
     renderTable();
 
     const table = within(await screen.findByRole("table"));
-    expect(table.getAllByText("未接入 / —").length).toBe(3);
+    expect(table.getAllByText("未接入 / —").length).toBe(4);
   });
 
   it("Agent 列显示飞书机器人名,不是 cc-connect 项目名", async () => {

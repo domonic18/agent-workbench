@@ -1,15 +1,17 @@
 import type { ReactNode } from "react";
+import type { WorkHoldReason } from "@shared/constants.js";
 import type {
   WorkItemInboxLink,
   WorkItemRunLink,
   WorkItemTaskLink,
   WorkItemThreadLink,
 } from "../../api/work-items.js";
-import { formatDateTime } from "../../shared/format.js";
+import { formatDateTime, formatDuration } from "../../shared/format.js";
 import {
   THREAD_MODE_LABEL,
   WORKER_INBOX_KIND_LABEL,
   WORKER_INBOX_STATUS_LABEL,
+  WORK_HOLD_REASON_LABEL,
 } from "../../shared/labels.js";
 import { agentMentionLabel } from "../../shared/agent-label.js";
 import styles from "./work-item-drawer.module.css";
@@ -137,7 +139,10 @@ export function WorkItemRelations({
                   {row.reason === null ? null : (
                     <>
                       <span>·</span>
-                      <span>{row.reason}</span>
+                      <span>
+                        挂起:{WORK_HOLD_REASON_LABEL[row.reason as WorkHoldReason] ?? row.reason} · 已挂起{" "}
+                        {formatDuration(Date.now() - row.updatedAt)}
+                      </span>
                     </>
                   )}
                 </span>
