@@ -41,6 +41,14 @@ export interface CollectorConfig {
   dispatchModel: string | null;
   /** claude 可执行文件路径;空表示自动探测 */
   dispatchClaude: string | null;
+  /** G2 cwd 活跃会话判定窗口(毫秒);窗口内新出现的会话文件视为开发进行中 */
+  busySessionWindowMs: number;
+  /** G4 机级活跃会话上限(含交互会话);达到后本轮全机不派发 */
+  maxMachineSessions: number;
+  /** 连续被挡 N 轮后探视退避 5min */
+  dispatchBackoffRounds: number;
+  /** 单批派工上限;超出部分留在收件箱下一批,防超大 PR 不可评审 */
+  batchMaxItems: number;
   batchMax: number;
   backfill: BackfillMode;
   spoolMaxBytes: number;
@@ -170,6 +178,11 @@ export function loadConfig(options: LoadConfigOptions = {}): CollectorConfig {
     sessionTimeoutMs: readInt(env, "AW_SESSION_TIMEOUT_MS", 30 * 60_000, 60_000, 24 * 60 * 60_000),
     dispatchModel: optionalText(env, "AW_DISPATCH_MODEL"),
     dispatchClaude: optionalText(env, "AW_DISPATCH_CLAUDE"),
+    busySessionWindowMs:
+      readInt(env, "AW_BUSY_SESSION_WINDOW_MIN", 15, 1, 24 * 60) * 60_000,
+    maxMachineSessions: readInt(env, "AW_MAX_MACHINE_SESSIONS", 2, 1, 64),
+    dispatchBackoffRounds: readInt(env, "AW_DISPATCH_BACKOFF_ROUNDS", 5, 1, 100),
+    batchMaxItems: readInt(env, "AW_BATCH_MAX_ITEMS", 8, 1, 64),
     batchMax: readInt(env, "AW_BATCH_MAX", 500, 1, 500),
     backfill: parseBackfill(env.AW_BACKFILL),
     spoolMaxBytes: readInt(env, "AW_SPOOL_MAX_BYTES", 512 * 1024 * 1024, 1024 * 1024, 8 * 1024 * 1024 * 1024),

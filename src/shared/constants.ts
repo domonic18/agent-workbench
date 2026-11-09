@@ -307,6 +307,18 @@ export const WORK_INBOX = {
   probeMs: 1_000,
 } as const;
 
+/** 派发闸门挂起原因(M3.10,dispatch-coordination.md §3.1.5):collector 与控制台端点共用 */
+export const WORK_HOLD_REASONS = ["cwd_session_active", "dirty_worktree"] as const;
+export type WorkHoldReason = (typeof WORK_HOLD_REASONS)[number];
+
+/** 僵尸任务回收与派工停滞(M3.10,dispatch-coordination.md §3.3);时限走 AW_TASK_ZOMBIE_HOURS / AW_ASSIGNMENT_STALL_HOURS */
+export const ZOMBIE_RECLAIM = {
+  /** 后台巡检间隔 */
+  pollMs: 5 * 60_000,
+  /** 同一事项自动重排上限:达到后不再重排,attention=stalled 留人裁决 */
+  maxRequeue: 2,
+} as const;
+
 /** 列表接口的统一分页边界:默认 50 条,单页最多 200 条 */
 export const LIST_LIMITS = {
   default: 50,
