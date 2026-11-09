@@ -111,7 +111,11 @@ describe("run 记录事件", () => {
     );
 
     expect(result).toMatchObject({ runId: "run_2", startedRun: true });
-    expect(await findRunById(db, "run_1")).toMatchObject({ status: "ended", endedAt: 1_000 });
+    expect(await findRunById(db, "run_1")).toMatchObject({
+      status: "ended",
+      endedAt: 1_000,
+      endReason: "idle_split",
+    });
     expect(await findRunById(db, "run_2")).toMatchObject({
       status: "running",
       startedAt: 1_000 + RUN_IDLE_GAP_MS,
@@ -202,8 +206,46 @@ describe("run 收尾与任务绑定", () => {
     await service.recordEvent(eventInput({ occurredAt: 1_000, ord: 1 }));
 
     expect(await service.endStream("agt_a", "claude-session:s1", 2_000)).toBe("run_1");
-    expect(await findRunById(db, "run_1")).toMatchObject({ status: "ended", endedAt: 2_000 });
+    expect(await findRunById(db, "run_1")).toMatchObject({
+      status: "ended",
+      endedAt: 2_000,
+      endReason: "process_exit",
+    });
     expect(await service.endStream("agt_a", "claude-session:s1", 3_000)).toBeNull();
+    await db.close();
+  });
+
+  it("收尾后的迟到事件(≤ ended_at)回填原 run,不误开新 run", async () => {
+    const { db, service } = await prepare();
+    await service.recordEvent(eventInput({ occurredAt: 1_000, ord: 1 }));
+    await service.endStream("agt_a", "claude-session:s1", 2_000);
+
+    const late = await service.recordEvent(eventInput({ occurredAt: 1_500, ord: 2 }));
+
+    expect(late).toMatchObject({ runId: "run_1", startedRun: false });
+    expect(await findRunById(db, "run_1")).toMatchObject({
+      status: "ended",
+      // 已收尾的 run 不回拨 last_seen(touch 只作用 running)
+      lastSeenAt: 1_000,
+      endReason: "process_exit",
+    });
+    expect(await listTimelineEventsByRun(db, "run_1")).toHaveLength(2);
+    await db.close();
+  });
+
+  it("收尾后的新事件(> ended_at)开新 run", async () => {
+    const { db, service } = await prepare();
+    await service.recordEvent(eventInput({ occurredAt: 1_000, ord: 1 }));
+    await service.endStream("agt_a", "claude-session:s1", 2_000);
+
+    const next = await service.recordEvent(eventInput({ occurredAt: 2_500, ord: 2 }));
+
+    expect(next).toMatchObject({ runId: "run_2", startedRun: true });
+    expect(await findRunById(db, "run_2")).toMatchObject({
+      status: "running",
+      startedAt: 2_500,
+      endReason: null,
+    });
     await db.close();
   });
 

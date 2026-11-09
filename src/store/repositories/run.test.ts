@@ -75,10 +75,14 @@ describe("agent_run 仓储", () => {
     const db = await prepare();
     await insertRun(db, newRun());
 
-    expect(await endRun(db, "run_1", 2_000)).toBe(true);
-    expect(await endRun(db, "run_1", 3_000)).toBe(false);
+    expect(await endRun(db, "run_1", 2_000, "process_exit")).toBe(true);
+    expect(await endRun(db, "run_1", 3_000, "process_exit")).toBe(false);
     expect(await findRunningRunForStream(db, "agt_a", "claude-session:s1")).toBeUndefined();
-    expect(await findRunById(db, "run_1")).toMatchObject({ status: "ended", endedAt: 2_000 });
+    expect(await findRunById(db, "run_1")).toMatchObject({
+      status: "ended",
+      endedAt: 2_000,
+      endReason: "process_exit",
+    });
     await db.close();
   });
 
@@ -106,7 +110,7 @@ describe("agent_run 仓储", () => {
     // 超出活跃窗口的 run 不再参与建单绑定
     expect(await findLatestUnboundRunningRunByAgent(db, "agt_a", 2_500)).toBeUndefined();
 
-    await endRun(db, "run_1", 4_000);
+    await endRun(db, "run_1", 4_000, "idle_split");
     expect(await findLatestUnboundRunningRunByAgent(db, "agt_a", 2_000)).toBeUndefined();
     await db.close();
   });

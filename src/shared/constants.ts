@@ -347,6 +347,16 @@ export type RunStatus = (typeof RUN_STATUSES)[number];
 /** run 切分硬阈值:同一流相邻事件间隔 ≥30 分钟即开新 run,不做自适应(02 §3.2) */
 export const RUN_IDLE_GAP_MS = 30 * 60 * 1000;
 
+/** run 收尾原因(02 §3.2):NULL=存量历史或 running 中。三层收尾路径见 arch/04 §2 */
+export const RUN_END_REASONS = ["idle_split", "process_exit", "orphan_swept"] as const;
+export type RunEndReason = (typeof RUN_END_REASONS)[number];
+
+/** 迟滞 run 兜底收敛(04 §2 L3):running 是临时状态,不允许无限期滞留 */
+export const RUN_RECLAIM = {
+  /** 后台巡检间隔;收敛时限 = idle gap + 一个巡检周期 */
+  pollMs: 5 * 60_000,
+} as const;
+
 /** SSE(01 §7):20s 心跳防中间层断连,1s 轮询作用域水位,单用户最多 10 个客户端 */
 export const SSE = {
   heartbeatMs: 20_000,

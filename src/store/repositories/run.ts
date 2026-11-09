@@ -1,4 +1,4 @@
-import type { RunStatus } from "../../shared/constants.js";
+import type { RunEndReason, RunStatus } from "../../shared/constants.js";
 import type { Db } from "../database.js";
 import { toJsonbText } from "../json.js";
 
@@ -13,12 +13,13 @@ export interface AgentRunRecord {
   startedAt: number;
   lastSeenAt: number;
   endedAt: number | null;
+  endReason: string | null;
 }
 
 const RUN_COLUMNS = `
   id, agent_id AS "agentId", machine, project, stream_id AS "streamId",
   task_id AS "taskId", status, started_at AS "startedAt", last_seen_at AS "lastSeenAt",
-  ended_at AS "endedAt"
+  ended_at AS "endedAt", end_reason AS "endReason"
 `;
 
 export interface NewAgentRun {
@@ -79,15 +80,52 @@ export async function touchRunLastSeen(db: Db, id: string, lastSeenAt: number): 
   );
 }
 
-export async function endRun(db: Db, id: string, endedAt: number): Promise<boolean> {
+export async function endRun(
+  db: Db,
+  id: string,
+  endedAt: number,
+  endReason: RunEndReason,
+): Promise<boolean> {
   return (
     (
       await db.run(
-        "UPDATE agent_run SET status = 'ended', ended_at = ? WHERE id = ? AND status = 'running'",
-        endedAt, id,
+        "UPDATE agent_run SET status = 'ended', ended_at = ?, end_reason = ? WHERE id = ? AND status = 'running'",
+        endedAt, endReason, id,
       )
     ).changes === 1
   );
+}
+
+/** 流上最近一段 run(不限状态),迟到事件回填判定用 */
+export async function findLatestRunForStream(
+  db: Db,
+  agentId: string,
+  streamId: string,
+): Promise<AgentRunRecord | undefined> {
+  return (await db.get(
+    `SELECT ${RUN_COLUMNS} FROM agent_run
+     WHERE agent_id = ? AND stream_id = ?
+     ORDER BY started_at DESC, id DESC LIMIT 1`,
+    agentId, streamId,
+  )) as AgentRunRecord | undefined;
+}
+
+/**
+ * L3 兜底收敛(04 §2):running 且 last_seen 早于阈值 → 收尾在最后一次活动。
+ * 单条 UPDATE 原子生效,与惰性切分并发时只有一方能收(WHERE status='running' 即 CAS)。
+ */
+export async function sweepStaleRunningRuns(
+  db: Db,
+  staleBefore: number,
+): Promise<string[]> {
+  const rows = (await db.all<{ id: string }>(
+    `UPDATE agent_run
+     SET status = 'ended', ended_at = last_seen_at, end_reason = 'orphan_swept'
+     WHERE status = 'running' AND last_seen_at < ?
+     RETURNING id`,
+    staleBefore,
+  )) as { id: string }[];
+  return rows.map((row) => row.id);
 }
 
 /**
