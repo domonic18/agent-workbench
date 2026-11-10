@@ -147,6 +147,8 @@ export interface HeartbeatCycleDeps {
   /** 取走并清空「自上一跳以来有新字节的流」(L2 观测续命,04 §2);心跳失败即弃,
    *  流继续写会被下一轮扫描重新标记,流停写则本就不该再豁免 */
   activeStreams: () => string[];
+  /** 采集器自身版本:心跳回报,控制台据此展示运行版本与升级提示 */
+  collectorVersion: string;
 }
 
 export interface HeartbeatCycle {
@@ -193,6 +195,7 @@ export function createHeartbeatCycle(deps: HeartbeatCycleDeps): HeartbeatCycle {
         last_error: logger.lastError(),
         streams: streamSummaries(),
         active_streams: deps.activeStreams(),
+        collector_version: deps.collectorVersion,
       });
       const next = new Set(response.projects);
       if (next.size > 0) {

@@ -33,8 +33,12 @@ cp "$BIN_DIR/aw-node-macos-arm64" "$BIN_DIR/aw-node-macos-x64" "$OUT/"
 cd "$OUT"
 shasum -a 256 aw-node-macos-arm64 aw-node-macos-x64 > checksums.txt
 
+# 控制台据此展示「执行机可升级」提示;与产物同批生成,不混批
+node -p "require('$ROOT/collector/package.json').version" | tr -d '\n' > version.txt
+
 echo ""
 echo "已发布到 $OUT:"
 ls -l "$OUT"
 echo ""
 cat "$OUT/checksums.txt"
+echo "version: $(cat "$OUT/version.txt")"

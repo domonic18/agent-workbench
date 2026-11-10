@@ -28,7 +28,7 @@ import {
   startSession,
 } from "../middleware/session.js";
 import { domainError, invalid, invalidSchema } from "./http.js";
-import { listArtifacts } from "./artifacts.js";
+import { listArtifacts, readArtifactVersion } from "./artifacts.js";
 
 const confirmSchema = z.object({
   machineId: z.string().min(1),
@@ -146,7 +146,9 @@ export function registerBootstrapRoutes(app: FastifyInstance, options: Bootstrap
   );
 
   app.get("/api/bootstrap/discovery", { preHandler: [requireSession(db, now)] }, async () => {
-    return { machines: await listDiscoveryForConsole(db) };
+    // 产物目录声明的最新采集器版本:逐机器标「可升级」;未发布产物时不提示
+    const latest = options.artifactDir === undefined ? null : readArtifactVersion(options.artifactDir);
+    return { latestCollectorVersion: latest, machines: await listDiscoveryForConsole(db, latest) };
   });
 
   app.post(

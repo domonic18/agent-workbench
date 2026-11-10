@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Fastify from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
-import { listArtifacts, registerArtifactRoutes } from "./artifacts.js";
+import { listArtifacts, readArtifactVersion, registerArtifactRoutes } from "./artifacts.js";
 
 const DIGEST = "a".repeat(64);
 
@@ -39,6 +39,30 @@ describe("执行面产物下发", () => {
     expect(sums.body).toContain(DIGEST);
 
     await app.close();
+  });
+
+  it("version.txt 按文本下发,升级提示据此取最新版本", async () => {
+    const app = Fastify({ logger: { level: "silent" } });
+    const root = fixtureDir();
+    writeFileSync(join(root, "version.txt"), "0.3.1\n");
+    registerArtifactRoutes(app, root);
+    await app.ready();
+
+    const response = await app.inject({ method: "GET", url: "/artifacts/version.txt" });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toBe("text/plain; charset=utf-8");
+    expect(response.body).toBe("0.3.1\n");
+
+    expect(readArtifactVersion(root)).toBe("0.3.1");
+    expect(readArtifactVersion(join(tmpdir(), "aw-artifacts-missing"))).toBeNull();
+
+    await app.close();
+  });
+
+  it("version.txt 内容不是版本号时读取侧按未发布处理", () => {
+    const root = fixtureDir();
+    writeFileSync(join(root, "version.txt"), "dev-build\n");
+    expect(readArtifactVersion(root)).toBeNull();
   });
 
   it("非白名单文件名一律 404,不做目录浏览", async () => {

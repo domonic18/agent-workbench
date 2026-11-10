@@ -13,7 +13,7 @@ vi.mock("../api/bootstrap.js", async (importOriginal) => {
     bootstrapStatus: vi.fn(),
     bootstrapAdmin: vi.fn(),
     issueEnrollToken: vi.fn(),
-    fetchDiscovery: vi.fn(async () => ({ machines: [] })),
+    fetchDiscovery: vi.fn(async () => ({ machines: [], latestCollectorVersion: null })),
     fetchArtifacts: vi.fn(async () => ({ publicUrl: null, assets: [] })),
     confirmAgents: vi.fn(),
     runPreflight: vi.fn(),

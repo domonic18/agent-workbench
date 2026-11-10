@@ -92,11 +92,45 @@ export interface DiscoveryMachineView {
   lastSeenAt: number | null;
   /** 发现上报:最近一次上报 cc-connect 发现结果的时间,与心跳不同源 */
   receivedAt: number | null;
+  /** 采集器版本:心跳活报,旧版采集器为 enroll 时落的值 */
+  collectorVersion: string;
+  /** 落后于控制台镜像的最新产物版本(版本号不可比或未发布产物时为 false) */
+  upgradeAvailable: boolean;
   projects: DiscoveryProjectView[];
 }
 
-/** 控制台预填视图:发现项目合并已确认状态;控制台不读执行机文件系统,只见上报结果 */
-export async function listDiscoveryForConsole(db: Db): Promise<DiscoveryMachineView[]> {
+/** 点分数字版本比较;任一侧不是纯数字段视为不可比,返回 false(不误报升级) */
+export function isVersionBehind(current: string, latest: string): boolean {
+  const parse = (value: string): number[] | null => {
+    if (!/^\d+(\.\d+)*$/.test(value)) {
+      return null;
+    }
+    return value.split(".").map((part) => Number.parseInt(part, 10));
+  };
+  const a = parse(current);
+  const b = parse(latest);
+  if (a === null || b === null) {
+    return false;
+  }
+  const width = Math.max(a.length, b.length);
+  for (let i = 0; i < width; i += 1) {
+    const l = a[i] ?? 0;
+    const r = b[i] ?? 0;
+    if (l !== r) {
+      return l < r;
+    }
+  }
+  return false;
+}
+
+/**
+ * 控制台预填视图:发现项目合并已确认状态;控制台不读执行机文件系统,只见上报结果。
+ * latestVersion 是控制台产物目录声明的最新采集器版本,用于逐机器标「可升级」。
+ */
+export async function listDiscoveryForConsole(
+  db: Db,
+  latestVersion: string | null = null,
+): Promise<DiscoveryMachineView[]> {
   const machines = await listMachines(db, { limit: 200 });
   const views: DiscoveryMachineView[] = [];
   for (const machine of machines) {
@@ -116,6 +150,8 @@ export async function listDiscoveryForConsole(db: Db): Promise<DiscoveryMachineV
       status: machine.status,
       lastSeenAt: machine.lastSeenAt,
       receivedAt: machine.discoveryReceivedAt,
+      collectorVersion: machine.collectorVersion,
+      upgradeAvailable: latestVersion === null ? false : isVersionBehind(machine.collectorVersion, latestVersion),
       projects: projects.map((project) => ({
         name: project.name,
         ...(project.cwd === undefined ? {} : { cwd: project.cwd }),

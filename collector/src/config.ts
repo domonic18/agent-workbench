@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-export const COLLECTOR_VERSION = "0.3.0";
+export const COLLECTOR_VERSION = "0.3.1";
 
 export type BackfillMode = "none" | "all";
 
@@ -53,6 +53,8 @@ export interface CollectorConfig {
   backfill: BackfillMode;
   spoolMaxBytes: number;
   requestTimeoutMs: number;
+  /** 采集器自身版本:心跳回报给控制台展示 */
+  collectorVersion: string;
 }
 
 export interface ConfigEnv {
@@ -187,6 +189,7 @@ export function loadConfig(options: LoadConfigOptions = {}): CollectorConfig {
     backfill: parseBackfill(env.AW_BACKFILL),
     spoolMaxBytes: readInt(env, "AW_SPOOL_MAX_BYTES", 512 * 1024 * 1024, 1024 * 1024, 8 * 1024 * 1024 * 1024),
     requestTimeoutMs: readInt(env, "AW_REQUEST_TIMEOUT_MS", 30_000, 1_000, 120_000),
+    collectorVersion: COLLECTOR_VERSION,
   };
 }
 

@@ -9,7 +9,18 @@ export const ARTIFACT_FILES = [
 ] as const;
 
 const CHECKSUMS_FILE = "checksums.txt";
+const VERSION_FILE = "version.txt";
 const NOT_FOUND = { error: { code: "NOT_FOUND", message: "not found" } } as const;
+
+/** 产物目录声明的最新采集器版本;未发布产物时返回 null(不提示升级) */
+export function readArtifactVersion(dir: string): string | null {
+  const path = join(resolve(dir), VERSION_FILE);
+  if (!existsSync(path)) {
+    return null;
+  }
+  const version = readFileSync(path, "utf8").trim();
+  return /^\d+(\.\d+){0,3}$/.test(version) ? version : null;
+}
 
 export interface ArtifactEntry {
   name: string;
@@ -71,6 +82,7 @@ export function registerArtifactRoutes(app: FastifyInstance, dir: string): void 
   const allowed = new Set<string>([
     ...ARTIFACT_FILES.map((item) => item.file),
     CHECKSUMS_FILE,
+    VERSION_FILE,
   ]);
   app.get("/artifacts/:name", (request, reply) => {
     const name = (request.params as { name?: string }).name ?? "";
@@ -87,7 +99,9 @@ export function registerArtifactRoutes(app: FastifyInstance, dir: string): void 
     return reply
       .header(
         "content-type",
-        name === CHECKSUMS_FILE ? "text/plain; charset=utf-8" : "application/octet-stream",
+        name === CHECKSUMS_FILE || name === VERSION_FILE
+          ? "text/plain; charset=utf-8"
+          : "application/octet-stream",
       )
       .header("content-length", statSync(path).size)
       .header("cache-control", "no-cache")
