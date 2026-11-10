@@ -108,6 +108,7 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
       activeSinceHeartbeat.clear();
       return streams;
     },
+    collectorVersion: config.collectorVersion,
   });
   // 调度模块:AW_DISPATCH_MS=0 关闭;claude 路径解析不到也不挂载,采集不受影响
   const claudePath = config.dispatchMs > 0 ? resolveClaudePath(config.dispatchClaude) : undefined;

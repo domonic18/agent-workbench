@@ -228,6 +228,26 @@ describe("ingest 路由", () => {
     expect((await findMachineById(fixture.db, "m1"))?.activeStreams).toEqual([]);
   });
 
+  it("心跳携带采集器版本即落库,不携带保留原值", async () => {
+    const beat = await app.inject({
+      method: "POST",
+      url: "/api/ingest/heartbeat",
+      headers: headers(),
+      payload: { uptime: 12, collector_version: "9.9.9" },
+    });
+    expect(beat.statusCode).toBe(200);
+    expect((await findMachineById(fixture.db, "m1"))?.collectorVersion).toBe("9.9.9");
+
+    const legacy = await app.inject({
+      method: "POST",
+      url: "/api/ingest/heartbeat",
+      headers: headers(),
+      payload: { uptime: 12 },
+    });
+    expect(legacy.statusCode).toBe(200);
+    expect((await findMachineById(fixture.db, "m1"))?.collectorVersion).toBe("9.9.9");
+  });
+
   it("心跳与项目列表都要求采集器 Bearer", async () => {
     const heartbeat = await app.inject({
       method: "POST",

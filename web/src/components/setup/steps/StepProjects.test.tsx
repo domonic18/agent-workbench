@@ -23,6 +23,8 @@ const MACHINES = [
     status: "active",
     lastSeenAt: 1_700_000_000_000,
     receivedAt: 1_700_000_000_000,
+    collectorVersion: "0.3.1",
+    upgradeAvailable: false,
     projects: [{ name: "alpha", confirmed: false }, { name: "beta", confirmed: false }],
   },
   {
@@ -32,6 +34,8 @@ const MACHINES = [
     status: "active",
     lastSeenAt: 1_700_000_000_000,
     receivedAt: 1_700_000_000_000,
+    collectorVersion: "0.2.2",
+    upgradeAvailable: true,
     projects: [{ name: "gamma", confirmed: false }],
   },
 ];
@@ -49,7 +53,7 @@ function renderStep(): void {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(bootstrap.fetchDiscovery).mockResolvedValue({ machines: MACHINES });
+  vi.mocked(bootstrap.fetchDiscovery).mockResolvedValue({ machines: MACHINES, latestCollectorVersion: null });
 });
 
 afterEach(() => {

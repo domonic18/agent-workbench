@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { openDatabase, type Db } from "../../store/database.js";
 import { insertMachine, touchMachineLastSeen } from "../../store/repositories/machine.js";
-import { listDiscoveryForConsole, saveDiscoveryReport } from "./discovery.js";
+import {
+  isVersionBehind,
+  listDiscoveryForConsole,
+  saveDiscoveryReport,
+} from "./discovery.js";
 
 async function prepare(): Promise<Db> {
   return openDatabase();
@@ -50,5 +54,40 @@ describe("执行机发现视图", () => {
     expect(view?.lastSeenAt).toBeNull();
     expect(view?.receivedAt).toBeNull();
     await db.close();
+  });
+
+  it("携带最新产物版本时逐机器标可升级,不携带不标", async () => {
+    const db = await prepare();
+    for (const [id, version] of [
+      ["mch_old", "0.2.2"],
+      ["mch_new", "0.3.1"],
+    ] as const) {
+      await insertMachine(db, {
+        id,
+        hostname: id,
+        os: "darwin",
+        collectorVersion: version,
+        collectorSecretHash: "hash",
+        createdAt: 1_000,
+      });
+    }
+
+    const plain = await listDiscoveryForConsole(db);
+    expect(plain.every((view) => view.upgradeAvailable)).toBe(false);
+    expect(plain.map((view) => view.collectorVersion).sort()).toEqual(["0.2.2", "0.3.1"]);
+
+    const withLatest = await listDiscoveryForConsole(db, "0.3.1");
+    expect(withLatest.find((view) => view.machineId === "mch_old")?.upgradeAvailable).toBe(true);
+    expect(withLatest.find((view) => view.machineId === "mch_new")?.upgradeAvailable).toBe(false);
+    await db.close();
+  });
+
+  it("版本比较:点分数字按段比,位数补零,非数字段不可比不误报", () => {
+    expect(isVersionBehind("0.2.9", "0.3.0")).toBe(true);
+    expect(isVersionBehind("0.3.0", "0.3.0")).toBe(false);
+    expect(isVersionBehind("0.10.0", "0.9.9")).toBe(false);
+    expect(isVersionBehind("0.3", "0.3.0")).toBe(false);
+    expect(isVersionBehind("dev", "0.3.0")).toBe(false);
+    expect(isVersionBehind("0.2.2", "dev-build")).toBe(false);
   });
 });

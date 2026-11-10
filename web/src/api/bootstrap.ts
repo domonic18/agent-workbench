@@ -54,6 +54,10 @@ export interface DiscoveryMachineView {
   lastSeenAt: number | null;
   /** 发现上报:最近一次上报 cc-connect 发现结果的时间,与心跳不同源 */
   receivedAt: number | null;
+  /** 采集器版本:心跳活报,旧版采集器为 enroll 时落的值 */
+  collectorVersion: string;
+  /** 落后于控制台镜像的最新产物版本 */
+  upgradeAvailable: boolean;
   projects: DiscoveryProjectView[];
 }
 
@@ -111,7 +115,11 @@ export function issueEnrollToken(): Promise<{ token: string; expiresAt: number }
   });
 }
 
-export function fetchDiscovery(): Promise<{ machines: DiscoveryMachineView[] }> {
+export function fetchDiscovery(): Promise<{
+  machines: DiscoveryMachineView[];
+  /** 控制台产物目录声明的最新采集器版本;未发布产物时为 null */
+  latestCollectorVersion: string | null;
+}> {
   return api.get("/api/bootstrap/discovery");
 }
 

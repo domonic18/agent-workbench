@@ -11,7 +11,7 @@ vi.mock("../../api/bootstrap.js", async (importOriginal) => {
     ...actual,
     issueEnrollToken: vi.fn(),
     fetchArtifacts: vi.fn(async () => ({ publicUrl: null, assets: [] })),
-    fetchDiscovery: vi.fn(async () => ({ machines: [] })),
+    fetchDiscovery: vi.fn(async () => ({ machines: [], latestCollectorVersion: null })),
   };
 });
 

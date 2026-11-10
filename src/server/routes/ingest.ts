@@ -8,6 +8,7 @@ import {
   listActiveAgentProjects,
   touchMachineLastSeen,
   updateMachineActiveStreams,
+  updateMachineCollectorVersion,
   type MachineRecord,
 } from "../../store/repositories/machine.js";
 import { requireMachineAuth } from "../middleware/machine-auth.js";
@@ -22,6 +23,8 @@ const heartbeatSchema = z.object({
   streams: z.array(z.unknown()).max(1000).optional(),
   /** 自上一跳以来有新字节的流(L2 观测续命,04 §2);旧版采集器不携带即覆盖为空 */
   active_streams: z.array(z.string().min(1).max(256)).max(1000).optional(),
+  /** 采集器自身版本;旧版采集器不携带,保留 enroll 时落的值 */
+  collector_version: z.string().min(1).max(32).optional(),
 });
 
 const itemSchema = z.object({
@@ -98,6 +101,9 @@ export function registerIngestRoutes(app: FastifyInstance, options: IngestRoutes
     // 心跳推进机器存活时间、整包覆盖活跃流,并取回可推送项目;CPU / 内存等指标不入库
     await touchMachineLastSeen(db, machine.id, now());
     await updateMachineActiveStreams(db, machine.id, parsed.data.active_streams ?? []);
+    if (parsed.data.collector_version !== undefined) {
+      await updateMachineCollectorVersion(db, machine.id, parsed.data.collector_version);
+    }
     return reply.code(200).send({
       ok: true,
       projects: await listActiveAgentProjects(db, machine.id),

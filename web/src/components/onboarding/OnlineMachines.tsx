@@ -33,9 +33,12 @@ const STATUS_LABEL: Record<string, string> = {
 
 function MachineRow({
   machine,
+  latestVersion,
   onRegistered,
 }: {
   machine: DiscoveryMachineView;
+  /** 控制台镜像的最新采集器版本;未发布产物时为 null */
+  latestVersion: string | null;
   onRegistered: () => void;
 }) {
   const [renaming, setRenaming] = useState(false);
@@ -77,7 +80,7 @@ function MachineRow({
           {machine.displayName ?? machine.hostname}
         </span>
         <span className={styles.machineSub}>
-          {machine.machineId} · 心跳 {heartbeat} · 发现 {discovered}
+          {machine.machineId} · 心跳 {heartbeat} · 发现 {discovered} · 采集器 v{machine.collectorVersion}
           {machine.displayName === null || machine.displayName === machine.hostname
             ? ""
             : ` · 主机名 ${machine.hostname}`}
@@ -87,6 +90,12 @@ function MachineRow({
         <span className={styles.machineSub}>
           项目 {machine.projects.length} 个（已登记 {confirmed}）
         </span>
+        {machine.upgradeAvailable ? (
+          <Badge
+            tone="warning"
+            text={latestVersion === null ? "采集器可升级" : `可升级到 v${latestVersion}`}
+          />
+        ) : null}
         <Badge tone={tone} text={label} />
         <Button size="sm" variant="ghost" onClick={() => setRenaming(true)}>
           改名
@@ -181,6 +190,7 @@ export function OnlineMachines() {
             <MachineRow
               key={machine.machineId}
               machine={machine}
+              latestVersion={machines.data?.latestCollectorVersion ?? null}
               onRegistered={() => {
                 void client.invalidateQueries({ queryKey: ["discovery"] });
               }}

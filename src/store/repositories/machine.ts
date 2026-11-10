@@ -75,7 +75,10 @@ export async function updateMachineDisplayName(
   );
 }
 
-/** 复用存量机器行时刷新采集器版本;机器 id 与 Agent 绑定不变 */
+/**
+ * 复用存量机器行时刷新采集器版本;机器 id 与 Agent 绑定不变。
+ * 值未变化时不写(心跳每分钟都带版本,免无谓 churn)。
+ */
 export async function updateMachineCollectorVersion(
   db: Db,
   id: string,
@@ -83,8 +86,8 @@ export async function updateMachineCollectorVersion(
 ): Promise<boolean> {
   return (
     (await db.run(
-      "UPDATE machine SET collector_version = ? WHERE id = ?",
-      collectorVersion, id,
+      "UPDATE machine SET collector_version = ? WHERE id = ? AND collector_version <> ?",
+      collectorVersion, id, collectorVersion,
     )).changes === 1
   );
 }

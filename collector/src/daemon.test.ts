@@ -90,6 +90,7 @@ function configOf(stateDir: string, claudeDir: string, ccConnectDir: string): Co
     backfill: "all",
     spoolMaxBytes: 512 * 1024 * 1024,
     requestTimeoutMs: 5_000,
+    collectorVersion: "0.3.1",
   };
 }
 
@@ -261,6 +262,8 @@ describe("采集循环", () => {
     ).toBe(true);
     // 之后没有新字节,最后一跳已排水回落为空
     expect(active(client.heartbeats.at(-1)!)).toEqual([]);
+    // 心跳回报采集器版本,控制台据此展示运行版本与升级提示
+    expect(client.heartbeats.every((beat) => beat.collector_version === config.collectorVersion)).toBe(true);
   });
 });
 
