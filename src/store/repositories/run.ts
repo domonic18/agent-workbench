@@ -113,17 +113,28 @@ export async function findLatestRunForStream(
 /**
  * L3 兜底收敛(04 §2):running 且 last_seen 早于阈值 → 收尾在最后一次活动。
  * 单条 UPDATE 原子生效,与惰性切分并发时只有一方能收(WHERE status='running' 即 CAS)。
+ * L2 豁免:run 自己的机器心跳新鲜(last_seen ≥ machineFreshSince)且把该流报进活跃集时,
+ * 说明机器仍在观测到写入,不算孤儿——机器时钟整体落后或 spool 积压回放时不误杀。
  */
 export async function sweepStaleRunningRuns(
   db: Db,
   staleBefore: number,
+  machineFreshSince: number,
 ): Promise<string[]> {
   const rows = (await db.all<{ id: string }>(
     `UPDATE agent_run
      SET status = 'ended', ended_at = last_seen_at, end_reason = 'orphan_swept'
      WHERE status = 'running' AND last_seen_at < ?
+       AND NOT EXISTS (
+         SELECT 1
+         FROM machine m, jsonb_array_elements_text(m.active_streams) AS s(stream_id)
+         WHERE m.id = agent_run.machine
+           AND m.status = 'active'
+           AND m.last_seen_at >= ?
+           AND s.stream_id = agent_run.stream_id
+       )
      RETURNING id`,
-    staleBefore,
+    staleBefore, machineFreshSince,
   )) as { id: string }[];
   return rows.map((row) => row.id);
 }

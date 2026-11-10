@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RUN_IDLE_GAP_MS } from "../../shared/constants.js";
+import { MACHINE_HEARTBEAT, RUN_IDLE_GAP_MS } from "../../shared/constants.js";
 import { openDatabase, type Db } from "../../store/database.js";
 import { findRunById } from "../../store/repositories/run.js";
 import { reclaimRunsOnce, startRunReclaimer } from "./run-reclaim.js";
@@ -104,6 +104,56 @@ describe("迟滞 run 兜底收敛", () => {
       status: "ended",
       endReason: "idle_split",
     });
+    await db.close();
+  });
+
+  it("L2 豁免:机器心跳新鲜且把该流报进活跃集,不收", async () => {
+    const { db, run } = await prepare();
+    await db.run(
+      "UPDATE machine SET last_seen_at = ?, active_streams = ?::jsonb WHERE id = 'm1'",
+      NOW - 60_000, JSON.stringify(["claude-session:s1"]),
+    );
+    await seedRun(db, "run_alive", { lastSeenAt: NOW - RUN_IDLE_GAP_MS - 1 });
+
+    expect((await run()).swept).toEqual([]);
+    expect(await findRunById(db, "run_alive")).toMatchObject({ status: "running" });
+    await db.close();
+  });
+
+  it("心跳超时的机器即使残留活跃集也不豁免", async () => {
+    const { db, run } = await prepare();
+    await db.run(
+      "UPDATE machine SET last_seen_at = ?, active_streams = ?::jsonb WHERE id = 'm1'",
+      NOW - MACHINE_HEARTBEAT.timeoutMs - 1, JSON.stringify(["claude-session:s1"]),
+    );
+    await seedRun(db, "run_stale", { lastSeenAt: NOW - RUN_IDLE_GAP_MS - 1 });
+
+    expect((await run()).swept).toEqual(["run_stale"]);
+    await db.close();
+  });
+
+  it("心跳新鲜但流不在活跃集(写入已停)照收", async () => {
+    const { db, run } = await prepare();
+    await db.run(
+      "UPDATE machine SET last_seen_at = ?, active_streams = ?::jsonb WHERE id = 'm1'",
+      NOW - 60_000, JSON.stringify(["claude-session:s-other"]),
+    );
+    await seedRun(db, "run_stale", { lastSeenAt: NOW - RUN_IDLE_GAP_MS - 1 });
+
+    expect((await run()).swept).toEqual(["run_stale"]);
+    await db.close();
+  });
+
+  it("活跃集是别台机器报的,不豁免本机 run", async () => {
+    const { db, run } = await prepare();
+    await db.run(
+      `INSERT INTO machine (id, hostname, os, collector_version, collector_secret_hash, status, created_at, last_seen_at, active_streams)
+       VALUES ('m2', 'h2', 'linux', '1', 'hash', 'active', 0, ?, ?::jsonb)`,
+      NOW - 60_000, JSON.stringify(["claude-session:s1"]),
+    );
+    await seedRun(db, "run_stale", { lastSeenAt: NOW - RUN_IDLE_GAP_MS - 1 });
+
+    expect((await run()).swept).toEqual(["run_stale"]);
     await db.close();
   });
 });

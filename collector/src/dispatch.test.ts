@@ -3,7 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { loadConfigSyncState, MCP_SERVER_NAME, saveConfigSyncState } from "./config-sync.js";
-import { createDispatchCycle } from "./dispatch.js";
+import { createDispatchCycle, createRunEndReporter, type RunEndReport } from "./dispatch.js";
+import type { ConsoleClient, RunEndRequest } from "./http.js";
 import {
   ALLOWED_TOOLS,
   DISPATCH_PROMPT,
@@ -236,6 +237,48 @@ describe("dispatch 调度循环", () => {
     const cycle = cycleFor(h);
     await cycle.once();
     h.sessions[0]!.onExit({ code: 0, signal: null });
+    await cycle.once();
+    expect(h.sessions).toHaveLength(2);
+  });
+
+  it("会话退出即上报 run-end 宣告,携带项目与预生成会话 id", async () => {
+    const h = harness({ secret: "sec-a" });
+    h.pending.set("agt_a.sec-a", 1);
+    const reports: RunEndReport[] = [];
+    const cycle = cycleFor(h, {
+      async reportRunEnd(report) {
+        reports.push(report);
+      },
+    });
+    await cycle.once();
+    h.sessions[0]!.onExit({ code: 1, signal: "SIGTERM" });
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(reports).toEqual([
+      {
+        agentProject: "p",
+        sessionId: h.sessions[0]!.sessionId,
+        exitCode: 1,
+        signal: "SIGTERM",
+      },
+    ]);
+  });
+
+  it("退出宣告抛错不影响 busy 释放,下一轮照常起会话", async () => {
+    const h = harness({ secret: "sec-a" });
+    h.pending.set("agt_a.sec-a", 1);
+    let calls = 0;
+    const cycle = cycleFor(h, {
+      async reportRunEnd() {
+        calls += 1;
+        throw new Error("控制台不可达");
+      },
+    });
+    await cycle.once();
+    h.sessions[0]!.onExit({ code: 0, signal: null });
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(calls).toBe(1);
+
     await cycle.once();
     expect(h.sessions).toHaveLength(2);
   });
@@ -503,3 +546,65 @@ describe("派发闸门 G2/G3/G4 与退避", () => {
     expect(h.workPeeked.length).toBeGreaterThan(peeked);
   });
 });
+
+describe("createRunEndReporter", () => {
+  function fakeClient(behavior: (attempt: number) => Promise<void>) {
+    const requests: RunEndRequest[] = [];
+    let attempt = 0;
+    const client = {
+      async postRunEnd(request: RunEndRequest) {
+        requests.push(request);
+        attempt += 1;
+        await behavior(attempt);
+        return { run_id: "run_x" };
+      },
+    } as unknown as ConsoleClient;
+    return { client, requests };
+  }
+
+  const report: RunEndReport = {
+    agentProject: "p",
+    sessionId: "11111111-2222-3333-4444-555555555555",
+    exitCode: 0,
+    signal: null,
+  };
+
+  it("成功即上报一次,流为 claude-session:<会话 id>", async () => {
+    const { client, requests } = fakeClient(async () => {});
+    await createRunEndReporter({ client, now: () => 9_000, retryDelayMs: 1 })(report);
+    expect(requests).toEqual([
+      {
+        agent_project: "p",
+        stream_id: "claude-session:11111111-2222-3333-4444-555555555555",
+        ended_at: 9_000,
+        exit_code: 0,
+        signal: null,
+      },
+    ]);
+  });
+
+  it("失败重试一次,二次成功不再重发", async () => {
+    const { client, requests } = fakeClient(async (attempt) => {
+      if (attempt === 1) {
+        throw new Error("网络抖动");
+      }
+    });
+    await createRunEndReporter({ client, now: () => 9_000, retryDelayMs: 1 })(report);
+    expect(requests).toHaveLength(2);
+  });
+
+  it("两次都失败即放弃,不抛出(best-effort,交控制台 L3 兜底)", async () => {
+    const { client, requests } = fakeClient(async () => {
+      throw new Error("控制台不可达");
+    });
+    const reporter = createRunEndReporter({
+      client,
+      logger: createLogger({ level: "error", sink: () => {} }),
+      now: () => 9_000,
+      retryDelayMs: 1,
+    });
+    await expect(reporter(report)).resolves.toBeUndefined();
+    expect(requests).toHaveLength(2);
+  });
+});
+

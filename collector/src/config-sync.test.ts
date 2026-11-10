@@ -75,6 +75,9 @@ function fakeClient(
     async postHeartbeat() {
       return { ok: true, projects: [] };
     },
+    async postRunEnd() {
+      return { run_id: null };
+    },
     async getProjects() {
       return [];
     },

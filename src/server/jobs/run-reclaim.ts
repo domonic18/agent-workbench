@@ -1,4 +1,4 @@
-import { RUN_IDLE_GAP_MS, RUN_RECLAIM } from "../../shared/constants.js";
+import { MACHINE_HEARTBEAT, RUN_IDLE_GAP_MS, RUN_RECLAIM } from "../../shared/constants.js";
 import type { Db } from "../../store/database.js";
 import { sweepStaleRunningRuns } from "../../store/repositories/run.js";
 import type { JobLogger } from "./reconcile.js";
@@ -22,13 +22,18 @@ export interface RunReclaimResult {
  * 惰性切分只在新事件到达同一流时生效,会话正常结束的最后一段 run 由此层收口——
  * 不变量:running 是临时状态,任何上游信号缺失时仍在有限时间(阈值 + 一个巡检周期)收敛。
  * 与惰性切分同一 30 分钟口径;比对用服务器时钟,跨机偏差相对 gap 可忽略。
+ * L2 例外:机器心跳新鲜且把该流报进活跃集时不收(机器仍在观测到写入)。
  */
 export async function reclaimRunsOnce(
   deps: RunReclaimDeps,
   logger: JobLogger,
 ): Promise<RunReclaimResult> {
-  const staleBefore = deps.now() - RUN_IDLE_GAP_MS;
-  const swept = await sweepStaleRunningRuns(deps.db, staleBefore);
+  const at = deps.now();
+  const swept = await sweepStaleRunningRuns(
+    deps.db,
+    at - RUN_IDLE_GAP_MS,
+    at - MACHINE_HEARTBEAT.timeoutMs,
+  );
   if (swept.length > 0) {
     logger.info({ count: swept.length, ids: swept }, "迟滞 run 兜底收尾");
   }
