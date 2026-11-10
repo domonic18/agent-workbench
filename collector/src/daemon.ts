@@ -17,7 +17,7 @@ import {
   createConsoleClient,
   type ConsoleClient,
 } from "./http.js";
-import { createDispatchCycle, type DispatchCycle } from "./dispatch.js";
+import { createDispatchCycle, createRunEndReporter, type DispatchCycle } from "./dispatch.js";
 import { resolveClaudePath } from "./dispatch-session.js";
 import { createLogger, type Logger } from "./log.js";
 import { acquireLock, type SingleInstanceLock } from "./lock.js";
@@ -28,6 +28,7 @@ import { Spool } from "./spool.js";
 import {
   loadState,
   saveState,
+  streamIdFor,
   type PersistedState,
 } from "./state.js";
 import { readNewLines } from "./tailer.js";
@@ -92,6 +93,8 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
     now,
     onRefreshBotNames: () => discovery.refreshBotNames(),
   });
+  /** 心跳活跃流(L2,04 §2):扫描读到新字节的流,下一跳上报给控制台豁免 L3 收敛 */
+  const activeSinceHeartbeat = new Set<string>();
   const heartbeat = createHeartbeatCycle({
     client,
     spool,
@@ -100,6 +103,11 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
     startedAt,
     logger,
     now,
+    activeStreams: () => {
+      const streams = [...activeSinceHeartbeat];
+      activeSinceHeartbeat.clear();
+      return streams;
+    },
   });
   // 调度模块:AW_DISPATCH_MS=0 关闭;claude 路径解析不到也不挂载,采集不受影响
   const claudePath = config.dispatchMs > 0 ? resolveClaudePath(config.dispatchClaude) : undefined;
@@ -120,6 +128,7 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
           maxMachineSessions: config.maxMachineSessions,
           dispatchBackoffRounds: config.dispatchBackoffRounds,
           batchMaxItems: config.batchMaxItems,
+          reportRunEnd: createRunEndReporter({ client, logger, now }),
           attributeSession: (sessionId, project) => {
             dispatchSessions.set(sessionId, new Set([project]));
           },
@@ -191,6 +200,7 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
       stream.inode = result.inode;
       if (result.lines.length > 0) {
         appendEvents(stream, result.lines, spool, now);
+        activeSinceHeartbeat.add(streamIdFor(stream.sessionId, stream.epoch));
       }
       stream.offset = result.offset;
       stream.updatedAt = now();

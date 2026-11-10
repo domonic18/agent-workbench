@@ -7,7 +7,9 @@ import { BootstrapError } from "../../domain/bootstrap/errors.js";
 import { consumeOneTimeToken } from "../../domain/bootstrap/one-time-token.js";
 import { IdentityError } from "../../domain/identity/errors.js";
 import { createIdentityService, type IdentityService } from "../../domain/identity/service.js";
+import { createRunService, type RunService } from "../../domain/run/service.js";
 import type { Db } from "../../store/database.js";
+import { findAgentByMachineProject } from "../../store/repositories/agent.js";
 import { touchMachineLastSeen, type MachineRecord } from "../../store/repositories/machine.js";
 import { requireMachineAuth } from "../middleware/machine-auth.js";
 import { requireIdempotencyKey } from "../middleware/session.js";
@@ -17,6 +19,7 @@ export interface AwNodeRoutesOptions {
   db: Db;
   now?: () => number;
   service?: IdentityService;
+  runService?: RunService;
 }
 
 interface EnrollBody {
@@ -61,6 +64,14 @@ const ackSchema = z.object({
     .max(100),
 });
 
+const runEndSchema = z.object({
+  agent_project: z.string().min(1).max(200),
+  stream_id: z.string().min(1).max(256),
+  ended_at: z.number().int().min(1).nullish(),
+  exit_code: z.number().int().nullish(),
+  signal: z.string().max(16).nullish(),
+});
+
 /**
  * 执行机加入(01 §2 / 04 §首次加入):安装脚本凭一次性 enroll token 兑换
  * 机器 ID 与长期采集密钥。无控制台会话,令牌即凭据;明文密钥只在响应出现一次。
@@ -69,6 +80,7 @@ export function registerAwNodeRoutes(app: FastifyInstance, options: AwNodeRoutes
   const db = options.db;
   const now = options.now ?? Date.now;
   const service = options.service ?? createIdentityService({ db, now });
+  const runService = options.runService ?? createRunService({ db, now });
 
   app.post("/api/aw-node/enroll", async (request, reply) => {
     const body = (request.body ?? {}) as EnrollBody;
@@ -120,6 +132,35 @@ export function registerAwNodeRoutes(app: FastifyInstance, options: AwNodeRoutes
       return { ok: true, received_at: now() };
     },
   );
+
+  /**
+   * run 收尾权威宣告(04 §2 三层信号之 L1):aw-node 的派发会话进程退出即一手事实,
+   * 不等 30 分钟惰性切分。exit_code / signal 只入日志不落库,收尾原因恒为 process_exit。
+   * 无 running run 返回 run_id=null,重复宣告幂等。
+   */
+  app.post("/api/aw-node/run-end", { preHandler: [requireMachineAuth(db)] }, async (request, reply) => {
+    const machine = request.machine as MachineRecord;
+    const parsed = runEndSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return invalidSchema(reply, parsed.error);
+    }
+    const body = parsed.data;
+    const agent = await findAgentByMachineProject(db, machine.id, body.agent_project);
+    if (agent === undefined || agent.status !== "active") {
+      return reply.code(404).send({
+        error: { code: "NOT_FOUND", message: "该机器下不存在启用的 Agent 项目" },
+      });
+    }
+    const runId = await runService.endStream(agent.id, body.stream_id, body.ended_at ?? undefined);
+    if (runId !== null) {
+      request.log.info(
+        { agentId: agent.id, streamId: body.stream_id, runId, exitCode: body.exit_code ?? null, signal: body.signal ?? null },
+        "run 进程退出收尾",
+      );
+    }
+    await touchMachineLastSeen(db, machine.id, now());
+    return reply.code(200).send({ run_id: runId });
+  });
 
   // 不加幂等重放:ACK 前每次请求都轮换并返回最新密钥,轮换本身就是恢复手段(01 §4)
   app.post("/api/aw-node/config", { preHandler: [requireMachineAuth(db)] }, async (request, reply) => {

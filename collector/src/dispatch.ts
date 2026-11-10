@@ -19,6 +19,7 @@ import {
   type SessionHandle,
   type SessionOptions,
 } from "./dispatch-session.js";
+import type { ConsoleClient, RunEndRequest } from "./http.js";
 import { createLogger, type Logger } from "./log.js";
 import {
   resolveSessionActivity,
@@ -26,6 +27,7 @@ import {
   type SessionActivity,
   type SessionSample,
 } from "./session-activity.js";
+import { streamIdFor } from "./state.js";
 
 /** 探视 a2a 收件箱待处理条数:只看不领,不占用消息租约 */
 async function fetchPendingCount(baseUrl: string, bearer: string, timeoutMs: number): Promise<number> {
@@ -99,6 +101,60 @@ export interface DispatchDeps {
   sampleSessions?: (claudeDir: string) => SessionSample;
   /** 派发会话归因登记:daemon 注入本地注册表,采集才能把 headless 会话归到 Agent 项目 */
   attributeSession?: (sessionId: string, project: string) => void;
+  /** 会话退出宣告(L1,04 §2):daemon 注入;失败重试由实现方负责,最终由控制台 L3 兜底 */
+  reportRunEnd?: (report: RunEndReport) => Promise<void>;
+}
+
+/** 退出宣告入参:sessionId 是 spawn 前预生成的会话 id,流即 claude-session:<sessionId> */
+export interface RunEndReport {
+  agentProject: string;
+  sessionId: string;
+  exitCode: number | null;
+  signal: string | null;
+}
+
+export interface RunEndReporterDeps {
+  client: ConsoleClient;
+  logger?: Logger;
+  now?: () => number;
+  /** 两次尝试间的等待;默认 3s,测试可缩短 */
+  retryDelayMs?: number;
+}
+
+/**
+ * 退出宣告默认实现(04 §2 L1):机器 Bearer 上报控制台收尾当前 run。
+ * best-effort——失败等一小会儿重试一次,再失败就放弃,进程退出是事实但
+ * 控制台还有 L2 观测续命与 L3 兜底收敛,信号缺失不致命。
+ */
+export function createRunEndReporter(deps: RunEndReporterDeps) {
+  const logger = deps.logger ?? createLogger();
+  const now = deps.now ?? Date.now;
+  const retryDelayMs = deps.retryDelayMs ?? 3_000;
+  return async function reportRunEnd(report: RunEndReport): Promise<void> {
+    const request: RunEndRequest = {
+      agent_project: report.agentProject,
+      stream_id: streamIdFor(report.sessionId, 0),
+      ended_at: now(),
+      exit_code: report.exitCode,
+      signal: report.signal,
+    };
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        await deps.client.postRunEnd(request);
+        return;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (attempt === 2) {
+          logger.warn("run 退出宣告失败,交控制台兜底收敛", {
+            sessionId: report.sessionId,
+            error: message,
+          });
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+      }
+    }
+  };
 }
 
 export interface DispatchCycle {
@@ -118,6 +174,7 @@ export function createDispatchCycle(deps: DispatchDeps): DispatchCycle {
   const reportHold = deps.reportHold ?? reportHoldToConsole;
   const sampleSessions = deps.sampleSessions ?? sampleSessionFiles;
   const attributeSession = deps.attributeSession ?? (() => {});
+  const reportRunEnd = deps.reportRunEnd;
   /** 连续被挡退避 + 双采样基线:轮末换基线,两轮比 mtime 前进判「仍在写入」 */
   const backoff = new BackoffTracker();
   let prevSample: SessionSample | undefined;
@@ -196,6 +253,17 @@ export function createDispatchCycle(deps: DispatchDeps): DispatchCycle {
           busy.delete(agentId);
           running.delete(agentId);
           logger.info("会话结束", { agent: agentId, code: result.code, signal: result.signal });
+          if (reportRunEnd !== undefined) {
+            void reportRunEnd({
+              agentProject: project,
+              sessionId,
+              exitCode: result.code,
+              signal: result.signal,
+            }).catch((error) => {
+              const message = error instanceof Error ? error.message : String(error);
+              logger.warn("run 退出宣告异常", { agent: agentId, sessionId, error: message });
+            });
+          }
         },
       };
       running.set(agentId, startSession(session));

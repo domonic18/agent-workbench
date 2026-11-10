@@ -16,6 +16,8 @@ export interface MachineRecord {
   discoveryReceivedAt: number | null;
   configStatus: MachineConfigStatus;
   botRefreshRequestedAt: number | null;
+  /** 心跳上报的活跃流(L2 观测续命):自上一跳以来有新字节的 stream_id 列表 */
+  activeStreams: string[];
 }
 
 export type MachineConfigStatus = "pending" | "delivered" | "effective";
@@ -25,7 +27,8 @@ const MACHINE_COLUMNS = `
   collector_secret_hash AS "collectorSecretHash", last_seen_at AS "lastSeenAt",
   status, created_at AS "createdAt",
   discovery_json AS "discoveryJson", discovery_received_at AS "discoveryReceivedAt",
-  config_status AS "configStatus", bot_refresh_requested_at AS "botRefreshRequestedAt"
+  config_status AS "configStatus", bot_refresh_requested_at AS "botRefreshRequestedAt",
+  active_streams AS "activeStreams"
 `;
 
 export interface NewMachine {
@@ -114,6 +117,23 @@ export async function touchMachineLastSeen(db: Db, id: string, now: number): Pro
         "UPDATE machine SET last_seen_at = ? WHERE id = ? AND status = 'active'",
         now, id,
       )
+    ).changes === 1
+  );
+}
+
+/**
+ * 心跳活跃流整包覆盖(04 §2 L2):absent 一律写空数组——
+ * 机器降级回不带上报的旧版本时,旧活跃集不得永久豁免 L3 收敛。
+ */
+export async function updateMachineActiveStreams(
+  db: Db,
+  id: string,
+  streams: string[],
+): Promise<boolean> {
+  return (
+    (
+      await db.run("UPDATE machine SET active_streams = ?::jsonb WHERE id = ? AND status = 'active'",
+        JSON.stringify(streams), id)
     ).changes === 1
   );
 }

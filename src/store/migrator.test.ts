@@ -80,6 +80,7 @@ describe("runMigrations", () => {
       { version: 15, name: "work_item_association_scope_revision" },
       { version: 16, name: "agent_enroll_token" },
       { version: 17, name: "agent_run_end_reason" },
+      { version: 18, name: "machine_active_streams" },
     ]);
     await db.close();
   });

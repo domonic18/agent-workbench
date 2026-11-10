@@ -144,6 +144,9 @@ export interface HeartbeatCycleDeps {
   startedAt: number;
   logger?: Logger;
   now?: () => number;
+  /** 取走并清空「自上一跳以来有新字节的流」(L2 观测续命,04 §2);心跳失败即弃,
+   *  流继续写会被下一轮扫描重新标记,流停写则本就不该再豁免 */
+  activeStreams: () => string[];
 }
 
 export interface HeartbeatCycle {
@@ -189,6 +192,7 @@ export function createHeartbeatCycle(deps: HeartbeatCycleDeps): HeartbeatCycle {
         mem: Math.round((1 - freemem() / totalmem()) * 100) / 100,
         last_error: logger.lastError(),
         streams: streamSummaries(),
+        active_streams: deps.activeStreams(),
       });
       const next = new Set(response.projects);
       if (next.size > 0) {

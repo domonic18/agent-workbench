@@ -16,6 +16,7 @@ const AT = "2026-10-29T06:20:06.481Z";
 
 class FakeClient implements ConsoleClient {
   batches: BatchRequest[] = [];
+  heartbeats: Record<string, unknown>[] = [];
   discoveryReports: unknown[] = [];
   acks: Array<Array<{ agent_id: string; config_version: number }>> = [];
   pull: PullConfigResponse = { config_status: "effective", agents: [] };
@@ -25,8 +26,15 @@ class FakeClient implements ConsoleClient {
     return { acked_seq: request.batch.at(-1)?.seq ?? 0 };
   }
 
-  async postHeartbeat(): Promise<{ ok: boolean; projects: string[] }> {
+  async postHeartbeat(
+    payload: Record<string, unknown>,
+  ): Promise<{ ok: boolean; projects: string[] }> {
+    this.heartbeats.push(payload);
     return { ok: true, projects: ["proj"] };
+  }
+
+  async postRunEnd(): Promise<{ run_id: string | null }> {
+    return { run_id: null };
   }
 
   async getProjects(): Promise<string[]> {
@@ -232,6 +240,27 @@ describe("采集循环", () => {
     await started;
 
     expect(logs.some((line) => line.includes("调度模块已挂载"))).toBe(true);
+  });
+
+  it("心跳活跃流:扫描读到新字节的流在下一跳上报,无新字节后回落为空", async () => {
+    const daemon = createDaemon({
+      config: { ...config, pollMs: 5, heartbeatMs: 10 },
+      client,
+      logger: createLogger({ level: "error", sink: () => {} }),
+    });
+    const started = daemon.start();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    daemon.stop();
+    await started;
+
+    const active = (beat: Record<string, unknown>): string[] =>
+      Array.isArray(beat.active_streams) ? (beat.active_streams as string[]) : [];
+    // 首批扫描读到两行新字节 → 后续某一跳携带该活跃流
+    expect(
+      client.heartbeats.some((beat) => active(beat).includes(`claude-session:${UUID}`)),
+    ).toBe(true);
+    // 之后没有新字节,最后一跳已排水回落为空
+    expect(active(client.heartbeats.at(-1)!)).toEqual([]);
   });
 });
 

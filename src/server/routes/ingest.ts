@@ -6,8 +6,9 @@ import { INGEST } from "../../shared/constants.js";
 import type { Db } from "../../store/database.js";
 import {
   listActiveAgentProjects,
-  type MachineRecord,
   touchMachineLastSeen,
+  updateMachineActiveStreams,
+  type MachineRecord,
 } from "../../store/repositories/machine.js";
 import { requireMachineAuth } from "../middleware/machine-auth.js";
 
@@ -19,6 +20,8 @@ const heartbeatSchema = z.object({
   mem: z.number().optional(),
   last_error: z.string().nullable().optional(),
   streams: z.array(z.unknown()).max(1000).optional(),
+  /** 自上一跳以来有新字节的流(L2 观测续命,04 §2);旧版采集器不携带即覆盖为空 */
+  active_streams: z.array(z.string().min(1).max(256)).max(1000).optional(),
 });
 
 const itemSchema = z.object({
@@ -92,8 +95,9 @@ export function registerIngestRoutes(app: FastifyInstance, options: IngestRoutes
     if (!parsed.success) {
       return validationError(reply, parsed.error);
     }
-    // 心跳只推进机器存活时间与取回可推送项目;CPU / 内存等指标不入库
+    // 心跳推进机器存活时间、整包覆盖活跃流,并取回可推送项目;CPU / 内存等指标不入库
     await touchMachineLastSeen(db, machine.id, now());
+    await updateMachineActiveStreams(db, machine.id, parsed.data.active_streams ?? []);
     return reply.code(200).send({
       ok: true,
       projects: await listActiveAgentProjects(db, machine.id),

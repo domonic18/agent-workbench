@@ -204,6 +204,30 @@ describe("ingest 路由", () => {
     expect((await findMachineById(fixture.db, "m1"))?.lastSeenAt).toBeTypeOf("number");
   });
 
+  it("心跳活跃流整包覆盖:携带即写入,不携带清空", async () => {
+    const first = await app.inject({
+      method: "POST",
+      url: "/api/ingest/heartbeat",
+      headers: headers(),
+      payload: { active_streams: ["claude-session:s1", "claude-session:s2"] },
+    });
+    expect(first.statusCode).toBe(200);
+    expect((await findMachineById(fixture.db, "m1"))?.activeStreams).toEqual([
+      "claude-session:s1",
+      "claude-session:s2",
+    ]);
+
+    const downgrade = await app.inject({
+      method: "POST",
+      url: "/api/ingest/heartbeat",
+      headers: headers(),
+      payload: { uptime: 12 },
+    });
+    expect(downgrade.statusCode).toBe(200);
+    // 未升级回旧版的采集器不上报该字段,旧活跃集不得残留成永久豁免
+    expect((await findMachineById(fixture.db, "m1"))?.activeStreams).toEqual([]);
+  });
+
   it("心跳与项目列表都要求采集器 Bearer", async () => {
     const heartbeat = await app.inject({
       method: "POST",

@@ -29,6 +29,15 @@ export interface BatchResponse {
   rejected?: number;
 }
 
+/** run 收尾权威宣告(04 §2 L1):派发会话进程退出时上报,机器 Bearer 鉴权 */
+export interface RunEndRequest {
+  agent_project: string;
+  stream_id: string;
+  ended_at: number;
+  exit_code: number | null;
+  signal: string | null;
+}
+
 export class ConsoleHttpError extends Error {
   readonly status: number;
   readonly body: unknown;
@@ -69,6 +78,8 @@ export interface ConsoleClient {
   postDiscovery(report: DiscoveryReport): Promise<{ ok: boolean; received_at: number }>;
   pullConfig(): Promise<PullConfigResponse>;
   ackConfig(acks: ConfigAckRequest["agents"]): Promise<ConfigAckResponse>;
+  /** 宣告派发会话进程退出;无 running run 时控制台返回 run_id=null,幂等 */
+  postRunEnd(request: RunEndRequest): Promise<{ run_id: string | null }>;
 }
 
 function asProjects(value: unknown): string[] {
@@ -188,6 +199,15 @@ export function createConsoleClient(options: ConsoleClientOptions): ConsoleClien
         headers: { "idempotency-key": randomUUID() },
         body: JSON.stringify({ agents: acks } satisfies ConfigAckRequest),
       })) as ConfigAckResponse;
+    },
+
+    async postRunEnd(requestBody) {
+      const body = (await request(`${options.baseUrl}/api/aw-node/run-end`, {
+        method: "POST",
+        body: JSON.stringify(requestBody),
+      })) as Record<string, unknown> | null;
+      const runId = body?.run_id;
+      return { run_id: typeof runId === "string" ? runId : null };
     },
   };
 }
