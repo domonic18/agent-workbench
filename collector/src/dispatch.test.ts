@@ -3,7 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { loadConfigSyncState, MCP_SERVER_NAME, saveConfigSyncState } from "./config-sync.js";
-import { createDispatchCycle, createRunEndReporter, type RunEndReport } from "./dispatch.js";
+import { createDispatchCycle, createRunEndReporter, PeekError, type RunEndReport } from "./dispatch.js";
+import { DispatchStatusTracker } from "./dispatch-status.js";
 import type { ConsoleClient, RunEndRequest } from "./http.js";
 import {
   ALLOWED_TOOLS,
@@ -37,6 +38,8 @@ interface Harness {
   workPending: Map<string, number>;
   peeked: string[];
   workPeeked: string[];
+  /** 默认实时扫描:p → 测试目录;单项测试可换新 Map 覆盖 */
+  scanCwds: () => Map<string, string>;
 }
 
 function harness(options: { cwd?: string; secret?: string | undefined } = {}): Harness {
@@ -65,6 +68,7 @@ function harness(options: { cwd?: string; secret?: string | undefined } = {}): H
     workPending: new Map(),
     peeked: [],
     workPeeked: [],
+    scanCwds: () => new Map([["p", cwd]]),
   };
 }
 
@@ -85,6 +89,7 @@ function cycleFor(
     maxMachineSessions: 2,
     dispatchBackoffRounds: 5,
     batchMaxItems: 8,
+    scanCwds: h.scanCwds,
     logger: createLogger({ level: "error" }),
     async peekInbox(bearer) {
       h.peeked.push(bearer);
@@ -544,6 +549,182 @@ describe("派发闸门 G2/G3/G4 与退避", () => {
     const peeked = h.workPeeked.length;
     await cycle.once();
     expect(h.workPeeked.length).toBeGreaterThan(peeked);
+  });
+});
+
+describe("cwd 实时解析与派发状态(M3.11)", () => {
+  function statusFor(): { status: DispatchStatusTracker; attach: Record<string, unknown> } {
+    const status = new DispatchStatusTracker(() => 1_700_000_000_000);
+    return { status, attach: { status } };
+  }
+
+  it("cwd 取实时扫描而非下发快照:目录挪动下一轮即跟随", async () => {
+    const stale = newDir();
+    const fresh = newDir();
+    const h = harness({ secret: "sec-a", cwd: stale });
+    h.pending.set("agt_a.sec-a", 1);
+    const cycle = cycleFor(h, {
+      scanCwds: () => new Map([["p", fresh]]),
+    });
+    await cycle.once();
+    expect(h.sessions).toHaveLength(1);
+    expect(h.sessions[0]!.cwd).toBe(fresh);
+  });
+
+  it("项目不在实时扫描 → cwd_unknown 挂起,不起会话不探视", async () => {
+    const h = harness({ secret: "sec-a" });
+    h.pending.set("agt_a.sec-a", 1);
+    const { status, attach } = statusFor();
+    const cycle = cycleFor(h, {
+      scanCwds: () => new Map(),
+      ...attach,
+    });
+    await cycle.once();
+    expect(h.peeked).toEqual([]);
+    expect(h.sessions).toHaveLength(0);
+    expect(status.snapshot()).toEqual([
+      { project: "p", pending: 0, hold: "cwd_unknown", since_ts: 1_700_000_000_000 },
+    ]);
+  });
+
+  it("目录不存在 → cwd_missing 挂起并携带待办数", async () => {
+    const h = harness({ secret: "sec-a", cwd: "/no/such/dir" });
+    h.pending.set("agt_a.sec-a", 2);
+    const { status, attach } = statusFor();
+    const cycle = cycleFor(h, { ...attach });
+    await cycle.once();
+    expect(h.sessions).toHaveLength(0);
+    expect(status.snapshot()).toEqual([
+      { project: "p", pending: 2, hold: "cwd_missing", since_ts: 1_700_000_000_000 },
+    ]);
+  });
+
+  it("闸门挡下记入状态快照,a2a 路径同样可见", async () => {
+    const h = harness({ secret: "sec-a" });
+    h.pending.set("agt_a.sec-a", 1);
+    const { status, attach } = statusFor();
+    const cycle = cycleFor(h, {
+      async probeDirty() {
+        return true;
+      },
+      ...attach,
+    });
+    await cycle.once();
+    expect(status.snapshot()).toEqual([
+      { project: "p", pending: 1, hold: "dirty_worktree", since_ts: 1_700_000_000_000 },
+    ]);
+  });
+
+  it("挂起解除即清除:目录恢复且收件箱清空后快照为空", async () => {
+    const h = harness({ secret: "sec-a", cwd: "/no/such/dir" });
+    h.pending.set("agt_a.sec-a", 1);
+    const { status, attach } = statusFor();
+    const cycle = cycleFor(h, {
+      scanCwds: () => new Map([["p", "/no/such/dir"]]),
+      ...attach,
+    });
+    await cycle.once();
+    expect(status.snapshot()).toHaveLength(1);
+    // 目录恢复 + 待办清空 → 空闲清除
+    h.scanCwds = () => new Map([["p", h.stateDir]]);
+    h.pending.clear();
+    const healed = cycleFor(h, { scanCwds: () => new Map([["p", h.stateDir]]), ...attach });
+    await healed.once();
+    expect(status.snapshot()).toEqual([]);
+  });
+
+  it("连续 3 轮探视 401 → auth_stale;探视成功后清除", async () => {
+    const h = harness({ secret: "sec-a" });
+    const { status, attach } = statusFor();
+    let fail = true;
+    const cycle = cycleFor(h, {
+      ...attach,
+      async peekInbox(bearer) {
+        h.peeked.push(bearer);
+        if (fail) {
+          throw new PeekError(401);
+        }
+        return h.pending.get(bearer) ?? 0;
+      },
+    });
+    await cycle.once();
+    expect(status.snapshot()).toEqual([]);
+    await cycle.once();
+    expect(status.snapshot()).toEqual([]);
+    await cycle.once();
+    expect(status.snapshot()).toEqual([
+      { project: "p", pending: 0, hold: "auth_stale", since_ts: 1_700_000_000_000 },
+    ]);
+    fail = false;
+    await cycle.once();
+    expect(status.snapshot()).toEqual([]);
+  });
+
+  it("非 401 探视失败不计 auth_stale 连击", async () => {
+    const h = harness({ secret: "sec-a" });
+    const { status, attach } = statusFor();
+    const cycle = cycleFor(h, {
+      ...attach,
+      async peekInbox() {
+        throw new PeekError(500);
+      },
+    });
+    for (let i = 0; i < 5; i += 1) {
+      await cycle.once();
+    }
+    expect(status.snapshot()).toEqual([]);
+  });
+
+  it("401 与其他错误交替不足以触发:连击只被探视成功清零,非 401 不累计也不打断", async () => {
+    const h = harness({ secret: "sec-a" });
+    const { status, attach } = statusFor();
+    let n = 0;
+    const cycle = cycleFor(h, {
+      ...attach,
+      async peekInbox() {
+        n += 1;
+        throw n % 2 === 1 ? new PeekError(401) : new PeekError(502);
+      },
+    });
+    // 401、502 交替四轮:401 累计 2,未达阈值 3
+    for (let i = 0; i < 4; i += 1) {
+      await cycle.once();
+    }
+    expect(status.snapshot()).toEqual([]);
+    // 第五轮第三个 401:触发 auth_stale
+    await cycle.once();
+    expect(status.snapshot()).toEqual([
+      { project: "p", pending: 0, hold: "auth_stale", since_ts: 1_700_000_000_000 },
+    ]);
+  });
+
+  it("spawn 同步抛错 → spawn_failed 挂起,占位释放下轮可再试", async () => {
+    const h = harness({ secret: "sec-a" });
+    h.pending.set("agt_a.sec-a", 1);
+    const { status, attach } = statusFor();
+    let fail = true;
+    const cycle = cycleFor(h, {
+      ...attach,
+      spawnSession(session) {
+        if (fail) {
+          throw new Error("spawn ENOENT");
+        }
+        h.sessions.push(session);
+        return {
+          kill(signal) {
+            h.killed.push(`${session.agentId}:${signal ?? "SIGTERM"}`);
+          },
+        };
+      },
+    });
+    await cycle.once();
+    expect(status.snapshot()).toEqual([
+      { project: "p", pending: 1, hold: "spawn_failed", since_ts: 1_700_000_000_000 },
+    ]);
+    fail = false;
+    await cycle.once();
+    expect(h.sessions).toHaveLength(1);
+    expect(status.snapshot()).toEqual([]);
   });
 });
 

@@ -19,6 +19,8 @@ import {
 } from "./http.js";
 import { createDispatchCycle, createRunEndReporter, type DispatchCycle } from "./dispatch.js";
 import { resolveClaudePath } from "./dispatch-session.js";
+import { DispatchStatusTracker } from "./dispatch-status.js";
+import { scanCwdByProject } from "./discovery.js";
 import { createLogger, type Logger } from "./log.js";
 import { acquireLock, type SingleInstanceLock } from "./lock.js";
 import { createPusher, type Pusher } from "./push.js";
@@ -95,6 +97,8 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
   });
   /** 心跳活跃流(L2,04 §2):扫描读到新字节的流,下一跳上报给控制台豁免 L3 收敛 */
   const activeSinceHeartbeat = new Set<string>();
+  /** 派发状态登记(M3.11):dispatch 写、heartbeat 捎带——被挡必须对控制台可见 */
+  const dispatchStatus = new DispatchStatusTracker(now);
   const heartbeat = createHeartbeatCycle({
     client,
     spool,
@@ -109,11 +113,22 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
       return streams;
     },
     collectorVersion: config.collectorVersion,
+    dispatchStatus,
   });
   // 调度模块:AW_DISPATCH_MS=0 关闭;claude 路径解析不到也不挂载,采集不受影响
   const claudePath = config.dispatchMs > 0 ? resolveClaudePath(config.dispatchClaude) : undefined;
   /** 派发会话归因登记:活引用叠加进索引,登记即刻命中,不吃 60s 刷新 */
   const dispatchSessions = new Map<string, Set<string>>();
+  /** 每轮现算 project→cwd(M3.11):cc-connect 配置是事实源,额外声明的项目兜底补齐 */
+  const scanCwds = (): Map<string, string> => {
+    const cwds = scanCwdByProject(config.ccConnectConfigs);
+    for (const extra of config.extraProjects) {
+      if (!cwds.has(extra.name)) {
+        cwds.set(extra.name, extra.cwd);
+      }
+    }
+    return cwds;
+  };
   const dispatch: DispatchCycle | null =
     config.dispatchMs > 0 && claudePath !== undefined
       ? createDispatchCycle({
@@ -129,6 +144,8 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
           maxMachineSessions: config.maxMachineSessions,
           dispatchBackoffRounds: config.dispatchBackoffRounds,
           batchMaxItems: config.batchMaxItems,
+          scanCwds,
+          status: dispatchStatus,
           reportRunEnd: createRunEndReporter({ client, logger, now }),
           attributeSession: (sessionId, project) => {
             dispatchSessions.set(sessionId, new Set([project]));

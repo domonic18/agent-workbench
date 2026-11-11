@@ -4,11 +4,15 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildAttributionIndex } from "./attribution.js";
 import type { CollectorConfig } from "./config.js";
+import { createHeartbeatCycle } from "./cycles.js";
 import { createDaemon } from "./daemon.js";
+import { DispatchStatusTracker } from "./dispatch-status.js";
 import { classifyStream, listSessionFiles } from "./sessions.js";
 import type { BatchRequest, ConsoleClient } from "./http.js";
 import { acquireLock, LockHeldError } from "./lock.js";
 import { createLogger } from "./log.js";
+import { Spool } from "./spool.js";
+import { emptyState } from "./state.js";
 import type { PullConfigResponse } from "../../src/shared/aw-node-wire.js";
 
 const UUID = "11111111-2222-3333-4444-555555555555";
@@ -336,6 +340,41 @@ describe("发现与配置同步周期", () => {
       expect(client.batches).toHaveLength(0);
     } finally {
       held.release();
+    }
+  });
+});
+
+describe("心跳派发状态快照(M3.11)", () => {
+  it("被挡项目随心跳携带 dispatch 数组,空快照省略字段", async () => {
+    const root = mkdtempSync(join(tmpdir(), "aw-heartbeat-"));
+    try {
+      mkdirSync(join(root, "spool"), { recursive: true });
+      const status = new DispatchStatusTracker(() => 1_700_000_000_000);
+      status.recordHold("proj-a", "cwd_missing", 2);
+      const client = new FakeClient();
+      const cycle = createHeartbeatCycle({
+        client,
+        spool: new Spool(join(root, "spool"), 1024 * 1024),
+        state: emptyState(),
+        registered: new Set(),
+        startedAt: 0,
+        logger: createLogger({ level: "error", sink: () => {} }),
+        now: () => 60_000,
+        activeStreams: () => [],
+        collectorVersion: "0.4.0",
+        dispatchStatus: status,
+      });
+
+      await cycle.once();
+      expect(client.heartbeats.at(-1)!.dispatch).toEqual([
+        { project: "proj-a", pending: 2, hold: "cwd_missing", since_ts: 1_700_000_000_000 },
+      ]);
+
+      status.clear("proj-a");
+      await cycle.once();
+      expect(client.heartbeats.at(-1)!.dispatch).toBeUndefined();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
   });
 });

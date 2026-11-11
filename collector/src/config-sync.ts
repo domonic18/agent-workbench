@@ -150,6 +150,46 @@ export interface ConfigSyncDeps {
   now?: () => number;
 }
 
+/**
+ * 受管 MCP 条目跟随 cwd 自迁移(M3.11):cc-connect 配置里的目录挪动后,
+ * 用本地已持有密钥把 claude.json 的 aw-console 条目写到新目录,不等控制台轮换。
+ * 成功即更新状态文件里的 agent.cwd(语义:已应用 MCP 条目的 cwd);旧键保留无害。
+ * 仅本地参与,无需控制台配合——密钥失效的情况由 auth_stale 自愈闭环兜底。
+ */
+export function migrateCwds(
+  stateDir: string,
+  claudeJsonPath: string,
+  baseUrl: string,
+  cwdByProject: ReadonlyMap<string, string>,
+  logger: Logger,
+): number {
+  const state = loadConfigSyncState(stateDir);
+  let migrated = 0;
+  for (const [agentId, agent] of Object.entries(state.agents)) {
+    if (agent.secret === undefined) {
+      continue;
+    }
+    const freshCwd = cwdByProject.get(agent.project);
+    if (freshCwd === undefined || freshCwd === agent.cwd) {
+      continue;
+    }
+    // MCP endpoint 与下发侧一致取 /mcp(config-delivery 默认值);自定义 endpoint
+    // 的少见场景由下一次轮换路径按下发值重写,此处不阻塞迁移
+    applyManagedMcp(claudeJsonPath, {
+      cwd: freshCwd,
+      url: `${baseUrl}/mcp`,
+      bearer: `${agentId}.${agent.secret}`,
+    });
+    agent.cwd = freshCwd;
+    migrated += 1;
+  }
+  if (migrated > 0) {
+    saveConfigSyncState(stateDir, state);
+    logger.info("受管 MCP 条目已跟随工作目录自迁移", { migrated });
+  }
+  return migrated;
+}
+
 export interface SyncSummary {
   status: string;
   rotated: number;

@@ -311,6 +311,22 @@ export const WORK_INBOX = {
 export const WORK_HOLD_REASONS = ["cwd_session_active", "dirty_worktree"] as const;
 export type WorkHoldReason = (typeof WORK_HOLD_REASONS)[number];
 
+/**
+ * 派发挂起原因(M3.11):collector 侧「有活派不出去」全集——目录失配(实时解析/
+ * 不存在)、闸门链(含 G4 机级上限)、密钥过期探视 401、spawn 同步失败。
+ * 随心跳 dispatch 数组上报控制台,任何一项出现都必须对控制台可见。
+ */
+export const DISPATCH_HOLD_REASONS = [
+  "cwd_unknown",
+  "cwd_missing",
+  "cwd_session_active",
+  "dirty_worktree",
+  "machine_limit",
+  "auth_stale",
+  "spawn_failed",
+] as const;
+export type DispatchHoldReason = (typeof DISPATCH_HOLD_REASONS)[number];
+
 /** 僵尸任务回收与派工停滞(M3.10,dispatch-coordination.md §3.3);时限走 AW_TASK_ZOMBIE_HOURS / AW_ASSIGNMENT_STALL_HOURS */
 export const ZOMBIE_RECLAIM = {
   /** 后台巡检间隔 */
