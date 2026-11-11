@@ -1,10 +1,10 @@
 import { enqueuePush } from "../../reliability/outbox.js";
 import type { Db } from "../../store/database.js";
-import { findAgentById } from "../../store/repositories/agent.js";
+import { findAgentById, findAgentByMachineProject } from "../../store/repositories/agent.js";
 import { findWorkItemById } from "../../store/repositories/work-item.js";
 import { findActiveAssignee, type HeldInboxRow } from "../../store/repositories/work-inbox.js";
 import { findWorkTriggerById } from "../../store/repositories/work-trigger.js";
-import type { WorkHoldReason } from "../../shared/constants.js";
+import type { DispatchHoldReason, WorkHoldReason } from "../../shared/constants.js";
 import { mdText, statusCard } from "../collab/card.js";
 
 /**
@@ -208,6 +208,63 @@ export async function announceHold(db: Db, input: AnnounceHoldInput): Promise<vo
     chatId: input.chatId,
     card,
     uuid: input.heldRows[0]!.id,
+    ...(input.now === undefined ? {} : { now: input.now }),
+  });
+}
+
+/** 派发挂起原因 → 群播报文案;枚举与 collector 端闸门/探测结果同源(shared/constants) */
+const DISPATCH_HOLD_TEXT: Record<DispatchHoldReason, string> = {
+  cwd_unknown: "项目不在 cc-connect 配置中,无法解析工作目录",
+  cwd_missing: "工作目录不存在,仓库可能已迁移",
+  cwd_session_active: "工作目录有活跃会话在写,避免同仓互踩",
+  dirty_worktree: "工作区有未提交改动,先保护现场",
+  machine_limit: "全机活跃会话数已达上限",
+  auth_stale: "密钥疑似失效,已触发自动轮换重发",
+  spawn_failed: "会话启动失败",
+};
+
+export interface AnnounceDispatchHoldInput {
+  machineId: string;
+  hostname: string;
+  project: string;
+  hold: DispatchHoldReason;
+  pending: number;
+  /** 本次挂起起点(collector 记录的 since_ts);进幂等键,同一轮挂起只播一次 */
+  sinceTs: number;
+  chatId: string | undefined;
+  now?: number | undefined;
+}
+
+/**
+ * 派发挂起首跳播报(M3.11):心跳携带的 dispatch 快照里某 project 首次出现某 hold 时进群。
+ * 此前这些原因只写 aw-node 本地日志,控制台侧完全不可见(11-11 事故)。
+ * 幂等键由 machine/project/hold/sinceTs 派生——持续挂起不重播,消除后重现(sinceTs 变化)再播。
+ */
+export async function announceDispatchHold(
+  db: Db,
+  input: AnnounceDispatchHoldInput,
+): Promise<void> {
+  if (input.chatId === undefined) {
+    return;
+  }
+  const agent = await findAgentByMachineProject(db, input.machineId, input.project);
+  const whoRaw = agent?.displayName ?? `${input.hostname}:${input.project}`;
+  const status =
+    input.hold === "auth_stale"
+      ? "已自动清回执,下轮拉取将轮换重发密钥"
+      : "条件消失后自动恢复派发,无需人工干预";
+  const card = statusCard({
+    title: `〔派发挂起〕${whoRaw} 的派发已挂起`,
+    template: "orange",
+    body: `**原因**:${mdText(DISPATCH_HOLD_TEXT[input.hold])}\n**机器**:${mdText(input.hostname)}\n**状态**:${status}`,
+  });
+  const episode = `${input.machineId}:${input.project}:${input.hold}@${input.sinceTs}`;
+  await enqueuePush(db, {
+    idempotencyKey: `dispatch-hold:${episode}`,
+    kind: "work_notify",
+    chatId: input.chatId,
+    card,
+    uuid: episode,
     ...(input.now === undefined ? {} : { now: input.now }),
   });
 }

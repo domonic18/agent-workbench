@@ -1,4 +1,4 @@
-import { MACHINE_HEARTBEAT, RUN_IDLE_GAP_MS, type AgentRuntime } from "../../shared/constants.js";
+import { MACHINE_HEARTBEAT, RUN_IDLE_GAP_MS, type AgentRuntime, type DispatchHoldReason } from "../../shared/constants.js";
 import { OVERVIEW_SCOPE } from "../../shared/scopes.js";
 import { startOfLocalDay } from "../../shared/time.js";
 import type { Db } from "../../store/database.js";
@@ -34,6 +34,10 @@ export interface OverviewAgent {
   currentTaskStatus: string | null;
   /** 无任务归属时的会话实况:当前 run 最近一条用户指令(已压平空白,截断 200 字符) */
   currentInstruction: string | null;
+  /** 心跳上报的派发挂起(M3.11);机器无关运行时无派发概念,为 null */
+  dispatchHold: DispatchHoldReason | null;
+  dispatchPending: number | null;
+  dispatchHoldSince: number | null;
   todayTokens: number;
 }
 
@@ -118,6 +122,9 @@ export function createOverviewService(deps: OverviewServiceDeps): OverviewServic
         currentTaskStage: row.currentTaskStage,
         currentTaskStatus: row.currentTaskStatus,
         currentInstruction: instructionText(row.currentInstruction),
+        dispatchHold: row.dispatchHold,
+        dispatchPending: row.dispatchPending,
+        dispatchHoldSince: row.dispatchHoldSince,
         todayTokens: row.todayTokens,
       })),
     };

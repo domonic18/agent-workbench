@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { openDatabase, type Db } from "../../store/database.js";
 import { insertAgent, type NewAgent } from "../../store/repositories/agent.js";
+import { insertMachine } from "../../store/repositories/machine.js";
 import { findOutboxByKey } from "../../store/repositories/outbox.js";
 import {
   ackInbox,
@@ -10,7 +11,7 @@ import {
 import type { WorkPolicy } from "../routing/policy.js";
 import type { WorkRequest } from "./contract.js";
 import { createIngestService } from "./ingest-service.js";
-import { notifyWorkEvent, announceHold, type WorkNotifyKind } from "./notify.js";
+import { notifyWorkEvent, announceHold, announceDispatchHold, type WorkNotifyKind } from "./notify.js";
 
 const AGENT_KEY = "wb-primary";
 const AGENT_ID = "agt_w";
@@ -322,6 +323,109 @@ describe("工作事项通知线 notifyWorkEvent", () => {
     });
     expect(await findOutboxByKey(fixture.db, "work-notify:wev_ghost")).toBeUndefined();
     await fixture.db.close();
+  });
+});
+
+describe("派发挂起首跳播报 announceDispatchHold", () => {
+  const SINCE = 1_700_000_000_000;
+
+  it("卡片带机器人名、原因与机器;同键幂等;新 sinceTs 再播;无登记 Agent 用宿主回退", async () => {
+    const db = await openDatabase();
+    await insertMachine(db, {
+      id: "m_dispatch",
+      hostname: "macbook.local",
+      os: "darwin",
+      collectorVersion: "0.4.0",
+      collectorSecretHash: "h",
+      createdAt: 1_000,
+    });
+    await insertAgent(db, {
+      ...workAgent(),
+      id: "agt_dispatch",
+      machineId: "m_dispatch",
+      project: "cc-sysdev",
+      displayName: "CC系统开发-1号",
+    });
+
+    await announceDispatchHold(db, {
+      machineId: "m_dispatch",
+      hostname: "macbook.local",
+      project: "cc-sysdev",
+      hold: "cwd_missing",
+      pending: 2,
+      sinceTs: SINCE,
+      chatId: CHAT_ID,
+      now: 7_000,
+    });
+    const row = await findOutboxByKey(db, `dispatch-hold:m_dispatch:cc-sysdev:cwd_missing@${SINCE}`);
+    expect(row).toBeDefined();
+    const payload = JSON.parse(row!.payloadJson) as OutboxPayload;
+    expect(payload.chatId).toBe(CHAT_ID);
+    const card = readCard(payload);
+    expect(card.title).toContain("派发挂起");
+    expect(card.title).toContain("CC系统开发-1号");
+    expect(card.template).toBe("orange");
+    expect(card.body).toContain("工作目录不存在");
+    expect(card.body).toContain("macbook.local");
+    expect(card.body).toContain("自动恢复派发");
+
+    // 同一轮挂起重放:幂等只留一条
+    await announceDispatchHold(db, {
+      machineId: "m_dispatch",
+      hostname: "macbook.local",
+      project: "cc-sysdev",
+      hold: "cwd_missing",
+      pending: 2,
+      sinceTs: SINCE,
+      chatId: CHAT_ID,
+      now: 8_000,
+    });
+    expect(((await db.get("SELECT COUNT(*) AS n FROM outbox")) as { n: number }).n).toBe(1);
+
+    // 消除后重现(sinceTs 变化):新一轮挂起再播
+    await announceDispatchHold(db, {
+      machineId: "m_dispatch",
+      hostname: "macbook.local",
+      project: "cc-sysdev",
+      hold: "cwd_missing",
+      pending: 2,
+      sinceTs: SINCE + 60_000,
+      chatId: CHAT_ID,
+      now: 9_000,
+    });
+    expect(((await db.get("SELECT COUNT(*) AS n FROM outbox")) as { n: number }).n).toBe(2);
+
+    // 未登记项目:回退宿主:项目,auth_stale 文案指向自愈
+    await announceDispatchHold(db, {
+      machineId: "m_dispatch",
+      hostname: "macbook.local",
+      project: "ghost-proj",
+      hold: "auth_stale",
+      pending: 0,
+      sinceTs: SINCE,
+      chatId: CHAT_ID,
+    });
+    const staleRow = await findOutboxByKey(db, `dispatch-hold:m_dispatch:ghost-proj:auth_stale@${SINCE}`);
+    expect(staleRow).toBeDefined();
+    const staleCard = readCard(JSON.parse(staleRow!.payloadJson) as OutboxPayload);
+    expect(staleCard.title).toContain("macbook.local:ghost-proj");
+    expect(staleCard.body).toContain("轮换重发");
+    await db.close();
+  });
+
+  it("群未配置:不入队", async () => {
+    const db = await openDatabase();
+    await announceDispatchHold(db, {
+      machineId: "m_x",
+      hostname: "h",
+      project: "p",
+      hold: "cwd_unknown",
+      pending: 0,
+      sinceTs: SINCE,
+      chatId: undefined,
+    });
+    expect(await findOutboxByKey(db, `dispatch-hold:m_x:p:cwd_unknown@${SINCE}`)).toBeUndefined();
+    await db.close();
   });
 });
 

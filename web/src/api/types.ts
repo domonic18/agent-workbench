@@ -6,12 +6,15 @@ export interface OverviewMetrics {
   heartbeatTimeouts: number;
 }
 
-import { AGENT_RUNTIMES } from "@shared/constants.js";
+import { AGENT_RUNTIMES, DISPATCH_HOLD_REASONS } from "@shared/constants.js";
 
 export type HeartbeatState = "ok" | "timeout" | "offline" | "unknown";
 
 /** Agent 运行时:与控制台 shared/constants AGENT_RUNTIMES 一一对应;web 侧无 aw-node 绑定概念,只用于展示标签 */
 export type AgentRuntime = (typeof AGENT_RUNTIMES)[number];
+
+/** 派发挂起原因:与控制台/collector 共用的 DISPATCH_HOLD_REASONS 同源 */
+export type DispatchHoldReason = (typeof DISPATCH_HOLD_REASONS)[number];
 
 export interface OverviewAgent {
   id: string;
@@ -35,6 +38,10 @@ export interface OverviewAgent {
   currentTaskStatus: string | null;
   /** 无任务归属时的会话实况:当前 run 最近一条用户指令(已截断) */
   currentInstruction: string | null;
+  /** 心跳上报的派发挂起(M3.11);机器无关运行时无派发概念,为 null */
+  dispatchHold: DispatchHoldReason | null;
+  dispatchPending: number | null;
+  dispatchHoldSince: number | null;
   todayTokens: number;
 }
 

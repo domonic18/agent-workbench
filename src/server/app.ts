@@ -160,7 +160,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     registerWorkRoutes(app, { db, ...timing, ...collab, usageResolver });
     registerWorkAgentRoutes(app, { db, ...timing, ...collab });
     registerStreamRoutes(app, { db, ...timing });
-    registerIngestRoutes(app, { db, ...timing });
+    registerIngestRoutes(app, { db, ...timing, ...collab });
     if (options.githubWebhookSecret !== undefined) {
       registerWebhookGithubRoutes(app, {
         db,

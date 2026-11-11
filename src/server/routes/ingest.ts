@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import { IngestError } from "../../domain/ingest/errors.js";
 import { createIngestService, type IngestService } from "../../domain/ingest/service.js";
+import { announceDispatchHold } from "../../domain/work/notify.js";
 import { AUTH_STALE_HEAL_COOLDOWN_MS, DISPATCH_HOLD_REASONS, INGEST } from "../../shared/constants.js";
 import type { Db } from "../../store/database.js";
 import { clearAgentConfigAcksForHeal } from "../../store/repositories/agent.js";
@@ -76,6 +77,8 @@ export interface IngestRoutesOptions {
   db: Db;
   now?: () => number;
   service?: IngestService;
+  /** 控制台协作群;派发挂起首跳播报目标,未配置时静默跳过 */
+  collabChatId?: string;
 }
 
 function sendError(reply: FastifyReply, error: IngestError): FastifyReply {
@@ -138,6 +141,26 @@ export function registerIngestRoutes(app: FastifyInstance, options: IngestRoutes
             "auth_stale 自愈:已清配置回执,下轮拉取轮换重发",
           );
         }
+      }
+      // 首跳播报(M3.11):与更新前的快照按 (project, hold) 比对,
+      // 持续挂起不重播;挂起消除后重现(since_ts 变化)由幂等键兜住再播
+      const previousHolds = new Set(
+        machine.dispatchStatus.map((entry) => `${entry.project}@${entry.hold}`),
+      );
+      for (const entry of parsed.data.dispatch) {
+        if (previousHolds.has(`${entry.project}@${entry.hold}`)) {
+          continue;
+        }
+        await announceDispatchHold(db, {
+          machineId: machine.id,
+          hostname: machine.hostname,
+          project: entry.project,
+          hold: entry.hold,
+          pending: entry.pending,
+          sinceTs: entry.since_ts,
+          chatId: options.collabChatId,
+          now: now(),
+        });
       }
     }
     return reply.code(200).send({

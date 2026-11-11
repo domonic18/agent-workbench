@@ -72,6 +72,9 @@ function live(overrides: Partial<OverviewAgent> = {}): OverviewAgent {
     currentTaskStage: null,
     currentTaskStatus: null,
     currentInstruction: null,
+    dispatchHold: null,
+    dispatchPending: null,
+    dispatchHoldSince: null,
     todayTokens: 0,
     ...overrides,
   };
