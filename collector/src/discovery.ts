@@ -141,6 +141,20 @@ export function scanDiscoveryState(configPaths?: string[]): {
 }
 
 /**
+ * 现算项目名 → 工作目录映射(M3.12):调度每轮取实时 cwd,不读下发快照、
+ * 不复用发现周期的 5min 缓存——cc-connect 配置是 cwd 唯一事实源。
+ */
+export function scanCwdByProject(configPaths?: string[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const project of scanDiscovery(configPaths).projects) {
+    if (project.cwd !== undefined) {
+      map.set(project.name, project.cwd);
+    }
+  }
+  return map;
+}
+
+/**
  * 把 AW_EXTRA_PROJECTS 声明的项目并入发现上报:新项目只带 name+cwd,
  * 不伪造 agents/channels/bot 名;同名已存在时仅补缺失的 cwd,cc-connect 事实优先。
  */

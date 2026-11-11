@@ -1,5 +1,13 @@
-import type { IdentityStatus } from "../../shared/constants.js";
+import type { DispatchHoldReason, IdentityStatus } from "../../shared/constants.js";
 import type { Db } from "../database.js";
+
+/** 心跳捎带的单项目派发状态(M3.12):被挡项目与挂起原因,空数组即全部放行 */
+export interface MachineDispatchStatusEntry {
+  project: string;
+  pending: number;
+  hold: DispatchHoldReason;
+  since_ts: number;
+}
 
 export interface MachineRecord {
   id: string;
@@ -18,6 +26,8 @@ export interface MachineRecord {
   botRefreshRequestedAt: number | null;
   /** 心跳上报的活跃流(L2 观测续命):自上一跳以来有新字节的 stream_id 列表 */
   activeStreams: string[];
+  /** 心跳捎带的派发状态(M3.12):被挡项目整包覆盖 */
+  dispatchStatus: MachineDispatchStatusEntry[];
 }
 
 export type MachineConfigStatus = "pending" | "delivered" | "effective";
@@ -28,7 +38,7 @@ const MACHINE_COLUMNS = `
   status, created_at AS "createdAt",
   discovery_json AS "discoveryJson", discovery_received_at AS "discoveryReceivedAt",
   config_status AS "configStatus", bot_refresh_requested_at AS "botRefreshRequestedAt",
-  active_streams AS "activeStreams"
+  active_streams AS "activeStreams", dispatch_status AS "dispatchStatus"
 `;
 
 export interface NewMachine {
@@ -137,6 +147,27 @@ export async function updateMachineActiveStreams(
     (
       await db.run("UPDATE machine SET active_streams = ?::jsonb WHERE id = ? AND status = 'active'",
         JSON.stringify(streams), id)
+    ).changes === 1
+  );
+}
+
+/**
+ * 心跳派发状态整包覆盖(M3.12):语义比对(jsonb <>),值未变化不写,
+ * 免得心跳每分钟都动行。未携带字段的旧采集器不调本函数,保留旧值。
+ */
+export async function updateMachineDispatchStatus(
+  db: Db,
+  id: string,
+  status: MachineDispatchStatusEntry[],
+): Promise<boolean> {
+  const json = JSON.stringify(status);
+  return (
+    (
+      await db.run(
+        `UPDATE machine SET dispatch_status = ?::jsonb
+          WHERE id = ? AND dispatch_status <> ?::jsonb`,
+        json, id, json,
+      )
     ).changes === 1
   );
 }

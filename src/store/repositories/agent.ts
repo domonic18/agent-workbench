@@ -86,10 +86,18 @@ export async function findAgentByMachineProject(
   )) as AgentRecord | undefined;
 }
 
+/**
+ * 轮换 Agent 密钥即清配置回执(M3.12):ACK 过的 Agent 不会被周期下发照顾,
+ * 新密钥必须能到达机器,否则两侧密钥劈开只能人肉修。
+ * 调用方:rotateAgentSecret(管理员轮换与自助兑换共用)。
+ */
 export async function updateAgentSecretHash(db: Db, id: string, hash: string, now: number): Promise<boolean> {
   return (
     (
-      await db.run("UPDATE agent SET secret_hash = ?, updated_at = ? WHERE id = ?", hash, now, id)
+      await db.run(
+        "UPDATE agent SET secret_hash = ?, config_ack_at = NULL, updated_at = ? WHERE id = ?",
+        hash, now, id,
+      )
     ).changes === 1
   );
 }
@@ -143,6 +151,31 @@ export async function markAgentConfigAck(
         now, now, id, configVersion,
       )
     ).changes === 1
+  );
+}
+
+/**
+ * auth_stale 自愈(M3.12):机器探视连续 401 时清回执,下轮拉取自动轮换重发。
+ * 只动 ACK 距今超过冷却期(默认 10min)的行,防轮换风暴;返回清掉的行数。
+ */
+export async function clearAgentConfigAcksForHeal(
+  db: Db,
+  query: { machineId: string; projects: string[]; ackedBefore: number; now: number },
+): Promise<number> {
+  if (query.projects.length === 0) {
+    return 0;
+  }
+  const placeholders = query.projects.map(() => "?").join(", ");
+  return (
+    (
+      await db.run(
+        `UPDATE agent
+           SET config_ack_at = NULL, updated_at = ?
+         WHERE machine_id = ? AND project IN (${placeholders})
+           AND config_ack_at IS NOT NULL AND config_ack_at < ?`,
+        query.now, query.machineId, ...query.projects, query.ackedBefore,
+      )
+    ).changes
   );
 }
 

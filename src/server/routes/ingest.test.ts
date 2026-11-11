@@ -4,6 +4,7 @@ import { createIdentityService } from "../../domain/identity/service.js";
 import { openDatabase, type Db } from "../../store/database.js";
 import { hasIngestReceipt } from "../../store/repositories/ingest-receipt.js";
 import { findMachineById } from "../../store/repositories/machine.js";
+import { findOutboxByKey } from "../../store/repositories/outbox.js";
 import { findRunningRunForStream, listTimelineEventsByRun } from "../../store/repositories/run.js";
 import { ensureConsoleCredential } from "../credential.js";
 import { buildApp } from "../app.js";
@@ -55,7 +56,17 @@ describe("ingest 路由", () => {
 
   beforeEach(async () => {
     fixture = await prepare();
-    app = buildApp({ logLevel: "silent", db: fixture.db });
+    app = buildApp({
+      logLevel: "silent",
+      db: fixture.db,
+      feishu: {
+        appId: "cli_test",
+        appSecret: "secret",
+        allowedOpenIds: [],
+        approvalChatId: undefined,
+        collabChatId: "oc_collab",
+      },
+    });
   });
 
   afterEach(async () => {
@@ -246,6 +257,103 @@ describe("ingest 路由", () => {
     });
     expect(legacy.statusCode).toBe(200);
     expect((await findMachineById(fixture.db, "m1"))?.collectorVersion).toBe("9.9.9");
+  });
+
+  it("心跳派发状态整包落 machine.dispatch_status;非法 hold 拒 400", async () => {
+    const entry = { project: "pa", pending: 2, hold: "cwd_missing", since_ts: 1_700_000_000_000 };
+    const beat = await app.inject({
+      method: "POST",
+      url: "/api/ingest/heartbeat",
+      headers: headers(),
+      payload: { uptime: 12, dispatch: [entry] },
+    });
+    expect(beat.statusCode).toBe(200);
+    expect((await findMachineById(fixture.db, "m1"))?.dispatchStatus).toEqual([entry]);
+
+    const bad = await app.inject({
+      method: "POST",
+      url: "/api/ingest/heartbeat",
+      headers: headers(),
+      payload: { uptime: 12, dispatch: [{ project: "pa", pending: 1, hold: "nope", since_ts: 1 }] },
+    });
+    expect(bad.statusCode).toBe(400);
+  });
+
+  it("auth_stale 自愈:ACK 超过冷却期即清回执,冷却期内与未 ACK 不动", async () => {
+    const now = Date.now();
+    await fixture.db.run(
+      `UPDATE agent SET secret_hash = 'h', config_version = 1,
+         config_ack_at = ? WHERE id = ?`,
+      now - 20 * 60_000, fixture.agentId,
+    );
+    const beat = await app.inject({
+      method: "POST",
+      url: "/api/ingest/heartbeat",
+      headers: headers(),
+      payload: {
+        uptime: 12,
+        dispatch: [{ project: "pa", pending: 0, hold: "auth_stale", since_ts: now }],
+      },
+    });
+    expect(beat.statusCode).toBe(200);
+    const healed = await fixture.db.get(
+      'SELECT config_ack_at AS ack FROM agent WHERE id = ?',
+      fixture.agentId,
+    );
+    expect((healed as { ack: number | null }).ack).toBeNull();
+
+    // 冷却期内(刚 ACK 1 分钟)不清:防轮换风暴
+    await fixture.db.run("UPDATE agent SET config_ack_at = ? WHERE id = ?", now - 60_000, fixture.agentId);
+    await app.inject({
+      method: "POST",
+      url: "/api/ingest/heartbeat",
+      headers: headers(),
+      payload: {
+        uptime: 12,
+        dispatch: [{ project: "pa", pending: 0, hold: "auth_stale", since_ts: now }],
+      },
+    });
+    const cooled = (await fixture.db.get(
+      'SELECT config_ack_at AS ack FROM agent WHERE id = ?',
+      fixture.agentId,
+    )) as { ack: number | null };
+    expect(cooled.ack).not.toBeNull();
+  });
+
+  it("派发挂起首跳播报:首次出现入群,持续挂起不重播,消除后重现再播", async () => {
+    const since = 1_700_000_000_000;
+    const beat = (hold: string, sinceTs = since) =>
+      app.inject({
+        method: "POST",
+        url: "/api/ingest/heartbeat",
+        headers: headers(),
+        payload: { uptime: 12, dispatch: [{ project: "pa", pending: 1, hold, since_ts: sinceTs }] },
+      });
+
+    expect((await beat("cwd_missing")).statusCode).toBe(200);
+    const row = await findOutboxByKey(fixture.db, `dispatch-hold:m1:pa:cwd_missing@${since}`);
+    expect(row).toBeDefined();
+    const payload = JSON.parse(row!.payloadJson) as { chatId: string };
+    expect(payload.chatId).toBe("oc_collab");
+
+    // 同一 hold 持续上报:非首跳,不重播
+    expect((await beat("cwd_missing")).statusCode).toBe(200);
+    expect(
+      (await fixture.db.get("SELECT COUNT(*) AS n FROM outbox")) as { n: number },
+    ).toMatchObject({ n: 1 });
+
+    // 挂起消除(空快照)后换原因重现:新一轮挂起再播
+    const clear = await app.inject({
+      method: "POST",
+      url: "/api/ingest/heartbeat",
+      headers: headers(),
+      payload: { uptime: 12, dispatch: [] },
+    });
+    expect(clear.statusCode).toBe(200);
+    expect((await beat("auth_stale", since + 60_000)).statusCode).toBe(200);
+    expect(
+      await findOutboxByKey(fixture.db, `dispatch-hold:m1:pa:auth_stale@${since + 60_000}`),
+    ).toBeDefined();
   });
 
   it("心跳与项目列表都要求采集器 Bearer", async () => {

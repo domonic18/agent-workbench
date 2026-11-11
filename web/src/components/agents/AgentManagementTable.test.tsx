@@ -72,6 +72,9 @@ function live(overrides: Partial<OverviewAgent> = {}): OverviewAgent {
     currentTaskStage: null,
     currentTaskStatus: null,
     currentInstruction: null,
+    dispatchHold: null,
+    dispatchPending: null,
+    dispatchHoldSince: null,
     todayTokens: 0,
     ...overrides,
   };
@@ -265,6 +268,27 @@ describe("Agent 管理表格", () => {
 
     const table = within(await screen.findByRole("table"));
     expect(table.getByText("a2a-real · a2a-real-workbuddy")).toBeTruthy();
+  });
+
+  it("派发挂起时状态列加徽标,原因与件数时长进 Tooltip(M3.12)", async () => {
+    vi.mocked(fetchAgents).mockResolvedValue([agent()]);
+    renderTable(
+      vi.fn(),
+      [
+        live({
+          dispatchHold: "cwd_missing",
+          dispatchPending: 2,
+          dispatchHoldSince: Date.now() - 5 * 60_000,
+        }),
+      ],
+    );
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getByText("派发挂起·目录不存在")).toBeTruthy();
+    const trigger = table.getByRole("img", { name: /目录不存在/ });
+    const label = trigger.getAttribute("aria-label") ?? "";
+    expect(label).toContain("待派 2 件");
+    expect(label).toContain("已持续");
   });
 
   it("机器列优先显示展示名", async () => {

@@ -1,7 +1,16 @@
 import type { AgentRosterSummary } from "../../api/identity.js";
 import type { OverviewAgent } from "../../api/types.js";
-import { HEARTBEAT_LABEL, HEARTBEAT_TONE, TASK_STAGE_LABEL, TASK_STATUS_LABEL } from "../../shared/labels.js";
+import { formatRelativeTime } from "../../shared/format.js";
+import {
+  DISPATCH_HOLD_LABEL,
+  DISPATCH_HOLD_TONE,
+  HEARTBEAT_LABEL,
+  HEARTBEAT_TONE,
+  TASK_STAGE_LABEL,
+  TASK_STATUS_LABEL,
+} from "../../shared/labels.js";
 import { Badge } from "../ui/Badge.js";
+import { Tooltip } from "../ui/Tooltip.js";
 
 /** 名册行与总览活体状态合并后的公共取数 */
 
@@ -23,6 +32,21 @@ export function statusBadges(agent: AgentRosterSummary, live: OverviewAgent | un
     );
     if (live?.running === true) {
       badges.push(<Badge key="running" tone="info" text="运行中" />);
+    }
+    if (live?.dispatchHold !== null && live?.dispatchHold !== undefined) {
+      const hold = live.dispatchHold;
+      const parts = [`派发挂起:${DISPATCH_HOLD_LABEL[hold]}`];
+      if (live.dispatchPending !== null && live.dispatchPending > 0) {
+        parts.push(`待派 ${live.dispatchPending} 件`);
+      }
+      if (live.dispatchHoldSince !== null) {
+        parts.push(`已持续 ${formatRelativeTime(live.dispatchHoldSince)}`);
+      }
+      badges.push(
+        <Tooltip key="dispatch-hold" label={parts.join(",")}>
+          <Badge tone={DISPATCH_HOLD_TONE[hold]} text={`派发挂起·${DISPATCH_HOLD_LABEL[hold]}`} />
+        </Tooltip>,
+      );
     }
   }
   return badges;

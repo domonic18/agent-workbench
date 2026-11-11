@@ -1,4 +1,4 @@
-import type { AgentRuntime } from "../../shared/constants.js";
+import type { AgentRuntime, DispatchHoldReason } from "../../shared/constants.js";
 import type { Db } from "../database.js";
 
 export interface OverviewMetrics {
@@ -59,6 +59,10 @@ export interface AgentOverviewRow {
   currentTaskStatus: string | null;
   /** 当前 run 最近一条用户指令的开头;没有任务归属时用来回答「在忙什么」 */
   currentInstruction: string | null;
+  /** 心跳上报的派发挂起(M3.12):按 (machine, project) 映射;无挂起为 null */
+  dispatchHold: DispatchHoldReason | null;
+  dispatchPending: number | null;
+  dispatchHoldSince: number | null;
   todayTokens: number;
 }
 
@@ -102,9 +106,20 @@ export async function listAgentOverviewRows(
            -- 运行时注入的 <task-notification> 之类也记为 user_message,不代表人的指令
            AND ltrim(e.payload_json::jsonb->>'text') NOT LIKE '<%'
          ORDER BY e.occurred_at DESC, e.ord DESC LIMIT 1) AS "currentInstruction",
+       dh."dispatchHold",
+       dh."dispatchPending",
+       dh."dispatchHoldSince",
        COALESCE(tok."totalTokens", 0) AS "todayTokens"
      FROM agent a
      LEFT JOIN machine m ON m.id = a.machine_id
+     LEFT JOIN LATERAL (
+       SELECT e->>'hold' AS "dispatchHold",
+              (e->>'pending')::int AS "dispatchPending",
+              (e->>'since_ts')::bigint AS "dispatchHoldSince"
+         FROM machine dm, jsonb_array_elements(dm.dispatch_status) e
+        WHERE dm.id = a.machine_id AND e->>'project' = a.project
+        LIMIT 1
+     ) dh ON TRUE
      LEFT JOIN agent_run r ON r.id = (
        SELECT id FROM agent_run
         WHERE agent_id = a.id AND status = 'running' AND last_seen_at >= ?

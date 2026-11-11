@@ -84,6 +84,8 @@ export function OverviewPage() {
   const { data, isPending, isError, error, refetch } = useQuery({
     queryKey: ["overview"],
     queryFn: fetchOverview,
+    // 派发挂起等机器侧状态随心跳(60s)更新,SSE 事件源不覆盖这类行级变化
+    refetchInterval: 60_000,
     retry: (count, caught) =>
       !(caught instanceof ApiError && caught.status === 401) && count < 2,
   });

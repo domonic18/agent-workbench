@@ -2,13 +2,16 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import { IngestError } from "../../domain/ingest/errors.js";
 import { createIngestService, type IngestService } from "../../domain/ingest/service.js";
-import { INGEST } from "../../shared/constants.js";
+import { announceDispatchHold } from "../../domain/work/notify.js";
+import { AUTH_STALE_HEAL_COOLDOWN_MS, DISPATCH_HOLD_REASONS, INGEST } from "../../shared/constants.js";
 import type { Db } from "../../store/database.js";
+import { clearAgentConfigAcksForHeal } from "../../store/repositories/agent.js";
 import {
   listActiveAgentProjects,
   touchMachineLastSeen,
   updateMachineActiveStreams,
   updateMachineCollectorVersion,
+  updateMachineDispatchStatus,
   type MachineRecord,
 } from "../../store/repositories/machine.js";
 import { requireMachineAuth } from "../middleware/machine-auth.js";
@@ -25,6 +28,18 @@ const heartbeatSchema = z.object({
   active_streams: z.array(z.string().min(1).max(256)).max(1000).optional(),
   /** 采集器自身版本;旧版采集器不携带,保留 enroll 时落的值 */
   collector_version: z.string().min(1).max(32).optional(),
+  /** 派发状态(M3.12):被挡项目随心跳捎带;空快照省略字段,旧采集器兼容 */
+  dispatch: z
+    .array(
+      z.object({
+        project: z.string().min(1).max(200),
+        pending: z.number().int().min(0).max(1_000_000),
+        hold: z.enum(DISPATCH_HOLD_REASONS),
+        since_ts: z.number().int().min(0),
+      }),
+    )
+    .max(100)
+    .optional(),
 });
 
 const itemSchema = z.object({
@@ -62,6 +77,8 @@ export interface IngestRoutesOptions {
   db: Db;
   now?: () => number;
   service?: IngestService;
+  /** 控制台协作群;派发挂起首跳播报目标,未配置时静默跳过 */
+  collabChatId?: string;
 }
 
 function sendError(reply: FastifyReply, error: IngestError): FastifyReply {
@@ -103,6 +120,48 @@ export function registerIngestRoutes(app: FastifyInstance, options: IngestRoutes
     await updateMachineActiveStreams(db, machine.id, parsed.data.active_streams ?? []);
     if (parsed.data.collector_version !== undefined) {
       await updateMachineCollectorVersion(db, machine.id, parsed.data.collector_version);
+    }
+    if (parsed.data.dispatch !== undefined) {
+      // 整包覆盖派发状态;auth_stale 即触发自愈——清回执让下轮拉取自动轮换重发,
+      // 10min 冷却(按 config_ack_at 距今)防轮换风暴
+      await updateMachineDispatchStatus(db, machine.id, parsed.data.dispatch);
+      const staleProjects = parsed.data.dispatch
+        .filter((entry) => entry.hold === "auth_stale")
+        .map((entry) => entry.project);
+      if (staleProjects.length > 0) {
+        const cleared = await clearAgentConfigAcksForHeal(db, {
+          machineId: machine.id,
+          projects: staleProjects,
+          ackedBefore: now() - AUTH_STALE_HEAL_COOLDOWN_MS,
+          now: now(),
+        });
+        if (cleared > 0) {
+          request.log.warn(
+            { machineId: machine.id, projects: staleProjects, cleared },
+            "auth_stale 自愈:已清配置回执,下轮拉取轮换重发",
+          );
+        }
+      }
+      // 首跳播报(M3.12):与更新前的快照按 (project, hold) 比对,
+      // 持续挂起不重播;挂起消除后重现(since_ts 变化)由幂等键兜住再播
+      const previousHolds = new Set(
+        machine.dispatchStatus.map((entry) => `${entry.project}@${entry.hold}`),
+      );
+      for (const entry of parsed.data.dispatch) {
+        if (previousHolds.has(`${entry.project}@${entry.hold}`)) {
+          continue;
+        }
+        await announceDispatchHold(db, {
+          machineId: machine.id,
+          hostname: machine.hostname,
+          project: entry.project,
+          hold: entry.hold,
+          pending: entry.pending,
+          sinceTs: entry.since_ts,
+          chatId: options.collabChatId,
+          now: now(),
+        });
+      }
     }
     return reply.code(200).send({
       ok: true,

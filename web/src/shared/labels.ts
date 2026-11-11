@@ -15,7 +15,7 @@ import type {
   WorkItemStatus,
 } from "@shared/constants.js";
 import type { ChainRelation } from "../api/task-chain.js";
-import type { AgentRuntime, HeartbeatState } from "../api/types.js";
+import type { AgentRuntime, DispatchHoldReason, HeartbeatState } from "../api/types.js";
 
 export type { Tone } from "./tone.js";
 import type { Tone } from "./tone.js";
@@ -280,6 +280,28 @@ export const WORK_ITEM_EVENT_LABEL: Record<string, string> = {
 export const WORK_HOLD_REASON_LABEL: Record<WorkHoldReason, string> = {
   cwd_session_active: "工作区会话占用中",
   dirty_worktree: "工作区有未提交改动",
+};
+
+/** 派发挂起原因:aw-node 闸门/探测挡下派发时随心跳上报(M3.12),枚举与 collector 同源 */
+export const DISPATCH_HOLD_LABEL: Record<DispatchHoldReason, string> = {
+  cwd_unknown: "项目未配置",
+  cwd_missing: "目录不存在",
+  cwd_session_active: "会话占用",
+  dirty_worktree: "工作区脏",
+  machine_limit: "会话满",
+  auth_stale: "密钥待重发",
+  spawn_failed: "会话启动失败",
+};
+
+/** 会让派发完全出不去的原因(找不到目录/密钥失效/起不来)用 danger,闸门类保护性挂起用 warning */
+export const DISPATCH_HOLD_TONE: Record<DispatchHoldReason, Tone> = {
+  cwd_unknown: "danger",
+  cwd_missing: "danger",
+  cwd_session_active: "warning",
+  dirty_worktree: "warning",
+  machine_limit: "warning",
+  auth_stale: "danger",
+  spawn_failed: "danger",
 };
 
 /** 派工信箱状态:等待对象由 pending / claimed 的行推出 */

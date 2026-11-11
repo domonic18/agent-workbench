@@ -135,4 +135,67 @@ describe("overview 路由", () => {
     // 机器无关运行时没有本机会话概念,不显示数字
     expect(byId.get("a2")?.activeSessions).toBeNull();
   });
+
+  it("透出心跳派发挂起(M3.12):按 (machine, project) 映射,机器无关 Agent 为 null", async () => {
+    await insertMachine(db, {
+      id: "m1",
+      hostname: "host",
+      os: "darwin",
+      collectorVersion: "1.0.0",
+      collectorSecretHash: "h",
+      createdAt: AT,
+    });
+    await insertAgent(db, {
+      id: "a1",
+      machineId: "m1",
+      runtime: "claude_code",
+      project: "p1",
+      displayName: "Agent One",
+      secretHash: "h",
+      feishuAppId: null,
+      allowedTargetsJson: "[]",
+      createdAt: AT,
+    });
+    await insertAgent(db, {
+      id: "a2",
+      machineId: null,
+      runtime: "workbuddy",
+      project: "p2",
+      displayName: "Agent Two",
+      secretHash: "h",
+      feishuAppId: null,
+      allowedTargetsJson: "[]",
+      createdAt: AT,
+    });
+    await db.run(
+      `UPDATE machine SET dispatch_status = ?::jsonb WHERE id = 'm1'`,
+      JSON.stringify([
+        { project: "p1", pending: 2, hold: "cwd_missing", since_ts: AT - 300_000 },
+        // 别的项目挂起不影响 a1 的行
+        { project: "p9", pending: 1, hold: "auth_stale", since_ts: AT },
+      ]),
+    );
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/overview",
+      headers: { cookie },
+    });
+    expect(response.statusCode).toBe(200);
+    const body = response.json() as {
+      agents: Array<{
+        id: string;
+        dispatchHold: string | null;
+        dispatchPending: number | null;
+        dispatchHoldSince: number | null;
+      }>;
+    };
+    const byId = new Map(body.agents.map((agent) => [agent.id, agent]));
+    expect(byId.get("a1")).toMatchObject({
+      dispatchHold: "cwd_missing",
+      dispatchPending: 2,
+      dispatchHoldSince: AT - 300_000,
+    });
+    expect(byId.get("a2")?.dispatchHold).toBeNull();
+  });
 });

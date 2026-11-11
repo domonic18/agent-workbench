@@ -89,6 +89,12 @@
 - 状态: **进行中**。D1–D8 已裁决(2026-11-09)：不做 dispatch_mode 枚举、不做控制台紧急插入按钮、机级上限默认 2、非 bug 负载仅承认委派语义(D6)、非代码产物 git 引用优先(D7)、外部运行时 deadline 死信为唯一护栏(D8)；系统输入清单六类与「自然语言不是直接输入」口径落 [arch/00 §6.1](../arch/00-总体架构设计.md)。任务拆解见 [tasks/M3.10.md](tasks/M3.10.md)。**批次 2–5 代码侧已闭**：派发闸门 G1–G4 + 退避 + `POST /api/work/hold` 原因端点与首次挂起播报（批次 2）、批次化交付提示词与单批上限 8 件（批次 3）、僵尸回收与自动重排后台作业（running 超 2h 转 blocked、同事项重排 ≤2 次、pending 超 24h 标 stalled，批次 4）、**agent_run 归因断链根因查实并修复**——aw-node 自起会话不在 cc-connect 档案、按 04 档 3 被判为不推送，致 11-08 事故时段 `agent_run` 0 行；修法是 spawn 前预生成 session uuid（`claude --session-id`）并登记进采集器本地活引用归因注册表（叠加索引），使派发会话走上同一条归因口径（批次 5，附总览「活跃会话」列与事项详情挂起原因/时长展示）。**批次 1 已于 2026-11-09 执行**（生产库，先备份校验再事务内执行，见变更记录）。**闸门真机行为已实测**：acore-portal 有活跃会话时被 G2 挡下，10 条派工写 reason、群播报恰一次、连挡 5 轮进退避
 - 阻塞项: 批次 6 真机复演（§7 剧本 7 步）待执行——当前 10 条重排派工因 acore-portal 有活跃会话处于挂起，等条件消失后自动放行
 
+### M3.12: 派发链路自愈与可观测
+
+- 目标: 11-11 双事故同根修复——「下发→ACK→冻结」管道同时承载两种所有权不同的状态（密钥归控制台、cwd/MCP 绑定归机器），按所有权分治：cwd 每轮实时解析、MCP 条目自迁移、派发挂起随心跳上报可见、auth_stale/rotate 自愈，任何「有活派不出去」不再只写机器本地日志
+- 验收标准: 仓库挪位后 aw-node ≤5min 自动跟随新 cwd 并 spawn（无需人工 SQL）；目录改名时总览出「派发挂起」徽标 + 协作群首跳卡片、改回后自愈消失；rotate 后新密钥自动重达机器；探视连续 3 轮 401 判 auth_stale 并自愈；`make check` 全绿
+- 状态: **进行中**。代码侧已闭 4 commits（collector 0.4.0 / console 迁移 0019 + 首跳播报 + 总览透出 / web 徽标）+ 本文档落档；未闭项:PR 合入 → 发 0.4.0 → MacBook 升级真机验证。任务拆解见 [tasks/M3.12.md](tasks/M3.12.md)
+
 ### M4: 产出量化 + 周报 + 飞书免登
 
 - 目标: R3 指标与 token 用量上限、周报自动生成、飞书网页应用嵌入免登
@@ -123,6 +129,7 @@
 | M3.8 | [tasks/M3.8.md](tasks/M3.8.md) | 3 | 文档收口、PostgreSQL 全新基线、控制台远程控制 MCP、每机单 aw-node、首次使用自动装配 |
 | M3.9 | [tasks/M3.9.md](tasks/M3.9.md) | 2 | 确定性 Git Router、WorkItem/worker_inbox、真实 Bug 接受/退回 E2E |
 | M3.10 | [tasks/M3.10.md](tasks/M3.10.md) | 6 | 派发闸门 G1–G4、批次交付语义、僵尸回收重排、可观测补齐、真机复演 |
+| M3.12 | [tasks/M3.12.md](tasks/M3.12.md) | 1 | 派发链路自愈：cwd 实时解析、MCP 自迁移、派发状态上报、auth_stale/rotate 自愈 |
 | M4 | [tasks/M4.md](tasks/M4.md) | 4 | 用量上限与硬停、下钻、周报、飞书免登 |
 
 依赖顺序按里程碑串行:M1 定稿 → M1.5 建单能力 → M2 授权 → M2.5 传输 → M3 看见 → M3.5 操作 → M3.8 地基迁移 → M3.9 真实 Bug 闭环 → M4 计量。M2.5 与 M3 需配对上线；M3.8-1 文档收口可与既有收尾并行，代码迁移必须先冻结旧基线行为测试。
@@ -292,3 +299,4 @@ P1 项(飞书长连接与回调穿 frp、SSE 穿 frp、launchd 用户域、长�
 | 2026-11-09 | **run 生命周期收口三层信号(M1：end_reason + 迟滞 run 兜底收敛)**：①`agent_run` 加 `end_reason`(迁移 `0017`，可空枚举 `idle_split`/`process_exit`/`orphan_swept`，存量历史保持 NULL 不伪造)并加 running 部分索引服务兜底扫描；②惰性切分与 `endStream` 收尾路径分别落 `idle_split`/`process_exit`；③新增迟到事件回填：流上最近 run 已收尾且 `occurred_at ≤ ended_at` 时事件落回原 run 不误开新 run(为 M2 进程退出宣告早于 spool 末批事件的乱序场景预置)；④后台作业 `src/server/jobs/run-reclaim.ts`(启动时 + 每 5min)：`running` 且 `last_seen` 超 `RUN_IDLE_GAP_MS`(同一 30min 口径)单条 UPDATE CAS 收尾在最后一次活动并记 `orphan_swept`，不播报协作群。`make check` 全绿(服务端 971 + web 200)。L2(心跳活跃流续命)与 L1(aw-node 进程起止宣告接线 `endStream`)为后续 M2/M3 | 实测全库积 15 条 `running` 残留(含 5 条跨天)：惰性切分只在同流新事件到达时生效，会话正常结束的最后一段 run 永远等不到下一事件——「进程退出即结束 run」写了从未接线。系统性修法是按「事实离谁近谁宣告」分三层 + 立不变量「running 是临时状态必须收敛」，兜底作业是收敛层而非补丁：先立不变量，后续任何上游信号演进都在保护伞下 |
 | 2026-11-09 | **run 生命周期收口三层信号(M2+M3)**：L1 进程退出宣告——控制台新增 `POST /api/aw-node/run-end`(机器 Bearer,按 `(machine, agent_project)` 解析 Agent 后 `endStream` 收尾 `end_reason='process_exit'`,无 running run 幂等返回 null,`exit_code`/`signal` 只入日志),aw-node 调度循环在派发会话 `onExit` 注入 `createRunEndReporter` 上报(best-effort:失败重试一次再失败放弃,交 L3 兜底);L2 观测续命——心跳携带 `active_streams`(自上一跳读到新字节的流,扫描轮标记/心跳轮排水),迁移 `0018` 落 `machine.active_streams`(JSONB 整包覆盖,未携带即空数组防降级残留),`run-reclaim` 对「run 自己的机器心跳新鲜(5min)且报了该流」的 running run 不收。`make check` 全绿(服务端 986 + collector 内含 + web 200)。三层信号至此全部实装 | L1 让「会话正常结束」在秒级收尾而非等 30min 惰性切分;L2 防 L3 误杀:机器时钟落后或 spool 积压回放时机器仍在观测写入,不算孤儿。控制台部署与 aw-node 二进制升级是两条独立发布链,后者走产物发布脚本 |
 | 2026-11-10 | **采集器版本可见与升级提示（M3.11）**：①collector 0.3.1——心跳携带 `collector_version`（活报运行版本）；②控制台心跳 schema 收该字段、值变化才落库（此前只在 enroll 落值、升级后永不过期是缺口）；③发布脚本与产物同批写 `version.txt`，`/artifacts` 白名单放行，`/api/bootstrap/discovery` 返回 `latestCollectorVersion` + 逐机器 `collectorVersion`/`upgradeAvailable`（点分数字按段比较，非数字段不可比不误报）；④接入页机器行显示「采集器 vX.Y.Z」并在落后镜像最新版时标「可升级到 vX」。`make check` 全绿（服务端 991 + web 202） | 版本必须由心跳活报而非 enroll 一次落值——机器升级后控制台仍显示旧版本已实测发生（库里 0.2.1/0.2.2，实际都在跑 0.3.0 代码）；「可升级」基准取控制台产物目录自描述的 version.txt，机器未发布产物时不提示 |
+| 2026-11-11 | **派发链路自愈与可观测（M3.12）**：11-11 双事故（aitech-hub 挪位致 cc-sysdev 永久 `工作目录不存在` 只写本地 WARN + 早上密钥失配只能人肉 SQL 清回执）同根——「下发→ACK→冻结」管道把机器自有的 cwd/MCP 绑定也冻住了，还挡住控制台自有的密钥重发。按所有权分治改造：①collector 0.4.0——调度每轮实时解析 cwd（直接扫 cc-connect 配置，不复用 5min 发现快照、不读 config-state 缓存）、`cwd_unknown`/`cwd_missing` 入挂起表；config-sync 用本机现存密钥自迁移受管 MCP 条目到新 cwd；派发状态（挂起原因/待派件数/持续起点，含 `auth_stale`＝探视连续 3 轮 401、`spawn_failed`）随心跳 `dispatch` 数组整包捎带。②console——迁移 `0019` 落 `machine.dispatch_status`（JSONB 整包覆盖、语义比对判重）；auth_stale 自愈清 ACK 距今超 10min 的 `config_ack_at`；rotate 与自助兑换联动清回执；挂起 `(project,hold)` 首跳向协作群播报（幂等键含 sinceTs，消除后重现再播）；总览 LATERAL 透出挂起三字段。③web——总览状态列「派发挂起·原因」徽标（四类 danger），Tooltip 带待派件数与持续时长，overview 轮询 60s。`make check` 全绿（服务端 1010 + web 203） | 设计原则：同一条管道不应承载两种所有权的状态——密钥事实源在控制台就补自愈，cwd 事实源在机器就让机器自维护；挂起的可见性不依赖人翻机器日志 |

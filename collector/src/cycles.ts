@@ -6,7 +6,8 @@ import {
   createCachedFeishuBotResolver,
   type CachedFeishuBotResolver,
 } from "./feishu-bot.js";
-import { syncConfigOnce, type ConfigSyncDeps } from "./config-sync.js";
+import { migrateCwds, syncConfigOnce, type ConfigSyncDeps } from "./config-sync.js";
+import type { DispatchStatusEntry } from "./dispatch-status.js";
 import type { ConsoleClient } from "./http.js";
 import { createLogger, type Logger } from "./log.js";
 import { Spool } from "./spool.js";
@@ -121,6 +122,13 @@ export function createConfigSyncCycle(deps: ConfigSyncCycleDeps): ConfigSyncCycl
       syncDeps.now = deps.now;
     }
     try {
+      // MCP 条目先跟随最新 cwd 自迁移(本地密钥即可,不等控制台轮换),再走正常拉取
+      migrateCwds(deps.stateDir, deps.claudeJsonPath, deps.baseUrl, deps.cwdByProject, logger);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.warn("MCP 条目跟随工作目录迁移失败,下轮重试", { error: message });
+    }
+    try {
       const summary = await syncConfigOnce(syncDeps);
       if (summary.refreshBotNames && deps.onRefreshBotNames !== undefined) {
         logger.info("控制台请求刷新 bot 名,立即重取");
@@ -149,6 +157,8 @@ export interface HeartbeatCycleDeps {
   activeStreams: () => string[];
   /** 采集器自身版本:心跳回报,控制台据此展示运行版本与升级提示 */
   collectorVersion: string;
+  /** 派发状态快照(M3.12):被挡项目随心跳上报;缺省不携带,旧版控制台兼容 */
+  dispatchStatus?: { snapshot(): DispatchStatusEntry[] };
 }
 
 export interface HeartbeatCycle {
@@ -186,6 +196,7 @@ export function createHeartbeatCycle(deps: HeartbeatCycleDeps): HeartbeatCycle {
 
   async function once(): Promise<void> {
     try {
+      const dispatch = deps.dispatchStatus?.snapshot() ?? [];
       const response = await deps.client.postHeartbeat({
         uptime: Math.round((now() - deps.startedAt) / 1000),
         pending_bytes: deps.spool.pendingBytes(),
@@ -196,6 +207,8 @@ export function createHeartbeatCycle(deps: HeartbeatCycleDeps): HeartbeatCycle {
         streams: streamSummaries(),
         active_streams: deps.activeStreams(),
         collector_version: deps.collectorVersion,
+        // 空快照省略字段:旧版控制台 zod 不拒可选项,新旧互兼容
+        ...(dispatch.length > 0 ? { dispatch } : {}),
       });
       const next = new Set(response.projects);
       if (next.size > 0) {

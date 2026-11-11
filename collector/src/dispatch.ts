@@ -19,6 +19,8 @@ import {
   type SessionHandle,
   type SessionOptions,
 } from "./dispatch-session.js";
+import { DispatchStatusTracker } from "./dispatch-status.js";
+import { scanCwdByProject } from "./discovery.js";
 import type { ConsoleClient, RunEndRequest } from "./http.js";
 import { createLogger, type Logger } from "./log.js";
 import {
@@ -29,6 +31,17 @@ import {
 } from "./session-activity.js";
 import { streamIdFor } from "./state.js";
 
+/** 收件箱探视的 HTTP 失败:携带状态码,连续 401 用于判密钥过期(auth_stale) */
+export class PeekError extends Error {
+  readonly status: number;
+
+  constructor(status: number) {
+    super(`收件箱探视失败(HTTP ${status})`);
+    this.name = "PeekError";
+    this.status = status;
+  }
+}
+
 /** 探视 a2a 收件箱待处理条数:只看不领,不占用消息租约 */
 async function fetchPendingCount(baseUrl: string, bearer: string, timeoutMs: number): Promise<number> {
   const response = await fetch(`${baseUrl}/api/a2a/inbox?wait=0&peek=1`, {
@@ -36,7 +49,7 @@ async function fetchPendingCount(baseUrl: string, bearer: string, timeoutMs: num
     signal: AbortSignal.timeout(timeoutMs),
   });
   if (!response.ok) {
-    throw new Error(`收件箱探视失败(HTTP ${response.status})`);
+    throw new PeekError(response.status);
   }
   const body = (await response.json()) as { items?: unknown[] };
   return Array.isArray(body.items) ? body.items.length : 0;
@@ -53,7 +66,7 @@ async function fetchWorkPendingCount(
     signal: AbortSignal.timeout(timeoutMs),
   });
   if (!response.ok) {
-    throw new Error(`工作收件箱探视失败(HTTP ${response.status})`);
+    throw new PeekError(response.status);
   }
   const body = (await response.json()) as { items?: unknown[] };
   return Array.isArray(body.items) ? body.items.length : 0;
@@ -81,6 +94,12 @@ export interface DispatchDeps {
   dispatchBackoffRounds: number;
   /** 单批派工上限;注入工作提示词,超出部分留下一批 */
   batchMaxItems: number;
+  /** 每轮现算项目名 → 工作目录(M3.12):cwd 事实源是 cc-connect 配置,不读下发快照 */
+  scanCwds?: () => Map<string, string>;
+  /** 派发状态登记:daemon 注入与心跳共享的实例;缺省内部新建(不上报,测试隔离) */
+  status?: DispatchStatusTracker;
+  /** 连续多少轮探视 401 判 auth_stale;默认 3 */
+  authStaleRounds?: number;
   logger?: Logger;
   /** 探视 a2a 收件箱待处理条数;默认走真实 HTTP */
   peekInbox?: (bearer: string) => Promise<number>;
@@ -175,6 +194,11 @@ export function createDispatchCycle(deps: DispatchDeps): DispatchCycle {
   const sampleSessions = deps.sampleSessions ?? sampleSessionFiles;
   const attributeSession = deps.attributeSession ?? (() => {});
   const reportRunEnd = deps.reportRunEnd;
+  const scanCwds = deps.scanCwds ?? (() => scanCwdByProject());
+  const status = deps.status ?? new DispatchStatusTracker();
+  const authStaleRounds = deps.authStaleRounds ?? 3;
+  /** 同一 Agent 连续探视 401 计数:达 authStaleRounds 判密钥过期,探视成功即清零 */
+  const authFailStreak = new Map<string, number>();
   /** 连续被挡退避 + 双采样基线:轮末换基线,两轮比 mtime 前进判「仍在写入」 */
   const backoff = new BackoffTracker();
   let prevSample: SessionSample | undefined;
@@ -196,26 +220,46 @@ export function createDispatchCycle(deps: DispatchDeps): DispatchCycle {
     /** 占位必须在首个 await 前完成,否则重叠轮次可能穿透 busy 检查为同一 Agent 起多个会话 */
     busy.add(agentId);
     let sessionStarted = false;
+    /** 探视同时维护 401 连击:成功清零,连续 401 达阈值判 auth_stale(其他错误不计) */
+    const peekCounted = async (fn: (bearer: string) => Promise<number>): Promise<number> => {
+      try {
+        const count = await fn(bearer);
+        authFailStreak.set(agentId, 0);
+        return count;
+      } catch (error) {
+        if (error instanceof PeekError && error.status === 401) {
+          const streak = (authFailStreak.get(agentId) ?? 0) + 1;
+          authFailStreak.set(agentId, streak);
+          if (streak >= authStaleRounds) {
+            status.recordHold(project, "auth_stale");
+            logger.warn("探视连续 401,密钥疑似过期,等控制台轮换重发自愈", { agent: agentId, streak });
+          }
+        }
+        throw error;
+      }
+    };
     try {
       // 双探视:a2a 待办优先(既有协作链不回归),无 a2a 才看 work 派工
-      const pending = await peek(bearer);
+      let pendingTotal = await peekCounted(peek);
       let prompt: string | null = null;
       let isWorkDispatch = false;
-      if (pending > 0) {
+      if (pendingTotal > 0) {
         prompt = DISPATCH_PROMPT;
       } else {
-        const workPending = await peekWork(bearer);
-        if (workPending > 0) {
+        pendingTotal = await peekCounted(peekWork);
+        if (pendingTotal > 0) {
           prompt = workPrompt;
           isWorkDispatch = true;
         }
       }
       if (prompt === null) {
         backoff.recordIdle(agentId);
+        status.clear(project);
         return;
       }
       if (!existsSync(cwd)) {
-        logger.warn("Agent 工作目录不存在,跳过调度", { agent: agentId });
+        status.recordHold(project, "cwd_missing", pendingTotal);
+        logger.warn("Agent 工作目录不存在,跳过调度", { agent: agentId, cwd });
         return;
       }
       // G2→G3→G4 闸门链:cwd 会话在写、脏工作区、机级上限,任一挡下本轮不派发
@@ -229,6 +273,7 @@ export function createDispatchCycle(deps: DispatchDeps): DispatchCycle {
       };
       const outcome = await runGates(gateDeps, { agentId, cwd, isWorkDispatch });
       if (outcome !== "pass") {
+        status.recordHold(project, outcome, pendingTotal);
         const backoffTriggered = backoff.recordBlocked(agentId, Date.now(), deps.dispatchBackoffRounds);
         logger.warn("派发闸门挡下,本轮不派发", { agent: agentId, outcome, backoffTriggered });
         return;
@@ -266,8 +311,14 @@ export function createDispatchCycle(deps: DispatchDeps): DispatchCycle {
           }
         },
       };
-      running.set(agentId, startSession(session));
+      try {
+        running.set(agentId, startSession(session));
+      } catch (error) {
+        status.recordHold(project, "spawn_failed", pendingTotal);
+        throw error;
+      }
       sessionStarted = true;
+      status.clear(project);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       logger.warn("调度检查失败", { agent: agentId, error: message });
@@ -294,6 +345,9 @@ export function createDispatchCycle(deps: DispatchDeps): DispatchCycle {
       if (backfillAgentSecrets(state, deps.claudeJsonPath, logger) > 0) {
         saveConfigSyncState(deps.stateDir, state);
       }
+      // cwd 实时解析(M3.12):每轮现算 project→cwd,目录挪动下一轮即跟随,
+      // 不读下发快照里 ACK 后冻结的旧值
+      const cwds = scanCwds();
       for (const [agentId, agent] of Object.entries(state.agents)) {
         if (agent.secret === undefined) {
           continue;
@@ -302,8 +356,14 @@ export function createDispatchCycle(deps: DispatchDeps): DispatchCycle {
         if (!backoff.eligible(agentId, Date.now())) {
           continue;
         }
+        const cwd = cwds.get(agent.project);
+        if (cwd === undefined) {
+          status.recordHold(agent.project, "cwd_unknown");
+          logger.warn("项目未在 cc-connect 配置中发现,跳过调度", { agent: agentId, project: agent.project });
+          continue;
+        }
         try {
-          await checkAgent(agentId, agent.project, agent.cwd, `${agentId}.${agent.secret}`, getActivity);
+          await checkAgent(agentId, agent.project, cwd, `${agentId}.${agent.secret}`, getActivity);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           logger.warn("调度检查失败", { agent: agentId, error: message });

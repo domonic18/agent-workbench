@@ -12,6 +12,8 @@ import {
   backfillAgentSecrets,
   loadConfigSyncState,
   MCP_SERVER_NAME,
+  migrateCwds,
+  saveConfigSyncState,
   syncConfigOnce,
   type ConfigSyncState,
 } from "./config-sync.js";
@@ -328,5 +330,78 @@ describe("syncConfigOnce", () => {
     });
     expect(summary).toMatchObject({ status: "effective", applied: 0, acked: false });
     expect(client.ackCalls).toEqual([]);
+  });
+});
+
+describe("migrateCwds(M3.12)", () => {
+  const logger = createLogger({ level: "error", sink: () => {} });
+
+  function seeded(stateDir: string, cwd: string): string {
+    const claudeJsonPath = join(stateDir, "claude.json");
+    saveConfigSyncState(stateDir, {
+      agents: {
+        agt_a: { version: 1, project: "proj-a", key: "p-a", cwd, secret: "sec-a" },
+      },
+      lastSyncAt: null,
+    });
+    applyManagedMcp(claudeJsonPath, {
+      cwd,
+      url: "https://aw/mcp",
+      bearer: "agt_a.sec-a",
+    });
+    return claudeJsonPath;
+  }
+
+  it("cwd 变化:用本地密钥把 MCP 条目写到新目录并更新状态文件,旧键保留", () => {
+    const dir = newDir();
+    const claudeJsonPath = seeded(dir, "/w/old");
+
+    const migrated = migrateCwds(
+      dir,
+      claudeJsonPath,
+      "https://aw",
+      new Map([["proj-a", "/w/new"]]),
+      logger,
+    );
+
+    expect(migrated).toBe(1);
+    const doc = readDoc(claudeJsonPath);
+    expect(doc.projects["/w/new"]!.mcpServers![MCP_SERVER_NAME]).toEqual({
+      type: "http",
+      url: "https://aw/mcp",
+      headers: { authorization: "Bearer agt_a.sec-a" },
+    });
+    // 旧键保留无害,Claude Code 不再引用
+    expect(doc.projects["/w/old"]!.mcpServers![MCP_SERVER_NAME]).toBeDefined();
+    const state = loadConfigSyncState(dir);
+    expect(state.agents.agt_a?.cwd).toBe("/w/new");
+    expect(state.agents.agt_a?.secret).toBe("sec-a");
+  });
+
+  it("cwd 未变化或项目不在扫描时不写不落盘", () => {
+    const dir = newDir();
+    const claudeJsonPath = seeded(dir, "/w/same");
+
+    const unchanged = migrateCwds(
+      dir,
+      claudeJsonPath,
+      "https://aw",
+      new Map([["proj-a", "/w/same"]]),
+      logger,
+    );
+    const unknown = migrateCwds(
+      dir,
+      claudeJsonPath,
+      "https://aw",
+      new Map([["proj-b", "/w/b"]]),
+      logger,
+    );
+
+    expect(unchanged).toBe(0);
+    expect(unknown).toBe(0);
+    const before = readFileSync(claudeJsonPath, "utf8");
+    expect(readDoc(claudeJsonPath).projects["/w/same"]).toBeDefined();
+    expect(before).toBe(readFileSync(claudeJsonPath, "utf8"));
+    expect(loadConfigSyncState(dir).agents.agt_a?.cwd).toBe("/w/same");
   });
 });
