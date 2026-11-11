@@ -34,7 +34,7 @@ export interface OverviewAgent {
   currentTaskStatus: string | null;
   /** 无任务归属时的会话实况:当前 run 最近一条用户指令(已压平空白,截断 200 字符) */
   currentInstruction: string | null;
-  /** 心跳上报的派发挂起(M3.11);机器无关运行时无派发概念,为 null */
+  /** 心跳上报的派发挂起(M3.12);机器无关运行时无派发概念,为 null */
   dispatchHold: DispatchHoldReason | null;
   dispatchPending: number | null;
   dispatchHoldSince: number | null;

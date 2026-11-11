@@ -97,7 +97,7 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
   });
   /** 心跳活跃流(L2,04 §2):扫描读到新字节的流,下一跳上报给控制台豁免 L3 收敛 */
   const activeSinceHeartbeat = new Set<string>();
-  /** 派发状态登记(M3.11):dispatch 写、heartbeat 捎带——被挡必须对控制台可见 */
+  /** 派发状态登记(M3.12):dispatch 写、heartbeat 捎带——被挡必须对控制台可见 */
   const dispatchStatus = new DispatchStatusTracker(now);
   const heartbeat = createHeartbeatCycle({
     client,
@@ -119,7 +119,7 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
   const claudePath = config.dispatchMs > 0 ? resolveClaudePath(config.dispatchClaude) : undefined;
   /** 派发会话归因登记:活引用叠加进索引,登记即刻命中,不吃 60s 刷新 */
   const dispatchSessions = new Map<string, Set<string>>();
-  /** 每轮现算 project→cwd(M3.11):cc-connect 配置是事实源,额外声明的项目兜底补齐 */
+  /** 每轮现算 project→cwd(M3.12):cc-connect 配置是事实源,额外声明的项目兜底补齐 */
   const scanCwds = (): Map<string, string> => {
     const cwds = scanCwdByProject(config.ccConnectConfigs);
     for (const extra of config.extraProjects) {

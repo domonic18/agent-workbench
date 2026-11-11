@@ -94,7 +94,7 @@ export interface DispatchDeps {
   dispatchBackoffRounds: number;
   /** 单批派工上限;注入工作提示词,超出部分留下一批 */
   batchMaxItems: number;
-  /** 每轮现算项目名 → 工作目录(M3.11):cwd 事实源是 cc-connect 配置,不读下发快照 */
+  /** 每轮现算项目名 → 工作目录(M3.12):cwd 事实源是 cc-connect 配置,不读下发快照 */
   scanCwds?: () => Map<string, string>;
   /** 派发状态登记:daemon 注入与心跳共享的实例;缺省内部新建(不上报,测试隔离) */
   status?: DispatchStatusTracker;
@@ -345,7 +345,7 @@ export function createDispatchCycle(deps: DispatchDeps): DispatchCycle {
       if (backfillAgentSecrets(state, deps.claudeJsonPath, logger) > 0) {
         saveConfigSyncState(deps.stateDir, state);
       }
-      // cwd 实时解析(M3.11):每轮现算 project→cwd,目录挪动下一轮即跟随,
+      // cwd 实时解析(M3.12):每轮现算 project→cwd,目录挪动下一轮即跟随,
       // 不读下发快照里 ACK 后冻结的旧值
       const cwds = scanCwds();
       for (const [agentId, agent] of Object.entries(state.agents)) {

@@ -141,7 +141,7 @@ export function scanDiscoveryState(configPaths?: string[]): {
 }
 
 /**
- * 现算项目名 → 工作目录映射(M3.11):调度每轮取实时 cwd,不读下发快照、
+ * 现算项目名 → 工作目录映射(M3.12):调度每轮取实时 cwd,不读下发快照、
  * 不复用发现周期的 5min 缓存——cc-connect 配置是 cwd 唯一事实源。
  */
 export function scanCwdByProject(configPaths?: string[]): Map<string, string> {

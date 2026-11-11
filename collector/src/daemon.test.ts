@@ -344,7 +344,7 @@ describe("发现与配置同步周期", () => {
   });
 });
 
-describe("心跳派发状态快照(M3.11)", () => {
+describe("心跳派发状态快照(M3.12)", () => {
   it("被挡项目随心跳携带 dispatch 数组,空快照省略字段", async () => {
     const root = mkdtempSync(join(tmpdir(), "aw-heartbeat-"));
     try {

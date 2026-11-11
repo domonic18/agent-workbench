@@ -236,7 +236,7 @@ export interface AnnounceDispatchHoldInput {
 }
 
 /**
- * 派发挂起首跳播报(M3.11):心跳携带的 dispatch 快照里某 project 首次出现某 hold 时进群。
+ * 派发挂起首跳播报(M3.12):心跳携带的 dispatch 快照里某 project 首次出现某 hold 时进群。
  * 此前这些原因只写 aw-node 本地日志,控制台侧完全不可见(11-11 事故)。
  * 幂等键由 machine/project/hold/sinceTs 派生——持续挂起不重播,消除后重现(sinceTs 变化)再播。
  */

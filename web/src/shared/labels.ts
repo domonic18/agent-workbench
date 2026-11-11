@@ -282,7 +282,7 @@ export const WORK_HOLD_REASON_LABEL: Record<WorkHoldReason, string> = {
   dirty_worktree: "工作区有未提交改动",
 };
 
-/** 派发挂起原因:aw-node 闸门/探测挡下派发时随心跳上报(M3.11),枚举与 collector 同源 */
+/** 派发挂起原因:aw-node 闸门/探测挡下派发时随心跳上报(M3.12),枚举与 collector 同源 */
 export const DISPATCH_HOLD_LABEL: Record<DispatchHoldReason, string> = {
   cwd_unknown: "项目未配置",
   cwd_missing: "目录不存在",

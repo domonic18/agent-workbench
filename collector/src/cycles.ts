@@ -157,7 +157,7 @@ export interface HeartbeatCycleDeps {
   activeStreams: () => string[];
   /** 采集器自身版本:心跳回报,控制台据此展示运行版本与升级提示 */
   collectorVersion: string;
-  /** 派发状态快照(M3.11):被挡项目随心跳上报;缺省不携带,旧版控制台兼容 */
+  /** 派发状态快照(M3.12):被挡项目随心跳上报;缺省不携带,旧版控制台兼容 */
   dispatchStatus?: { snapshot(): DispatchStatusEntry[] };
 }
 

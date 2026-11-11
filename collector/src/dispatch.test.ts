@@ -552,7 +552,7 @@ describe("派发闸门 G2/G3/G4 与退避", () => {
   });
 });
 
-describe("cwd 实时解析与派发状态(M3.11)", () => {
+describe("cwd 实时解析与派发状态(M3.12)", () => {
   function statusFor(): { status: DispatchStatusTracker; attach: Record<string, unknown> } {
     const status = new DispatchStatusTracker(() => 1_700_000_000_000);
     return { status, attach: { status } };

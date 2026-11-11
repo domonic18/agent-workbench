@@ -270,7 +270,7 @@ describe("Agent 管理表格", () => {
     expect(table.getByText("a2a-real · a2a-real-workbuddy")).toBeTruthy();
   });
 
-  it("派发挂起时状态列加徽标,原因与件数时长进 Tooltip(M3.11)", async () => {
+  it("派发挂起时状态列加徽标,原因与件数时长进 Tooltip(M3.12)", async () => {
     vi.mocked(fetchAgents).mockResolvedValue([agent()]);
     renderTable(
       vi.fn(),

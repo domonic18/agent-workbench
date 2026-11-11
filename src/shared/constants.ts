@@ -312,7 +312,7 @@ export const WORK_HOLD_REASONS = ["cwd_session_active", "dirty_worktree"] as con
 export type WorkHoldReason = (typeof WORK_HOLD_REASONS)[number];
 
 /**
- * 派发挂起原因(M3.11):collector 侧「有活派不出去」全集——目录失配(实时解析/
+ * 派发挂起原因(M3.12):collector 侧「有活派不出去」全集——目录失配(实时解析/
  * 不存在)、闸门链(含 G4 机级上限)、密钥过期探视 401、spawn 同步失败。
  * 随心跳 dispatch 数组上报控制台,任何一项出现都必须对控制台可见。
  */
@@ -327,7 +327,7 @@ export const DISPATCH_HOLD_REASONS = [
 ] as const;
 export type DispatchHoldReason = (typeof DISPATCH_HOLD_REASONS)[number];
 
-/** auth_stale 自愈节流(M3.11):心跳发现 auth_stale 时,只清 ACK 距今超过该时长的回执,防轮换风暴 */
+/** auth_stale 自愈节流(M3.12):心跳发现 auth_stale 时,只清 ACK 距今超过该时长的回执,防轮换风暴 */
 export const AUTH_STALE_HEAL_COOLDOWN_MS = 10 * 60_000;
 
 /** 僵尸任务回收与派工停滞(M3.10,dispatch-coordination.md §3.3);时限走 AW_TASK_ZOMBIE_HOURS / AW_ASSIGNMENT_STALL_HOURS */

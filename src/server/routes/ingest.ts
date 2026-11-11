@@ -28,7 +28,7 @@ const heartbeatSchema = z.object({
   active_streams: z.array(z.string().min(1).max(256)).max(1000).optional(),
   /** 采集器自身版本;旧版采集器不携带,保留 enroll 时落的值 */
   collector_version: z.string().min(1).max(32).optional(),
-  /** 派发状态(M3.11):被挡项目随心跳捎带;空快照省略字段,旧采集器兼容 */
+  /** 派发状态(M3.12):被挡项目随心跳捎带;空快照省略字段,旧采集器兼容 */
   dispatch: z
     .array(
       z.object({
@@ -142,7 +142,7 @@ export function registerIngestRoutes(app: FastifyInstance, options: IngestRoutes
           );
         }
       }
-      // 首跳播报(M3.11):与更新前的快照按 (project, hold) 比对,
+      // 首跳播报(M3.12):与更新前的快照按 (project, hold) 比对,
       // 持续挂起不重播;挂起消除后重现(since_ts 变化)由幂等键兜住再播
       const previousHolds = new Set(
         machine.dispatchStatus.map((entry) => `${entry.project}@${entry.hold}`),

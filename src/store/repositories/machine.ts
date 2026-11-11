@@ -1,7 +1,7 @@
 import type { DispatchHoldReason, IdentityStatus } from "../../shared/constants.js";
 import type { Db } from "../database.js";
 
-/** 心跳捎带的单项目派发状态(M3.11):被挡项目与挂起原因,空数组即全部放行 */
+/** 心跳捎带的单项目派发状态(M3.12):被挡项目与挂起原因,空数组即全部放行 */
 export interface MachineDispatchStatusEntry {
   project: string;
   pending: number;
@@ -26,7 +26,7 @@ export interface MachineRecord {
   botRefreshRequestedAt: number | null;
   /** 心跳上报的活跃流(L2 观测续命):自上一跳以来有新字节的 stream_id 列表 */
   activeStreams: string[];
-  /** 心跳捎带的派发状态(M3.11):被挡项目整包覆盖 */
+  /** 心跳捎带的派发状态(M3.12):被挡项目整包覆盖 */
   dispatchStatus: MachineDispatchStatusEntry[];
 }
 
@@ -152,7 +152,7 @@ export async function updateMachineActiveStreams(
 }
 
 /**
- * 心跳派发状态整包覆盖(M3.11):语义比对(jsonb <>),值未变化不写,
+ * 心跳派发状态整包覆盖(M3.12):语义比对(jsonb <>),值未变化不写,
  * 免得心跳每分钟都动行。未携带字段的旧采集器不调本函数,保留旧值。
  */
 export async function updateMachineDispatchStatus(

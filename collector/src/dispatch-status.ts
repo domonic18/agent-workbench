@@ -9,7 +9,7 @@ export interface DispatchStatusEntry {
 }
 
 /**
- * 派发状态登记(M3.11):dispatch cycle 写入、heartbeat cycle 快照捎带。
+ * 派发状态登记(M3.12):dispatch cycle 写入、heartbeat cycle 快照捎带。
  * 只登记被挡的项目——「有活派不出去必须上报可见」;挂起解除即清除,
  * 空快照在心跳里省略字段,旧版控制台与旧采集器互相兼容。
  */

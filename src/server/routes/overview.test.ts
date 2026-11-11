@@ -136,7 +136,7 @@ describe("overview 路由", () => {
     expect(byId.get("a2")?.activeSessions).toBeNull();
   });
 
-  it("透出心跳派发挂起(M3.11):按 (machine, project) 映射,机器无关 Agent 为 null", async () => {
+  it("透出心跳派发挂起(M3.12):按 (machine, project) 映射,机器无关 Agent 为 null", async () => {
     await insertMachine(db, {
       id: "m1",
       hostname: "host",

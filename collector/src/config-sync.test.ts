@@ -333,7 +333,7 @@ describe("syncConfigOnce", () => {
   });
 });
 
-describe("migrateCwds(M3.11)", () => {
+describe("migrateCwds(M3.12)", () => {
   const logger = createLogger({ level: "error", sink: () => {} });
 
   function seeded(stateDir: string, cwd: string): string {

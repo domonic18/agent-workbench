@@ -151,7 +151,7 @@ export interface ConfigSyncDeps {
 }
 
 /**
- * 受管 MCP 条目跟随 cwd 自迁移(M3.11):cc-connect 配置里的目录挪动后,
+ * 受管 MCP 条目跟随 cwd 自迁移(M3.12):cc-connect 配置里的目录挪动后,
  * 用本地已持有密钥把 claude.json 的 aw-console 条目写到新目录,不等控制台轮换。
  * 成功即更新状态文件里的 agent.cwd(语义:已应用 MCP 条目的 cwd);旧键保留无害。
  * 仅本地参与,无需控制台配合——密钥失效的情况由 auth_stale 自愈闭环兜底。

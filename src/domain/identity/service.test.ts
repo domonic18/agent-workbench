@@ -122,7 +122,7 @@ describe("身份注册", () => {
     await db.close();
   });
 
-  it("轮换 Agent 密钥联动清配置回执,新密钥必须能重新下达到机器(M3.11)", async () => {
+  it("轮换 Agent 密钥联动清配置回执,新密钥必须能重新下达到机器(M3.12)", async () => {
     const { db, service } = await prepare();
     await service.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
     const first = await service.registerAgent({ machineId: "m1", project: "aw", displayName: "A" });

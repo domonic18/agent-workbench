@@ -87,7 +87,7 @@ export async function findAgentByMachineProject(
 }
 
 /**
- * 轮换 Agent 密钥即清配置回执(M3.11):ACK 过的 Agent 不会被周期下发照顾,
+ * 轮换 Agent 密钥即清配置回执(M3.12):ACK 过的 Agent 不会被周期下发照顾,
  * 新密钥必须能到达机器,否则两侧密钥劈开只能人肉修。
  * 调用方:rotateAgentSecret(管理员轮换与自助兑换共用)。
  */
@@ -155,7 +155,7 @@ export async function markAgentConfigAck(
 }
 
 /**
- * auth_stale 自愈(M3.11):机器探视连续 401 时清回执,下轮拉取自动轮换重发。
+ * auth_stale 自愈(M3.12):机器探视连续 401 时清回执,下轮拉取自动轮换重发。
  * 只动 ACK 距今超过冷却期(默认 10min)的行,防轮换风暴;返回清掉的行数。
  */
 export async function clearAgentConfigAcksForHeal(

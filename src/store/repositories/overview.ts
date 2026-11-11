@@ -59,7 +59,7 @@ export interface AgentOverviewRow {
   currentTaskStatus: string | null;
   /** 当前 run 最近一条用户指令的开头;没有任务归属时用来回答「在忙什么」 */
   currentInstruction: string | null;
-  /** 心跳上报的派发挂起(M3.11):按 (machine, project) 映射;无挂起为 null */
+  /** 心跳上报的派发挂起(M3.12):按 (machine, project) 映射;无挂起为 null */
   dispatchHold: DispatchHoldReason | null;
   dispatchPending: number | null;
   dispatchHoldSince: number | null;
