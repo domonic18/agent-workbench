@@ -327,6 +327,9 @@ export const DISPATCH_HOLD_REASONS = [
 ] as const;
 export type DispatchHoldReason = (typeof DISPATCH_HOLD_REASONS)[number];
 
+/** auth_stale 自愈节流(M3.11):心跳发现 auth_stale 时,只清 ACK 距今超过该时长的回执,防轮换风暴 */
+export const AUTH_STALE_HEAL_COOLDOWN_MS = 10 * 60_000;
+
 /** 僵尸任务回收与派工停滞(M3.10,dispatch-coordination.md §3.3);时限走 AW_TASK_ZOMBIE_HOURS / AW_ASSIGNMENT_STALL_HOURS */
 export const ZOMBIE_RECLAIM = {
   /** 后台巡检间隔 */

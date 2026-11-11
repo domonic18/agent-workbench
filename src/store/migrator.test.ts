@@ -81,6 +81,7 @@ describe("runMigrations", () => {
       { version: 16, name: "agent_enroll_token" },
       { version: 17, name: "agent_run_end_reason" },
       { version: 18, name: "machine_active_streams" },
+      { version: 19, name: "machine_dispatch_status" },
     ]);
     await db.close();
   });

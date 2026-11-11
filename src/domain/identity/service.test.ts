@@ -122,6 +122,27 @@ describe("身份注册", () => {
     await db.close();
   });
 
+  it("轮换 Agent 密钥联动清配置回执,新密钥必须能重新下达到机器(M3.11)", async () => {
+    const { db, service } = await prepare();
+    await service.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
+    const first = await service.registerAgent({ machineId: "m1", project: "aw", displayName: "A" });
+    // 模拟一次完整下发+ACK:此前 admin rotate 只换哈希不清回执,机器永远拉不到新密钥
+    await db.run(
+      "UPDATE agent SET config_version = 1, config_ack_at = 5_000 WHERE id = ?",
+      first.agent.id,
+    );
+
+    const rotated = await service.rotateAgentSecret(first.agent.id);
+
+    const row = (await db.get(
+      'SELECT config_ack_at AS ack FROM agent WHERE id = ?',
+      first.agent.id,
+    )) as { ack: number | null };
+    expect(row.ack).toBeNull();
+    expect(rotated.agent.configVersion).toBe(1);
+    await db.close();
+  });
+
   it("轮换密钥作废该 Agent 在途的接入令牌,不影响他人", async () => {
     const { db, service } = await prepare();
     await service.registerMachine({ id: "m1", hostname: "h", os: "linux", collectorVersion: "1" });
