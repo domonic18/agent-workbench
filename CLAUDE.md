@@ -3,7 +3,7 @@
 ## 1. 项目概览
 
 - **愿景**: 把散落在飞书群、黑板表格、本地脚本里的多 Agent 协作，收进一个可看、可控、可计量的工作台——人能看清 Agent 在干什么，系统能拦住它不该干的事，账上能算清花了多少。
-- **架构**: Node.js + TypeScript + PostgreSQL（同机 Docker Compose，`pg_trgm` + `pgvector`）；控制台容器内监听 `0.0.0.0:8787`、宿主机仅 `127.0.0.1:8787` 暴露（公网入口属部署环境，项目栈不含隧道）；四屏：总览 / 任务 / 授权 / 知识，外加「接入」组两屏——协作接入（`/agent-access`：两种接入方式对照、接入参数、Agent 名册、轮换密钥、签发一次性接入令牌后**弹窗给出「接入包」**（控制台地址+令牌+三步命令一段文本，人整段粘给 Agent）、各客户端就绪配置片段——**明文版**（Claude Code / 通用 MCP / WorkBuddy）与 **env 版**（凭据写成 `${AW_AGENT_SECRET}`，给支持变量展开的客户端，配置文件可进仓库））与 Agent 手册（`/agent-guide`：A2A 协作规范正文、工作区提示词、`SKILL.md` 下载；页头提示 Agent 自己拉的是 `/api/agent-kit/guide` 接口而非网页）
+- **架构**: Node.js + TypeScript + PostgreSQL（同机 Docker Compose，`pg_trgm` + `pgvector`）；控制台容器内监听 `0.0.0.0:8787`、宿主机仅 `127.0.0.1:8787` 暴露（公网入口属部署环境，项目栈不含隧道）；四屏：总览 / 任务 / 授权 / 知识，外加「接入」组两屏——协作接入（`/agent-access`：两种接入方式对照、接入参数、执行机面板（已上线机器、版本/可升级徽标、待登记项目一键登记，复用 `onboarding/OnlineMachines`——发现到但未注册的项目不再只藏在 `/setup`）、Agent 名册、轮换密钥、签发一次性接入令牌后**弹窗给出「接入包」**（控制台地址+令牌+三步命令一段文本，人整段粘给 Agent）、各客户端就绪配置片段——**明文版**（Claude Code / 通用 MCP / WorkBuddy）与 **env 版**（凭据写成 `${AW_AGENT_SECRET}`，给支持变量展开的客户端，配置文件可进仓库））与 Agent 手册（`/agent-guide`：A2A 协作规范正文、工作区提示词、`SKILL.md` 下载；页头提示 Agent 自己拉的是 `/api/agent-kit/guide` 接口而非网页）
 - **关键约束**:
   - 产品形态是「控制台 + 飞书」双面并存：控制台管状态与权力，飞书管说话与拍板；控制台不承担 IM 功能
   - 事实源在控制台 PostgreSQL（work_item / work_trigger / worker_inbox / task / a2a_message / capability / agent_run）；WorkItem 的 Mandate 与 Task/Run 分离，Assignment/Input/Handback 不冒充 A2A；**不使用飞书黑板，不做投影**
