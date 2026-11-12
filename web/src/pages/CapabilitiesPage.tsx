@@ -1,4 +1,5 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { useSearchParams } from "react-router";
 import {
   CAPABILITY_VIEW_LABEL,
@@ -7,11 +8,13 @@ import {
   readCapabilityView,
 } from "../api/capabilities.js";
 import { ApiError } from "../api/client.js";
+import { fetchAgents } from "../api/identity.js";
 import { CapabilityCard } from "../components/capability/CapabilityCard.js";
 import { DelegationMatrix } from "../components/capability/DelegationMatrix.js";
 import { AsyncSection } from "../components/ui/AsyncSection.js";
 import { EmptyState } from "../components/ui/EmptyState.js";
 import { Tabs } from "../components/ui/Tabs.js";
+import { agentDisplayName } from "../shared/agent-label.js";
 import { useNow } from "../shared/useNow.js";
 import styles from "./CapabilitiesPage.module.css";
 
@@ -50,6 +53,22 @@ export function CapabilitiesPage() {
 
   const capabilities = capabilitiesQuery.data?.pages.flatMap((page) => page.items) ?? [];
 
+  // subject 形如 agent:<id|key>:按 id 再按 key 解析显示名,都查不到回落原文
+  const agentsQuery = useQuery({ queryKey: ["agents"], queryFn: fetchAgents });
+  const subjectNames = useMemo(() => {
+    const agents = agentsQuery.data ?? [];
+    const byId = new Map(agents.map((agent) => [agent.id, agentDisplayName(agent)]));
+    const byKey = new Map(
+      agents
+        .filter((agent) => agent.key !== null)
+        .map((agent) => [agent.key as string, agentDisplayName(agent)]),
+    );
+    return (subject: string): string | null => {
+      const idOrKey = subject.startsWith("agent:") ? subject.slice("agent:".length) : subject;
+      return byId.get(idOrKey) ?? byKey.get(idOrKey) ?? null;
+    };
+  }, [agentsQuery.data]);
+
   function selectView(next: string): void {
     const nextParams = new URLSearchParams(params);
     nextParams.set("view", next);
@@ -62,7 +81,13 @@ export function CapabilitiesPage() {
     ) : (
       <div className={styles.grid}>
         {capabilities.map((capability) => (
-          <CapabilityCard key={capability.id} capability={capability} view={view} now={now} />
+          <CapabilityCard
+            key={capability.id}
+            capability={capability}
+            view={view}
+            now={now}
+            subjectName={subjectNames(capability.subject)}
+          />
         ))}
       </div>
     );

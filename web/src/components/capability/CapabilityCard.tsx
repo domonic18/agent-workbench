@@ -15,12 +15,15 @@ import { formatDateTime, formatDuration } from "../../shared/format.js";
 import { Badge } from "../ui/Badge.js";
 import { Button } from "../ui/Button.js";
 import { Card } from "../ui/Panel.js";
+import { CapabilityFlow } from "./CapabilityFlow.js";
 import styles from "./CapabilityCard.module.css";
 
 export interface CapabilityCardProps {
   capability: CapabilityDto;
   view: CapabilityView;
   now: number;
+  /** 名册解析出的申请人显示名;查不到为 null(卡片头回落 subject 原文) */
+  subjectName?: string | null;
 }
 
 function toCreateInput(capability: CapabilityDto): CapabilityCreateInput {
@@ -43,7 +46,7 @@ function isIssueFailure(error: unknown): boolean {
   return error instanceof ApiError && (error.status === 503 || error.code === "UPSTREAM_UNAVAILABLE");
 }
 
-export function CapabilityCard({ capability, view, now }: CapabilityCardProps) {
+export function CapabilityCard({ capability, view, now, subjectName = null }: CapabilityCardProps) {
   const queryClient = useQueryClient();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -100,10 +103,13 @@ export function CapabilityCard({ capability, view, now }: CapabilityCardProps) {
   return (
     <Card className={styles.card}>
       <header className={styles.header}>
-        <div className={styles.titleGroup}>
-          <h3 className={styles.target}>{capability.target}</h3>
-          <Badge tone="info" text={capability.action} />
-        </div>
+        <CapabilityFlow
+          subject={capability.subject}
+          subjectName={subjectName}
+          action={capability.action}
+          target={capability.target}
+          status={capability.status}
+        />
         <Badge
           tone={CAPABILITY_STATUS_TONE[capability.status]}
           text={CAPABILITY_STATUS_LABEL[capability.status]}

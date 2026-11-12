@@ -1,3 +1,4 @@
+import type { CapabilityAction } from "@shared/constants.js";
 import { api, newIdempotencyKey } from "./client.js";
 import type { CapabilityStatus } from "./tasks.js";
 
@@ -15,7 +16,7 @@ export interface CapabilityDto {
   id: string;
   subject: string;
   target: string;
-  action: string;
+  action: CapabilityAction;
   scope: unknown;
   ttlSeconds: number;
   status: CapabilityStatus;
@@ -36,7 +37,7 @@ export interface CapabilityListResponse {
 export interface CapabilityCreateInput {
   subject: string;
   target: string;
-  action: string;
+  action: CapabilityAction;
   scope: unknown;
   ttlSeconds: number;
   taskId: string;

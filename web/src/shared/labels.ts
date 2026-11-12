@@ -1,6 +1,7 @@
 import type {
   A2AIntent as A2aIntent,
   A2aThreadStatus,
+  CapabilityAction,
   CapabilityStatus,
   OutboxStatus as DeliveryStatus,
   KnowledgeEmbeddingStatus,
@@ -158,6 +159,13 @@ export const DELIVERY_STATUS_TONE: Record<DeliveryStatus, Tone> = {
   delivered: "positive",
   failed: "danger",
   uncertain: "warning",
+};
+
+/** 能力动作的中文注释:卡片头流程条里与枚举文本并列展示(色+文双编码) */
+export const CAPABILITY_ACTION_LABEL: Record<CapabilityAction, string> = {
+  read: "读取",
+  write: "写入",
+  exec: "执行",
 };
 
 export const CAPABILITY_STATUS_LABEL: Record<CapabilityStatus, string> = {
