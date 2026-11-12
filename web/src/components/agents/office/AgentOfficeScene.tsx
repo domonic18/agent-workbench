@@ -1,18 +1,31 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { AgentRosterSummary } from "../../../api/identity.js";
 import type { OverviewAgent } from "../../../api/types.js";
 import { agentDisplayName } from "../../../shared/agent-label.js";
 import { formatTokens } from "../../../shared/format.js";
 import { RuntimeIcon } from "../../../shared/runtime-icon.js";
-import { OfficeCharacter, OFFICE_SLOT_H, OFFICE_SLOT_W } from "./OfficeCharacter.js";
 import { OFFICE_STATE_LABEL, officeStateOf, type OfficeState } from "./office-state.js";
+import { PixActor } from "./pix/PixActor.js";
+import { packOf, STATE_CLIP } from "./pix/clip-map.js";
+import {
+  CHAIR_H,
+  CHAIR_W,
+  DESK_H,
+  DESK_W,
+  ROOM_H,
+  ROOM_W,
+  SHADOW,
+  STATION,
+  WALK_DISTANCE,
+  layoutGroups,
+  type StationSlot,
+} from "./pix/geometry.js";
 import styles from "./office.module.css";
 
-const MAX_COLS = 4;
-const LABEL_H = 24;
-const ZONE_GAP = 32;
-const HIT_W = 172;
-const HIT_H = 28;
+/** 走位速度（房间像素/秒），用来换算走位时长 */
+const WALK_SPEED = 300;
+/** 入场错峰间隔 */
+const WALK_STAGGER = 120;
 
 const OFFICE_STATES: OfficeState[] = ["running", "idle", "hold", "offline", "disabled"];
 
@@ -31,21 +44,22 @@ export interface AgentOfficeSceneProps {
   onOpenDetail: (agent: AgentRosterSummary) => void;
 }
 
-interface SlotLayout {
+interface StationScene {
   agent: AgentRosterSummary;
   live: OverviewAgent | undefined;
   state: OfficeState;
-  x: number;
-  y: number;
+  slot: StationSlot;
+  pack: string;
+  clip: string;
+  walkMs: number;
+  delay: number;
 }
 
-interface ZoneLayout {
+interface ZoneView {
   key: string;
   label: string;
-  start: number;
-  width: number;
-  height: number;
-  slots: SlotLayout[];
+  count: number;
+  first: StationScene;
 }
 
 function busyText(live: OverviewAgent | undefined): string {
@@ -59,9 +73,26 @@ function busyText(live: OverviewAgent | undefined): string {
   return "无进行中任务";
 }
 
-/** 办公室视图：Agent 变成工位上的扁平小人，按机器分区，状态即姿势 */
+/** 办公室视图：Agent 变成像素房间里工位上的角色，按机器分区，状态即姿势 */
 export function AgentOfficeScene({ agents, liveById, onOpenDetail }: AgentOfficeSceneProps) {
-  const { zones, width, height } = useMemo(() => {
+  const frameRef = useRef<HTMLDivElement | null>(null);
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    const element = frameRef.current;
+    if (element === null) return;
+    const update = () => {
+      const width = element.clientWidth;
+      setScale(width > 0 ? Math.min(1, width / ROOM_W) : 1);
+    };
+    update();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  const { stations, zones, origin, roomScale } = useMemo(() => {
     const groups = new Map<string, { label: string; members: AgentRosterSummary[] }>();
     for (const agent of agents) {
       const key = agent.machineId ?? "none";
@@ -76,111 +107,141 @@ export function AgentOfficeScene({ agents, liveById, onOpenDetail }: AgentOffice
       group.members.push(agent);
     }
 
-    let offset = 0;
-    const zoneList: ZoneLayout[] = [];
-    for (const [key, group] of groups) {
-      const cols = Math.min(MAX_COLS, group.members.length);
-      const slots = group.members.map((agent, index) => {
-        const col = index % cols;
-        const row = Math.floor(index / cols);
-        const live = liveById.get(agent.id);
-        return {
-          agent,
-          live,
-          state: officeStateOf(agent, live),
-          x: col * OFFICE_SLOT_W,
-          y: LABEL_H + row * OFFICE_SLOT_H,
-        };
-      });
-      const start = offset;
-      offset += cols * OFFICE_SLOT_W + ZONE_GAP;
-      zoneList.push({
-        key,
-        label: group.label,
-        start,
-        width: cols * OFFICE_SLOT_W,
-        height: LABEL_H + Math.ceil(group.members.length / cols) * OFFICE_SLOT_H,
-        slots,
-      });
+    const groupEntries = [...groups.entries()];
+    const groupList = groupEntries.map(([, group]) => group);
+    const layout = layoutGroups(groupList.map((group) => group.members.length));
+    const walkMs = Math.round((WALK_DISTANCE / WALK_SPEED) * 1000);
+
+    const taken = new Array<number>(groupList.length).fill(0);
+    const frontOfGroup = new Map<number, StationScene>();
+    const views: StationScene[] = [];
+    for (const item of layout.placed) {
+      const group = groupList[item.group];
+      if (group === undefined) continue;
+      const used = taken[item.group] ?? 0;
+      const agent = group.members[used];
+      if (agent === undefined) continue;
+      taken[item.group] = used + 1;
+      const live = liveById.get(agent.id);
+      const state = officeStateOf(agent, live);
+      const view: StationScene = {
+        agent,
+        live,
+        state,
+        slot: item.slot,
+        pack: packOf(agent.id),
+        clip: STATE_CLIP[state],
+        walkMs,
+        delay: views.length * WALK_STAGGER,
+      };
+      views.push(view);
+      // 分区标签取组内最前排的那份：跨行时前排的标签更好认
+      frontOfGroup.set(item.group, view);
     }
 
+    const zoneViews: ZoneView[] = [];
+    groupList.forEach((group, index) => {
+      const first = frontOfGroup.get(index);
+      if (first === undefined) return;
+      zoneViews.push({
+        key: groupEntries[index]?.[0] ?? `${index}`,
+        label: group.label,
+        count: group.members.length,
+        first,
+      });
+    });
+
     return {
-      zones: zoneList,
-      width: offset - (zoneList.length > 0 ? ZONE_GAP : 0),
-      height: Math.max(...zoneList.map((zone) => zone.height)),
+      stations: views,
+      zones: zoneViews,
+      origin: layout.origin,
+      roomScale: layout.scale,
     };
   }, [agents, liveById]);
 
-  if (zones.length === 0) {
+  if (stations.length === 0) {
     return null;
   }
 
+  const stageWidth = ROOM_W * scale;
+  const stageHeight = ROOM_H * scale;
+
+  /**
+   * 工位局部坐标 → 舞台坐标。
+   *
+   * 两层变换必须完全一致：工位层先按 slot.scale 摆位，再按房间容量整体缩放，
+   * 命中层照抄同样的换算，名牌才不会跟角色错位。
+   */
+  const toStage = (slot: StationSlot, localX: number, localY: number) => {
+    const roomX = slot.x + localX * slot.scale;
+    const roomY = slot.y - DESK_H + localY * slot.scale;
+    const layerX = origin.x + (roomX - origin.x) * roomScale;
+    const layerY = origin.y + (roomY - origin.y) * roomScale;
+    return { left: layerX * scale, top: layerY * scale };
+  };
+
   return (
     <div>
-      <div className={styles.scene} role="group" aria-label="办公室视图">
-        <svg
-          className={styles.canvas}
-          width={width}
-          height={height}
-          viewBox={`0 0 ${width} ${height}`}
-          aria-hidden="true"
-        >
-          {zones.map((zone, index) => (
-            <g key={zone.key}>
-              {index > 0 ? (
-                <line
-                  x1={zone.start - ZONE_GAP / 2}
-                  y1="10"
-                  x2={zone.start - ZONE_GAP / 2}
-                  y2={height - 10}
-                  className={styles.divider}
-                />
-              ) : null}
-              <text x={zone.start + 8} y={16} className={styles.zoneLabel}>
-                {zone.label} · {zone.slots.length} 个工位
-              </text>
-              {zone.slots.map((slot) => (
-                <g key={slot.agent.id} transform={`translate(${zone.start + slot.x} ${slot.y})`}>
-                  <OfficeCharacter state={slot.state} />
-                </g>
+      <div className={styles.scene} role="group" aria-label="办公室视图" ref={frameRef}>
+        <div className={styles.stage} style={{ width: stageWidth, height: stageHeight }}>
+          <div
+            className={styles.room}
+            style={{ width: ROOM_W, height: ROOM_H, transform: `scale(${scale})` }}
+          >
+            <img className={styles.roomImage} src="/pix/room.webp" alt="" />
+            <div
+              className={styles.stations}
+              style={{
+                transform: `scale(${roomScale})`,
+                transformOrigin: `${origin.x}px ${origin.y}px`,
+              }}
+            >
+              {stations.map((station) => (
+                <StationSprite key={station.agent.id} station={station} />
               ))}
-            </g>
-          ))}
-        </svg>
+            </div>
+          </div>
 
-        {zones.map((zone) =>
-          zone.slots.map((slot) => {
-            const name = agentDisplayName(slot.agent);
-            const busy = busyText(slot.live);
-            const tokens = slot.live?.todayTokens ?? 0;
-            return (
-              <span key={slot.agent.id}>
-                {tokens > 0 ? (
-                  <span
-                    className={styles.tokenBadge}
-                    style={{ left: zone.start + slot.x + OFFICE_SLOT_W - 84, top: slot.y + 6 }}
-                  >
-                    今日 {formatTokens(tokens)} tok
-                  </span>
-                ) : null}
-                <button
-                  type="button"
-                  className={styles.hit}
-                  style={{
-                    left: zone.start + slot.x + (OFFICE_SLOT_W - HIT_W) / 2,
-                    top: slot.y + OFFICE_SLOT_H - HIT_H - 8,
-                  }}
-                  aria-label={`${name}，${OFFICE_STATE_LABEL[slot.state]}，${busy}`}
-                  title={`${name} · ${OFFICE_STATE_LABEL[slot.state]} · ${busy}`}
-                  onClick={() => onOpenDetail(slot.agent)}
-                >
-                  <RuntimeIcon runtime={slot.agent.runtime} size={12} />
-                  <span className={styles.hitName}>{name}</span>
-                </button>
+          <div className={styles.hits}>
+            {zones.map((zone) => (
+              <span
+                key={zone.key}
+                className={styles.zoneTag}
+                style={toStage(zone.first.slot, STATION.zone.x, STATION.zone.y)}
+              >
+                {zone.label} · {zone.count} 个工位
               </span>
-            );
-          }),
-        )}
+            ))}
+            {stations.map((station) => {
+              const name = agentDisplayName(station.agent);
+              const busy = busyText(station.live);
+              const tokens = station.live?.todayTokens ?? 0;
+              return (
+                <span key={station.agent.id}>
+                  {tokens > 0 ? (
+                    <span
+                      className={styles.tokenBadge}
+                      style={toStage(station.slot, STATION.badge.x, STATION.badge.y)}
+                    >
+                      今日 {formatTokens(tokens)} tok
+                    </span>
+                  ) : null}
+                  <button
+                    type="button"
+                    className={styles.hit}
+                    style={toStage(station.slot, STATION.label.x, STATION.label.y)}
+                    aria-label={`${name}，${OFFICE_STATE_LABEL[station.state]}，${busy}`}
+                    title={`${name} · ${OFFICE_STATE_LABEL[station.state]} · ${busy}`}
+                    onClick={() => onOpenDetail(station.agent)}
+                  >
+                    <RuntimeIcon runtime={station.agent.runtime} size={12} />
+                    <span className={styles.hitName}>{name}</span>
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       <ul className={styles.legend} aria-label="状态图例">
@@ -191,6 +252,60 @@ export function AgentOfficeScene({ agents, liveById, onOpenDetail }: AgentOffice
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+/** 工位：桌子、椅子与角色 */
+function StationSprite({ station }: { station: StationScene }) {
+  const { slot } = station;
+  const dimmed = station.state === "offline" || station.state === "disabled";
+  return (
+    <div
+      className={styles.station}
+      style={{
+        transform: `translate3d(${slot.x}px, ${slot.y - DESK_H}px, 0) scale(${slot.scale})`,
+      }}
+    >
+      <span
+        className={styles.shadow}
+        style={{
+          left: SHADOW.x - SHADOW.w / 2,
+          top: SHADOW.y,
+          width: SHADOW.w,
+          height: SHADOW.h,
+        }}
+      />
+      <img
+        className={styles.desk}
+        src="/pix/desk.webp"
+        width={DESK_W}
+        height={DESK_H}
+        style={{ width: DESK_W, height: DESK_H }}
+        alt=""
+      />
+      <PixActor
+        pack={station.pack}
+        clip={station.clip}
+        feet={STATION.feet}
+        walkFrom={{
+          x: STATION.feet.x - WALK_DISTANCE / slot.scale,
+          y: STATION.feet.y,
+        }}
+        walkMs={station.walkMs}
+        delay={station.delay}
+        dimmed={dimmed}
+        sway={station.state === "hold"}
+      />
+      {/* 椅子画在角色之前（更靠近观众），遮住角色下半身 */}
+      <img
+        className={styles.chair}
+        src="/pix/chair.webp"
+        width={CHAIR_W}
+        height={CHAIR_H}
+        style={{ left: STATION.chair.x, top: STATION.chair.y, width: CHAIR_W, height: CHAIR_H }}
+        alt=""
+      />
     </div>
   );
 }
