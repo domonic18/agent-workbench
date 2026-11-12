@@ -1,0 +1,281 @@
+/* 办公室视图：SVG 工位装饰 + HTML 命中层与图例（M3.13 总览第三视图） */
+
+.scene {
+  position: relative;
+  min-width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+
+.canvas {
+  display: block;
+}
+
+/* ---------- 工位图形（SVG 元素，纯装饰） ---------- */
+
+.floorLine {
+  stroke: var(--border);
+  stroke-width: 2;
+}
+
+.furniture {
+  fill: var(--subtle);
+}
+
+.deskTop {
+  fill: var(--border-strong);
+}
+
+.monitorFrame {
+  fill: var(--text-secondary);
+}
+
+.screenOff {
+  fill: var(--surface-2);
+}
+
+.screenActive {
+  fill: var(--accent);
+  animation: screenPulse 1.6s ease-in-out infinite;
+}
+
+.screenLine {
+  fill: var(--surface);
+  opacity: 0.7;
+}
+
+.keyboard {
+  fill: var(--border-strong);
+}
+
+.body {
+  fill: var(--text-secondary);
+}
+
+.head {
+  fill: var(--text-secondary);
+}
+
+.face {
+  fill: var(--surface-2);
+}
+
+.faceLine {
+  fill: none;
+  stroke: var(--surface-2);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+
+.typingArmL {
+  fill: var(--muted);
+  animation: armTypingL 0.48s ease-in-out infinite alternate;
+}
+
+.typingArmR {
+  fill: var(--muted);
+  animation: armTypingR 0.48s ease-in-out infinite alternate-reverse;
+}
+
+.cup {
+  fill: var(--info);
+}
+
+.cupHandle {
+  fill: none;
+  stroke: var(--info);
+  stroke-width: 1.6;
+}
+
+.steam {
+  fill: none;
+  stroke: var(--subtle);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-dasharray: 3 3;
+}
+
+.warnTriangle {
+  fill: var(--warning);
+}
+
+.warnMark {
+  fill: var(--surface);
+}
+
+.door {
+  fill: var(--surface-3);
+  stroke: var(--border);
+}
+
+.dim {
+  opacity: 0.45;
+}
+
+.idleBob {
+  animation: idleBob 2.4s ease-in-out infinite alternate;
+  transform-box: fill-box;
+}
+
+.holdSway {
+  animation: holdSway 1s ease-in-out infinite alternate;
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+/* 双臂绕肩转动：肩在臂顶端，基准 22°、摆幅 ±4°，左右反相 */
+.typingArmL,
+.typingArmR {
+  transform-box: fill-box;
+  transform-origin: 50% 6%;
+}
+
+@keyframes armTypingL {
+  from {
+    transform: rotate(18deg);
+  }
+  to {
+    transform: rotate(26deg);
+  }
+}
+
+@keyframes armTypingR {
+  from {
+    transform: rotate(-18deg);
+  }
+  to {
+    transform: rotate(-26deg);
+  }
+}
+
+@keyframes screenPulse {
+  0%,
+  100% {
+    opacity: 0.12;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes idleBob {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(1px);
+  }
+}
+
+@keyframes holdSway {
+  from {
+    transform: rotate(-1deg);
+  }
+  to {
+    transform: rotate(1deg);
+  }
+}
+
+/* ---------- 命中层与图例（HTML） ---------- */
+
+.zoneLabel {
+  fill: var(--muted);
+  font-size: 12px;
+}
+
+.divider {
+  stroke: var(--line-soft);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+
+.hit {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  max-width: 172px;
+  padding: 3px var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text);
+  font-size: var(--font-xs);
+  cursor: pointer;
+}
+
+.hit:hover {
+  border-color: var(--border-hover);
+  background: var(--surface);
+}
+
+.hit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.hitName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tokenBadge {
+  position: absolute;
+  padding: 1px var(--space-2);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--font-2xs);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+
+/* 图例色点与工位状态一一对应：色 + 文双编码 */
+.legendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+}
+
+.dotRunning {
+  background: var(--accent);
+}
+
+.dotIdle {
+  background: var(--info);
+}
+
+.dotHold {
+  background: var(--warning);
+}
+
+.dotOffline {
+  background: var(--muted);
+}
+
+.dotDisabled {
+  background: var(--subtle);
+}
