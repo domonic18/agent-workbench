@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { DiscoveryMachineView } from "../api/bootstrap.js";
 import type { AgentRosterSummary } from "../api/identity.js";
 import { RealtimeProvider } from "../api/stream.js";
 import type { OverviewSnapshot } from "../api/types.js";
@@ -62,19 +63,41 @@ function rosterAgent(overrides: Partial<AgentRosterSummary> = {}): AgentRosterSu
   };
 }
 
+function discoveryMachine(overrides: Partial<DiscoveryMachineView> = {}): DiscoveryMachineView {
+  return {
+    machineId: "mch_book",
+    hostname: "MacBook.local",
+    displayName: "MacBook",
+    status: "active",
+    lastSeenAt: 1_700_000_000_000,
+    receivedAt: 1_700_000_000_000,
+    collectorVersion: "0.4.0",
+    upgradeAvailable: false,
+    projects: [],
+    ...overrides,
+  };
+}
+
 function fakeResponse(body: unknown): Response {
   return { ok: true, status: 200, json: async () => body } as Response;
 }
 
-/** 按路径分派：总览快照、Agent 名册与执行面产物清单形状不同 */
+/** 按路径分派：总览快照、Agent 名册、执行面产物清单与机器发现形状不同 */
 function fakeFetch(
   body: unknown,
   roster: AgentRosterSummary[] = [],
+  discovery: { latestCollectorVersion: string | null; machines: DiscoveryMachineView[] } = {
+    latestCollectorVersion: null,
+    machines: [],
+  },
 ): ReturnType<typeof vi.fn> {
   return vi.fn(async (input: RequestInfo | URL) => {
     const path = String(input);
     if (path.includes("/api/bootstrap/artifacts")) {
       return fakeResponse({ publicUrl: null, assets: [] });
+    }
+    if (path.includes("/api/bootstrap/discovery")) {
+      return fakeResponse(discovery);
     }
     if (path.includes("/api/agents")) {
       return fakeResponse({ items: roster, nextCursor: null });
@@ -187,5 +210,53 @@ describe("总览页", () => {
     await waitFor(() => {
       expect(screen.getByTestId("pathname").textContent).toBe("/onboarding");
     });
+  });
+
+  it("发现未注册项目时『需要你看一眼』给出登记提示", async () => {
+    vi.stubGlobal(
+      "fetch",
+      fakeFetch(snapshot(), [rosterAgent()], {
+        latestCollectorVersion: null,
+        machines: [
+          discoveryMachine({
+            projects: [
+              { name: "aw", cwd: "/srv/aw", confirmed: true },
+              {
+                name: "recruit",
+                cwd: "/Users/dev/Code/recruit",
+                confirmed: false,
+                feishuBotName: "随行-招聘专家",
+              },
+            ],
+          }),
+        ],
+      }),
+    );
+    renderPage();
+
+    expect(
+      await screen.findByText(
+        "发现 1 个未注册项目（MacBook：recruit · 随行-招聘专家）——去「协作接入」登记",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("发现的项目都已登记时不出现未注册提示", async () => {
+    vi.stubGlobal(
+      "fetch",
+      fakeFetch(snapshot(), [rosterAgent()], {
+        latestCollectorVersion: null,
+        machines: [
+          discoveryMachine({
+            projects: [{ name: "recruit", cwd: "/Users/dev/Code/recruit", confirmed: true }],
+          }),
+        ],
+      }),
+    );
+    renderPage();
+
+    // 等到总览数据已渲染(提示行与总览同批请求),再断言提示行不出现
+    await screen.findByText("4 项授权待批准，未批准不可执行");
+    expect(screen.queryByText(/未注册项目/)).toBeNull();
   });
 });

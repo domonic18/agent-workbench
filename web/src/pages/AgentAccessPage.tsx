@@ -9,6 +9,7 @@ import { AgentRoster } from "../components/access/AgentRoster.js";
 import { EnrollDialog } from "../components/access/EnrollDialog.js";
 import { AccessParameters, ConfigSnippets } from "../components/access/McpConfig.js";
 import type { AgentCredentials, AgentEnrollGrant } from "../components/access/types.js";
+import { OnlineMachines } from "../components/onboarding/OnlineMachines.js";
 import { AsyncSection } from "../components/ui/AsyncSection.js";
 import { Button } from "../components/ui/Button.js";
 import { Panel } from "../components/ui/Panel.js";
@@ -47,6 +48,9 @@ export function AgentAccessPage() {
       <AccessPaths />
 
       <AccessParameters endpoint={endpoint} fallbackOrigin={publicUrl === null} />
+
+      {/* 机器维度状态与待登记项目:发现到但未注册的项目在这里一键登记,不再只藏在 /setup */}
+      <OnlineMachines />
 
       <Panel
         title="Agent 名册"
