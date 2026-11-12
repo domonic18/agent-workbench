@@ -1,14 +1,14 @@
 /**
- * 把文生图产出的像素素材加工成前端可直接消费的静态资源。
+ * 把上游 PixOffice 像素素材加工成前端可直接消费的静态资源。
  *
- * 输入：.pix-src/ 下的原始 PNG（房间底图、桌子、椅子、六张角色姿态表）
+ * 输入：.pix-src/ 下的原始 PNG（房间底图、桌子、椅子、六套角色动作包）
  * 产出：
  *   web/public/pix/          房间、桌椅、角色 sprite sheet（运行时按 URL 懒加载）
  *   web/src/assets/pix/      生成的帧表全局样式与几何常量（编译期引用）
  *
- * 角色素材是 3×2 的姿态表：每个格子一个姿势，
- * 抠掉洋红底后按统一比例缩放、把脚底对齐到同一条地面线，
- * 再拼成 3×2 的帧 sheet，并生成按 clip 名索引的帧表 CSS。
+ * PixOffice 角色包按动作拆成独立 PNG，这里按 3×2 帧表口径重新拼合：
+ * 0=idle.back, 1-2=work.typing-back, 3=pose.lean, 4-5=walk.right。
+ * 素材本身已带透明底，只裁去空白、归一缩放、脚底对齐，不再做洋红抠色。
  *
  * 用法：pnpm tsx scripts/build-pix-assets.mjs
  */
@@ -19,7 +19,6 @@ import { fileURLToPath } from "node:url";
 import {
   boundsOf,
   canvas,
-  keyOut,
   scaleToHeight,
   scaleToWidth,
   sharp,
@@ -33,17 +32,26 @@ const SRC = path.join(ROOT, ".pix-src");
 const OUT = path.join(ROOT, "web", "public", "pix");
 const GEN = path.join(ROOT, "web", "src", "assets", "pix");
 
-/** 角色素材表：3 列 × 2 行，格子序号 = 行 * 3 + 列 */
+/** 角色素材包：对应 .pix-src/characters/ 下的 PixOffice pack 目录 */
 const PACKS = [
-  { id: "code-agent", file: "char-code-agent.png" },
-  { id: "office-lead", file: "char-office-lead.png" },
-  { id: "data-agent", file: "char-data-agent.png" },
-  { id: "file-agent", file: "char-file-agent.png" },
-  { id: "app-agent", file: "char-app-agent.png" },
-  { id: "review-agent", file: "char-review-agent.png" },
+  { id: "code-agent", dir: "code-agent" },
+  { id: "office-lead", dir: "office-lead" },
+  { id: "data-agent", dir: "data-agent" },
+  { id: "file-agent", dir: "file-agent" },
+  { id: "app-agent", dir: "app-agent" },
+  { id: "review-agent", dir: "review-agent" },
 ];
 
-/** 动作片段 → 用到的格子与单轮时长（毫秒） */
+/** 3×2 帧表每个格子对应的 PixOffice 动作文件（相对 pack 目录） */
+const POSE_MAP = [
+  "idle/back/001.png",
+  "work/typing-back/001.png",
+  "work/typing-back/002.png",
+  "pose/lean/001.png",
+  "walk/right/001.png",
+  "walk/right/002.png",
+];
+
 /** 角色显示高度（像素）：房间里的工位比例基准 */
 const CHARACTER_H = 150;
 /** 角色帧留白：底部留给脚线，顶部留给抬手等姿势 */
@@ -54,10 +62,6 @@ const FRAME_PAD_BOTTOM = 6;
 /** 桌子按显示宽度缩放，椅子按显示高度缩放（椅背比人矮一截） */
 const DESK_W = 132;
 const CHAIR_H = 82;
-
-/** 姿态表切成 3×2 */
-/** 格子之间有黑色分隔线，切格时向内收一点去掉 */
-const CELL_INSET = 5;
 
 function classNameOf(clipId) {
   return `clip-${clipId.replace(/[^a-z0-9]+/gi, "-")}`;
@@ -74,25 +78,14 @@ function source(file) {
 }
 
 /**
- * 从姿态表里切出一个格子并抠底裁切。
+ * 从 PixOffice 角色包里读一个独立姿态 PNG 并裁去透明边。
+ *
+ * 上游素材本身已带透明底，不需要洋红抠色。
  */
-async function cutCell(sheet, index) {
-  const col = index % SHEET_COLS;
-  const row = Math.floor(index / SHEET_COLS);
-  const { width, height } = await sheet.metadata();
-  const cellW = Math.floor(width / SHEET_COLS);
-  const cellH = Math.floor(height / SHEET_ROWS);
-  const cell = await sheet
-    .clone()
-    .extract({
-      left: col * cellW + CELL_INSET,
-      top: row * cellH + CELL_INSET,
-      width: cellW - CELL_INSET * 2,
-      height: cellH - CELL_INSET * 2,
-    })
-    .png()
-    .toBuffer();
-  return trim(await keyOut(cell));
+async function readPose(packDir, index) {
+  const file = path.join(SRC, "characters", packDir, POSE_MAP[index] ?? "");
+  const buffer = await sharp(readFileSync(file)).png().toBuffer();
+  return trim(buffer);
 }
 
 /**
@@ -102,10 +95,9 @@ async function cutCell(sheet, index) {
  * 按待机格归一后其余格子同比缩放，抬手等姿势不会显得忽大忽小。
  */
 async function cutPack(pack) {
-  const sheet = source(pack.file);
   const cells = [];
   for (let index = 0; index < SHEET_COLS * SHEET_ROWS; index += 1) {
-    cells.push(await cutCell(sheet, index));
+    cells.push(await readPose(pack.dir, index));
   }
   const idleBox = await boundsOf(cells[0]);
   const scale = CHARACTER_H / idleBox.height;
@@ -237,13 +229,13 @@ async function buildRoomAndFurniture() {
     .webp({ quality: 84, effort: 5 })
     .toFile(path.join(OUT, "room.webp"));
 
-  const desk = await trim(await keyOut(await source("desk.png").toBuffer()));
+  const desk = await trim(await source("desk.png").toBuffer());
   const deskSized = await scaleToWidth(desk, DESK_W);
   await sharp(deskSized.buffer)
     .webp({ quality: 90, alphaQuality: 95, effort: 5 })
     .toFile(path.join(OUT, "desk.webp"));
 
-  const chair = await trim(await keyOut(await source("chair.png").toBuffer()));
+  const chair = await trim(await source("chair.png").toBuffer());
   const chairSized = await scaleToHeight(chair, CHAIR_H);
   await sharp(chairSized.buffer)
     .webp({ quality: 90, alphaQuality: 95, effort: 5 })
