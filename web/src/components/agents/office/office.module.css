@@ -1,195 +1,190 @@
-/* 办公室视图：SVG 工位装饰 + HTML 命中层与图例（M3.13 总览第三视图） */
+/* 办公室视图：像素房间场景 + HTML 命中层与图例（M3.13 总览第三视图） */
 
 .scene {
   position: relative;
-  min-width: 100%;
-  max-width: 100%;
-  overflow-x: auto;
+  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface-2);
 }
 
-.canvas {
+.stage {
+  position: relative;
+  margin: 0 auto;
+}
+
+/* 房间底图：整块按容器宽度缩放，房间内的一切都用房间像素定位 */
+.room {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  transform-origin: 0 0;
+}
+
+.roomImage {
   display: block;
+  width: 100%;
+  height: 100%;
 }
 
-/* ---------- 工位图形（SVG 元素，纯装饰） ---------- */
-
-.floorLine {
-  stroke: var(--border);
-  stroke-width: 2;
+.stations {
+  position: absolute;
+  inset: 0;
 }
 
-.furniture {
-  fill: var(--subtle);
+.station {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
 }
 
-.deskTop {
-  fill: var(--border-strong);
+.desk,
+.chair {
+  position: absolute;
+  display: block;
+  /* 桌椅是白灰配色，压在米色地板上几乎看不见，用投影把轮廓拉出来 */
+  filter: drop-shadow(0 3px 3px rgb(88 74 58 / 28%));
 }
 
-.monitorFrame {
-  fill: var(--text-secondary);
+/* 椅子画在角色前面，白色椅背会糊在角色身上，加一道描边式投影把它分离出来 */
+.chair {
+  filter: drop-shadow(0 2px 3px rgb(88 74 58 / 30%)) drop-shadow(0 0 1px rgb(120 105 85 / 40%));
 }
 
-.screenOff {
-  fill: var(--surface-2);
+/* 落地投影：椭圆渐变，给工位一个着地感 */
+.shadow {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgb(96 82 64 / 32%), rgb(96 82 64 / 0%) 72%);
+  pointer-events: none;
 }
 
-.screenActive {
-  fill: var(--accent);
-  animation: screenPulse 1.6s ease-in-out infinite;
+/* ---------- 角色精灵 ---------- */
+
+.actor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: translate3d(var(--to-x), var(--to-y), 0);
+  animation: walkIn var(--walk-ms) ease-in-out var(--delay) both;
 }
 
-.screenLine {
-  fill: var(--surface);
-  opacity: 0.7;
+.spriteBox {
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 
-.keyboard {
-  fill: var(--border-strong);
+.walkFade,
+.stateFade,
+.pose {
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 
-.body {
-  fill: var(--text-secondary);
+/* 走位层入场后淡出，状态层接手——时长与延迟都走 CSS 变量，
+   因为 CSS 模块会改写 @keyframes 名字，内联 animation 引用不到 */
+.walkFade {
+  animation: walkFade var(--walk-ms) linear var(--delay) forwards;
 }
 
-.head {
-  fill: var(--text-secondary);
+.stateFade {
+  opacity: 0;
+  animation: stateFade var(--fade-ms) linear var(--state-delay) forwards;
 }
 
-.face {
-  fill: var(--surface-2);
-}
-
-.faceLine {
-  fill: none;
-  stroke: var(--surface-2);
-  stroke-width: 1.4;
-  stroke-linecap: round;
-}
-
-.typingArmL {
-  fill: var(--muted);
-  animation: armTypingL 0.48s ease-in-out infinite alternate;
-}
-
-.typingArmR {
-  fill: var(--muted);
-  animation: armTypingR 0.48s ease-in-out infinite alternate-reverse;
-}
-
-.cup {
-  fill: var(--info);
-}
-
-.cupHandle {
-  fill: none;
-  stroke: var(--info);
-  stroke-width: 1.6;
-}
-
-.steam {
-  fill: none;
-  stroke: var(--subtle);
-  stroke-width: 1.4;
-  stroke-linecap: round;
-  stroke-dasharray: 3 3;
-}
-
-.warnTriangle {
-  fill: var(--warning);
-}
-
-.warnMark {
-  fill: var(--surface);
-}
-
-.door {
-  fill: var(--surface-3);
-  stroke: var(--border);
-}
-
-.dim {
+.dimmed {
+  filter: grayscale(1);
   opacity: 0.45;
 }
 
-.idleBob {
-  animation: idleBob 2.4s ease-in-out infinite alternate;
-  transform-box: fill-box;
+.sway {
+  animation: sway 1.8s ease-in-out infinite alternate;
 }
 
-.holdSway {
-  animation: holdSway 1s ease-in-out infinite alternate;
-  transform-box: fill-box;
-  transform-origin: 50% 100%;
-}
-
-/* 双臂绕肩转动：肩在臂顶端，基准 22°、摆幅 ±4°，左右反相 */
-.typingArmL,
-.typingArmR {
-  transform-box: fill-box;
-  transform-origin: 50% 6%;
-}
-
-@keyframes armTypingL {
+@keyframes walkIn {
   from {
-    transform: rotate(18deg);
+    transform: translate3d(var(--from-x), var(--from-y), 0);
   }
   to {
-    transform: rotate(26deg);
+    transform: translate3d(var(--to-x), var(--to-y), 0);
   }
 }
 
-@keyframes armTypingR {
-  from {
-    transform: rotate(-18deg);
-  }
-  to {
-    transform: rotate(-26deg);
-  }
-}
-
-@keyframes screenPulse {
+@keyframes walkFade {
   0%,
-  100% {
-    opacity: 0.12;
+  72% {
+    opacity: 1;
   }
-  50% {
-    opacity: 0.5;
+  100% {
+    opacity: 0;
   }
 }
 
-@keyframes idleBob {
+@keyframes stateFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sway {
   from {
     transform: translateY(0);
   }
   to {
-    transform: translateY(1px);
+    transform: translateY(-3px);
   }
 }
 
-@keyframes holdSway {
-  from {
-    transform: rotate(-1deg);
+@media (prefers-reduced-motion: reduce) {
+  .actor {
+    animation: none;
   }
-  to {
-    transform: rotate(1deg);
+
+  .walkFade {
+    animation: none !important;
+    opacity: 0 !important;
+  }
+
+  .stateFade {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+
+  .sway {
+    animation: none;
   }
 }
 
 /* ---------- 命中层与图例（HTML） ---------- */
 
-.zoneLabel {
-  fill: var(--muted);
-  font-size: 12px;
+.hits {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 
-.divider {
-  stroke: var(--line-soft);
-  stroke-width: 1;
-  stroke-dasharray: 4 4;
+.hits > * {
+  pointer-events: auto;
+}
+
+.zoneTag {
+  position: absolute;
+  padding: 1px var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: var(--font-xs);
+  white-space: nowrap;
+  transform: translateX(-50%);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 12%);
 }
 
 .hit {
@@ -198,19 +193,21 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-1);
-  max-width: 172px;
-  padding: 3px var(--space-2);
-  border: 1px solid transparent;
+  max-width: 150px;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-full);
-  background: transparent;
+  background: var(--surface);
   color: var(--text);
   font-size: var(--font-xs);
   cursor: pointer;
+  transform: translateX(-50%);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 12%);
 }
 
 .hit:hover {
   border-color: var(--border-hover);
-  background: var(--surface);
+  background: var(--accent-soft);
 }
 
 .hit:focus-visible {
@@ -233,6 +230,7 @@
   color: var(--accent);
   font-size: var(--font-2xs);
   white-space: nowrap;
+  transform: translateX(-50%);
   pointer-events: none;
 }
 

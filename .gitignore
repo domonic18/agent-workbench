@@ -61,3 +61,6 @@ docker/.env
 # A2A 真机实测接入包:含 Agent Bearer 与一次性令牌,不入库
 e2e/a2a-real/out/
 e2e/a2a-real/.console-password
+
+# 文生图原始产物(体积大,不入库;处理后的成品在 web/public/pix)
+.pix-src/
