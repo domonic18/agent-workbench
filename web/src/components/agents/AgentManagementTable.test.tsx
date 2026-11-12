@@ -174,6 +174,18 @@ describe("Agent 管理表格", () => {
     expect(window.localStorage.getItem("aw:agents-view")).toBe("card");
   });
 
+  it("切到办公室视图后渲染工位场景并记住偏好", async () => {
+    vi.mocked(fetchAgents).mockResolvedValue([agent()]);
+    renderTable();
+
+    fireEvent.click(await screen.findByRole("button", { name: "办公室视图" }));
+
+    expect(await screen.findByRole("group", { name: "办公室视图" })).toBeTruthy();
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(screen.getByRole("button", { name: /构建 Agent，待命/ })).toBeTruthy();
+    expect(window.localStorage.getItem("aw:agents-view")).toBe("office");
+  });
+
   it("名册为空时给引导空态", async () => {
     vi.mocked(fetchAgents).mockResolvedValue([]);
     renderTable();
