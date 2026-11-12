@@ -1,8 +1,8 @@
 /* 由 scripts/build-pix-assets.mjs 生成，勿手改 */
 
 .pix-sprite {
-  width: 162px;
-  height: 160px;
+  width: 115px;
+  height: 161px;
   background-repeat: no-repeat;
 }
 
@@ -11,26 +11,26 @@
 }
 
 .clip-work-typing-back {
-  background-position: -162px 0px;
+  background-position: -115px 0px;
   animation: clip-work-typing-back 520ms steps(1, end) infinite;
 }
 
 @keyframes clip-work-typing-back {
-  0% { background-position: -162px 0px; }
-  50% { background-position: -324px 0px; }
+  0% { background-position: -115px 0px; }
+  50% { background-position: -230px 0px; }
 }
 
 .clip-pose-lean {
-  background-position: 0px -160px;
+  background-position: 0px -161px;
 }
 
 .clip-walk-right {
-  background-position: -162px -160px;
+  background-position: -115px -161px;
   animation: clip-walk-right 620ms steps(1, end) infinite;
 }
 
 @keyframes clip-walk-right {
-  0% { background-position: -162px -160px; }
-  50% { background-position: -324px -160px; }
+  0% { background-position: -115px -161px; }
+  50% { background-position: -230px -161px; }
 }
 

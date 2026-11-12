@@ -1,6 +1,6 @@
 import type { OfficeState } from "../office-state.js";
 
-/** 自绘生成的六套角色素材（见 scripts/build-pix-assets.mjs） */
+/** 上游 PixOffice 角色素材包（经 scripts/build-pix-assets.mjs 加工） */
 export const PIX_PACKS = [
   "code-agent",
   "office-lead",
