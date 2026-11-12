@@ -1,73 +1,28 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import { Network, Table as TableIcon } from "lucide-react";
 import { ApiError } from "../../api/client.js";
-import { fetchAgents, setAgentTargets, type AgentSummary } from "../../api/identity.js";
+import type { AgentSummary } from "../../api/identity.js";
 import { agentDisplayName } from "../../shared/agent-label.js";
 import { Button } from "../ui/Button.js";
 import { EmptyState } from "../ui/EmptyState.js";
+import { IconButton } from "../ui/IconButton.js";
 import { Table, type TableColumn } from "../ui/Table.js";
+import { DelegationGraph } from "./DelegationGraph.js";
+import { useDelegationDraft } from "./useDelegationDraft.js";
 import styles from "./DelegationMatrix.module.css";
 
-function sameSet(a: readonly string[], b: readonly string[]): boolean {
-  if (a.length !== b.length) {
-    return false;
-  }
-  const seen = new Set(a);
-  return b.every((id) => seen.has(id));
-}
+type MatrixView = "graph" | "table";
 
-function messageOf(error: unknown, fallback: string): string {
-  return error instanceof ApiError ? error.message : fallback;
-}
+const HINT: Record<MatrixView, string> = {
+  graph: "节点=Agent，箭头=可委派方向（发起方 → 收件方）；点击节点编辑，保存后下一次 a2a.send 判定立即生效。",
+  table: "行=发起方，列=收件方；勾选即允许该发起方向该收件方发送 A2A 消息。默认全不勾，自我委派不可选。",
+};
 
-type Selection = Record<string, string[]>;
-
-/** 行=发起方,列=收件方;保存即写 allowed_targets_json,下一次 a2a.send 判定立即生效 */
+/** 委派白名单编辑区:图(默认)与表共用同一份草稿与保存语义 */
 export function DelegationMatrix() {
-  const queryClient = useQueryClient();
-  const agentsQuery = useQuery({ queryKey: ["agents"], queryFn: fetchAgents });
-  const [draft, setDraft] = useState<Selection | null>(null);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const agents = useMemo(() => agentsQuery.data ?? [], [agentsQuery.data]);
-  const saved = useMemo(() => {
-    const map: Selection = {};
-    for (const agent of agents) {
-      map[agent.id] = [...agent.allowedTargets];
-    }
-    return map;
-  }, [agents]);
-  const selection = draft ?? saved;
-  const dirty = agents.filter((agent) => !sameSet(selection[agent.id] ?? [], saved[agent.id] ?? []));
-
-  function toggle(initiator: AgentSummary, recipient: AgentSummary): void {
-    const current = selection[initiator.id] ?? [];
-    const next = current.includes(recipient.id)
-      ? current.filter((id) => id !== recipient.id)
-      : [...current, recipient.id];
-    setDraft({ ...selection, [initiator.id]: next });
-    setError(null);
-  }
-
-  async function save(): Promise<void> {
-    if (dirty.length === 0) {
-      return;
-    }
-    setPending(true);
-    setError(null);
-    try {
-      await Promise.all(
-        dirty.map((agent) => setAgentTargets(agent.id, selection[agent.id] ?? [])),
-      );
-      await queryClient.invalidateQueries({ queryKey: ["agents"], exact: true });
-      setDraft(null);
-    } catch (caught) {
-      setError(messageOf(caught, "保存失败，请稍后再试"));
-    } finally {
-      setPending(false);
-    }
-  }
+  const draft = useDelegationDraft();
+  const { agents, selection, dirty, pending, error } = draft;
+  const [view, setView] = useState<MatrixView>("graph");
 
   const columns: TableColumn<AgentSummary>[] = [
     {
@@ -95,7 +50,7 @@ export function DelegationMatrix() {
               type="checkbox"
               checked={checked}
               disabled={self || pending}
-              onChange={() => toggle(initiator, recipient)}
+              onChange={() => draft.toggle(initiator, recipient)}
               aria-label={`${agentDisplayName(initiator)} 委派给 ${recipient.displayName}`}
             />
           </span>
@@ -105,44 +60,62 @@ export function DelegationMatrix() {
   ];
 
   return (
-    <section className={styles.section} aria-label="委派矩阵">
+    <section className={styles.section} aria-label="委派关系">
       <header className={styles.header}>
         <div className={styles.heading}>
-          <h2 className={styles.title}>委派矩阵</h2>
-          <p className={styles.hint}>
-            行=发起方，列=收件方；勾选即允许该发起方向该收件方发送 A2A 消息。默认全不勾，自我委派不可选。
-          </p>
+          <h2 className={styles.title}>委派关系</h2>
+          <p className={styles.hint}>{HINT[view]}</p>
         </div>
-        <Button
-          variant="primary"
-          disabled={pending || dirty.length === 0}
-          onClick={() => void save()}
-        >
-          {pending ? "保存中…" : "保存委派"}
-        </Button>
+        <div className={styles.headerActions}>
+          <div className={styles.viewToggle} role="group" aria-label="委派视图切换">
+            <IconButton
+              label="关系图视图"
+              icon={<Network size={14} />}
+              aria-pressed={view === "graph"}
+              onClick={() => setView("graph")}
+            />
+            <IconButton
+              label="表格视图"
+              icon={<TableIcon size={14} />}
+              aria-pressed={view === "table"}
+              onClick={() => setView("table")}
+            />
+          </div>
+          {view === "table" ? (
+            <Button
+              variant="primary"
+              disabled={pending || dirty.length === 0}
+              onClick={() => void draft.save()}
+            >
+              {pending ? "保存中…" : "保存委派"}
+            </Button>
+          ) : null}
+        </div>
       </header>
 
-      {agentsQuery.isPending ? <p className={styles.loading}>加载中…</p> : null}
+      {draft.isPending ? <p className={styles.loading}>加载中…</p> : null}
 
-      {agentsQuery.isError ? (
+      {draft.isError ? (
         <div className={styles.errorBox} role="alert">
           <span>
-            {agentsQuery.error instanceof ApiError
-              ? agentsQuery.error.message
+            {draft.queryError instanceof ApiError
+              ? draft.queryError.message
               : "Agent 列表加载失败"}
           </span>
-          <Button size="sm" variant="secondary" onClick={() => void agentsQuery.refetch()}>
+          <Button size="sm" variant="secondary" onClick={() => void draft.refetch()}>
             重试
           </Button>
         </div>
       ) : null}
 
-      {!agentsQuery.isPending && !agentsQuery.isError ? (
+      {!draft.isPending && !draft.isError ? (
         agents.length === 0 ? (
           <EmptyState
             title="暂无 Agent"
             description="先注册 Agent，才能在这里配置谁能找谁。"
           />
+        ) : view === "graph" ? (
+          <DelegationGraph draft={draft} />
         ) : (
           <div className={styles.matrix}>
             <Table
@@ -157,15 +130,15 @@ export function DelegationMatrix() {
         )
       ) : null}
 
-      {dirty.length === 0 ? null : (
+      {view === "table" && dirty.length > 0 ? (
         <p className={styles.dirtyNote}>{dirty.length} 个发起方有未保存的改动。</p>
-      )}
+      ) : null}
 
-      {error === null ? null : (
+      {view === "table" && error !== null ? (
         <p className={styles.error} role="alert">
           {error}
         </p>
-      )}
+      ) : null}
     </section>
   );
 }

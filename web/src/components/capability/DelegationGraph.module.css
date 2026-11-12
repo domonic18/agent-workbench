@@ -1,0 +1,197 @@
+/* 画布:固定像素 1:1 叠加命中按钮,横向滚动交给外层 */
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.canvasWrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.canvas {
+  position: relative;
+}
+
+.svg {
+  display: block;
+}
+
+.nodeRect {
+  fill: var(--surface);
+  stroke: var(--border-strong);
+  stroke-width: 1;
+}
+
+.nodeRectActive {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.nodeAvatar {
+  fill: var(--avatar-bg);
+  stroke: var(--avatar-text);
+  stroke-width: 1;
+}
+
+.nodeInitial {
+  fill: var(--avatar-text);
+  font-size: var(--font-xs);
+  font-weight: 700;
+}
+
+.nodeName {
+  fill: var(--text);
+  font-size: var(--font-sm);
+}
+
+.countRect {
+  fill: var(--accent-soft);
+}
+
+.countText {
+  fill: var(--accent);
+  font-size: var(--font-2xs);
+}
+
+.edge {
+  fill: none;
+  stroke: var(--accent);
+  stroke-opacity: 0.55;
+  stroke-width: 1.5;
+}
+
+.edgeActive {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.arrowHead {
+  fill: var(--accent);
+}
+
+/* 命中区:透明覆盖节点,键盘可达,hover/选中给轻量着色 */
+.hit {
+  position: absolute;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  cursor: pointer;
+}
+
+.hit:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+}
+
+.hit:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.pickHint {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+
+/* 节点编辑面板:图视图的编辑面,保存语义与表视图一致 */
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.editorTitle {
+  margin: 0;
+  font-size: var(--font-md);
+  font-weight: 700;
+  color: var(--text);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.chipsEmpty {
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  color: var(--text);
+  font-size: var(--font-sm);
+}
+
+.chipRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.chipRemove:hover {
+  color: var(--danger);
+}
+
+.addRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.addLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+}
+
+.select {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--font-sm);
+}
+
+.dirtyNote {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--warning);
+}
+
+.error {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--danger);
+}
