@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { LayoutGrid, Table } from "lucide-react";
+import { Building2, LayoutGrid, Table } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ApiError } from "../../api/client.js";
 import { fetchAgents, type AgentRosterSummary } from "../../api/identity.js";
@@ -13,6 +13,7 @@ import { IconButton } from "../ui/IconButton.js";
 import { Input, Select } from "../ui/Field.js";
 import { AgentCardList } from "./AgentCardList.js";
 import { AgentTable, buildAgentColumns } from "./AgentTableColumns.js";
+import { AgentOfficeScene } from "./office/AgentOfficeScene.js";
 import styles from "./agents.module.css";
 
 export interface AgentManagementTableProps {
@@ -25,9 +26,16 @@ export interface AgentManagementTableProps {
 }
 
 type StatusFilter = "all" | "active" | "disabled";
-type ViewMode = "list" | "card";
+type ViewMode = "list" | "card" | "office";
 
 const VIEW_STORAGE_KEY = "aw:agents-view";
+
+const VIEW_OPTIONS: ViewMode[] = ["list", "card", "office"];
+
+function readViewPreference(): ViewMode {
+  const saved = readPreference(VIEW_STORAGE_KEY, "list");
+  return VIEW_OPTIONS.includes(saved as ViewMode) ? (saved as ViewMode) : "list";
+}
 
 const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "all", label: "全部状态" },
@@ -61,9 +69,7 @@ export function AgentManagementTable({
   const [status, setStatus] = useState<StatusFilter>("all");
   const [runtime, setRuntime] = useState("all");
   const [machine, setMachine] = useState("all");
-  const [view, setView] = useState<ViewMode>(() =>
-    readPreference(VIEW_STORAGE_KEY, "list") === "card" ? "card" : "list",
-  );
+  const [view, setView] = useState<ViewMode>(readViewPreference);
   const narrow = useMediaQuery(NARROW_QUERY);
   const agentsQuery = useQuery({ queryKey: ["agents"], queryFn: fetchAgents });
 
@@ -210,6 +216,15 @@ export function AgentManagementTable({
             className={view === "card" ? styles.viewActive : undefined}
             onClick={() => changeView("card")}
           />
+          <IconButton
+            size="sm"
+            label={narrow ? "办公室视图（窄屏不支持）" : "办公室视图"}
+            aria-pressed={view === "office" && !narrow}
+            icon={<Building2 size={14} />}
+            className={view === "office" && !narrow ? styles.viewActive : undefined}
+            disabled={narrow}
+            onClick={() => changeView("office")}
+          />
         </div>
       </div>
 
@@ -230,6 +245,8 @@ export function AgentManagementTable({
           onEdit={onEdit}
           onRotateKey={onRotateKey}
         />
+      ) : view === "office" ? (
+        <AgentOfficeScene agents={visible} liveById={liveById} onOpenDetail={onOpenDetail} />
       ) : (
         <AgentTable agents={visible} columns={columns} onOpenDetail={onOpenDetail} />
       )}
