@@ -118,6 +118,10 @@ write_state() {
 rollback() {
   local failed="$1" prev="$2"
   echo "[FAIL] 部署失败,回滚: $failed → ${prev:-<无>}" >&2
+  # 回滚会重建容器,失败现场日志随容器销毁——先转储到 stderr 再回滚,
+  # 否则「起不来」只剩一个 unhealthy,根因(如迁移 checksum)无处可查
+  echo "--- 失败容器日志(console 最近 80 行) ---" >&2
+  $COMPOSE logs --no-color --tail 80 console >&2 || true
   if [ -z "$prev" ]; then
     write_state "$failed" "" FAILED
     echo "ERROR: 无 previous 镜像可回滚(首次部署),保留现场人工处理" >&2
