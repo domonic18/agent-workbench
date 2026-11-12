@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { DiscoveryMachineView } from "../api/bootstrap.js";
 import { ToastProvider } from "../components/ui/Toast.js";
 import { AgentAccessPage } from "./AgentAccessPage.js";
 
@@ -30,7 +31,28 @@ const AGENT = {
   lastRunAt: null,
 };
 
-function fakeFetch(): ReturnType<typeof vi.fn> {
+const MACHINE: DiscoveryMachineView = {
+  machineId: "mch_book",
+  hostname: "MacBook.local",
+  displayName: "MacBook",
+  status: "active",
+  lastSeenAt: 1_700_000_000_000,
+  receivedAt: 1_700_000_000_000,
+  collectorVersion: "0.4.0",
+  upgradeAvailable: false,
+  projects: [
+    {
+      name: "recruit",
+      cwd: "/Users/dev/Code/recruit",
+      confirmed: false,
+      feishuBotName: "随行-招聘专家",
+    },
+  ],
+};
+
+function fakeFetch(
+  machines: DiscoveryMachineView[] = [],
+): ReturnType<typeof vi.fn> {
   return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input);
     if (path.includes("/enroll-token")) {
@@ -38,6 +60,14 @@ function fakeFetch(): ReturnType<typeof vi.fn> {
     }
     if (path.includes("/rotate")) {
       return json({ secret: "s3cret" });
+    }
+    if (path.includes("/api/bootstrap/discovery")) {
+      return json({ latestCollectorVersion: null, machines });
+    }
+    if (path.includes("/api/bootstrap/agents")) {
+      return json({
+        agents: [{ id: "agt_9", key: "recruit", project: "recruit", displayName: "recruit" }],
+      });
     }
     if (path.includes("/api/agents")) {
       if (init?.method === "POST") {
@@ -142,5 +172,30 @@ describe("协作接入页", () => {
     expect(dialog.textContent).toContain("第 4 步");
     expect(dialog.textContent).toContain("https://aw.example.com/mcp");
     expect(dialog.textContent).toContain("${AW_AGENT_SECRET}");
+  });
+
+  it("执行机面板列出待登记项目，勾选后一键登记", async () => {
+    const fetcher = fakeFetch([MACHINE]);
+    vi.stubGlobal("fetch", fetcher);
+    renderPage();
+
+    expect(await screen.findByText("已上线执行机")).toBeTruthy();
+    expect(await screen.findByText("MacBook")).toBeTruthy();
+    expect(screen.getByText("待登记项目")).toBeTruthy();
+    // 复合文案分两个节点渲染（项目名 + bot 名），分别断言
+    expect(screen.getByText("recruit")).toBeTruthy();
+    expect(screen.getByText("· 随行-招聘专家")).toBeTruthy();
+
+    // 勾选语义默认全选（记录取消项），无需再勾
+    fireEvent.click(screen.getByRole("button", { name: "登记为 Agent" }));
+
+    await waitFor(() => {
+      const call = fetcher.mock.calls.find(
+        ([input, init]) =>
+          String(input).includes("/api/bootstrap/agents") && init?.method === "POST",
+      );
+      expect(call).toBeDefined();
+    });
+    expect(await screen.findByText("已登记 1 个 Agent")).toBeTruthy();
   });
 });

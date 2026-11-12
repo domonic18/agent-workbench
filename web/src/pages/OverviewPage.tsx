@@ -13,6 +13,7 @@ import { useNavigate } from "react-router";
 import { ApiError } from "../api/client.js";
 import { fetchOverview } from "../api/overview.js";
 import { fetchAgents, type AgentRosterSummary } from "../api/identity.js";
+import { fetchDiscovery } from "../api/bootstrap.js";
 import { AgentDeleteDialog } from "../components/agents/AgentDeleteDialog.js";
 import { AgentDetailDialog } from "../components/agents/AgentDetailDialog.js";
 import { AgentEditDialog } from "../components/agents/AgentEditDialog.js";
@@ -74,6 +75,20 @@ function attentionRows(
   return rows;
 }
 
+interface UnregisteredProject {
+  machine: string;
+  name: string;
+  bot?: string | undefined;
+}
+
+/** 已发现未注册项目的提示文案:取首个项目点名,多个加「等」 */
+function unregisteredHint(projects: readonly UnregisteredProject[]): string {
+  const first = projects[0]!;
+  const named = first.bot === undefined ? first.name : `${first.name} · ${first.bot}`;
+  const rest = projects.length > 1 ? " 等" : "";
+  return `发现 ${projects.length} 个未注册项目（${first.machine}：${named}${rest}）——去「协作接入」登记`;
+}
+
 export function OverviewPage() {
   const navigate = useNavigate();
   const [registerDialog, setRegisterDialog] = useState<"agent" | null>(null);
@@ -90,6 +105,21 @@ export function OverviewPage() {
       !(caught instanceof ApiError && caught.status === 401) && count < 2,
   });
   const rosterQuery = useQuery({ queryKey: ["agents"], queryFn: fetchAgents });
+  // 已发现未注册项目:机器发现上报里有、名册里没有——不提示就永远唤不醒也不可达
+  const discovery = useQuery({
+    queryKey: ["discovery"],
+    queryFn: fetchDiscovery,
+    refetchInterval: 60_000,
+  });
+  const unregistered = (discovery.data?.machines ?? []).flatMap((machine) =>
+    machine.projects
+      .filter((project) => !project.confirmed)
+      .map((project) => ({
+        machine: machine.displayName ?? machine.hostname,
+        name: project.name,
+        bot: project.feishuBotName,
+      })),
+  );
 
   const agents = data?.agents ?? [];
   const online = agents.filter((agent) => agent.heartbeat === "ok").length;
@@ -192,6 +222,12 @@ export function OverviewPage() {
                   <span>{row.text}</span>
                 </li>
               ))}
+              {unregistered.length > 0 ? (
+                <li className={styles.attentionRow}>
+                  <ToneIcon tone="warning" icon={<AlertTriangle size={14} aria-hidden="true" />} />
+                  <span>{unregisteredHint(unregistered)}</span>
+                </li>
+              ) : null}
             </ul>
           </section>
 
