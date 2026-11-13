@@ -27,6 +27,8 @@ export interface OverviewAgent {
   /** 本机活跃会话数(与派发闸门 G4 同口径的机级视图);机器无关运行时为 null */
   activeSessions: number | null;
   lastRunAt: number | null;
+  /** 最近一次已结束运行的结束时刻;从未跑完过为 null */
+  lastRunEndedAt: number | null;
   running: boolean;
   currentTaskId: string | null;
   currentTaskTitle: string | null;
@@ -116,6 +118,7 @@ export function createOverviewService(deps: OverviewServiceDeps): OverviewServic
         heartbeat: heartbeatState(row.machineLastSeenAt, at),
         activeSessions: row.activeSessions,
         lastRunAt: row.lastRunAt,
+        lastRunEndedAt: row.lastRunEndedAt,
         running: row.running === 1,
         currentTaskId: row.currentTaskId,
         currentTaskTitle: row.currentTaskTitle,

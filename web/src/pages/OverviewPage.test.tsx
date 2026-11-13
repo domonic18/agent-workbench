@@ -172,6 +172,7 @@ describe("总览页", () => {
               heartbeat: "ok",
               activeSessions: 5,
               lastRunAt: null,
+              lastRunEndedAt: null,
               running: true,
               currentTaskId: "tsk_1",
               currentTaskTitle: "实现接口契约",

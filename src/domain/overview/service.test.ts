@@ -11,6 +11,7 @@ import { insertAgent } from "../../store/repositories/agent.js";
 import { currentRevision } from "../../store/repositories/revision.js";
 import {
   bindRunTaskIfEmpty,
+  endRun,
   insertRun,
   insertTimelineEvent,
 } from "../../store/repositories/run.js";
@@ -280,6 +281,25 @@ describe("overview 服务", () => {
       running: false,
       lastRunAt: null,
       todayTokens: 0,
+    });
+  });
+
+  it("lastRunEndedAt 取最近一次已结束运行的结束时刻,运行中的行不算", async () => {
+    await endRun(db, "r-ok", AT - 30_000, "process_exit");
+    // a-ok 另有一跑在跑,结束时刻仍取已结束那次的
+    await addRun(db, "r-live-again", "a-ok", "m-ok", AT - 20_000);
+
+    const agents = (await createOverviewService({ db, now: () => AT }).get()).agents;
+    expect(agents.find((agent) => agent.id === "a-ok")).toMatchObject({
+      running: true,
+      lastRunEndedAt: AT - 30_000,
+    });
+    // 只在跑、没跑完过的 Agent 为 null,不能当成 0
+    expect(agents.find((agent) => agent.id === "a-offline")).toMatchObject({
+      lastRunEndedAt: null,
+    });
+    expect(agents.find((agent) => agent.id === "a-unknown")).toMatchObject({
+      lastRunEndedAt: null,
     });
   });
 

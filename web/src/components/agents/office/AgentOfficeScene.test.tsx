@@ -43,6 +43,7 @@ function live(overrides: Partial<OverviewAgent> = {}): OverviewAgent {
     heartbeat: "ok",
     activeSessions: null,
     lastRunAt: null,
+    lastRunEndedAt: null,
     running: false,
     currentTaskId: null,
     currentTaskTitle: null,
@@ -142,5 +143,48 @@ describe("办公室视图", () => {
     for (const label of ["工作中", "待命", "派发挂起", "离线", "已停用"]) {
       expect(legend.textContent).toContain(label);
     }
+  });
+
+  it("工作中头顶挂气泡，说的是当前阶段", () => {
+    renderScene([agent()], [live({ running: true, currentTaskStage: "exec" })]);
+
+    expect(screen.getByText("执行")).toBeTruthy();
+  });
+
+  it("刚跑完的待命 Agent 说刚刚完成，离线的 Agent 头顶打盹", () => {
+    renderScene(
+      [agent(), agent({ id: "agt_off", displayName: "离线 Agent", machineId: null })],
+      [
+        live({ lastRunEndedAt: Date.now() - 30_000 }),
+        live({ id: "agt_off", displayName: "离线 Agent", heartbeat: "timeout", machineId: null }),
+      ],
+    );
+
+    expect(screen.getByText("刚刚完成")).toBeTruthy();
+    expect(screen.getByText("Z")).toBeTruthy();
+  });
+
+  it("状态从待命变成工作时播一次过渡动作", () => {
+    const { rerender } = render(
+      <AgentOfficeScene agents={[agent()]} liveById={liveById([live()])} onOpenDetail={vi.fn()} />,
+    );
+    expect(document.querySelector('[style*="clip-sit-down-back"]')).toBeNull();
+
+    rerender(
+      <AgentOfficeScene
+        agents={[agent()]}
+        liveById={liveById([live({ running: true })])}
+        onOpenDetail={vi.fn()}
+      />,
+    );
+
+    expect(document.querySelector('[style*="clip-sit-down-back"]')).toBeTruthy();
+  });
+
+  it("工位上摆着桌面小物", () => {
+    renderScene([agent()], [live()]);
+
+    const prop = document.querySelector('img[src="/pix/props/plant.webp"]');
+    expect(prop).toBeTruthy();
   });
 });

@@ -332,3 +332,11 @@ export const THREAD_MODE_LABEL: Record<string, string> = {
   context: "上下文",
 };
 
+/** 办公室视图的头顶气泡文案：名牌之外的一句人话 */
+export const OFFICE_BUBBLE_LABEL = {
+  /** 正在跑但没有更具体的阶段可说 */
+  running: "执行中",
+  /** 刚跑完的收尾提示 */
+  justDone: "刚刚完成",
+} as const;
+
