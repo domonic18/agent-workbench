@@ -18,6 +18,7 @@ import {
   PIX_CHAIR_W,
   PIX_DESK_H,
   PIX_DESK_W,
+  PIX_PROP_SIZE,
 } from "../../../../assets/pix/manifest.js";
 
 /** 房间底图尺寸 */
@@ -42,7 +43,7 @@ export const CHAIR_H = PIX_CHAIR_H;
 
 /** 每行工位数与工位横向间距 */
 export const COLS = 6;
-const PITCH = 200;
+export const PITCH = 200;
 
 /** 房间水平中心 */
 const CENTER_X = ROOM_W / 2;
@@ -73,6 +74,8 @@ export interface StationSlot {
   y: number;
   /** 该行的透视缩放 */
   scale: number;
+  /** 该行的横向展开系数：相邻工位的实际间距 = PITCH * spread */
+  spread: number;
 }
 
 /** 工位及其所属分组 */
@@ -163,6 +166,7 @@ export function layoutGroups(groupSizes: readonly number[]): SceneLayout {
           x: CENTER_X + offset - DESK_W / 2,
           y: spec.baseY,
           scale: spec.scale,
+          spread: spec.spread,
         },
       });
     }
@@ -198,7 +202,34 @@ export const STATION = {
   badge: { x: ACTOR_X, y: DESK_H + ACTOR_FOOT_GAP + 50 },
   /** 分区标签：角色头顶上方 */
   zone: { x: ACTOR_X, y: DESK_H + ACTOR_FOOT_GAP - ACTOR_H - 34 },
+  /** 头顶气泡：紧贴头顶上沿（在分区标签之下） */
+  bubble: { x: ACTOR_X, y: DESK_H + ACTOR_FOOT_GAP - ACTOR_H - 10 },
 } as const;
+
+/**
+ * 桌面小物的落点（工位局部坐标）
+ *
+ * 桌图自带显示器与键鼠，桌面右侧（显示器右边）才是空位，
+ * 小物落在那一块才不会挡住屏幕，也不会被角色挡住。
+ *
+ * 尺寸取自生成产物 manifest（`PIX_PROP_SIZE`），不在这里复写一份——
+ * 素材重做后尺寸会变，写死就会和图对不上。
+ */
+export const PROP_BASE_Y = 40;
+
+function propPlacement(id: string, x: number) {
+  const size = PIX_PROP_SIZE[id];
+  if (size === undefined) {
+    throw new Error(`素材缺少桌面小物尺寸：${id}`);
+  }
+  return { x, y: PROP_BASE_Y - size.h, w: size.w, h: size.h };
+}
+
+export const PROPS = {
+  plant: propPlacement("plant", 88),
+  books: propPlacement("books", 92),
+  mug: propPlacement("mug", 96),
+};
 
 /** 地面投影：椭圆罩住角色脚下的落地范围 */
 export const SHADOW = {

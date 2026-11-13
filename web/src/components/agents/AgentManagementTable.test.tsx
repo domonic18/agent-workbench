@@ -66,6 +66,7 @@ function live(overrides: Partial<OverviewAgent> = {}): OverviewAgent {
     heartbeat: "ok",
     activeSessions: null,
     lastRunAt: null,
+    lastRunEndedAt: null,
     running: false,
     currentTaskId: null,
     currentTaskTitle: null,

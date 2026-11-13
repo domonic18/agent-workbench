@@ -52,6 +52,8 @@ export interface AgentOverviewRow {
   /** 本机活跃会话数(ingest 按机器聚合);无宿主机器为 null */
   activeSessions: number | null;
   lastRunAt: number | null;
+  /** 最近一次已结束运行的结束时刻;从未跑完过为 null(与 lastRunAt 不同义) */
+  lastRunEndedAt: number | null;
   running: number;
   currentTaskId: string | null;
   currentTaskTitle: string | null;
@@ -95,6 +97,7 @@ export async function listAgentOverviewRows(
           WHERE r2.machine = a.machine_id AND r2.status = 'running' AND r2.last_seen_at >= ?
        ) END AS "activeSessions",
        lr."lastRunAt",
+       lr."lastRunEndedAt",
        CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS running,
        r.task_id AS "currentTaskId",
        t.title AS "currentTaskTitle",
@@ -128,7 +131,9 @@ export async function listAgentOverviewRows(
      )
      LEFT JOIN task t ON t.id = r.task_id
      LEFT JOIN (
-       SELECT agent_id, MAX(last_seen_at) AS "lastRunAt"
+       -- 聚合子查询里一并取最近一次「已结束」运行的结束时刻:
+       -- 运行中的行 ended_at 为 NULL,被 MAX 忽略,不会污染结果
+       SELECT agent_id, MAX(last_seen_at) AS "lastRunAt", MAX(ended_at) AS "lastRunEndedAt"
          FROM agent_run GROUP BY agent_id
      ) lr ON lr.agent_id = a.id
      LEFT JOIN (

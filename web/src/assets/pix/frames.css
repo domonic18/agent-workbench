@@ -1,8 +1,8 @@
 /* 由 scripts/build-pix-assets.mjs 生成，勿手改 */
 
 .pix-sprite {
-  width: 115px;
-  height: 161px;
+  width: 116px;
+  height: 181px;
   background-repeat: no-repeat;
 }
 
@@ -10,27 +10,120 @@
   background-position: 0px 0px;
 }
 
+.clip-work-quiet-back {
+  background-position: -116px 0px;
+  animation: clip-work-quiet-back 4000ms steps(1, end) infinite;
+}
+
+@keyframes clip-work-quiet-back {
+  0% { background-position: -116px 0px; }
+  6.25% { background-position: -232px 0px; }
+  12.5% { background-position: -348px 0px; }
+  18.75% { background-position: -464px 0px; }
+  25% { background-position: -116px 0px; }
+  31.25% { background-position: -232px 0px; }
+  37.5% { background-position: -348px 0px; }
+  43.75% { background-position: -464px 0px; }
+  50% { background-position: -116px 0px; }
+  56.25% { background-position: -232px 0px; }
+  62.5% { background-position: -348px 0px; }
+  68.75% { background-position: -464px 0px; }
+  75% { background-position: -116px 0px; }
+  100% { background-position: -116px 0px; }
+}
+
 .clip-work-typing-back {
-  background-position: -115px 0px;
-  animation: clip-work-typing-back 520ms steps(1, end) infinite;
+  background-position: -580px 0px;
+  animation: clip-work-typing-back 640ms steps(1, end) infinite;
 }
 
 @keyframes clip-work-typing-back {
-  0% { background-position: -115px 0px; }
-  50% { background-position: -230px 0px; }
-}
-
-.clip-pose-lean {
-  background-position: 0px -161px;
+  0% { background-position: -580px 0px; }
+  32.81% { background-position: 0px -181px; }
+  50% { background-position: -116px -181px; }
+  82.81% { background-position: -232px -181px; }
+  100% { background-position: -232px -181px; }
 }
 
 .clip-walk-right {
-  background-position: -115px -161px;
-  animation: clip-walk-right 620ms steps(1, end) infinite;
+  background-position: -348px -181px;
+  animation: clip-walk-right 800ms steps(1, end) infinite;
 }
 
 @keyframes clip-walk-right {
-  0% { background-position: -115px -161px; }
-  50% { background-position: -230px -161px; }
+  0% { background-position: -348px -181px; }
+  25% { background-position: -464px -181px; }
+  50% { background-position: -580px -181px; }
+  75% { background-position: -464px -181px; }
+  100% { background-position: -464px -181px; }
+}
+
+.clip-walk-back {
+  background-position: 0px -362px;
+  animation: clip-walk-back 800ms steps(1, end) infinite;
+}
+
+@keyframes clip-walk-back {
+  0% { background-position: 0px -362px; }
+  25% { background-position: -116px -362px; }
+  50% { background-position: -232px -362px; }
+  75% { background-position: -348px -362px; }
+  100% { background-position: -348px -362px; }
+}
+
+.clip-sit-back {
+  background-position: -464px -362px;
+}
+
+.clip-pose-lean {
+  background-position: -580px -362px;
+}
+
+.clip-pose-rise {
+  background-position: 0px -543px;
+}
+
+.clip-sit-down-back {
+  background-position: 0px 0px;
+  animation: clip-sit-down-back 520ms steps(1, end) infinite;
+}
+
+@keyframes clip-sit-down-back {
+  0% { background-position: 0px 0px; }
+  11.92% { background-position: 0px -543px; }
+  55% { background-position: -580px -362px; }
+  90% { background-position: -464px -362px; }
+  100% { background-position: -464px -362px; }
+}
+
+.clip-stand-up-back {
+  background-position: -464px -362px;
+  animation: clip-stand-up-back 520ms steps(1, end) infinite;
+}
+
+@keyframes clip-stand-up-back {
+  0% { background-position: -464px -362px; }
+  10% { background-position: -580px -362px; }
+  45% { background-position: 0px -543px; }
+  88.08% { background-position: 0px 0px; }
+  100% { background-position: 0px 0px; }
+}
+
+.clip-emote-wave {
+  background-position: -116px -543px;
+}
+
+.clip-emote-thinking {
+  background-position: -232px -543px;
+}
+
+.clip-emote-surprised {
+  background-position: -348px -543px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pix-sprite {
+    animation: none !important;
+  }
 }
 
