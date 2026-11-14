@@ -166,6 +166,21 @@ describe("定时任务只读观测", () => {
     });
   });
 
+  it("库里存着负数的「从未执行」占位值时,读出来按没有", async () => {
+    await saveMachineSchedules(db, "m-ok", [
+      cronReport({
+        id: "cron:never",
+        last_run: -62135596800000,
+        next_run: 1_700_003_600_000,
+      }),
+    ]);
+
+    const rows = await listScheduleRows(db, AT);
+
+    expect(rows[0]?.lastRunAt).toBeNull();
+    expect(rows[0]?.nextRunAt).toBe(1_700_003_600_000);
+  });
+
   it("没有上报计划的机器不产生条目", async () => {
     expect(await listScheduleRows(db, AT)).toEqual([]);
   });
