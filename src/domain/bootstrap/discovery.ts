@@ -46,10 +46,18 @@ export function feishuBotsFromDiscovery(
   return result;
 }
 
-/** 时刻字段归一化成整数毫秒(协议层只保证是有限数,小数由域层收口) */
+/**
+ * 时刻字段归一化成整数毫秒(协议层只保证是有限数,小数由域层收口)
+ *
+ * 负数是 cc-connect「从未执行」的占位值(实测 -62135596800000),
+ * 落库一律当 null——否则界面上会显示成公元 1 年的日期。
+ */
 function normalizeSchedules(schedules: ScheduleReport[]): ScheduleReport[] {
-  const floor = (value: number | null): number | null =>
-    value === null ? null : Math.floor(value);
+  const floor = (value: number | null): number | null => {
+    if (value === null) return null;
+    const ms = Math.floor(value);
+    return ms < 0 ? null : ms;
+  };
   return schedules.map((schedule) => ({
     ...schedule,
     last_run: floor(schedule.last_run),

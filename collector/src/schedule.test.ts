@@ -195,6 +195,23 @@ describe("定时任务快照采集", () => {
     expect(rows[0]?.created_at).toBe(1793330010000);
   });
 
+  it("负数是「从未执行」的占位值,按没有处理", () => {
+    const dir = newDir();
+    writeJobs(dir, "crons", [
+      {
+        id: "never",
+        project: "cc-arch",
+        cron_expr: "30 9 * * 1",
+        description: "还没跑过",
+        last_run: -62135596800000,
+      },
+    ]);
+
+    const rows = collectSchedules({ ccConnectDir: dir, now, timezone: "Asia/Shanghai" });
+
+    expect(rows[0]?.last_run).toBeNull();
+  });
+
   it("文件缺失或损坏返回空,不抛错", () => {
     const dir = newDir();
     expect(collectSchedules({ ccConnectDir: dir, now, timezone: "Asia/Shanghai" })).toEqual([]);
