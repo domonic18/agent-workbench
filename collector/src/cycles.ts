@@ -7,6 +7,7 @@ import {
   type CachedFeishuBotResolver,
 } from "./feishu-bot.js";
 import { migrateCwds, syncConfigOnce, type ConfigSyncDeps } from "./config-sync.js";
+import { collectSchedules } from "./schedule.js";
 import type { DispatchStatusEntry } from "./dispatch-status.js";
 import type { ConsoleClient } from "./http.js";
 import { createLogger, type Logger } from "./log.js";
@@ -22,6 +23,10 @@ export interface DiscoveryCycleDeps {
   logger?: Logger;
   /** bot 身份解析器;测试可注入假实现,缺省用带缓存的飞书实现 */
   resolver?: CachedFeishuBotResolver;
+  /** 本机 cc-connect 目录,用于读定时任务快照 */
+  ccConnectDir: string;
+  /** 当前时刻;测试可注入 */
+  now?: () => number;
 }
 
 export interface DiscoveryCycle {
@@ -42,6 +47,12 @@ export function createDiscoveryCycle(deps: DiscoveryCycleDeps): DiscoveryCycle {
   async function once(): Promise<void> {
     const scanned = scanDiscoveryState(deps.configs);
     const report = mergeExtraProjects(scanned.report, deps.extraProjects ?? []);
+    // 定时任务快照:随发现一起上报,内容不变不重报(hash 覆盖整个 report)
+    report.schedules = collectSchedules({
+      ccConnectDir: deps.ccConnectDir,
+      now: (deps.now ?? Date.now)(),
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    });
     const feishuCredentials = scanned.feishuCredentials;
     // 飞书 bot 名只作为展示字段补充,取不到就保留项目名,不阻断发现上报
     await Promise.all(

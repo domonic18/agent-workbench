@@ -84,6 +84,7 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
     extraProjects: config.extraProjects,
     client,
     logger,
+    ccConnectDir: config.ccConnectDir,
   });
   const configSync = createConfigSyncCycle({
     client,

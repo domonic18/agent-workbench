@@ -7,6 +7,7 @@ import {
   listActiveAgentProjects,
   listMachines,
   saveMachineDiscovery,
+  saveMachineSchedules,
 } from "../../store/repositories/machine.js";
 import { updateAgentFeishuBotByProject } from "../../store/repositories/agent.js";
 import { BootstrapError } from "./errors.js";
@@ -50,13 +51,16 @@ export async function saveDiscoveryReport(
   input: { machineId: string; report: DiscoveryReport; now: () => number },
 ): Promise<void> {
   const receivedAt = input.now();
+  // 定时任务快照单独落 machine.schedules 列:发现快照只管项目元数据,两件事不混在一列
+  const projects = input.report.projects ?? [];
   if (
-    !(await saveMachineDiscovery(db, input.machineId, JSON.stringify(input.report), receivedAt))
+    !(await saveMachineDiscovery(db, input.machineId, JSON.stringify({ projects }), receivedAt))
   ) {
     throw new BootstrapError("NOT_FOUND", `机器 ${input.machineId} 未注册`);
   }
+  await saveMachineSchedules(db, input.machineId, input.report.schedules ?? []);
   // 发现上报顺带回写 bot 展示名:手动刷新与 7 天缓存到期都经此落地到 agent 表
-  for (const project of input.report.projects ?? []) {
+  for (const project of projects) {
     if (typeof project.feishu_bot_name !== "string" || project.feishu_bot_name === "") {
       continue;
     }

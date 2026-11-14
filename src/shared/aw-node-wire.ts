@@ -29,9 +29,41 @@ export interface DiscoveryProjectReport {
   feishu_bot_open_id?: string | undefined;
 }
 
+/**
+ * 采集端上报的定时任务快照
+ *
+ * 只含展示必需字段:prompt / exec / work_dir / session_key 等敏感内容在采集端剔除,
+ * 不出机器(控制台公网可达,prompt 实测含明文 ssh 命令与内网地址)。
+ */
+export interface ScheduleReport {
+  id: string;
+  /** cc-connect 项目名;与机器一起定位对应 Agent 机器人 */
+  project: string;
+  /** cron=周期任务;timer=一次性延时任务 */
+  kind: "cron" | "timer";
+  /** 任务标题(人工可读,非敏感);缺失时回退项目名 */
+  description: string;
+  /** 周期任务的 5 字段 cron 表达式;一次性任务为 null */
+  cron_expr: string | null;
+  /** 一次性任务的执行时刻(epoch ms);周期任务为 null */
+  scheduled_at: number | null;
+  enabled: boolean;
+  /** 上次执行时刻(epoch ms) */
+  last_run: number | null;
+  /** 下次执行时刻(epoch ms,按计划所在机器的本地时区推算) */
+  next_run: number | null;
+  /** 上次执行的错误摘要(已脱敏) */
+  last_error: string | null;
+  created_at: number | null;
+  /** 计划所在机器的 IANA 时区 */
+  timezone: string;
+}
+
 /** POST /api/aw-node/discovery 请求体 */
 export interface DiscoveryReport {
   projects: DiscoveryProjectReport[];
+  /** 本机 cc-connect 的定时任务快照;整包覆盖,缺省即为空 */
+  schedules?: ScheduleReport[] | undefined;
 }
 
 /** POST /api/aw-node/config 响应中的单个 Agent 配置 */
