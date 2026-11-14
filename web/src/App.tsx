@@ -32,6 +32,10 @@ const WorkItemDrawerRoute = lazy(async () => {
   const module = await import("./pages/WorkItemDrawerRoute.js");
   return { default: module.WorkItemDrawerRoute };
 });
+const SchedulesPage = lazy(async () => {
+  const module = await import("./pages/SchedulesPage.js");
+  return { default: module.SchedulesPage };
+});
 const CapabilitiesPage = lazy(async () => {
   const module = await import("./pages/CapabilitiesPage.js");
   return { default: module.CapabilitiesPage };
@@ -119,6 +123,7 @@ export function App() {
                 <Route path="/tasks/:id" element={<TaskDrawerRoute />} />
                 <Route path="/work-items/:id" element={<WorkItemDrawerRoute />} />
               </Route>
+              <Route path="/schedules" element={<SchedulesPage />} />
               <Route path="/capabilities" element={<CapabilitiesPage />} />
               <Route path="/onboarding" element={<OnboardingPage />} />
               <Route path="/agent-guide" element={<AgentGuidePage />} />

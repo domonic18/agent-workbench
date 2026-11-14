@@ -36,6 +36,7 @@ import { registerIdentityRoutes } from "./routes/identity.js";
 import { registerIngestRoutes } from "./routes/ingest.js";
 import { registerKnowledgeRoutes } from "./routes/knowledge.js";
 import { registerMachineRoutes } from "./routes/machine.js";
+import { registerScheduleRoutes } from "./routes/schedules.js";
 import { registerMcpRoutes } from "./routes/mcp.js";
 import { registerOverviewRoutes } from "./routes/overview.js";
 import { registerInstallScriptRoute, registerWebRoutes } from "./routes/static.js";
@@ -140,6 +141,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     registerAuditRoutes(app, { db, ...timing });
     registerIdentityRoutes(app, { db, ...timing });
     registerMachineRoutes(app, { db, ...timing });
+    registerScheduleRoutes(app, { db, ...timing });
     registerAgentLifecycleRoutes(app, { db, ...timing });
     registerAgentDetailRoutes(app, { db, ...timing });
     registerAgentSelfRoutes(app, { db, ...timing });

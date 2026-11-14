@@ -4,6 +4,7 @@ import {
   formatDateTime,
   formatDuration,
   formatExactTokens,
+  formatCountdown,
   formatRelativeTime,
   formatTokens,
 } from "./format.js";
@@ -54,5 +55,14 @@ describe("时间格式化", () => {
     expect(formatRelativeTime(now - 5 * 60_000, now)).toBe("5 分钟前");
     expect(formatRelativeTime(now - 3 * 3_600_000, now)).toBe("3 小时前");
     expect(formatRelativeTime(now - 2 * 86_400_000, now)).toBe("2 天前");
+  });
+
+  it("倒计时只说未来", () => {
+    const now = 1_700_000_000_000;
+    expect(formatCountdown(now + 30_000, now)).toBe("不到 1 分钟");
+    expect(formatCountdown(now + 5 * 60_000, now)).toBe("5 分钟后");
+    expect(formatCountdown(now + 3 * 3_600_000, now)).toBe("3 小时后");
+    expect(formatCountdown(now + 2 * 86_400_000, now)).toBe("2 天后");
+    expect(formatCountdown(now - 3_600_000, now)).toBe("已到点");
   });
 });

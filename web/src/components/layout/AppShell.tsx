@@ -1,6 +1,7 @@
 import {
   BookMarked,
   BookOpen,
+  CalendarClock,
   KeyRound,
   LayoutGrid,
   ListChecks,
@@ -28,6 +29,7 @@ const NAV_GROUPS = [
     items: [
       { to: "/overview", label: "总览", icon: LayoutGrid },
       { to: "/tasks", label: "任务", icon: ListChecks },
+      { to: "/schedules", label: "定时任务", icon: CalendarClock },
     ],
   },
   {
@@ -61,6 +63,11 @@ const PAGE_META: { path: string; title: string; description: string }[] = [
     path: "/tasks",
     title: "任务",
     description: "工作台里正在流转与已收口的任务",
+  },
+  {
+    path: "/schedules",
+    title: "定时任务",
+    description: "执行机上按计划自动触发的活：频率、下次执行与对应机器人",
   },
   {
     path: "/capabilities",

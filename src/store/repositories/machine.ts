@@ -1,4 +1,5 @@
 import type { DispatchHoldReason, IdentityStatus } from "../../shared/constants.js";
+import type { ScheduleReport } from "../../shared/aw-node-wire.js";
 import type { Db } from "../database.js";
 
 /** 心跳捎带的单项目派发状态(M3.12):被挡项目与挂起原因,空数组即全部放行 */
@@ -28,6 +29,8 @@ export interface MachineRecord {
   activeStreams: string[];
   /** 心跳捎带的派发状态(M3.12):被挡项目整包覆盖 */
   dispatchStatus: MachineDispatchStatusEntry[];
+  /** 执行机上报的定时任务快照:整包覆盖,只读观测(真相源在 cc-connect 侧) */
+  schedules: ScheduleReport[];
 }
 
 export type MachineConfigStatus = "pending" | "delivered" | "effective";
@@ -38,7 +41,8 @@ const MACHINE_COLUMNS = `
   status, created_at AS "createdAt",
   discovery_json AS "discoveryJson", discovery_received_at AS "discoveryReceivedAt",
   config_status AS "configStatus", bot_refresh_requested_at AS "botRefreshRequestedAt",
-  active_streams AS "activeStreams", dispatch_status AS "dispatchStatus"
+  active_streams AS "activeStreams", dispatch_status AS "dispatchStatus",
+  schedules AS "schedules"
 `;
 
 export interface NewMachine {
@@ -198,8 +202,26 @@ export async function saveMachineDiscovery(
   );
 }
 
-/** 配置下发状态机:pending(确认待下发)→ delivered(已拉取待 ACK)→ effective(ACK 已回执) */
-export async function updateMachineConfigStatus(
+/**
+ * 定时任务快照整包覆盖:采集端读本机 cc-connect 的计划后随发现上报。
+ * 未上报即空数组——机器侧的计划消失了,控制台不留旧账。
+ */
+export async function saveMachineSchedules(
+  db: Db,
+  id: string,
+  schedules: ScheduleReport[],
+): Promise<boolean> {
+  return (
+    (
+      await db.run(
+        "UPDATE machine SET schedules = ?::jsonb WHERE id = ?",
+        JSON.stringify(schedules), id,
+      )
+    ).changes === 1
+  );
+}
+
+/** 配置下发状态机:pending(确认待下发)→ delivered(已拉取待 ACK)→ effective(ACK 已回执) */export async function updateMachineConfigStatus(
   db: Db,
   id: string,
   status: MachineConfigStatus,

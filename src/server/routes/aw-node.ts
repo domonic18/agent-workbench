@@ -36,6 +36,27 @@ function textOf(value: unknown, field: string): string {
   return value.trim();
 }
 
+/**
+ * 定时任务快照(执行机本机 cc-connect 的计划)
+ *
+ * zod 对象默认剔除未声明字段,采集端多带什么也进不了库——
+ * prompt/exec/session_key 这些敏感内容在协议层就没有位置。
+ */
+const scheduleSchema = z.object({
+  id: z.string().min(1).max(128),
+  project: z.string().max(200),
+  kind: z.enum(["cron", "timer"]),
+  description: z.string().max(200),
+  cron_expr: z.string().max(120).nullable(),
+  scheduled_at: z.number().int().min(0).nullable(),
+  enabled: z.boolean(),
+  last_run: z.number().int().min(0).nullable(),
+  next_run: z.number().int().min(0).nullable(),
+  last_error: z.string().max(400).nullable(),
+  created_at: z.number().int().min(0).nullable(),
+  timezone: z.string().max(64),
+});
+
 const discoverySchema = z.object({
   // 允许空列表:执行机没装 cc-connect 时如实上报「扫描为空」,否则会每轮 422 死循环
   projects: z
@@ -50,6 +71,8 @@ const discoverySchema = z.object({
       }),
     )
     .max(200),
+  /** 本机定时任务快照;缺省即为空(整包覆盖) */
+  schedules: z.array(scheduleSchema).max(500).optional(),
 });
 
 const ackSchema = z.object({
