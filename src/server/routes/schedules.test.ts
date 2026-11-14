@@ -143,6 +143,41 @@ describe("定时任务只读路由", () => {
     expect(stored).not.toContain("0000.5");
   });
 
+  it("负数的「从未执行」占位值落库为 null", async () => {
+    const machine = await enroll();
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/aw-node/discovery",
+      headers: { authorization: `Bearer ${machine.machineId}.${machine.secret}`, "idempotency-key": "k4" },
+      payload: {
+        projects: [{ name: "cc-arch" }],
+        schedules: [
+          {
+            id: "cron:1",
+            project: "cc-arch",
+            kind: "cron",
+            description: "还没跑过",
+            cron_expr: "30 9 * * 1",
+            scheduled_at: null,
+            enabled: true,
+            last_run: -62135596800000,
+            next_run: 1794792600000,
+            last_error: null,
+            created_at: null,
+            timezone: "Asia/Shanghai",
+          },
+        ],
+      },
+    });
+    expect(response.statusCode).toBe(200);
+
+    const row = await db.get(
+      'SELECT schedules::text AS "schedulesText" FROM machine WHERE id = ?',
+      machine.machineId,
+    );
+    expect((row as { schedulesText: string }).schedulesText).toContain('"last_run": null');
+  });
+
   it("采集端多带的敏感字段被协议层剔除", async () => {
     const machine = await enroll();
     const response = await app.inject({

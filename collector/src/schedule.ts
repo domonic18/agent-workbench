@@ -50,12 +50,15 @@ function readJobs(path: string): Record<string, unknown>[] {
  * cc-connect 各版本写法不一:有的记 ISO 字符串,有的记 epoch 秒(带小数)。
  * 小于 1e11 的数值按秒解释(1e11 ms ≈ 1973 年),否则按毫秒;
  * 一律向下取整成整数毫秒——服务端协议要求整数字段,带小数会被整包拒收。
+ *
+ * 负数是「从未执行」的占位值(实测 -62135596800000),一律当没有。
  */
 const EPOCH_SECONDS_CUTOFF = 1e11;
 
-function normalizeEpoch(value: number): number {
+function normalizeEpoch(value: number): number | null {
   const ms = Math.abs(value) < EPOCH_SECONDS_CUTOFF ? value * 1000 : value;
-  return Math.floor(ms);
+  const floored = Math.floor(ms);
+  return floored < 0 ? null : floored;
 }
 
 /** ISO 字符串 / epoch 数字 → 整数毫秒;不可解析返回 null */
