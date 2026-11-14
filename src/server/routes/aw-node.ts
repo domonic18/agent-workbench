@@ -41,6 +41,10 @@ function textOf(value: unknown, field: string): string {
  *
  * zod 对象默认剔除未声明字段,采集端多带什么也进不了库——
  * prompt/exec/session_key 这些敏感内容在协议层就没有位置。
+ *
+ * 时刻字段只要求是有限数(不要求整数):带小数的 epoch 属采集端实现细节,
+ * 由域层归一化成整数毫秒。这里放宽是为了不让**一个字段不合规把整份发现报告打成 422**——
+ * 那会让这台机器的项目元数据一起丢。
  */
 const scheduleSchema = z.object({
   id: z.string().min(1).max(128),
@@ -48,12 +52,12 @@ const scheduleSchema = z.object({
   kind: z.enum(["cron", "timer"]),
   description: z.string().max(200),
   cron_expr: z.string().max(120).nullable(),
-  scheduled_at: z.number().int().min(0).nullable(),
+  scheduled_at: z.number().finite().nullable(),
   enabled: z.boolean(),
-  last_run: z.number().int().min(0).nullable(),
-  next_run: z.number().int().min(0).nullable(),
+  last_run: z.number().finite().nullable(),
+  next_run: z.number().finite().nullable(),
   last_error: z.string().max(400).nullable(),
-  created_at: z.number().int().min(0).nullable(),
+  created_at: z.number().finite().nullable(),
   timezone: z.string().max(64),
 });
 
@@ -148,6 +152,15 @@ export function registerAwNodeRoutes(app: FastifyInstance, options: AwNodeRoutes
       const machine = request.machine as MachineRecord;
       const parsed = discoverySchema.safeParse(request.body ?? {});
       if (!parsed.success) {
+        // 记字段路径(不记值):上报被拒时要知道是哪个字段不合规,否则只能靠猜
+        request.log.warn(
+          {
+            issues: parsed.error.issues
+              .slice(0, 5)
+              .map((issue) => `${issue.path.join(".")}: ${issue.message}`),
+          },
+          "发现上报校验失败",
+        );
         return invalidSchema(reply, parsed.error);
       }
       await saveDiscoveryReport(db, { machineId: machine.id, report: parsed.data, now });

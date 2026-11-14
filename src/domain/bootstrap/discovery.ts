@@ -1,6 +1,7 @@
 import type {
   DiscoveryProjectReport,
   DiscoveryReport,
+  ScheduleReport,
 } from "../../shared/aw-node-wire.js";
 import type { Db } from "../../store/database.js";
 import {
@@ -45,6 +46,19 @@ export function feishuBotsFromDiscovery(
   return result;
 }
 
+/** 时刻字段归一化成整数毫秒(协议层只保证是有限数,小数由域层收口) */
+function normalizeSchedules(schedules: ScheduleReport[]): ScheduleReport[] {
+  const floor = (value: number | null): number | null =>
+    value === null ? null : Math.floor(value);
+  return schedules.map((schedule) => ({
+    ...schedule,
+    last_run: floor(schedule.last_run),
+    next_run: floor(schedule.next_run),
+    scheduled_at: floor(schedule.scheduled_at),
+    created_at: floor(schedule.created_at),
+  }));
+}
+
 /** 上报整包覆盖:发现结果反映 aw-node 最新一次扫描,不做增量合并 */
 export async function saveDiscoveryReport(
   db: Db,
@@ -58,7 +72,7 @@ export async function saveDiscoveryReport(
   ) {
     throw new BootstrapError("NOT_FOUND", `机器 ${input.machineId} 未注册`);
   }
-  await saveMachineSchedules(db, input.machineId, input.report.schedules ?? []);
+  await saveMachineSchedules(db, input.machineId, normalizeSchedules(input.report.schedules ?? []));
   // 发现上报顺带回写 bot 展示名:手动刷新与 7 天缓存到期都经此落地到 agent 表
   for (const project of projects) {
     if (typeof project.feishu_bot_name !== "string" || project.feishu_bot_name === "") {

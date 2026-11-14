@@ -44,11 +44,33 @@ function readJobs(path: string): Record<string, unknown>[] {
   }
 }
 
-/** ISO 字符串或 epoch 毫秒 → epoch 毫秒;不可解析返回 null */
+/**
+ * epoch 值归一化
+ *
+ * cc-connect 各版本写法不一:有的记 ISO 字符串,有的记 epoch 秒(带小数)。
+ * 小于 1e11 的数值按秒解释(1e11 ms ≈ 1973 年),否则按毫秒;
+ * 一律向下取整成整数毫秒——服务端协议要求整数字段,带小数会被整包拒收。
+ */
+const EPOCH_SECONDS_CUTOFF = 1e11;
+
+function normalizeEpoch(value: number): number {
+  const ms = Math.abs(value) < EPOCH_SECONDS_CUTOFF ? value * 1000 : value;
+  return Math.floor(ms);
+}
+
+/** ISO 字符串 / epoch 数字 → 整数毫秒;不可解析返回 null */
 function toEpoch(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return normalizeEpoch(value);
+  }
   if (typeof value !== "string") return null;
-  const parsed = Date.parse(value);
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+  if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
+    const numeric = Number(trimmed);
+    if (Number.isFinite(numeric)) return normalizeEpoch(numeric);
+  }
+  const parsed = Date.parse(trimmed);
   return Number.isNaN(parsed) ? null : parsed;
 }
 

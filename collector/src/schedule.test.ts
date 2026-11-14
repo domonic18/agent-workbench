@@ -176,6 +176,25 @@ describe("定时任务快照采集", () => {
     expect(rows[0]?.next_run).toBe(Date.parse("2026-11-14T12:30:00+08:00"));
   });
 
+  it("epoch 秒与带小数的时刻都归一成整数毫秒", () => {
+    const dir = newDir();
+    writeJobs(dir, "crons", [
+      {
+        id: "sec",
+        project: "invest",
+        cron_expr: "0 9 * * *",
+        description: "秒制",
+        last_run: 1794567628.969292,
+        created_at: 1793330010,
+      },
+    ]);
+
+    const rows = collectSchedules({ ccConnectDir: dir, now, timezone: "Asia/Shanghai" });
+
+    expect(rows[0]?.last_run).toBe(1794567628969);
+    expect(rows[0]?.created_at).toBe(1793330010000);
+  });
+
   it("文件缺失或损坏返回空,不抛错", () => {
     const dir = newDir();
     expect(collectSchedules({ ccConnectDir: dir, now, timezone: "Asia/Shanghai" })).toEqual([]);
