@@ -23,6 +23,17 @@ function isStale(machine: { status: string; lastSeenAt: number | null }, now: nu
 }
 
 /**
+ * 负数是 cc-connect「从未执行」的占位值,一律当没有
+ *
+ * 读取侧也收一道:库里可能存着旧采集端报上来的负值,
+ * 不挡住它就会在界面上显示成公元 1 年的日期。
+ */
+function moment(value: number | null): number | null {
+  if (value === null) return null;
+  return value < 0 ? null : value;
+}
+
+/**
  * 列出全部机器上的定时任务。
  *
  * Agent 归属按 **(机器, 项目)** 关联:名册里同一 project 可能有多台机器各注册一个
@@ -44,9 +55,9 @@ export async function listScheduleRows(db: Db, now: number): Promise<ScheduleRow
         kind: schedule.kind,
         description: schedule.description,
         cronExpr: schedule.cron_expr,
-        scheduledAt: schedule.scheduled_at,
-        nextRunAt: schedule.next_run,
-        lastRunAt: schedule.last_run,
+        scheduledAt: moment(schedule.scheduled_at),
+        nextRunAt: moment(schedule.next_run),
+        lastRunAt: moment(schedule.last_run),
         lastError: schedule.last_error,
         enabled: schedule.enabled,
         timezone: schedule.timezone,
