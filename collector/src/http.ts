@@ -59,7 +59,35 @@ function describeError(body: unknown): string {
     return "";
   }
   const message = (error as Record<string, unknown>).message;
-  return typeof message === "string" ? `: ${message}` : "";
+  const detail = describeDetail((error as Record<string, unknown>).detail);
+  if (typeof message !== "string") {
+    return detail === "" ? "" : `: ${detail}`;
+  }
+  return detail === "" ? `: ${message}` : `: ${message}（${detail}）`;
+}
+
+/**
+ * 校验失败明细转成一行短文案
+ *
+ * 控制台 422 的 detail 是字段路径与说明(不含取值)。带上它,
+ * 执行机日志就能直接说清「哪个字段不合规」,不用靠猜。
+ */
+function describeDetail(detail: unknown): string {
+  if (!Array.isArray(detail)) {
+    return "";
+  }
+  return detail
+    .slice(0, 3)
+    .map((item) => {
+      if (typeof item !== "object" || item === null) return "";
+      const path = (item as Record<string, unknown>).path;
+      const message = (item as Record<string, unknown>).message;
+      const at = typeof path === "string" && path !== "" ? path : "(根)";
+      const why = typeof message === "string" ? message : "";
+      return `${at}${why === "" ? "" : `: ${why}`}`;
+    })
+    .filter((text) => text !== "")
+    .join("; ");
 }
 
 export interface ConsoleClientOptions {

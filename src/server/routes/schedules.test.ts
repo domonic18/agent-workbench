@@ -103,6 +103,46 @@ describe("定时任务只读路由", () => {
     });
   });
 
+  it("时刻带小数也不打回整份报告,域层归一成整数毫秒", async () => {
+    const machine = await enroll();
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/aw-node/discovery",
+      headers: { authorization: `Bearer ${machine.machineId}.${machine.secret}`, "idempotency-key": "k3" },
+      payload: {
+        projects: [{ name: "invest" }],
+        schedules: [
+          {
+            id: "cron:1",
+            project: "invest",
+            kind: "cron",
+            description: "带小数的时刻",
+            cron_expr: "0 9 * * *",
+            scheduled_at: null,
+            enabled: true,
+            last_run: 1794567628.969292,
+            next_run: 1794639600000.5,
+            last_error: null,
+            created_at: null,
+            timezone: "Asia/Shanghai",
+          },
+        ],
+      },
+    });
+    expect(response.statusCode).toBe(200);
+
+    const row = await db.get(
+      'SELECT schedules::text AS "schedulesText" FROM machine WHERE id = ?',
+      machine.machineId,
+    );
+    // 服务端只负责「必须是整数」:秒/毫秒的单位换算是采集端的活
+    const stored = (row as { schedulesText: string }).schedulesText;
+    expect(stored).toContain("1794567628");
+    expect(stored).toContain("1794639600000");
+    expect(stored).not.toContain(".969292");
+    expect(stored).not.toContain("0000.5");
+  });
+
   it("采集端多带的敏感字段被协议层剔除", async () => {
     const machine = await enroll();
     const response = await app.inject({
