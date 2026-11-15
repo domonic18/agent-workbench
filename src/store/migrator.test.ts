@@ -83,6 +83,7 @@ describe("runMigrations", () => {
       { version: 18, name: "machine_active_streams" },
       { version: 19, name: "machine_dispatch_status" },
       { version: 20, name: "machine_schedules" },
+      { version: 21, name: "agent_group" },
     ]);
     await db.close();
   });

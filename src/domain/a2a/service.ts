@@ -16,6 +16,7 @@ import {
   type A2aThreadRecord,
 } from "../../store/repositories/a2a.js";
 import { findAgentById, type AgentRecord } from "../../store/repositories/agent.js";
+import { canReachAgent, reachableAgentIds } from "../delegation/targets.js";
 import {
   claimPullByMsgId,
   findOutboxByKey,
@@ -157,10 +158,11 @@ export function createA2aService(deps: A2aServiceDeps): A2aService {
       throw new A2aError("NOT_FOUND", `目标 Agent ${input.to} 不存在或已停用`);
     }
     const allowedTargets = parseJsonStringArray(sender.allowedTargetsJson);
-    if (!allowedTargets.includes(input.to)) {
+    // 白名单里可以写 Agent id,也可以写组 id(组内成员全部可达)
+    if (!(await canReachAgent(db, allowedTargets, input.to))) {
       // 拒绝时回带可达目标,tool 层据此告诉模型该找谁
       throw new A2aError("FORBIDDEN", `目标 Agent ${input.to} 不在委派白名单内`, {
-        allowedTargets,
+        allowedTargets: await reachableAgentIds(db, allowedTargets),
       });
     }
 

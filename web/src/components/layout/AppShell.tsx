@@ -7,6 +7,7 @@ import {
   ListChecks,
   LogOut,
   Plug,
+  Share2,
   ShieldCheck,
 } from "lucide-react";
 import { Suspense, useState } from "react";
@@ -36,6 +37,7 @@ const NAV_GROUPS = [
     label: "治理",
     items: [
       { to: "/capabilities", label: "授权", icon: ShieldCheck },
+      { to: "/delegation", label: "委派", icon: Share2 },
       { to: "/knowledge", label: "知识", icon: BookOpen },
     ],
   },
@@ -47,6 +49,9 @@ const NAV_GROUPS = [
     ],
   },
 ] as const;
+
+/** 内容区放开窄栏上限的屏:图版面需要整块横向空间 */
+const WIDE_ROUTES = ["/delegation"];
 
 const PAGE_META: { path: string; title: string; description: string }[] = [
   {
@@ -68,6 +73,11 @@ const PAGE_META: { path: string; title: string; description: string }[] = [
     path: "/schedules",
     title: "定时任务",
     description: "执行机上按计划自动触发的活：频率、下次执行与对应机器人",
+  },
+  {
+    path: "/delegation",
+    title: "委派关系",
+    description: "谁能找谁：Agent 之间的委派规则与委派目标组",
   },
   {
     path: "/capabilities",
@@ -250,7 +260,8 @@ function Shell() {
           </div>
         </header>
 
-        <main className={styles.main}>
+        {/* 委派屏是图版面,内容区按窄栏排会把画布压扁——这一屏放开宽度 */}
+        <main className={WIDE_ROUTES.some((path) => location.pathname.startsWith(path)) ? `${styles.main} ${styles.mainWide}` : styles.main}>
           <Suspense
             fallback={
               <p className={styles.pageLoading} role="status">

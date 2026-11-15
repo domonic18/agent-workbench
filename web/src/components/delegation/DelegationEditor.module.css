@@ -1,107 +1,11 @@
-/* 画布:固定像素 1:1 叠加命中按钮,横向滚动交给外层 */
-.wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
+/* 选中发起方后的编辑面板 */
 
-.canvasWrap {
-  overflow-x: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-}
-
-.canvas {
-  position: relative;
-}
-
-.svg {
-  display: block;
-}
-
-.nodeRect {
-  fill: var(--surface);
-  stroke: var(--border-strong);
-  stroke-width: 1;
-}
-
-.nodeRectActive {
-  fill: var(--accent-soft);
-  stroke: var(--accent);
-  stroke-width: 2;
-}
-
-.nodeAvatar {
-  fill: var(--avatar-bg);
-  stroke: var(--avatar-text);
-  stroke-width: 1;
-}
-
-.nodeInitial {
-  fill: var(--avatar-text);
-  font-size: var(--font-xs);
-  font-weight: 700;
-}
-
-.nodeName {
-  fill: var(--text);
-  font-size: var(--font-sm);
-}
-
-.countRect {
-  fill: var(--accent-soft);
-}
-
-.countText {
-  fill: var(--accent);
-  font-size: var(--font-2xs);
-}
-
-.edge {
-  fill: none;
-  stroke: var(--accent);
-  stroke-opacity: 0.55;
-  stroke-width: 1.5;
-}
-
-.edgeActive {
-  fill: none;
-  stroke: var(--accent);
-  stroke-width: 2;
-}
-
-.arrowHead {
-  fill: var(--accent);
-}
-
-/* 命中区:透明覆盖节点,键盘可达,hover/选中给轻量着色 */
-.hit {
-  position: absolute;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  background: transparent;
-  cursor: pointer;
-}
-
-.hit:hover {
-  background: var(--accent-soft);
-  border-color: var(--accent-border);
-}
-
-.hit:focus-visible {
-  outline: var(--focus-ring);
-  outline-offset: -2px;
-}
-
-.pickHint {
+.hint {
   margin: 0;
   font-size: var(--font-sm);
   color: var(--muted);
 }
 
-/* 节点编辑面板:图视图的编辑面,保存语义与表视图一致 */
 .editor {
   display: flex;
   flex-direction: column;
@@ -136,6 +40,19 @@
   gap: var(--space-1);
   padding: var(--space-1) var(--space-2);
   border: 1px solid var(--accent-border);
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  color: var(--text);
+  font-size: var(--font-sm);
+}
+
+/* 组收件方:与单个 Agent 区分开,一眼看得出授权粒度 */
+.chipGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border: 1px dashed var(--accent-border);
   border-radius: var(--radius-full);
   background: var(--accent-soft);
   color: var(--text);

@@ -15,6 +15,7 @@ function messageOf(error: unknown, fallback: string): string {
   return error instanceof ApiError ? error.message : fallback;
 }
 
+/** 发起方 → 目标引用 id 列表(Agent id 或组 id) */
 export type DelegationSelection = Record<string, string[]>;
 
 export interface DelegationDraft {
@@ -31,7 +32,8 @@ export interface DelegationDraft {
   pending: boolean;
   /** 保存失败信息;null 表示无 */
   error: string | null;
-  toggle: (initiator: AgentSummary, recipient: AgentSummary) => void;
+  /** 切换一条委派目标(Agent id 或组 id) */
+  toggle: (initiator: AgentSummary, targetId: string) => void;
   save: () => Promise<void>;
 }
 
@@ -57,11 +59,11 @@ export function useDelegationDraft(): DelegationDraft {
   const selection = draft ?? saved;
   const dirty = agents.filter((agent) => !sameSet(selection[agent.id] ?? [], saved[agent.id] ?? []));
 
-  function toggle(initiator: AgentSummary, recipient: AgentSummary): void {
+  function toggle(initiator: AgentSummary, targetId: string): void {
     const current = selection[initiator.id] ?? [];
-    const next = current.includes(recipient.id)
-      ? current.filter((id) => id !== recipient.id)
-      : [...current, recipient.id];
+    const next = current.includes(targetId)
+      ? current.filter((id) => id !== targetId)
+      : [...current, targetId];
     setDraft({ ...selection, [initiator.id]: next });
     setError(null);
   }

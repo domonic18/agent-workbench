@@ -10,7 +10,6 @@ import {
 import { ApiError } from "../api/client.js";
 import { fetchAgents } from "../api/identity.js";
 import { CapabilityCard } from "../components/capability/CapabilityCard.js";
-import { DelegationMatrix } from "../components/capability/DelegationMatrix.js";
 import { AsyncSection } from "../components/ui/AsyncSection.js";
 import { EmptyState } from "../components/ui/EmptyState.js";
 import { Tabs } from "../components/ui/Tabs.js";
@@ -122,7 +121,6 @@ export function CapabilitiesPage() {
         }))}
       />
 
-      <DelegationMatrix />
     </div>
   );
 }
