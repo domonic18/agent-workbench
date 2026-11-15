@@ -21,6 +21,7 @@ import {
   type AgentListQuery,
   type AgentRecord,
 } from "../../store/repositories/agent.js";
+import { listGroupsByIds } from "../../store/repositories/agent-group.js";
 import { voidPendingAgentEnrollTokens } from "../../store/repositories/one-time-token.js";
 import { hashSecret, newSecret } from "../security/secrets.js";
 import { IdentityError } from "./errors.js";
@@ -279,8 +280,14 @@ export function createIdentityService(deps: IdentityServiceDeps): IdentityServic
     if (normalized.includes(id)) {
       throw new IdentityError("VALIDATION_FAILED", "不能委派给自身");
     }
+    // 收件方可以是 Agent,也可以是委派目标组(组内成员全部可达)
+    const groups = await listGroupsByIds(db, normalized);
+    const groupIds = new Set(groups.map((group) => group.id));
     const unknown: string[] = [];
     for (const target of normalized) {
+      if (groupIds.has(target)) {
+        continue;
+      }
       if ((await findAgentById(db, target)) === undefined) {
         unknown.push(target);
       }

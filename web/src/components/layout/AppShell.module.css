@@ -198,6 +198,11 @@
   padding: var(--space-5) var(--space-6);
 }
 
+/* 委派屏:画布要整块横向空间,内容区不按窄栏限宽 */
+.mainWide {
+  max-width: none;
+}
+
 .pageLoading {
   color: var(--muted);
   font-size: var(--font-md);

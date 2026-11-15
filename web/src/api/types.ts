@@ -95,3 +95,17 @@ export interface ScheduleRow {
   /** 最后采集时刻(epoch ms) */
   collectedAt: number | null;
 }
+
+/**
+ * 委派目标组:一组 Agent 作为一个委派收件方
+ *
+ * 与服务端 `src/domain/group/service.ts` 的 AgentGroupView 一一对应。
+ */
+export interface AgentGroupSummary {
+  id: string;
+  name: string;
+  /** 成员 Agent id */
+  memberIds: string[];
+  createdAt: number;
+  updatedAt: number;
+}

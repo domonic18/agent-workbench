@@ -1,0 +1,114 @@
+/* 委派屏:画布占主区,编辑与组管理在右侧 */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.heading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-lg);
+  font-weight: 700;
+  color: var(--text);
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+
+.headerActions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.viewToggle {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.search {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--font-sm);
+  min-width: 180px;
+}
+
+.body {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+/* 画布区:固定一块高度,缩放平移在画布内完成 */
+.canvasArea {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-2);
+  /* 画布要一块确定的高度:缩放平移在画布内完成,页面不被它撑长 */
+  height: clamp(460px, 72vh, 900px);
+}
+
+.side {
+  display: flex;
+  flex: 0 0 320px;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.dirtyNote {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--warning);
+}
+
+.error {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--danger);
+}
+
+@media (max-width: 1023px) {
+  .body {
+    flex-direction: column;
+  }
+
+  .side {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+}
+
+@media (max-width: 767px) {
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .headerActions {
+    flex-wrap: wrap;
+  }
+}

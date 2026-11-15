@@ -193,6 +193,35 @@ describe("a2a send", () => {
     await db.close();
   });
 
+  it("白名单里的组:组内成员可发,组外仍拒", async () => {
+    const { db, service } = await prepare();
+    await db.run(
+      "INSERT INTO agent_group (id, name, created_at, updated_at) VALUES ('grp_1', 'CC 组', 0, 0)",
+    );
+    await db.run(
+      "INSERT INTO agent_group_member (group_id, agent_id) VALUES ('grp_1', 'agt_c')",
+    );
+    await db.run(
+      "UPDATE agent SET allowed_targets_json = ? WHERE id = 'agt_a'",
+      JSON.stringify(["grp_1"]),
+    );
+
+    // 组内成员:可达
+    const sent = await service.send(sendInput({ to: "agt_c" }));
+    expect(sent.msgId).toMatch(/^msg_/);
+
+    // 组外:仍拒,且回带的可达目标已展开成具体的人
+    try {
+      await service.send(sendInput({ idempotencyKey: "idem-group", to: "agt_b" }));
+      throw new Error("预期被白名单拒绝");
+    } catch (error) {
+      expect(error).toBeInstanceOf(A2aError);
+      expect((error as A2aError).code).toBe("FORBIDDEN");
+      expect((error as A2aError).detail).toEqual({ allowedTargets: ["agt_c"] });
+    }
+    await db.close();
+  });
+
   it("目标不在白名单、未注册、任务不属于自己都拒绝", async () => {
     const { service, db } = await prepare();
     await expectCode(
