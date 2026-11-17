@@ -13,9 +13,8 @@ export function ensureStream(
   config: CollectorConfig,
   now: () => number,
 ): StreamState {
-  const existing = state.streams[file.sessionId];
+  const existing = state.streams[file.path];
   if (existing !== undefined) {
-    existing.path = file.path;
     return existing;
   }
   let inode = 0;
@@ -40,8 +39,23 @@ export function ensureStream(
     lastError: null,
     updatedAt: now(),
   };
-  state.streams[file.sessionId] = created;
+  state.streams[file.path] = created;
   return created;
+}
+
+/**
+ * 清掉文件已消失的状态条目(项目目录被删、会话文件被清理)。
+ * 返回清理条数;留下的条目都会在下一轮扫描被 ensureStream 复用。
+ */
+export function pruneStreams(state: PersistedState, livePaths: ReadonlySet<string>): number {
+  let removed = 0;
+  for (const key of Object.keys(state.streams)) {
+    if (!livePaths.has(key)) {
+      delete state.streams[key];
+      removed += 1;
+    }
+  }
+  return removed;
 }
 
 export function appendEvents(

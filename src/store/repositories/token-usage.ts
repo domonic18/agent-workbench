@@ -75,12 +75,13 @@ export async function listTokenUsageByRun(db: Db, runId: string): Promise<TokenU
   )) as TokenUsageRecord[];
 }
 
-/** 四维之和:总 token 不单独落列,读时按口径计算(02 §3.6) */
+/** 四维之和:总 token 不单独落列,读时按口径计算(02 §3.6)。
+ *  口径走 token_usage_all 冷热视图:明细过期聚合后,任务的长期总量仍准确 */
 export async function sumTaskTokens(db: Db, taskId: string): Promise<number> {
   const row = (await db.get(
     `SELECT COALESCE(SUM(
        input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens
-     ), 0) AS total FROM token_usage WHERE task_id = ?`,
+     ), 0) AS total FROM token_usage_all WHERE task_id = ?`,
     taskId,
   )) as { total: number };
   return row.total;
@@ -91,13 +92,13 @@ export interface TaskTokenSummary {
   entries: number;
 }
 
-/** 任务详情的用量汇总:四维之和与明细条数,与 token_usage 可对账 */
+/** 任务详情的用量汇总:四维之和与明细条数,与 token_usage_all 可对账 */
 export async function summarizeTaskTokens(db: Db, taskId: string): Promise<TaskTokenSummary> {
   return (await db.get(
     `SELECT COALESCE(SUM(
        input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens
-     ), 0) AS total, COUNT(*) AS entries
-       FROM token_usage WHERE task_id = ?`,
+     ), 0) AS total, COALESCE(SUM(entries), 0) AS entries
+       FROM token_usage_all WHERE task_id = ?`,
     taskId,
   )) as TaskTokenSummary;
 }
@@ -111,7 +112,7 @@ export async function sumAgentTokensSince(
   const row = (await db.get(
     `SELECT COALESCE(SUM(
        input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens
-     ), 0) AS total FROM token_usage WHERE agent_id = ? AND occurred_at >= ?`,
+     ), 0) AS total FROM token_usage_all WHERE agent_id = ? AND occurred_at >= ?`,
     agentId,
     since,
   )) as { total: number };
@@ -122,4 +123,55 @@ export async function setTaskTotalTokens(db: Db, taskId: string, total: number):
   return (
     (await db.run("UPDATE task SET total_tokens = ? WHERE id = ?", total, taskId)).changes === 1
   );
+}
+
+export interface TokenUsageRollupResult {
+  /** 聚合进 token_usage_daily 的明细行数 */
+  aggregated: number;
+}
+
+/**
+ * 用量明细滚动聚合(02 §3.6):cutoff(取整天零点)之前的明细按
+ * (agent, task, source, provider, model, 天) 加总进 token_usage_daily 后删除。
+ * 聚合与删除同一事务:中断要么都不发生,要么都完成,不会重复计数。
+ * 幂等性由「删过的行不再参与聚合」保证。
+ */
+export async function rollupTokenUsageBefore(
+  db: Db,
+  cutoff: number,
+  now: number,
+): Promise<TokenUsageRollupResult> {
+  return db.transaction(async (tx): Promise<TokenUsageRollupResult> => {
+    await tx.run(
+      `INSERT INTO token_usage_daily
+         (agent_id, task_id, source, provider, model, day,
+          input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, entries, updated_at)
+       SELECT agent_id, COALESCE(task_id, ''), source, provider, model,
+              to_char(to_timestamp(occurred_at / 1000) AT TIME ZONE 'UTC', 'YYYY-MM-DD'),
+              SUM(input_tokens), SUM(output_tokens), SUM(cache_read_tokens),
+              SUM(cache_creation_tokens), COUNT(*), ?
+         FROM token_usage
+        WHERE occurred_at < ?
+        GROUP BY 1, 2, 3, 4, 5, 6
+       ON CONFLICT (agent_id, task_id, source, provider, model, day) DO UPDATE SET
+          input_tokens = token_usage_daily.input_tokens + EXCLUDED.input_tokens,
+          output_tokens = token_usage_daily.output_tokens + EXCLUDED.output_tokens,
+          cache_read_tokens = token_usage_daily.cache_read_tokens + EXCLUDED.cache_read_tokens,
+          cache_creation_tokens = token_usage_daily.cache_creation_tokens + EXCLUDED.cache_creation_tokens,
+          entries = token_usage_daily.entries + EXCLUDED.entries,
+          updated_at = EXCLUDED.updated_at`,
+      now,
+      cutoff,
+    );
+    const deleted = (await tx.run("DELETE FROM token_usage WHERE occurred_at < ?", cutoff)).changes;
+    return { aggregated: deleted };
+  });
+}
+
+/** timeline_event 按入库时刻滚动删除;返回删除行数 */
+export async function deleteTimelineEventsIngestedBefore(
+  db: Db,
+  cutoff: number,
+): Promise<number> {
+  return (await db.run("DELETE FROM timeline_event WHERE ingested_at < ?", cutoff)).changes;
 }

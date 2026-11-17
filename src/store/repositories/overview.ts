@@ -29,7 +29,7 @@ export async function getOverviewMetrics(db: Db, window: OverviewWindow): Promis
        (SELECT COUNT(*) FROM task WHERE status = 'running') AS "runningTasks",
        (SELECT COALESCE(SUM(
                  input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens), 0)
-          FROM token_usage WHERE occurred_at >= ?) AS "todayTokens",
+          FROM token_usage_all WHERE occurred_at >= ?) AS "todayTokens",
        (SELECT COUNT(*) FROM capability WHERE status = 'pending') AS "pendingApprovals",
        (SELECT COUNT(*) FROM machine
          WHERE status = 'active' AND last_seen_at IS NOT NULL
@@ -140,7 +140,7 @@ export async function listAgentOverviewRows(
        SELECT agent_id,
               SUM(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens)
                 AS "totalTokens"
-         FROM token_usage
+         FROM token_usage_all
         WHERE occurred_at >= ?
         GROUP BY agent_id
      ) tok ON tok.agent_id = a.id

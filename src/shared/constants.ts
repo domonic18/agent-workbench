@@ -407,6 +407,17 @@ export const INGEST = {
   receiptSweepIntervalMs: 60 * 60 * 1000,
 } as const;
 
+/**
+ * 遥测保留(2026-11-17 裁决):展示类事件 30 天滚动删除;token 用量明细
+ * 30 天后聚合进 token_usage_daily 再删,长期口径从聚合读。
+ * 窗口按「入库时间」算,不按事件发生时刻——否则旧事件迟到入库会逃出窗口。
+ */
+export const TELEMETRY = {
+  timelineRetentionMs: 30 * 24 * 60 * 60 * 1000,
+  tokenUsageRawRetentionMs: 30 * 24 * 60 * 60 * 1000,
+  sweepIntervalMs: 60 * 60 * 1000,
+} as const;
+
 /** token 用量事件类型:采集器按此 kind 上报四维用量(02 §3.6) */
 export const INGEST_TOKEN_USAGE_KIND = "token_usage";
 

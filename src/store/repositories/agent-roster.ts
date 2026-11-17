@@ -74,7 +74,7 @@ export async function listAgentRosterRows(
        SELECT agent_id,
               SUM(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens)
                 AS "totalTokens"
-         FROM token_usage GROUP BY agent_id
+         FROM token_usage_all GROUP BY agent_id
      ) tok ON tok.agent_id = a.id
      LEFT JOIN (
        SELECT assignee, COUNT(*) AS "openTasks"

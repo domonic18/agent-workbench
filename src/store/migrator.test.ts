@@ -84,6 +84,7 @@ describe("runMigrations", () => {
       { version: 19, name: "machine_dispatch_status" },
       { version: 20, name: "machine_schedules" },
       { version: 21, name: "agent_group" },
+      { version: 22, name: "telemetry_retention" },
     ]);
     await db.close();
   });
