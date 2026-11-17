@@ -4,7 +4,7 @@ import {
   deleteTimelineEventsIngestedBefore,
   pruneOrphanRuns,
   rollupTokenUsageBefore,
-} from "../../store/repositories/token-usage.js";
+} from "../../store/repositories/telemetry-cleanup.js";
 import type { JobLogger } from "./reconcile.js";
 
 export interface TelemetryRetentionSweeper {
@@ -38,9 +38,9 @@ export function startTelemetryRetention(
     // 聚合按 UTC 整天对齐:冷热视图的水位是「聚合表最大日 + 1 天」,切在半天里会漏算
     const cutoff = Math.floor((at - tokenUsageRawRetentionMs) / 86_400_000) * 86_400_000;
     void rollupTokenUsageBefore(db, cutoff, at)
-      .then(({ aggregated }) => {
-        if (aggregated > 0) {
-          logger.info({ aggregated }, "token 用量明细聚合进日表");
+      .then(({ groups }) => {
+        if (groups > 0) {
+          logger.info({ groups }, "token 用量明细聚合进日表");
         }
       })
       .catch((error) => {

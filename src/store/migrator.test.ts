@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -189,6 +189,27 @@ describe("runMigrations", () => {
       { project: "agent-sims", name: "测试专家" },
       { project: "bug-triage", name: "bug-triage" },
     ]);
+    await db.close();
+  });
+
+  it("每条迁移在事务内设置锁等待与语句超时", async () => {
+    const db = await createTestDatabase(resolveTestAdminUrl());
+    const dir = mkdtempSync(join(tmpdir(), "aw-mig-timeout-"));
+    writeFileSync(
+      join(dir, "0001_probe_timeout.sql"),
+      `CREATE TABLE migration_timeout_probe (setting TEXT);
+       INSERT INTO migration_timeout_probe
+       VALUES (current_setting('lock_timeout') || '/' || current_setting('statement_timeout'));`,
+    );
+
+    const applied = await runMigrations(db, dir);
+
+    expect(applied).toBe(1);
+    const row = (await db.get(
+      "SELECT setting FROM migration_timeout_probe",
+    )) as { setting: string };
+    expect(row.setting).toBe("3s/5min");
+    rmSync(dir, { recursive: true, force: true });
     await db.close();
   });
 });

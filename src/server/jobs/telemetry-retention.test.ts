@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { openDatabase, type Db } from "../../store/database.js";
 import { insertTokenUsage, sumAgentTokensSince, summarizeTaskTokens } from "../../store/repositories/token-usage.js";
+import { rollupTokenUsageBefore, deleteTimelineEventsIngestedBefore } from "../../store/repositories/telemetry-cleanup.js";
 import { startTelemetryRetention } from "./telemetry-retention.js";
 
 const DAY = 86_400_000;
@@ -123,6 +124,52 @@ describe("startTelemetryRetention", () => {
     sweeper2.stop();
 
     expect(Number(await sumAgentTokensSince(db, "agt_x", 0))).toBe(100);
+    await db.close();
+  });
+
+  it("分批推进:批次小于全量也能清完,且不重复计数", async () => {
+    const db = await prepare();
+    // 5 笔旧明细,batchMax=2 → 3 轮(2+2+1),聚合值必须恰好等于原值
+    for (let i = 0; i < 5; i += 1) {
+      await insertUsage(db, { occurredAt: NOW - 3 * DAY, input: 10, taskId: null });
+    }
+
+    const { groups } = await rollupTokenUsageBefore(db, NOW - 2 * DAY, NOW, 2);
+
+    expect(groups).toBe(1); // 同一天同一维度 → 聚合出一行
+    const daily = Number(
+      (await db.get("SELECT COALESCE(SUM(entries), 0) AS n FROM token_usage_daily") as { n: number }).n,
+    );
+    const rawLeft = Number(
+      (await db.get("SELECT COUNT(*) AS n FROM token_usage") as { n: number }).n,
+    );
+    expect(daily).toBe(5);
+    expect(rawLeft).toBe(0);
+    expect(Number(await sumAgentTokensSince(db, "agt_x", 0))).toBe(50);
+    await db.close();
+  });
+
+  it("时间线删除分批推进:跨批次删干净", async () => {
+    const db = await prepare();
+    await db.run(
+      `UPDATE agent_run SET status = 'ended', ended_at = 1 WHERE id = 'run_1'`,
+    );
+    for (let i = 1; i <= 5; i += 1) {
+      await db.run(
+        `INSERT INTO timeline_event (id, run_id, kind, ord, occurred_at, ingested_at, payload_json)
+         VALUES (?, 'run_1', 'user_message', ?, 1, 1, '{}')`,
+        `tle_b${i}`,
+        i,
+      );
+    }
+
+    const deleted = await deleteTimelineEventsIngestedBefore(db, NOW, 2);
+
+    expect(deleted).toBe(5);
+    const left = Number(
+      (await db.get("SELECT COUNT(*) AS n FROM timeline_event") as { n: number }).n,
+    );
+    expect(left).toBe(0);
     await db.close();
   });
 
