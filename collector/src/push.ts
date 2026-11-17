@@ -1,6 +1,6 @@
 import type { ConsoleClient, OutgoingEvent } from "./http.js";
 import type { Logger } from "./log.js";
-import type { PersistedState } from "./state.js";
+import { streamsBySession, type PersistedState } from "./state.js";
 import type { Spool, SpoolEntry } from "./spool.js";
 
 export interface Backoff {
@@ -29,9 +29,11 @@ export function createPusher(deps: PushDeps): Pusher {
 
   function projectForStream(streamId: string): string | null {
     for (const entry of spool.pending(streamId)) {
-      const stream = state.streams[entry.session_id];
-      if (stream !== undefined) {
-        return stream.status === "ok" ? stream.project : null;
+      // 状态按物理路径键控,同一会话可能有多份副本:有一份归因成功即可推送
+      const matches = streamsBySession(state, entry.session_id);
+      if (matches.length > 0) {
+        const ok = matches.find((stream) => stream.status === "ok");
+        return ok?.project ?? null;
       }
       return entry.project;
     }
@@ -75,10 +77,11 @@ export function createPusher(deps: PushDeps): Pusher {
       spool.ack(streamId, response.acked_seq);
       backoff.delete(streamId);
       for (const entry of entries) {
-        const stream = state.streams[entry.session_id];
-        if (stream !== undefined && response.acked_seq >= entry.seq) {
-          stream.ackedSeq = Math.max(stream.ackedSeq, entry.seq);
-          stream.lastError = null;
+        for (const stream of streamsBySession(state, entry.session_id)) {
+          if (response.acked_seq >= entry.seq) {
+            stream.ackedSeq = Math.max(stream.ackedSeq, entry.seq);
+            stream.lastError = null;
+          }
         }
       }
       logger.debug("批次已确认", { streamId, acked: response.acked_seq, size: batch.length });
@@ -96,8 +99,7 @@ export function createPusher(deps: PushDeps): Pusher {
       backoff.set(streamId, { attempt, nextAt: now() + delay });
       const message = error instanceof Error ? error.message : String(error);
       for (const entry of entries) {
-        const stream = state.streams[entry.session_id];
-        if (stream !== undefined) {
+        for (const stream of streamsBySession(state, entry.session_id)) {
           stream.lastError = message;
         }
       }
