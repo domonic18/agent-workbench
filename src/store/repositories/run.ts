@@ -176,12 +176,13 @@ export interface TimelineEventRecord {
   kind: string;
   payloadJson: string;
   occurredAt: number;
+  ingestedAt: number;
 }
 
 const TIMELINE_COLUMNS = `
   id, run_id AS "runId", turn_id AS "turnId", block_id AS "blockId", ord,
   block_rev AS "blockRev", "offset" AS "offset", kind, payload_json AS "payloadJson",
-  occurred_at AS "occurredAt"
+  occurred_at AS "occurredAt", ingested_at AS "ingestedAt"
 `;
 
 export interface NewTimelineEvent {
@@ -195,15 +196,18 @@ export interface NewTimelineEvent {
   kind: string;
   payload: unknown;
   occurredAt: number;
+  /** 落库时刻;缺省取传入的 occurredAt */
+  ingestedAt?: number;
 }
 
 export async function insertTimelineEvent(db: Db, event: NewTimelineEvent): Promise<void> {
   await db.run(
     `INSERT INTO timeline_event
-       (id, run_id, turn_id, block_id, ord, block_rev, "offset", kind, payload_json, occurred_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, run_id, turn_id, block_id, ord, block_rev, "offset", kind, payload_json, occurred_at, ingested_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     event.id, event.runId, event.turnId, event.blockId, event.ord, event.blockRev,
     event.offset, event.kind, toJsonbText(event.payload), event.occurredAt,
+    event.ingestedAt ?? event.occurredAt,
   );
 }
 

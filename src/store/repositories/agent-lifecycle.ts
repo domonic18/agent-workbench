@@ -114,7 +114,7 @@ export async function countAgentDeleteImpact(db: Db, agentId: string): Promise<A
        (SELECT COUNT(*) FROM agent_run WHERE agent_id = $1) AS "agentRun",
        (SELECT COUNT(*) FROM timeline_event
          WHERE run_id IN (SELECT id FROM agent_run WHERE agent_id = $1)) AS "timelineEvent",
-       (SELECT COUNT(*) FROM token_usage WHERE agent_id = $1) AS "tokenUsage",
+       (SELECT COALESCE(SUM(entries), 0) FROM token_usage_all WHERE agent_id = $1) AS "tokenUsage",
        (SELECT COUNT(*) FROM usage_limit WHERE agent_id = $1) AS "usageLimit",
        (SELECT COUNT(*) FROM work_trigger WHERE target_agent_id = $1) AS "workTrigger",
        (SELECT COUNT(*) FROM knowledge_entry WHERE source_agent_id = $1) AS "knowledgeEntry",
@@ -234,6 +234,7 @@ export async function deleteAgentCascade(
     agentId,
   );
   await db.run("DELETE FROM token_usage WHERE agent_id = ?", agentId);
+  await db.run("DELETE FROM token_usage_daily WHERE agent_id = ?", agentId);
   await db.run("DELETE FROM agent_run WHERE agent_id = ?", agentId);
   await db.run("DELETE FROM usage_limit WHERE agent_id = ?", agentId);
   // 墓碑留名:纯文本列(task.assignee / tool_call_log.agent_id)靠它显示「已删除 Agent X」

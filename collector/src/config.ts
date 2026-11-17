@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-export const COLLECTOR_VERSION = "0.5.1";
+export const COLLECTOR_VERSION = "0.6.0";
 
 export type BackfillMode = "none" | "all";
 

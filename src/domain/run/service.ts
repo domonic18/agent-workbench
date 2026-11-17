@@ -160,6 +160,8 @@ export function createRunService(deps: RunServiceDeps): RunService {
         kind,
         payload: input.payload,
         occurredAt,
+        // 保留窗口按入库时刻算,不用事件发生时刻(迟到事件会被 occurred_at 逃逸)
+        ingestedAt: now(),
       });
       return { runId: run.id, eventId, startedRun, staleRev: false };
     });

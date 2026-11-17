@@ -129,7 +129,7 @@ async function enrollCommand(argv: string[]): Promise<number> {
 
 function status(argv: string[]): number {
   const config = loadConfig({ requireAuth: false, env: diagnosticsEnv() });
-  const state = loadState(config.stateDir);
+  const { state } = loadState(config.stateDir);
   const streams = sortedStreams(state);
   const counts = { ok: 0, unregistered: 0, ambiguous: 0, unattributed: 0 };
   for (const stream of streams) {

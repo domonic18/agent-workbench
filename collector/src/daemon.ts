@@ -24,7 +24,7 @@ import { scanCwdByProject } from "./discovery.js";
 import { createLogger, type Logger } from "./log.js";
 import { acquireLock, type SingleInstanceLock } from "./lock.js";
 import { createPusher, type Pusher } from "./push.js";
-import { appendEvents, ensureStream } from "./scan.js";
+import { appendEvents, ensureStream, pruneStreams } from "./scan.js";
 import { classifyStream, listSessionFiles } from "./sessions.js";
 import { Spool } from "./spool.js";
 import {
@@ -66,7 +66,8 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
 
   ensureStateDirs(config.stateDir);
   const spool = new Spool(join(config.stateDir, "spool"), config.spoolMaxBytes);
-  const state: PersistedState = loadState(config.stateDir);
+  const loaded = loadState(config.stateDir);
+  const state: PersistedState = loaded.state;
   const registered = new Set(config.registeredProjects);
   const startedAt = now();
   const pusher: Pusher = createPusher({
@@ -168,6 +169,10 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
   let dispatchTimer: ReturnType<typeof setInterval> | null = null;
   let stopping: (() => void) | null = null;
 
+  if (loaded.migrated) {
+    logger.warn("采集器状态格式升级:断点按物理文件重建,清空旧格式的待推送队列", {});
+    spool.clear();
+  }
   spool.load();
 
   function refreshIndex(): void {
@@ -181,7 +186,8 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
 
   async function scanOnce(): Promise<void> {
     refreshIndex();
-    for (const file of listSessionFiles(config.claudeDir)) {
+    const files = listSessionFiles(config.claudeDir);
+    for (const file of files) {
       const stream = ensureStream(file, state, config, now);
       const classified = classifyStream(index, file.sessionId, registered);
       if (classified.status !== stream.status || classified.project !== stream.project) {
@@ -223,6 +229,11 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
       }
       stream.offset = result.offset;
       stream.updatedAt = now();
+    }
+
+    const pruned = pruneStreams(state, new Set(files.map((file) => file.path)));
+    if (pruned > 0) {
+      logger.info("清理已消失会话文件的状态条目", { pruned });
     }
 
     const dropped = spool.enforceLimit();
