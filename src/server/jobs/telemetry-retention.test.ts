@@ -126,19 +126,13 @@ describe("startTelemetryRetention", () => {
     await db.close();
   });
 
-  it("时间线按入库时刻删除:窗口外的删、窗口内的留", async () => {
+  it("孤立 run 随时间线清理一起删除", async () => {
     const db = await prepare();
+    // run_1 已 running(未结束) = 不应删
+    // 再建一个已结束、无事件、无用量的孤立 run
     await db.run(
-      `UPDATE agent_run SET status = 'ended', ended_at = 1 WHERE id = 'run_1'`,
-    );
-    await db.run(
-      `INSERT INTO timeline_event (id, run_id, kind, ord, occurred_at, ingested_at, payload_json)
-       VALUES ('tle_old', 'run_1', 'user_message', 1, 1, 1, '{}')`,
-    );
-    await db.run(
-      `INSERT INTO timeline_event (id, run_id, kind, ord, occurred_at, ingested_at, payload_json)
-       VALUES ('tle_new', 'run_1', 'user_message', 2, 1, ?, '{}')`,
-      NOW - 1,
+      `INSERT INTO agent_run (id, agent_id, machine, project, stream_id, started_at, last_seen_at, ended_at, status)
+       VALUES ('run_old', 'agt_x', 'm1', 'p', 'claude-session:s', 1, 1, 1, 'ended')`,
     );
 
     const sweeper = startTelemetryRetention(db, logger(), {
@@ -150,10 +144,10 @@ describe("startTelemetryRetention", () => {
     await new Promise((resolve) => setTimeout(resolve, 30));
     sweeper.stop();
 
-    const left = (await db.all("SELECT id FROM timeline_event ORDER BY id") as { id: string }[]).map(
+    const left = (await db.all("SELECT id FROM agent_run ORDER BY id") as { id: string }[]).map(
       (row) => row.id,
     );
-    expect(left).toEqual(["tle_new"]);
+    expect(left).toEqual(["run_1"]);
     await db.close();
   });
 });

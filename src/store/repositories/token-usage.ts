@@ -175,3 +175,35 @@ export async function deleteTimelineEventsIngestedBefore(
 ): Promise<number> {
   return (await db.run("DELETE FROM timeline_event WHERE ingested_at < ?", cutoff)).changes;
 }
+
+export interface PruneOrphanRunsResult {
+  deleted: number;
+}
+
+/**
+ * 清理已无遥测子表的孤立 agent_run。
+ *
+ * run 存在的意义是承载 timeline_event / token_usage;当它的所有事件与用量
+ * 都已被保留策略删除后,run 行本身也成了死元数据,应及时删除。
+ * 只删同时满足下列条件的 run,避免误伤有在跑事件或被查看的 run:
+ *  - 已结束(ended_at not null);
+ *  - 没有 timeline_event 子行;
+ *  - 没有 token_usage 子行;
+ *  - ended_at 早于 cutoff(与遥测窗口对齐,迟到回填不再打开它的可能性极低)。
+ */
+export async function pruneOrphanRuns(
+  db: Db,
+  cutoff: number,
+): Promise<PruneOrphanRunsResult> {
+  const deleted = (
+    await db.run(
+      `DELETE FROM agent_run
+        WHERE ended_at IS NOT NULL
+          AND ended_at < ?
+          AND NOT EXISTS (SELECT 1 FROM timeline_event t WHERE t.run_id = agent_run.id)
+          AND NOT EXISTS (SELECT 1 FROM token_usage u WHERE u.run_id = agent_run.id)`,
+      cutoff,
+    )
+  ).changes;
+  return { deleted };
+}
