@@ -2,8 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { CONSOLE_PASSWORD_MIN_LENGTH, LOGIN_LOCKOUT } from "../../shared/constants.js";
 import type { Db } from "../../store/database.js";
-import { deleteOtherSessions } from "../../store/repositories/session.js";
-import { updateConsolePassword, verifyConsolePassword } from "../credential.js";
+import { revokeOtherSessions, updateConsolePassword, verifyConsolePassword } from "../credential.js";
 import { createLoginLockoutGuard } from "../login-lockout.js";
 import {
   clearSessionCookie,
@@ -111,7 +110,7 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRoutesOpti
         // requireSession 已校验过会话存在;走到这里说明 cookie 没了,此时不动任何会话
         return reply.code(401).send({ error: { code: "UNAUTHORIZED", message: "未登录或会话已过期" } });
       }
-      const revoked = await deleteOtherSessions(db, currentSessionId);
+      const revoked = await revokeOtherSessions(db, currentSessionId);
       return { ok: true, revokedSessions: revoked };
     },
   );

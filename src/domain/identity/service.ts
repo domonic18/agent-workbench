@@ -1,4 +1,5 @@
 import { EXTERNAL_RUNTIMES, IDENTITY_LIMITS, type AgentRuntime } from "../../shared/constants.js";
+import { createIdentityReads, type IdentityReads } from "./reads.js";
 import { newPrefixedId } from "../../shared/ids.js";
 import type { Db } from "../../store/database.js";
 import {
@@ -61,7 +62,7 @@ export interface RegisteredAgent {
   secret: string;
 }
 
-export interface IdentityService {
+export interface IdentityService extends IdentityReads {
   registerMachine(input: RegisterMachineInput): Promise<RegisteredMachine>;
   registerAgent(input: RegisterAgentInput): Promise<RegisteredAgent>;
   rotateMachineSecret(id: string): Promise<RegisteredMachine>;
@@ -318,6 +319,7 @@ export function createIdentityService(deps: IdentityServiceDeps): IdentityServic
   }
 
   return {
+    ...createIdentityReads(db),
     registerMachine,
     registerAgent,
     rotateMachineSecret,

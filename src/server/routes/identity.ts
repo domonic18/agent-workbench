@@ -13,16 +13,8 @@ import { formatKeysetCursor } from "../../shared/cursor.js";
 import type { Db } from "../../store/database.js";
 import { parseJsonStringArray } from "../../store/json.js";
 import type { AgentRecord } from "../../store/repositories/agent.js";
-import { findAgentById } from "../../store/repositories/agent.js";
-import {
-  listAgentRosterRows,
-  type AgentRosterRow,
-} from "../../store/repositories/agent-roster.js";
-import {
-  findUsageLimitByAgentId,
-  findUsageLimitsByAgentIds,
-  type UsageLimitRecord,
-} from "../../store/repositories/usage-limit.js";
+import type { AgentRosterRow } from "../../store/repositories/agent-roster.js";
+import type { UsageLimitRecord } from "../../store/repositories/usage-limit.js";
 import { requireCsrf, requireIdempotencyKey, requireSession } from "../middleware/session.js";
 import { parseListQuery } from "./http.js";
 
@@ -106,8 +98,14 @@ export async function toAgentDto(
   db: Db,
   row: AgentRecord,
   limit?: UsageLimitRecord | undefined,
+  resolveLimit?: (agentId: string) => Promise<UsageLimitRecord | undefined>,
 ): Promise<AgentDto> {
-  const resolved = limit === undefined ? await findUsageLimitByAgentId(db, row.id) : limit;
+  const resolved =
+    limit !== undefined
+      ? limit
+      : resolveLimit !== undefined
+        ? await resolveLimit(row.id)
+        : undefined;
   return {
     id: row.id,
     machineId: row.machineId,
@@ -189,7 +187,7 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
     }
     try {
       const { agent, secret } = await service.registerAgent(parsed.data);
-      return reply.code(201).send({ agent: await toAgentDto(db, agent), secret });
+      return reply.code(201).send({ agent: await toAgentDto(db, agent, undefined, service.findUsageLimit), secret });
     } catch (error) {
       if (error instanceof IdentityError) {
         return sendError(reply, error);
@@ -217,7 +215,7 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
    */
   app.post("/api/agents/:id/enroll-token", { preHandler: writeGuards }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    if ((await findAgentById(db, id)) === undefined) {
+    if ((await service.findAgent(id)) === undefined) {
       return reply
         .code(404)
         .send({ error: { code: "NOT_FOUND", message: `Agent ${id} 未注册` } });
@@ -239,7 +237,7 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
     }
     try {
       const agent = await service.setAllowedTargets(id, parsed.data.targets);
-      return { agent: await toAgentDto(db, agent) };
+      return { agent: await toAgentDto(db, agent, undefined, service.findUsageLimit) };
     } catch (error) {
       if (error instanceof IdentityError) {
         return sendError(reply, error);
@@ -256,7 +254,7 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
     }
     try {
       const agent = await service.setUsageLimit(id, parsed.data);
-      return { agent: await toAgentDto(db, agent) };
+      return { agent: await toAgentDto(db, agent, undefined, service.findUsageLimit) };
     } catch (error) {
       if (error instanceof IdentityError) {
         return sendError(reply, error);
@@ -270,11 +268,7 @@ export function registerIdentityRoutes(app: FastifyInstance, options: IdentityRo
     if (query === undefined) {
       return reply;
     }
-    const rows = await listAgentRosterRows(db, query);
-    const limits = await findUsageLimitsByAgentIds(
-      db,
-      rows.map((row) => row.id),
-    );
+    const { rows, limits } = await service.listRoster(query);
     const last = rows.at(-1);
     return {
       items: rows.map((row) => toAgentRosterDto(row, limits.get(row.id))),

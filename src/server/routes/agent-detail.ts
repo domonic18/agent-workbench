@@ -1,12 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { IdentityError } from "../../domain/identity/errors.js";
+import { createIdentityService, type IdentityService } from "../../domain/identity/service.js";
 import { formatKeysetCursor } from "../../shared/cursor.js";
 import type { Db } from "../../store/database.js";
-import { findAgentById } from "../../store/repositories/agent.js";
-import {
-  listTimelineEventsByAgent,
-  type AgentTimelineRow,
-} from "../../store/repositories/agent-timeline.js";
+import type { AgentTimelineRow } from "../../store/repositories/agent-timeline.js";
 import { requireSession } from "../middleware/session.js";
 import { parseListQuery } from "./http.js";
 import { sendError } from "./identity.js";
@@ -29,6 +26,7 @@ export interface AgentTimelineResponse {
 }
 
 export interface AgentDetailRoutesOptions {
+  service?: IdentityService;
   db: Db;
   now?: () => number;
 }
@@ -54,6 +52,7 @@ export function registerAgentDetailRoutes(
   options: AgentDetailRoutesOptions,
 ): void {
   const db = options.db;
+  const service: IdentityService = options.service ?? createIdentityService({ db, now: options.now ?? Date.now });
   const session = requireSession(db, options.now ?? Date.now);
 
   app.get("/api/agents/:id/timeline", { preHandler: session }, async (request, reply) => {
@@ -62,13 +61,12 @@ export function registerAgentDetailRoutes(
     if (query === undefined) {
       return reply;
     }
-    const agent = await findAgentById(db, id);
+    const agent = await service.findAgent(id);
     if (agent === undefined) {
       return sendError(reply, new IdentityError("NOT_FOUND", "Agent 不存在"));
     }
     // 多取一条判断还有没有更早的
-    const rows = await listTimelineEventsByAgent(db, {
-      agentId: id,
+    const rows = await service.agentTimeline(id, {
       limit: query.limit + 1,
       ...(query.before === undefined
         ? {}

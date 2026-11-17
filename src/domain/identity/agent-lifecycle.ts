@@ -51,6 +51,8 @@ export interface AgentDeletionResult {
 }
 
 export interface AgentLifecycleService {
+  /** 幂等重放的查证读:路由不直连仓储 */
+  findAgent(id: string): Promise<AgentRecord | undefined>;
   updateAgent(id: string, input: UpdateAgentInput): Promise<AgentRecord>;
   previewDeletion(id: string): Promise<AgentDeletionPreview>;
   deleteAgent(
@@ -235,5 +237,9 @@ export function createAgentLifecycleService(deps: AgentLifecycleDeps): AgentLife
     return { id, replayed: false, bootstrapPrimaryReassignedTo: reassignedTo };
   }
 
-  return { updateAgent, previewDeletion, deleteAgent };
+  async function findAgent(id: string): Promise<AgentRecord | undefined> {
+    return findAgentById(db, id);
+  }
+
+  return { findAgent, updateAgent, previewDeletion, deleteAgent };
 }

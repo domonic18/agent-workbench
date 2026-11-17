@@ -4,7 +4,6 @@ import { createTaskReadService, type TaskReadService } from "../../domain/task/r
 import { LIST_LIMITS, TASK_STATUSES, type TaskStatus } from "../../shared/constants.js";
 import { parseJsonObject } from "../../shared/json.js";
 import type { Db } from "../../store/database.js";
-import { resolveAgentLabels } from "../../store/repositories/agent-lifecycle.js";
 import type { CapabilitySummary } from "../../store/repositories/capability.js";
 import type { TaskEventRecord, TaskRecord } from "../../store/repositories/task.js";
 import { requireSession } from "../middleware/session.js";
@@ -126,7 +125,7 @@ export function registerTaskReadRoutes(
     });
     const last = result.items.at(-1);
     // 承接方可能已被硬删除:查墓碑把裸 id 换成「已删除 Agent X」
-    const labels = await resolveAgentLabels(db, agentIdsOf(result.items));
+    const labels = await read.resolveAgentLabels(agentIdsOf(result.items));
     return {
       items: result.items.map((row) => toTaskDto(row, labels)),
       nextCursor:
@@ -138,7 +137,7 @@ export function registerTaskReadRoutes(
     const { id } = request.params as { id: string };
     try {
       const result = await read.detail(id);
-      const labels = await resolveAgentLabels(db, agentIdsOf([result.task]));
+      const labels = await read.resolveAgentLabels(agentIdsOf([result.task]));
       return {
         task: toTaskDto(result.task, labels),
         capabilities: result.capabilities.map(toCapabilityDto),
