@@ -5,6 +5,10 @@ import {
   listCapabilitySummariesByTask,
   type CapabilitySummary,
 } from "../../store/repositories/capability.js";
+import {
+  resolveAgentLabels as resolveAgentLabelsRepo,
+  type AgentLabel,
+} from "../../store/repositories/agent-lifecycle.js";
 import { currentRevision } from "../../store/repositories/revision.js";
 import {
   findTaskById,
@@ -51,6 +55,8 @@ export interface TaskEventsResult {
 }
 
 export interface TaskReadService {
+  /** 承接方显示名解析(墓碑兜底):路由不直连仓储 */
+  resolveAgentLabels(agentIds: readonly string[]): Promise<Map<string, AgentLabel>>;
   list(query: TaskListQuery): Promise<TaskListResult>;
   detail(taskId: string): Promise<TaskDetailResult>;
   events(taskId: string, query: TaskEventsQuery): Promise<TaskEventsResult>;
@@ -71,7 +77,14 @@ export function createTaskReadService(deps: TaskReadServiceDeps): TaskReadServic
     return task;
   }
 
+  async function resolveAgentLabels(
+    agentIds: readonly string[],
+  ): Promise<Map<string, AgentLabel>> {
+    return resolveAgentLabelsRepo(db, agentIds);
+  }
+
   return {
+    resolveAgentLabels,
     async list(query) {
       // 多取一行判断是否还有下一页,避免为翻页额外 COUNT
       const rows = await listTasks(db, { ...query, limit: query.limit + 1 });

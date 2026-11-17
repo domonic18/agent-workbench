@@ -9,8 +9,8 @@ import { IdentityError } from "../../domain/identity/errors.js";
 import { createIdentityService, type IdentityService } from "../../domain/identity/service.js";
 import { createRunService, type RunService } from "../../domain/run/service.js";
 import type { Db } from "../../store/database.js";
-import { findAgentByMachineProject } from "../../store/repositories/agent.js";
-import { touchMachineLastSeen, type MachineRecord } from "../../store/repositories/machine.js";
+import { touchHeartbeat } from "../../domain/bootstrap/heartbeat.js";
+import type { MachineRecord } from "../../store/repositories/machine.js";
 import { requireMachineAuth } from "../middleware/machine-auth.js";
 import { requireIdempotencyKey } from "../middleware/session.js";
 import { domainError, invalidSchema } from "./http.js";
@@ -164,7 +164,8 @@ export function registerAwNodeRoutes(app: FastifyInstance, options: AwNodeRoutes
         return invalidSchema(reply, parsed.error);
       }
       await saveDiscoveryReport(db, { machineId: machine.id, report: parsed.data, now });
-      await touchMachineLastSeen(db, machine.id, now());
+      // 发现到达同时推进存活(两个时间源仍各自独立,01 §4);经域函数,路由不直连仓储
+      await touchHeartbeat(db, machine.id, now());
       return { ok: true, received_at: now() };
     },
   );
@@ -181,7 +182,7 @@ export function registerAwNodeRoutes(app: FastifyInstance, options: AwNodeRoutes
       return invalidSchema(reply, parsed.error);
     }
     const body = parsed.data;
-    const agent = await findAgentByMachineProject(db, machine.id, body.agent_project);
+    const agent = await service.findAgentByMachine(machine.id, body.agent_project);
     if (agent === undefined || agent.status !== "active") {
       return reply.code(404).send({
         error: { code: "NOT_FOUND", message: "该机器下不存在启用的 Agent 项目" },
@@ -194,7 +195,7 @@ export function registerAwNodeRoutes(app: FastifyInstance, options: AwNodeRoutes
         "run 进程退出收尾",
       );
     }
-    await touchMachineLastSeen(db, machine.id, now());
+    await touchHeartbeat(db, machine.id, now());
     return reply.code(200).send({ run_id: runId });
   });
 

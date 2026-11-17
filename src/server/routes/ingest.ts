@@ -2,18 +2,10 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import { IngestError } from "../../domain/ingest/errors.js";
 import { createIngestService, type IngestService } from "../../domain/ingest/service.js";
-import { announceDispatchHold } from "../../domain/work/notify.js";
-import { AUTH_STALE_HEAL_COOLDOWN_MS, DISPATCH_HOLD_REASONS, INGEST } from "../../shared/constants.js";
+import { DISPATCH_HOLD_REASONS, INGEST } from "../../shared/constants.js";
 import type { Db } from "../../store/database.js";
-import { clearAgentConfigAcksForHeal } from "../../store/repositories/agent.js";
-import {
-  listActiveAgentProjects,
-  touchMachineLastSeen,
-  updateMachineActiveStreams,
-  updateMachineCollectorVersion,
-  updateMachineDispatchStatus,
-  type MachineRecord,
-} from "../../store/repositories/machine.js";
+import { recordMachineHeartbeat, listPushableProjects } from "../../domain/bootstrap/heartbeat.js";
+import type { MachineRecord } from "../../store/repositories/machine.js";
 import { requireMachineAuth } from "../middleware/machine-auth.js";
 
 const heartbeatSchema = z.object({
@@ -115,57 +107,30 @@ export function registerIngestRoutes(app: FastifyInstance, options: IngestRoutes
     if (!parsed.success) {
       return validationError(reply, parsed.error);
     }
-    // 心跳推进机器存活时间、整包覆盖活跃流,并取回可推送项目;CPU / 内存等指标不入库
-    await touchMachineLastSeen(db, machine.id, now());
-    await updateMachineActiveStreams(db, machine.id, parsed.data.active_streams ?? []);
-    if (parsed.data.collector_version !== undefined) {
-      await updateMachineCollectorVersion(db, machine.id, parsed.data.collector_version);
-    }
-    if (parsed.data.dispatch !== undefined) {
-      // 整包覆盖派发状态;auth_stale 即触发自愈——清回执让下轮拉取自动轮换重发,
-      // 10min 冷却(按 config_ack_at 距今)防轮换风暴
-      await updateMachineDispatchStatus(db, machine.id, parsed.data.dispatch);
-      const staleProjects = parsed.data.dispatch
-        .filter((entry) => entry.hold === "auth_stale")
-        .map((entry) => entry.project);
-      if (staleProjects.length > 0) {
-        const cleared = await clearAgentConfigAcksForHeal(db, {
-          machineId: machine.id,
-          projects: staleProjects,
-          ackedBefore: now() - AUTH_STALE_HEAL_COOLDOWN_MS,
-          now: now(),
-        });
-        if (cleared > 0) {
-          request.log.warn(
-            { machineId: machine.id, projects: staleProjects, cleared },
-            "auth_stale 自愈:已清配置回执,下轮拉取轮换重发",
-          );
-        }
-      }
-      // 首跳播报(M3.12):与更新前的快照按 (project, hold) 比对,
-      // 持续挂起不重播;挂起消除后重现(since_ts 变化)由幂等键兜住再播
-      const previousHolds = new Set(
-        machine.dispatchStatus.map((entry) => `${entry.project}@${entry.hold}`),
+    // 心跳编排(存活/活跃流/版本/派发状态/auth_stale 自愈/首跳播报)收在域服务;CPU/内存等指标不入库
+    const { healedAcks, healedProjects } = await recordMachineHeartbeat(db, {
+      machine,
+      heartbeat: {
+        ...(parsed.data.active_streams === undefined
+          ? {}
+          : { activeStreams: parsed.data.active_streams }),
+        ...(parsed.data.collector_version === undefined
+          ? {}
+          : { collectorVersion: parsed.data.collector_version }),
+        ...(parsed.data.dispatch === undefined ? {} : { dispatch: parsed.data.dispatch }),
+      },
+      collabChatId: options.collabChatId,
+      now,
+    });
+    if (healedAcks > 0) {
+      request.log.warn(
+        { machineId: machine.id, projects: healedProjects, cleared: healedAcks },
+        "auth_stale 自愈:已清配置回执,下轮拉取轮换重发",
       );
-      for (const entry of parsed.data.dispatch) {
-        if (previousHolds.has(`${entry.project}@${entry.hold}`)) {
-          continue;
-        }
-        await announceDispatchHold(db, {
-          machineId: machine.id,
-          hostname: machine.hostname,
-          project: entry.project,
-          hold: entry.hold,
-          pending: entry.pending,
-          sinceTs: entry.since_ts,
-          chatId: options.collabChatId,
-          now: now(),
-        });
-      }
     }
     return reply.code(200).send({
       ok: true,
-      projects: await listActiveAgentProjects(db, machine.id),
+      projects: await listPushableProjects(db, machine.id),
       server_time: now(),
     });
   });
@@ -173,7 +138,7 @@ export function registerIngestRoutes(app: FastifyInstance, options: IngestRoutes
   app.get("/api/ingest/projects", { preHandler: [requireMachineAuth(db)] }, async (request, reply) => {
     const machine = request.machine as MachineRecord;
     return reply.code(200).send({
-      projects: await listActiveAgentProjects(db, machine.id),
+      projects: await listPushableProjects(db, machine.id),
     });
   });
 

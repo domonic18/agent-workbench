@@ -1,5 +1,6 @@
 import { CONSOLE_PASSWORD_MIN_LENGTH } from "../shared/constants.js";
 import { hashSecret, verifySecret } from "../domain/security/secrets.js";
+import { deleteOtherSessions } from "../store/repositories/session.js";
 import type { Db } from "../store/database.js";
 
 export interface CredentialInit {
@@ -11,6 +12,11 @@ function assertPasswordLength(password: string): void {
   if (password.length < CONSOLE_PASSWORD_MIN_LENGTH) {
     throw new Error(`口令至少 ${CONSOLE_PASSWORD_MIN_LENGTH} 位`);
   }
+}
+
+/** 改口令后吊销除发起设备外的其他会话(01 §4):写路径收口在服务,路由不直连库 */
+export async function revokeOtherSessions(db: Db, keepSessionId: string): Promise<number> {
+  return deleteOtherSessions(db, keepSessionId);
 }
 
 /** 首次启动把口令哈希写入库;已存在则忽略种子,不再改写。

@@ -11,7 +11,6 @@ import {
 } from "../../domain/security/idempotency.js";
 import { IDENTITY_STATUSES } from "../../shared/constants.js";
 import type { Db } from "../../store/database.js";
-import { findAgentById } from "../../store/repositories/agent.js";
 import { requireCsrf, requireIdempotencyKey, requireSession } from "../middleware/session.js";
 import { sendError, toAgentDto, validationError } from "./identity.js";
 
@@ -67,7 +66,7 @@ export function registerAgentLifecycleRoutes(
     const scope = `${UPDATE_SCOPE}:${id}`;
     const existingId = await idempotency.find(scope, key);
     if (existingId !== undefined) {
-      const previous = await findAgentById(db, existingId);
+      const previous = await service.findAgent(existingId);
       if (previous !== undefined) {
         return { agent: await toAgentDto(db, previous), replayed: true };
       }

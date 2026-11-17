@@ -7,7 +7,6 @@ import { type IdentityStatus } from "../../shared/constants.js";
 import { formatKeysetCursor } from "../../shared/cursor.js";
 import type { Db } from "../../store/database.js";
 import type { MachineRecord } from "../../store/repositories/machine.js";
-import { findMachineById } from "../../store/repositories/machine.js";
 import { requireCsrf, requireIdempotencyKey, requireSession } from "../middleware/session.js";
 import { domainError, invalidSchema, parseListQuery } from "./http.js";
 
@@ -108,7 +107,7 @@ export function registerMachineRoutes(app: FastifyInstance, options: MachineRout
     const scope = `machine.rename:${id}`;
     const existingId = await idempotency.find(scope, key);
     if (existingId !== undefined) {
-      const previous = await findMachineById(db, existingId);
+      const previous = await service.findMachine(existingId);
       if (previous !== undefined) {
         return { machine: toMachineDto(previous), replayed: true };
       }
