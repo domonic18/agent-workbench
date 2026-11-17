@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { CollectorConfig } from "./config.js";
 import { ensureStream, pruneStreams } from "./scan.js";
-import { emptyState, streamIdFor } from "./state.js";
+import { emptyState, streamIdFor, streamsBySession } from "./state.js";
 import type { SessionFile } from "./sessions.js";
 
 const SESSION = "22222222-2222-4222-8222-222222222222";
@@ -80,5 +80,27 @@ describe("扫描断点键控", () => {
 
     expect(removed).toBe(1);
     expect(Object.keys(state.streams)).toEqual([live]);
+  });
+
+  it("streamsBySession 能找回同一 uuid 的全部副本条目(推送回执按 sessionId 定位)", () => {
+    const copyA = join(dir, "a.jsonl");
+    const copyB = join(dir, "b.jsonl");
+    writeFileSync(copyA, "x");
+    writeFileSync(copyB, "x");
+    const state = emptyState();
+    const cfg = config();
+    ensureStream(file(copyA), state, cfg, () => 1);
+    ensureStream(file(copyB), state, cfg, () => 2);
+
+    const matches = streamsBySession(state, SESSION);
+
+    expect(matches.map((stream) => stream.path).sort()).toEqual([copyA, copyB].sort());
+    // 回执与错误标记要对每份副本生效:共用流 id,ack 同步推进
+    for (const stream of matches) {
+      stream.ackedSeq = 42;
+    }
+    expect(state.streams[copyA]?.ackedSeq).toBe(42);
+    expect(state.streams[copyB]?.ackedSeq).toBe(42);
+    expect(streamsBySession(state, "not-exist")).toEqual([]);
   });
 });

@@ -58,6 +58,11 @@ export function streamIdFor(sessionId: string, epoch: number): string {
   return epoch === 0 ? `claude-session:${sessionId}` : `claude-session:${sessionId}:r${epoch}`;
 }
 
+/** 同一会话 uuid 可能有多份副本(按物理路径各一条断点);按 sessionId 找全部副本 */
+export function streamsBySession(state: PersistedState, sessionId: string): StreamState[] {
+  return Object.values(state.streams).filter((stream) => stream.sessionId === sessionId);
+}
+
 function statePath(stateDir: string): string {
   return join(stateDir, "state", "streams.json");
 }
