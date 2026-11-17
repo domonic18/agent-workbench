@@ -2,6 +2,7 @@ import { TELEMETRY } from "../../shared/constants.js";
 import type { Db } from "../../store/database.js";
 import {
   deleteTimelineEventsIngestedBefore,
+  pruneOrphanRuns,
   rollupTokenUsageBefore,
 } from "../../store/repositories/token-usage.js";
 import type { JobLogger } from "./reconcile.js";
@@ -57,6 +58,16 @@ export function startTelemetryRetention(
       })
       .catch((error) => {
         logger.error({ err: error }, "会话时间线事件清理失败");
+      });
+    // 时间线删完后,级联清理已无子表的孤立 run
+    void pruneOrphanRuns(db, cutoff)
+      .then(({ deleted }) => {
+        if (deleted > 0) {
+          logger.info({ deleted }, "清理孤立运行记录");
+        }
+      })
+      .catch((error) => {
+        logger.error({ err: error }, "孤立运行记录清理失败");
       });
   };
 
