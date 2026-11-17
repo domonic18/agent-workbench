@@ -53,7 +53,16 @@ export function loadMigrations(dir: string = defaultMigrationsDir()): Migration[
 /**
  * forward-only:已应用的迁移只校验不重跑,内容变了即启动失败(02 §7)。
  * 返回本次新应用的条数,重复启动返回 0。
+ *
+ * 每条迁移在事务内先设锁等待与语句超时(SET LOCAL,只作用于本事务):
+ * - lock_timeout:等表锁 3 秒拿不到就明确失败(55P03),部署可重试;
+ *   不设的话迁移会无限排队等锁,表现是容器一直起不来、健康检查超时回滚,日志看不出原因。
+ * - statement_timeout:大表 DDL(如 ALTER COLUMN TYPE 全表重写)超过 5 分钟中止,
+ *   不让一条长语句无限占用生产连接与 ACCESS EXCLUSIVE 锁。
  */
+const MIGRATION_LOCK_TIMEOUT_MS = 3_000;
+const MIGRATION_STATEMENT_TIMEOUT_MS = 5 * 60_000;
+
 export async function runMigrations(db: Db, dir?: string): Promise<number> {
   const migrations = loadMigrations(dir);
 
@@ -82,14 +91,24 @@ export async function runMigrations(db: Db, dir?: string): Promise<number> {
       }
       continue;
     }
-    await db.transaction(async (tx) => {
-      // 迁移脚本含多语句 DDL,走 exec(无参数 simple 协议);记录与脚本同事务提交
-      await tx.exec(migration.sql);
-      await tx.run(
-        "INSERT INTO schema_migration (version, name, checksum, applied_at) VALUES (?, ?, ?, ?)",
-        migration.version, migration.name, migration.checksum, Date.now(),
-      );
-    });
+    try {
+      await db.transaction(async (tx) => {
+        await tx.exec(
+          `SET LOCAL lock_timeout = '${MIGRATION_LOCK_TIMEOUT_MS}ms'; SET LOCAL statement_timeout = '${MIGRATION_STATEMENT_TIMEOUT_MS}ms';`,
+        );
+        // 迁移脚本含多语句 DDL,走 exec(无参数 simple 协议);记录与脚本同事务提交
+        await tx.exec(migration.sql);
+        await tx.run(
+          "INSERT INTO schema_migration (version, name, checksum, applied_at) VALUES (?, ?, ?, ?)",
+          migration.version, migration.name, migration.checksum, Date.now(),
+        );
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`迁移 ${migration.version}_${migration.name} 失败: ${message}`, {
+        cause: error,
+      });
+    }
     count += 1;
   }
   return count;

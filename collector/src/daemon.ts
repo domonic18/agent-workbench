@@ -1,11 +1,5 @@
-import { statSync } from "node:fs";
 import { cpus } from "node:os";
 import { join } from "node:path";
-import {
-  loadAttributionIndex,
-  overlayAttributionIndex,
-  type AttributionIndex,
-} from "./attribution.js";
 import type { CollectorConfig } from "./config.js";
 import { ensureStateDirs } from "./config.js";
 import {
@@ -24,18 +18,9 @@ import { scanCwdByProject } from "./discovery.js";
 import { createLogger, type Logger } from "./log.js";
 import { acquireLock, type SingleInstanceLock } from "./lock.js";
 import { createPusher, type Pusher } from "./push.js";
-import { appendEvents, ensureStream, pruneStreams } from "./scan.js";
-import { classifyStream, listSessionFiles } from "./sessions.js";
+import { createScanCycle } from "./scan-cycle.js";
+import { loadState, saveState, type PersistedState } from "./state.js";
 import { Spool } from "./spool.js";
-import {
-  loadState,
-  saveState,
-  streamIdFor,
-  type PersistedState,
-} from "./state.js";
-import { readNewLines } from "./tailer.js";
-
-const ATTRIBUTION_TTL_MS = 60_000;
 
 export interface DaemonDeps {
   config: CollectorConfig;
@@ -156,11 +141,6 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
         })
       : null;
   let lock: SingleInstanceLock | null = null;
-  let index: AttributionIndex = overlayAttributionIndex(
-    loadAttributionIndex(config.ccConnectDir),
-    dispatchSessions,
-  );
-  let indexAt = 0;
   let running = true;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
@@ -175,76 +155,19 @@ export function createDaemon(deps: DaemonDeps): CollectorDaemon {
   }
   spool.load();
 
-  function refreshIndex(): void {
-    const at = now();
-    if (at - indexAt < ATTRIBUTION_TTL_MS) {
-      return;
-    }
-    index = overlayAttributionIndex(loadAttributionIndex(config.ccConnectDir), dispatchSessions);
-    indexAt = at;
-  }
-
-  async function scanOnce(): Promise<void> {
-    refreshIndex();
-    const files = listSessionFiles(config.claudeDir);
-    for (const file of files) {
-      const stream = ensureStream(file, state, config, now);
-      const classified = classifyStream(index, file.sessionId, registered);
-      if (classified.status !== stream.status || classified.project !== stream.project) {
-        stream.status = classified.status;
-        stream.project = classified.project;
-        stream.updatedAt = now();
-      }
-      if (classified.status === "unattributed") {
-        // 档 3:不推送也不计未归因;跳过历史,等它真的接上 cc-connect 再从当下开始
-        try {
-          stream.offset = statSync(file.path).size;
-          stream.inode = statSync(file.path).ino;
-        } catch {
-          // 文件消失,保留原断点
-        }
-        continue;
-      }
-      const result = readNewLines(file.path, {
-        inode: stream.inode,
-        offset: stream.offset,
-        epoch: stream.epoch,
-      });
-      if (result.missing) {
-        continue;
-      }
-      if (result.rotated || result.truncated) {
-        logger.warn("会话文件已轮转或截断,断点归零", {
-          sessionId: stream.sessionId,
-          epoch: result.epoch,
-        });
-        stream.epoch = result.epoch;
-        stream.ackedSeq = 0;
-        stream.lastSeq = 0;
-      }
-      stream.inode = result.inode;
-      if (result.lines.length > 0) {
-        appendEvents(stream, result.lines, spool, now);
-        activeSinceHeartbeat.add(streamIdFor(stream.sessionId, stream.epoch));
-      }
-      stream.offset = result.offset;
-      stream.updatedAt = now();
-    }
-
-    const pruned = pruneStreams(state, new Set(files.map((file) => file.path)));
-    if (pruned > 0) {
-      logger.info("清理已消失会话文件的状态条目", { pruned });
-    }
-
-    const dropped = spool.enforceLimit();
-    if (dropped > 0) {
-      logger.error("spool 超过上限,已丢弃最旧的未确认事件", { dropped });
-    }
-    saveState(config.stateDir, state);
-  }
+  const scanCycle = createScanCycle({
+    config,
+    state,
+    spool,
+    registered,
+    dispatchSessions,
+    activeSinceHeartbeat,
+    logger,
+    now,
+  });
 
   async function runOnce(): Promise<void> {
-    await scanOnce();
+    await scanCycle.scanOnce();
     await pusher.pushAll();
     saveState(config.stateDir, state);
   }
