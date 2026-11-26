@@ -98,6 +98,16 @@ function configOf(stateDir: string, claudeDir: string, ccConnectDir: string): Co
   };
 }
 
+async function waitFor(predicate: () => boolean, timeoutMs = 2_000): Promise<void> {
+  const start = Date.now();
+  while (!predicate()) {
+    if (Date.now() - start > timeoutMs) {
+      throw new Error("waitFor 超时");
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
 describe("采集循环", () => {
   let root: string;
   let config: CollectorConfig;
@@ -254,20 +264,29 @@ describe("采集循环", () => {
       logger: createLogger({ level: "error", sink: () => {} }),
     });
     const started = daemon.start();
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    daemon.stop();
-    await started;
+    try {
+      const active = (beat: Record<string, unknown>): string[] =>
+        Array.isArray(beat.active_streams) ? (beat.active_streams as string[]) : [];
+      const sawActive = () =>
+        client.heartbeats.some((beat) => active(beat).includes(`claude-session:${UUID}`));
+      const drained = () =>
+        client.heartbeats.length > 0 && active(client.heartbeats.at(-1)!).length === 0;
+      // 等确定性状态:先有某一跳携带活跃流,之后又一跳回落为空。
+      // 不依赖固定 sleep 与「最后一跳」的墙钟时序,规避负载下定时器堆积导致的偶发失败。
+      await waitFor(() => sawActive() && drained());
 
-    const active = (beat: Record<string, unknown>): string[] =>
-      Array.isArray(beat.active_streams) ? (beat.active_streams as string[]) : [];
-    // 首批扫描读到两行新字节 → 后续某一跳携带该活跃流
-    expect(
-      client.heartbeats.some((beat) => active(beat).includes(`claude-session:${UUID}`)),
-    ).toBe(true);
-    // 之后没有新字节,最后一跳已排水回落为空
-    expect(active(client.heartbeats.at(-1)!)).toEqual([]);
-    // 心跳回报采集器版本,控制台据此展示运行版本与升级提示
-    expect(client.heartbeats.every((beat) => beat.collector_version === config.collectorVersion)).toBe(true);
+      // 首批扫描读到两行新字节 → 后续某一跳携带该活跃流
+      expect(sawActive()).toBe(true);
+      // 之后没有新字节,活跃流已排水回落为空
+      expect(active(client.heartbeats.at(-1)!)).toEqual([]);
+      // 心跳回报采集器版本,控制台据此展示运行版本与升级提示
+      expect(
+        client.heartbeats.every((beat) => beat.collector_version === config.collectorVersion),
+      ).toBe(true);
+    } finally {
+      daemon.stop();
+      await started;
+    }
   });
 });
 
