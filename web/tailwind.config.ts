@@ -130,11 +130,9 @@ export default {
       },
       width: {
         sidebar: "var(--sidebar-w)",
-        control: {
-          sm: "var(--size-control-sm)",
-          md: "var(--size-control-md)",
-          lg: "var(--size-control-lg)",
-        },
+        "control-sm": "var(--size-control-sm)",
+        "control-md": "var(--size-control-md)",
+        "control-lg": "var(--size-control-lg)",
         "icon-tile": "var(--size-icon-tile)",
         "dialog-sm": "var(--dialog-sm)",
         "dialog-md": "var(--dialog-md)",
@@ -148,11 +146,9 @@ export default {
       },
       height: {
         topbar: "var(--topbar-h)",
-        control: {
-          sm: "var(--size-control-sm)",
-          md: "var(--size-control-md)",
-          lg: "var(--size-control-lg)",
-        },
+        "control-sm": "var(--size-control-sm)",
+        "control-md": "var(--size-control-md)",
+        "control-lg": "var(--size-control-lg)",
         touch: "var(--size-touch)",
         "icon-tile": "var(--size-icon-tile)",
       },
