@@ -1,7 +1,7 @@
 import { Check } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import styles from "./overlays.module.css";
+import { cn } from "../../lib/utils.js";
 
 export interface MenuItem {
   key: string;
@@ -37,11 +37,6 @@ interface Position {
   left: number;
 }
 
-/**
- * 下拉菜单：非模态，不加遮罩、不锁滚动（与 Dialog 的取舍不同，故不复用）。
- *
- * 行为：Esc 关闭、外部点击关闭、关闭后焦点回到触发器、上下键在项间移动。
- */
 export function Menu({ label, trigger, items, align = "start" }: MenuProps) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<Position>({ top: 0, left: 0 });
@@ -136,12 +131,12 @@ export function Menu({ label, trigger, items, align = "start" }: MenuProps) {
   }, [open]);
 
   return (
-    <div className={styles.menuAnchor} ref={anchorRef}>
+    <div className="inline-flex" ref={anchorRef}>
       {trigger({ open, toggle })}
       {open
         ? createPortal(
             <div
-              className={styles.menu}
+              className="fixed z-95 min-w-menu-min p-1 border border-border rounded-md bg-surface shadow-md"
               role="menu"
               aria-label={label}
               style={{ top: position.top, left: position.left }}
@@ -154,7 +149,11 @@ export function Menu({ label, trigger, items, align = "start" }: MenuProps) {
                     type="button"
                     role={item.checked === undefined ? "menuitem" : "menuitemradio"}
                     aria-checked={item.checked === undefined ? undefined : item.checked}
-                    className={`${styles.menuItem} ${item.tone === "danger" ? styles.menuItemDanger : ""} ${item.disabled === true ? styles.menuItemDisabled : ""}`}
+                    className={cn(
+                      "flex items-center gap-2 w-full px-3 py-2 border-none rounded-sm bg-transparent text-foreground text-sm text-left transition-colors hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none",
+                      item.tone === "danger" && "text-danger",
+                      item.disabled === true && "text-muted cursor-default hover:bg-transparent",
+                    )}
                     disabled={item.disabled === true}
                     onClick={() => {
                       item.onSelect?.();
@@ -162,19 +161,19 @@ export function Menu({ label, trigger, items, align = "start" }: MenuProps) {
                     }}
                   >
                     {item.icon === undefined ? null : (
-                      <span className={styles.menuItemIcon} aria-hidden="true">
+                      <span className="inline-flex text-muted" aria-hidden="true">
                         {item.icon}
                       </span>
                     )}
                     {item.label}
                     {item.checked === true ? (
-                      <span className={styles.menuItemCheck} aria-hidden="true">
+                      <span className="inline-flex ml-auto text-accent" aria-hidden="true">
                         <Check size={14} />
                       </span>
                     ) : null}
                   </button>
                 ) : (
-                  <div key={item.key} className={styles.menuHeading} role="presentation">
+                  <div key={item.key} className="px-3 py-2 text-muted text-2xs font-semibold tracking-wide uppercase" role="presentation">
                     {item.heading}
                   </div>
                 ),

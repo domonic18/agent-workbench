@@ -98,6 +98,12 @@ export default {
         ring: "var(--focus-ring)",
         "ring-danger": "var(--danger-focus)",
       },
+      zIndex: {
+        60: "60",
+        80: "80",
+        90: "90",
+        95: "95",
+      },
       transitionDuration: {
         fast: "var(--duration-fast)",
         DEFAULT: "var(--duration)",
@@ -110,9 +116,17 @@ export default {
           "0%": { backgroundPosition: "100% 0" },
           "100%": { backgroundPosition: "0 0" },
         },
+        fade: {
+          from: { opacity: "0" },
+        },
+        rise: {
+          from: { opacity: "0", transform: "translateY(var(--space-2))" },
+        },
       },
       animation: {
         shimmer: "shimmer 1.4s ease infinite",
+        fade: "fade var(--duration) var(--ease)",
+        rise: "rise var(--duration) var(--ease)",
       },
       width: {
         sidebar: "var(--sidebar-w)",
