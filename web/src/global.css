@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* 设计基线：颜色、尺度、动效的唯一出处（03 §设计基线）
  *
  * 色板对齐 SquadSight 的设计语言：靛蓝主色 + 分层底色（bg / surface / surface-2 / surface-3），
@@ -175,78 +179,76 @@
   --danger-focus: 0 0 0 3px rgb(248 81 73 / 30%);
 }
 
-* {
-  box-sizing: border-box;
-}
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
 
-html,
-body,
-#root {
-  min-height: 100%;
-}
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: var(--font-md);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-  font-size: var(--font-md);
-  line-height: 1.55;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
 
-button,
-input,
-select,
-textarea {
-  font: inherit;
-  color: inherit;
-}
+  button {
+    cursor: pointer;
+  }
 
-button {
-  cursor: pointer;
-}
+  button:disabled {
+    cursor: not-allowed;
+  }
 
-button:disabled {
-  cursor: not-allowed;
-}
+  a {
+    color: var(--accent);
+  }
 
-a {
-  color: var(--accent);
-}
+  :focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
 
-:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
+  code,
+  kbd {
+    font-family: var(--font-mono);
+    font-size: 0.92em;
+  }
 
-code,
-kbd {
-  font-family: var(--font-mono);
-  font-size: 0.92em;
-}
+  /* 滚动条：与主题同色，避免默认滚动条割裂画面 */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
 
-/* 滚动条：与主题同色，避免默认滚动条割裂画面 */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-strong) transparent;
-}
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
 
-*::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
+  *::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border: 3px solid transparent;
+    border-radius: var(--radius-full);
+    background-clip: content-box;
+  }
 
-*::-webkit-scrollbar-thumb {
-  background: var(--border-strong);
-  border: 3px solid transparent;
-  border-radius: var(--radius-full);
-  background-clip: content-box;
-}
-
-*::-webkit-scrollbar-track {
-  background: transparent;
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
