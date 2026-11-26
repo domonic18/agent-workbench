@@ -212,7 +212,7 @@ describe("总览页", () => {
     });
   });
 
-  it("发现未注册项目时『需要你看一眼』给出登记提示", async () => {
+  it("发现未注册项目时给出可登记的告警卡片", async () => {
     vi.stubGlobal(
       "fetch",
       fakeFetch(snapshot(), [rosterAgent()], {
@@ -234,29 +234,42 @@ describe("总览页", () => {
     );
     renderPage();
 
+    expect(await screen.findByText("发现未注册项目")).toBeTruthy();
     expect(
-      await screen.findByText(
-        "发现 1 个未注册项目（MacBook：recruit · 随行-招聘专家）——去「协作接入」登记",
-      ),
+      screen.getByText(/在 MacBook 上发现 1 个未注册项目（recruit · 随行-招聘专家）/),
     ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "去登记" })).toBeTruthy();
   });
 
-  it("发现的项目都已登记时不出现未注册提示", async () => {
+  it("发现的项目都已登记时不出现待处理告警", async () => {
     vi.stubGlobal(
       "fetch",
-      fakeFetch(snapshot(), [rosterAgent()], {
-        latestCollectorVersion: null,
-        machines: [
-          discoveryMachine({
-            projects: [{ name: "recruit", cwd: "/Users/dev/Code/recruit", confirmed: true }],
-          }),
-        ],
-      }),
+      fakeFetch(
+        snapshot({
+          metrics: {
+            runningAgents: 0,
+            runningTasks: 0,
+            todayTokens: 1_200_000,
+            pendingApprovals: 0,
+            heartbeatTimeouts: 0,
+          },
+        }),
+        [rosterAgent()],
+        {
+          latestCollectorVersion: null,
+          machines: [
+            discoveryMachine({
+              projects: [{ name: "recruit", cwd: "/Users/dev/Code/recruit", confirmed: true }],
+            }),
+          ],
+        },
+      ),
     );
     renderPage();
 
-    // 等到总览数据已渲染(提示行与总览同批请求),再断言提示行不出现
-    await screen.findByText("4 项授权待批准，未批准不可执行");
-    expect(screen.queryByText(/未注册项目/)).toBeNull();
+    // 等到总览数据已渲染，再断言告警不出现
+    await screen.findByText("运行中任务");
+    expect(screen.queryByText("发现未注册项目")).toBeNull();
+    expect(screen.queryByRole("region", { name: "待处理" })).toBeNull();
   });
 });

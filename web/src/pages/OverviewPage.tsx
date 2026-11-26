@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
   AlertTriangle,
-  CheckCircle2,
   CircleDollarSign,
   Cpu,
   ShieldAlert,
@@ -28,48 +27,44 @@ import { SectionHeader } from "../components/ui/SectionHeader.js";
 import { StatCard } from "../components/ui/StatCard.js";
 import { ToneIcon } from "../components/ui/ToneIcon.js";
 import { formatExactTokens, formatTokens } from "../shared/format.js";
+import { cn } from "../lib/utils.js";
 import type { Tone } from "../shared/tone.js";
 
-interface AttentionRow {
-  icon: ReactNode;
+interface AttentionCardProps {
   tone: Tone;
-  text: string;
+  icon: ReactNode;
+  title: string;
+  description: string;
+  action: { label: string; onClick: () => void };
 }
 
-/** 需要人工看一眼的事：语义色图标 + 文案双编码，不靠颜色单独表意 */
-function attentionRows(
-  pendingApprovals: number,
-  heartbeatTimeouts: number,
-  todayTokens: number,
-): AttentionRow[] {
-  const rows: AttentionRow[] = [];
-  if (heartbeatTimeouts > 0) {
-    rows.push({
-      icon: <AlertTriangle size={14} aria-hidden="true" />,
-      tone: "warning",
-      text: `${heartbeatTimeouts} 个 Agent 心跳超时，可能已离线`,
-    });
-  }
-  if (pendingApprovals > 0) {
-    rows.push({
-      icon: <ShieldAlert size={14} aria-hidden="true" />,
-      tone: "danger",
-      text: `${pendingApprovals} 项授权待批准，未批准不可执行`,
-    });
-  }
-  if (rows.length === 0) {
-    rows.push({
-      icon: <CheckCircle2 size={14} aria-hidden="true" />,
-      tone: "positive",
-      text: "暂无异常与待决策项",
-    });
-  }
-  rows.push({
-    icon: <CircleDollarSign size={14} aria-hidden="true" />,
-    tone: "info",
-    text: `今日 Token ${formatExactTokens(todayTokens)}，未配置预算`,
-  });
-  return rows;
+function AttentionCard({ tone, icon, title, description, action }: AttentionCardProps) {
+  const styles: Record<Tone, { border: string; bg: string }> = {
+    positive: { border: "border-positive-border", bg: "bg-positive-soft" },
+    warning: { border: "border-warning-border", bg: "bg-warning-soft" },
+    danger: { border: "border-danger-border", bg: "bg-danger-soft" },
+    info: { border: "border-info-border", bg: "bg-info-soft" },
+    muted: { border: "border-border", bg: "bg-surface" },
+  };
+  const { border, bg } = styles[tone];
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-4 p-4 border rounded-md max-md:flex-col max-md:items-start",
+        border,
+        bg,
+      )}
+    >
+      <ToneIcon tone={tone} icon={icon} />
+      <div className="flex-1 min-w-0">
+        <h3 className="m-0 text-sm font-semibold text-foreground">{title}</h3>
+        <p className="m-0 text-sm text-text-secondary">{description}</p>
+      </div>
+      <Button size="sm" variant="secondary" onClick={action.onClick}>
+        {action.label}
+      </Button>
+    </div>
+  );
 }
 
 interface UnregisteredProject {
@@ -78,12 +73,12 @@ interface UnregisteredProject {
   bot?: string | undefined;
 }
 
-/** 已发现未注册项目的提示文案:取首个项目点名,多个加「等」 */
-function unregisteredHint(projects: readonly UnregisteredProject[]): string {
+/** 未注册项目卡片描述:取首个项目点名,多个加「等」 */
+function unregisteredDescription(projects: readonly UnregisteredProject[]): string {
   const first = projects[0]!;
   const named = first.bot === undefined ? first.name : `${first.name} · ${first.bot}`;
   const rest = projects.length > 1 ? " 等" : "";
-  return `发现 ${projects.length} 个未注册项目（${first.machine}：${named}${rest}）——去「协作接入」登记`;
+  return `在 ${first.machine} 上发现 ${projects.length} 个未注册项目（${named}${rest}），登记后才可参与委派。`;
 }
 
 export function OverviewPage() {
@@ -175,7 +170,7 @@ export function OverviewPage() {
             />
           </section>
 
-          <section className="flex flex-col gap-4">
+          <section id="agent-management" className="flex flex-col gap-4 scroll-mt-6">
             <SectionHeader
               title="Agent 管理"
               actions={
@@ -205,27 +200,40 @@ export function OverviewPage() {
             )}
           </section>
 
-          <section className="flex flex-col gap-4">
-            <SectionHeader title="需要你看一眼" />
-            <ul className="flex flex-col gap-2 m-0 p-4 border border-border rounded-md bg-surface list-none">
-              {attentionRows(
-                data.metrics.pendingApprovals,
-                data.metrics.heartbeatTimeouts,
-                data.metrics.todayTokens,
-              ).map((row) => (
-                <li key={row.text} className="flex items-center gap-2 text-sm text-text-secondary max-md:items-start">
-                  <ToneIcon tone={row.tone} icon={row.icon} />
-                  <span>{row.text}</span>
-                </li>
-              ))}
-              {unregistered.length > 0 ? (
-                <li className="flex items-center gap-2 text-sm text-text-secondary max-md:items-start">
-                  <ToneIcon tone="warning" icon={<AlertTriangle size={14} aria-hidden="true" />} />
-                  <span>{unregisteredHint(unregistered)}</span>
-                </li>
+          {data.metrics.heartbeatTimeouts > 0 || data.metrics.pendingApprovals > 0 || unregistered.length > 0 ? (
+            <section className="grid gap-3" aria-label="待处理">
+              {data.metrics.heartbeatTimeouts > 0 ? (
+                <AttentionCard
+                  tone="warning"
+                  icon={<AlertTriangle size={18} aria-hidden="true" />}
+                  title="Agent 心跳超时"
+                  description={`${data.metrics.heartbeatTimeouts} 个 Agent 可能已离线`}
+                  action={{
+                    label: "查看 Agent",
+                    onClick: () => document.getElementById("agent-management")?.scrollIntoView({ behavior: "smooth" }),
+                  }}
+                />
               ) : null}
-            </ul>
-          </section>
+              {data.metrics.pendingApprovals > 0 ? (
+                <AttentionCard
+                  tone="danger"
+                  icon={<ShieldAlert size={18} aria-hidden="true" />}
+                  title="授权待批准"
+                  description={`${data.metrics.pendingApprovals} 项授权未批准，不可执行`}
+                  action={{ label: "去审批", onClick: () => navigate("/capabilities?view=pending") }}
+                />
+              ) : null}
+              {unregistered.length > 0 ? (
+                <AttentionCard
+                  tone="warning"
+                  icon={<AlertTriangle size={18} aria-hidden="true" />}
+                  title="发现未注册项目"
+                  description={unregisteredDescription(unregistered)}
+                  action={{ label: "去登记", onClick: () => navigate("/agent-access") }}
+                />
+              ) : null}
+            </section>
+          ) : null}
 
           {registerDialog === "agent" ? (
             <AgentRegisterDialog onClose={() => setRegisterDialog(null)} />

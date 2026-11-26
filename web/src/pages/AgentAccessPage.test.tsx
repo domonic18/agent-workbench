@@ -128,17 +128,22 @@ describe("协作接入页", () => {
       const call = fetcher.mock.calls.find(([input]) => String(input).includes("/rotate"));
       expect(call).toBeDefined();
     });
-    // 三块配置片段各带一次凭据
-    const snippets = await screen.findAllByText(/Bearer agt_1\.s3cret/);
-    expect(snippets).toHaveLength(3);
-    expect(snippets[0]?.textContent).toContain("claude mcp add --transport http");
-    expect(snippets[1]?.textContent).toContain("mcpServers");
-    expect(snippets[2]?.textContent).toContain("Header 名: authorization");
 
-    // env 版：配置里只有变量名，密钥只在 export 那一行
+    // Claude Code tab 默认选中，直接断言命令片段
+    expect(await screen.findByText(/claude mcp add --transport http/)).toBeTruthy();
+    expect(screen.getByText(/Bearer agt_1\.s3cret/)).toBeTruthy();
+
+    // 通用 MCP tab：env 版 + 明文版 + export 命令
+    fireEvent.click(screen.getByRole("tab", { name: "通用 MCP" }));
     const envSnippet = await screen.findByText(/Bearer agt_1\.\$\{AW_AGENT_SECRET\}/);
     expect(envSnippet.textContent).not.toContain("s3cret");
     expect(screen.getByText("export AW_AGENT_SECRET=s3cret")).toBeTruthy();
+    expect(screen.getByText(/"authorization": "Bearer agt_1\.s3cret"/)).toBeTruthy();
+
+    // WorkBuddy tab
+    fireEvent.click(screen.getByRole("tab", { name: "WorkBuddy" }));
+    expect(await screen.findByText(/Header 名: authorization/)).toBeTruthy();
+    expect(screen.getByText(/Header 值: Bearer agt_1\.s3cret/)).toBeTruthy();
   });
 
   it("没有明文密钥时不出配置片段", async () => {
