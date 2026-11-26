@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useLocation } from "react-router";
 import { ApiError } from "../api/client.js";
 import { fetchAgents } from "../api/identity.js";
@@ -9,6 +9,7 @@ import { TaskTable } from "../components/task/TaskTable.js";
 import { WorkItemSection } from "../components/work-item/WorkItemSection.js";
 import { AsyncSection } from "../components/ui/AsyncSection.js";
 import { EmptyState } from "../components/ui/EmptyState.js";
+import { Tabs } from "../components/ui/Tabs.js";
 import { useNow } from "../shared/useNow.js";
 import { agentNameMap } from "../shared/agent-label.js";
 
@@ -25,6 +26,7 @@ export function TasksPage() {
   const now = useNow(30_000);
   const filters = readTaskFilters(new URLSearchParams(location.search));
   const query = toQuery(filters);
+  const [activeTab, setActiveTab] = useState("tasks");
 
   const tasksQuery = useInfiniteQuery({
     queryKey: ["tasks", filters.status ?? "", filters.project ?? "", filters.assignee ?? ""],
@@ -44,35 +46,51 @@ export function TasksPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <TaskFiltersForm />
-
-      <AsyncSection
-        pending={tasksQuery.isPending}
-        error={
-          tasksQuery.isError
-            ? tasksQuery.error instanceof ApiError
-              ? tasksQuery.error.message
-              : "任务列表加载失败"
-            : null
-        }
-        onRetry={() => void tasksQuery.refetch()}
-        hasMore={tasksQuery.hasNextPage}
-        fetchingMore={tasksQuery.isFetchingNextPage}
-        onLoadMore={() => void tasksQuery.fetchNextPage()}
-      >
-        {tasks.length === 0 ? (
-          <EmptyState title={hasFilters ? "没有匹配的任务" : "暂无任务记录"} />
-        ) : (
-          <TaskTable
-            tasks={tasks}
-            agentNames={agentNames}
-            search={location.search}
-            now={now}
-          />
-        )}
-      </AsyncSection>
-
-      <WorkItemSection />
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        items={[
+          {
+            key: "tasks",
+            label: "任务",
+            content: (
+              <div className="flex flex-col gap-4">
+                <TaskFiltersForm />
+                <AsyncSection
+                  pending={tasksQuery.isPending}
+                  error={
+                    tasksQuery.isError
+                      ? tasksQuery.error instanceof ApiError
+                        ? tasksQuery.error.message
+                      : "任务列表加载失败"
+                      : null
+                  }
+                  onRetry={() => void tasksQuery.refetch()}
+                  hasMore={tasksQuery.hasNextPage}
+                  fetchingMore={tasksQuery.isFetchingNextPage}
+                  onLoadMore={() => void tasksQuery.fetchNextPage()}
+                >
+                  {tasks.length === 0 ? (
+                    <EmptyState title={hasFilters ? "没有匹配的任务" : "暂无任务记录"} />
+                  ) : (
+                    <TaskTable
+                      tasks={tasks}
+                      agentNames={agentNames}
+                      search={location.search}
+                      now={now}
+                    />
+                  )}
+                </AsyncSection>
+              </div>
+            ),
+          },
+          {
+            key: "work-items",
+            label: "工作事项",
+            content: <WorkItemSection showHeader={false} />,
+          },
+        ]}
+      />
     </div>
   );
 }
