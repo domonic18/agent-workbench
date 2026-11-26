@@ -1,0 +1,83 @@
+/* 办公室视图的全局动画关键帧。
+   原 office.module.css 迁往 Tailwind 后，@keyframes 无法用工具类表达，
+   保留在此全局样式里（类名与帧名不再被 CSS module 改写）。 */
+
+@keyframes office-walk-in {
+  from {
+    transform: translate3d(var(--from-x), var(--from-y), 0);
+  }
+  to {
+    transform: translate3d(var(--to-x), var(--to-y), 0);
+  }
+}
+
+@keyframes office-walk-fade {
+  0%,
+  72% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes office-state-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes office-state-trans {
+  0%,
+  70% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes office-trans-fade {
+  0%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes office-sway {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes office-breathe {
+  from {
+    transform: translateY(0) scale(1);
+  }
+  to {
+    transform: translateY(-1px) scale(1.012);
+  }
+}
+
+@keyframes office-zzz {
+  0% {
+    opacity: 0;
+    transform: translateY(0) scale(0.8);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-14px) scale(1.1);
+  }
+}

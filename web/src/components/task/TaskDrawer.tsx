@@ -24,7 +24,7 @@ import { TaskA2aThreads } from "./TaskA2aThreads.js";
 import { TaskChainView } from "./TaskChainView.js";
 import { TaskDetailSummary } from "./TaskDetailSummary.js";
 import { TaskTimeline } from "./TaskTimeline.js";
-import styles from "./task-drawer.module.css";
+import { errorBox as sharedErrorBox, loading as sharedLoading } from "./shared.js";
 
 export interface TaskDrawerProps {
   taskId: string;
@@ -102,9 +102,9 @@ export function TaskDrawer({ taskId, onClose, onOpenWorkItem }: TaskDrawerProps)
       }
       headerExtra={<Badge tone={REALTIME_TONE[realtime]} text={REALTIME_LABEL[realtime]} />}
     >
-      {detail.isPending ? <p className={styles.loading}>加载中…</p> : null}
+      {detail.isPending ? <p className={sharedLoading}>加载中…</p> : null}
       {detail.isError ? (
-        <div className={styles.errorBox} role="alert">
+        <div className={sharedErrorBox} role="alert">
           <span>{errorMessage(detail.error, "任务详情加载失败")}</span>
           <Button size="sm" variant="secondary" onClick={() => void detail.refetch()}>
             重试
@@ -124,10 +124,13 @@ export function TaskDrawer({ taskId, onClose, onOpenWorkItem }: TaskDrawerProps)
             onOpenWorkItem={onOpenWorkItem}
           />
 
-          <section className={styles.inlineSection} aria-label="轮次链">
-            <div className={styles.sectionHeading}>
-              <h3 className={styles.inlineTitle}>轮次链</h3>
-              <span className={styles.sectionHint}>A2A 内容只在这里，不进群</span>
+          <section
+            className="mt-5 border-t border-line-soft pt-4"
+            aria-label="轮次链"
+          >
+            <div className="mb-2 flex flex-wrap items-baseline gap-2">
+              <h3 className="m-0 text-md font-bold text-foreground">轮次链</h3>
+              <span className="text-xs text-subtle">A2A 内容只在这里，不进群</span>
             </div>
             <TaskChainView
               chain={chain.data}
@@ -146,7 +149,7 @@ export function TaskDrawer({ taskId, onClose, onOpenWorkItem }: TaskDrawerProps)
           </section>
 
           {events.isError ? (
-            <div className={styles.errorBox} role="alert">
+            <div className={sharedErrorBox} role="alert">
               <span>{errorMessage(events.error, "事件加载失败")}</span>
               <Button size="sm" variant="secondary" onClick={() => void events.refetch()}>
                 重试

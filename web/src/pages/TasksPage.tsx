@@ -11,7 +11,6 @@ import { AsyncSection } from "../components/ui/AsyncSection.js";
 import { EmptyState } from "../components/ui/EmptyState.js";
 import { useNow } from "../shared/useNow.js";
 import { agentNameMap } from "../shared/agent-label.js";
-import styles from "../components/task/task-list.module.css";
 
 function toQuery(filters: TaskFilters) {
   return {
@@ -44,7 +43,7 @@ export function TasksPage() {
     filters.status !== null || filters.project !== null || filters.assignee !== null;
 
   return (
-    <div className={styles.page}>
+    <div className="flex flex-col gap-4">
       <TaskFiltersForm />
 
       <AsyncSection

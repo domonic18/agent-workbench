@@ -8,7 +8,6 @@ import {
 } from "../../shared/labels.js";
 import { Badge } from "../ui/Badge.js";
 import { Table, type TableColumn } from "../ui/Table.js";
-import styles from "./work-item-list.module.css";
 
 export interface WorkItemTableProps {
   items: readonly WorkItemListItem[];
@@ -34,15 +33,15 @@ export function WorkItemTable({ items, from, search }: WorkItemTableProps) {
       render: (item) => (
         <>
           <Link
-            className={styles.rowLink}
+            className="block overflow-hidden whitespace-nowrap text-ellipsis text-foreground no-underline hover:text-accent hover:underline"
             to={workItemUrl(item.id, search)}
             state={{ from }}
             onClick={(event) => event.stopPropagation()}
           >
-            <span className={styles.title}>{item.title}</span>
+            <span className="break-normal font-semibold text-foreground">{item.title}</span>
           </Link>
-          <div className={styles.subline}>
-            <span className={styles.mono}>{item.id}</span>
+          <div className="mt-1 flex items-center gap-2 text-xs text-subtle">
+            <span className="font-mono text-xs text-subtle">{item.id}</span>
             <span>·</span>
             <span>{item.kind}</span>
           </div>
@@ -53,7 +52,7 @@ export function WorkItemTable({ items, from, search }: WorkItemTableProps) {
       key: "project",
       header: "项目",
       width: "12%",
-      render: (item) => <span className={styles.clip}>{item.project}</span>,
+      render: (item) => <span className="block overflow-hidden whitespace-nowrap text-ellipsis">{item.project}</span>,
     },
     {
       key: "stage",
@@ -80,9 +79,9 @@ export function WorkItemTable({ items, from, search }: WorkItemTableProps) {
       width: "25%",
       render: (item) =>
         item.nextAction === null ? (
-          <span className={styles.muted}>尚未给出下一步</span>
+          <span className="text-xs text-muted">尚未给出下一步</span>
         ) : (
-          <span className={styles.clip} title={item.nextAction}>
+          <span className="block overflow-hidden whitespace-nowrap text-ellipsis" title={item.nextAction}>
             {item.nextAction}
           </span>
         ),
@@ -100,7 +99,7 @@ export function WorkItemTable({ items, from, search }: WorkItemTableProps) {
 
   return (
     <>
-      <div className={styles.tableArea}>
+      <div className="block max-md:hidden">
         <Table
           columns={columns}
           rows={[...items]}
@@ -111,30 +110,30 @@ export function WorkItemTable({ items, from, search }: WorkItemTableProps) {
       </div>
 
       {/* 窄屏转卡片:标题 + 注意力 + 项目 + 下一步(03 §8) */}
-      <ul className={styles.cards} aria-label="工作事项卡片">
+      <ul className="m-0 hidden list-none flex-col gap-3 p-0 max-md:flex" aria-label="工作事项卡片">
         {items.map((item) => (
-          <li key={item.id} className={styles.card}>
+          <li key={item.id} className="rounded-lg border border-border bg-surface">
             <Link
-              className={styles.cardLink}
+              className="flex min-h-touch flex-col gap-3 p-4 text-foreground no-underline active:bg-accent-soft"
               to={workItemUrl(item.id, search)}
               state={{ from }}
               aria-label={item.title}
             >
-              <span className={styles.cardTop}>
-                <span className={styles.cardTitle}>{item.title}</span>
+              <span className="flex items-start justify-between gap-3">
+                <span className="break-words text-md font-semibold">{item.title}</span>
                 <Badge
                   tone={WORK_ITEM_ATTENTION_TONE[item.attention]}
                   text={WORK_ITEM_ATTENTION_LABEL[item.attention]}
                 />
               </span>
-              <span className={styles.cardMeta}>
-                <span className={styles.cardMetaLabel}>项目</span>
+              <span className="flex flex-wrap items-baseline gap-2 text-sm">
+                <span className="text-xs text-muted">项目</span>
                 <span>{item.project}</span>
-                <span className={styles.cardMetaLabel}>阶段</span>
+                <span className="text-xs text-muted">阶段</span>
                 <span>{WORK_ITEM_STAGE_LABEL[item.stage]}</span>
               </span>
               {item.nextAction === null ? null : (
-                <span className={styles.cardNext}>{item.nextAction}</span>
+                <span className="break-words text-sm text-text-secondary">{item.nextAction}</span>
               )}
             </Link>
           </li>

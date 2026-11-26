@@ -1,7 +1,6 @@
 import type { WorkItemDetail } from "../../api/work-items.js";
 import { formatDateTime } from "../../shared/format.js";
 import { JsonBlock, KeyValueList } from "./JsonBlock.js";
-import styles from "./work-item-drawer.module.css";
 
 export interface WorkItemOutcomeProps {
   item: WorkItemDetail;
@@ -10,8 +9,8 @@ export interface WorkItemOutcomeProps {
 /** 结果与验证:产出、验证依据与验收引用;发布仍是独立人工动作 */
 export function WorkItemOutcome({ item }: WorkItemOutcomeProps) {
   return (
-    <section className={styles.block} aria-label="结果与验证">
-      <h3 className={styles.blockTitle}>结果与验证</h3>
+    <section className="mb-5 last:mb-0" aria-label="结果与验证">
+      <h3 className="mb-1 text-md font-bold text-foreground">结果与验证</h3>
       <KeyValueList
         items={[
           {
@@ -31,8 +30,8 @@ export function WorkItemOutcome({ item }: WorkItemOutcomeProps) {
           },
         ]}
       />
-      <div className={styles.group}>
-        <div className={styles.groupTitle}>验证依据</div>
+      <div className="mb-4 last:mb-0">
+        <div className="mb-2 flex items-baseline gap-2 text-sm font-semibold text-foreground">验证依据</div>
         <JsonBlock value={item.validation} empty="尚无验证记录" />
       </div>
     </section>

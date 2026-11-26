@@ -15,7 +15,6 @@ import { ErrorState } from "../ui/ErrorState.js";
 import { LoadingState } from "../ui/LoadingState.js";
 import { SectionHeader } from "../ui/SectionHeader.js";
 import { WorkItemTable } from "./WorkItemTable.js";
-import styles from "./work-item-list.module.css";
 
 const PAGE_SIZE = 20;
 
@@ -69,16 +68,16 @@ export function WorkItemSection() {
   const from = `${location.pathname}${location.search}`;
 
   return (
-    <section className={styles.section} aria-label="工作事项">
+    <section className="flex flex-col gap-4" aria-label="工作事项">
       <SectionHeader title="工作事项" />
-      <div className={styles.toolbar}>
+      <div className="flex flex-wrap items-center gap-3">
         <ChipGroup
           label="注意力筛选"
           options={FILTERS}
           value={attention ?? ""}
           onValueChange={selectFilter}
         />
-        <span className={styles.count}>
+        <span className="ml-auto text-xs text-muted">
           {items.length} 个工作事项
           {attention === null ? "" : ` · 已筛选「${WORK_ITEM_ATTENTION_LABEL[attention]}」`}
         </span>

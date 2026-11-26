@@ -9,7 +9,6 @@ import { Button } from "../ui/Button.js";
 import { Table, type TableColumn } from "../ui/Table.js";
 import { Tooltip } from "../ui/Tooltip.js";
 import { statusBadges, taskMeta } from "./agent-rows.js";
-import styles from "./agents.module.css";
 
 export interface AgentColumnOptions {
   liveById: ReadonlyMap<string, OverviewAgent>;
@@ -26,9 +25,9 @@ export function buildAgentColumns(options: AgentColumnOptions): TableColumn<Agen
       width: "154px",
       header: "机器人",
       render: (agent) => (
-        <div className={styles.identity}>
-          <span className={styles.identityName}>{agentDisplayName(agent)}</span>
-          <span className={styles.identitySub}>
+        <div className="flex flex-col gap-px min-w-0">
+          <span className="font-semibold text-foreground [overflow-wrap:normal] [word-break:normal]">{agentDisplayName(agent)}</span>
+          <span className="text-xs text-muted overflow-hidden text-ellipsis whitespace-nowrap">
             {agent.project}
             {/* 路由 key 默认等于 cc-connect 项目名,重复时不再赘述 */}
             {agent.key === null || agent.key === agent.project ? "" : ` · ${agent.key}`}
@@ -53,12 +52,12 @@ export function buildAgentColumns(options: AgentColumnOptions): TableColumn<Agen
       render: (agent) => {
         const name = agent.machineDisplayName ?? agent.machineHostname;
         return (
-          <span className={styles.machineCell}>
+          <span className="inline-flex items-center gap-1 max-w-full text-text-secondary">
             <Monitor size={14} aria-hidden="true" />
             {name === null || name === undefined ? (
-              <span className={styles.muted}>未绑定</span>
+              <span className="text-muted">未绑定</span>
             ) : (
-              <span className={styles.machineName} title={name}>
+              <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap" title={name}>
                 {name}
               </span>
             )}
@@ -73,15 +72,15 @@ export function buildAgentColumns(options: AgentColumnOptions): TableColumn<Agen
       align: "right",
       render: (agent) => {
         if (!hasCollector(agent)) {
-          return <span className={styles.muted}>{NOT_COLLECTED}</span>;
+          return <span className="text-muted">{NOT_COLLECTED}</span>;
         }
         const live = liveById.get(agent.id);
         if (live === undefined || live.activeSessions === null) {
-          return <span className={styles.muted}>—</span>;
+          return <span className="text-muted">—</span>;
         }
         // 同机共享一个数字;0 是真实空闲,不用占位符掩盖
         return (
-          <span className={live.activeSessions === 0 ? styles.muted : undefined}>
+          <span className={live.activeSessions === 0 ? "text-muted" : undefined}>
             {live.activeSessions}
           </span>
         );
@@ -92,7 +91,7 @@ export function buildAgentColumns(options: AgentColumnOptions): TableColumn<Agen
       width: "120px",
       header: "状态",
       render: (agent) => (
-        <div className={styles.statusCell}>{statusBadges(agent, liveById.get(agent.id))}</div>
+        <div className="flex flex-wrap gap-1 items-center">{statusBadges(agent, liveById.get(agent.id))}</div>
       ),
     },
     {
@@ -105,27 +104,27 @@ export function buildAgentColumns(options: AgentColumnOptions): TableColumn<Agen
         if (title !== null) {
           const meta = taskMeta(live);
           return (
-            <div className={styles.taskCell}>
-              <span className={styles.taskTitle} title={title}>
+            <div className="flex flex-col gap-px min-w-0 max-w-[280px]">
+              <span className="overflow-hidden text-ellipsis whitespace-nowrap" title={title}>
                 {title}
               </span>
-              {meta === "" ? null : <span className={styles.taskMeta}>{meta}</span>}
+              {meta === "" ? null : <span className="text-xs text-muted">{meta}</span>}
             </div>
           );
         }
         // 未建单的运行会话没有任务标题，用最近一条指令回答「在忙什么」，比一句横杠有用
         if (live?.running === true && live.currentInstruction !== null) {
           return (
-            <div className={styles.taskCell}>
-              <span className={styles.taskTitle} title={live.currentInstruction}>
-                <span className={styles.instructionTag}>最近指令</span>
+            <div className="flex flex-col gap-px min-w-0 max-w-[280px]">
+              <span className="overflow-hidden text-ellipsis whitespace-nowrap" title={live.currentInstruction}>
+                <span className="mr-1 font-semibold text-muted">最近指令</span>
                 {live.currentInstruction}
               </span>
             </div>
           );
         }
         return (
-          <span className={styles.muted}>
+          <span className="text-muted">
             {live?.running === true ? "运行中 · 当前会话未关联任务" : "当前没有进行中的任务"}
           </span>
         );
@@ -139,11 +138,11 @@ export function buildAgentColumns(options: AgentColumnOptions): TableColumn<Agen
       render: (agent) => {
         // 外部运行时没有 aw-node 采集,Token 固定「未接入 / —」,不显示为 0
         if (!hasCollector(agent)) {
-          return <span className={styles.muted}>{NOT_COLLECTED}</span>;
+          return <span className="text-muted">{NOT_COLLECTED}</span>;
         }
         const live = liveById.get(agent.id);
         if (live === undefined) {
-          return <span className={styles.muted}>—</span>;
+          return <span className="text-muted">—</span>;
         }
         return (
           <span title={formatExactTokens(live.todayTokens)}>{formatTokens(live.todayTokens)}</span>
@@ -158,12 +157,12 @@ export function buildAgentColumns(options: AgentColumnOptions): TableColumn<Agen
       nowrap: true,
       render: (agent) => {
         if (!hasCollector(agent)) {
-          return <span className={styles.muted}>{NOT_COLLECTED}</span>;
+          return <span className="text-muted">{NOT_COLLECTED}</span>;
         }
         return (
           <div>
             <div>{agent.totalRuns} 次</div>
-            <div className={styles.taskMeta}>{formatTokens(agent.totalTokens)} tok</div>
+            <div className="text-xs text-muted">{formatTokens(agent.totalTokens)} tok</div>
           </div>
         );
       },
@@ -175,10 +174,10 @@ export function buildAgentColumns(options: AgentColumnOptions): TableColumn<Agen
       nowrap: true,
       render: (agent) => {
         if (!hasCollector(agent)) {
-          return <span className={styles.muted}>{NOT_COLLECTED}</span>;
+          return <span className="text-muted">{NOT_COLLECTED}</span>;
         }
         if (agent.lastRunAt === null) {
-          return <span className={styles.muted}>从未运行</span>;
+          return <span className="text-muted">从未运行</span>;
         }
         return <span title={formatDateTime(agent.lastRunAt)}>{formatRelativeTime(agent.lastRunAt)}</span>;
       },
@@ -189,7 +188,7 @@ export function buildAgentColumns(options: AgentColumnOptions): TableColumn<Agen
       header: "操作",
       align: "right",
       render: (agent) => (
-        <div className={styles.rowActions}>
+        <div className="flex justify-end gap-2">
           {/* 行点击进管理：动作按钮要先截断冒泡，否则一次点击触发两件事 */}
           <Button
             size="sm"
@@ -227,7 +226,7 @@ export interface AgentTableProps {
 /** 宽屏表格 */
 export function AgentTable({ agents, columns, onOpenDetail }: AgentTableProps) {
   return (
-    <div className={styles.tableArea}>
+    <div className="block">
       <Table
         columns={columns}
         rows={[...agents]}

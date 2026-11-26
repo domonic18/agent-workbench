@@ -3,7 +3,10 @@ import { CopyBlock } from "../ui/CopyBlock.js";
 import { Dialog } from "../ui/Dialog.js";
 import { enrollPackage } from "./snippets.js";
 import type { AgentEnrollGrant } from "./types.js";
-import styles from "./access.module.css";
+
+const snippets = "flex flex-col gap-4";
+const warning =
+  "m-0 rounded-md border border-warning-border bg-warning-soft p-3 text-sm text-foreground";
 
 export interface EnrollDialogProps {
   grant: AgentEnrollGrant;
@@ -16,8 +19,8 @@ export function EnrollDialog({ grant, origin, onClose }: EnrollDialogProps) {
   const packageText = enrollPackage(origin, grant.displayName, grant.token);
   return (
     <Dialog title="接入包已生成" size="lg" onClose={onClose}>
-      <div className={styles.snippets}>
-        <p className={styles.warning} role="alert">
+      <div className={snippets}>
+        <p className={warning} role="alert">
           令牌只显示这一次，有效期到 {formatDateTime(grant.expiresAt)}、只能用一次。它等同密码，别发到公开频道；
           兑换时 {grant.displayName} 的旧密钥会立即作废。
         </p>

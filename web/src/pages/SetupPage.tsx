@@ -12,7 +12,6 @@ import {
 import { SetupStepper } from "../components/setup/SetupStepper.js";
 import { LogoIcon } from "../components/brand/LogoIcon.js";
 import { APP_NAME, APP_VERSION } from "../shared/app.js";
-import styles from "../components/setup/setup.module.css";
 
 function stepForPhase(phase: string): number {
   switch (phase) {
@@ -26,14 +25,14 @@ function stepForPhase(phase: string): number {
 
 function Shell({ children }: { children: ReactNode }) {
   return (
-    <div className={styles.page}>
-      <div className={styles.shell}>
-        <header className={styles.shellHead}>
-          <span className={styles.shellMark} aria-hidden="true">
+    <div className="min-h-screen flex items-start justify-center pt-6 px-4 pb-7 bg-background text-foreground">
+      <div className="w-full max-w-dialog-lg flex flex-col gap-5">
+        <header className="flex items-center gap-3">
+          <span className="grid place-items-center h-control-lg w-control-lg rounded-md bg-accent text-on-accent" aria-hidden="true">
             <LogoIcon size={28} />
           </span>
-          <span className={styles.shellTitle}>{APP_NAME}</span>
-          <span className={styles.shellVersion}>{APP_VERSION}</span>
+          <span className="text-lg font-semibold">{APP_NAME}</span>
+          <span className="ml-auto text-xs text-muted">{APP_VERSION}</span>
         </header>
         {children}
       </div>
@@ -53,13 +52,13 @@ export function SetupPage() {
   const error = statusQuery.error;
   const unauthorized = error instanceof ApiError && error.status === 401;
   if (statusQuery.isLoading && !unauthorized) {
-    return <Shell><div className={styles.card}>读取初始化状态…</div></Shell>;
+    return <Shell><div className="w-full bg-surface border border-border rounded-lg p-6 shadow-sm max-md:[&_input]:min-h-touch max-md:[&_select]:min-h-touch max-md:[&_button]:min-h-touch">读取初始化状态…</div></Shell>;
   }
   if (error !== null && !unauthorized) {
     return (
       <Shell>
-        <div className={styles.card}>
-          <p className={styles.error}>初始化状态读取失败:{(error as ApiError).message}</p>
+        <div className="w-full bg-surface border border-border rounded-lg p-6 shadow-sm max-md:[&_input]:min-h-touch max-md:[&_select]:min-h-touch max-md:[&_button]:min-h-touch">
+          <p className="text-danger text-sm mt-3">初始化状态读取失败:{(error as ApiError).message}</p>
         </div>
       </Shell>
     );

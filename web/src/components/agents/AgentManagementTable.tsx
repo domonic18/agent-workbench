@@ -14,7 +14,6 @@ import { Input, Select } from "../ui/Field.js";
 import { AgentCardList } from "./AgentCardList.js";
 import { AgentTable, buildAgentColumns } from "./AgentTableColumns.js";
 import { AgentOfficeScene } from "./office/AgentOfficeScene.js";
-import styles from "./agents.module.css";
 
 export interface AgentManagementTableProps {
   /** 总览投影的活体状态，按 id 与名册合并 */
@@ -128,7 +127,7 @@ export function AgentManagementTable({
   }
 
   if (agentsQuery.isPending) {
-    return <p className={styles.muted}>加载中…</p>;
+    return <p className="text-muted">加载中…</p>;
   }
 
   if (agentsQuery.isError) {
@@ -148,8 +147,8 @@ export function AgentManagementTable({
 
   return (
     <div>
-      <div className={styles.toolbar}>
-        <div className={styles.searchWrap}>
+      <div className="flex flex-wrap items-end gap-3 px-5 py-4 border-b border-line-soft">
+        <div className="flex-[1_1_220px] min-w-0">
           <Input
             type="search"
             value={keyword}
@@ -159,7 +158,7 @@ export function AgentManagementTable({
           />
         </div>
         <Select
-          className={styles.select}
+          className="flex-[0_0_150px] w-auto min-w-[130px]"
           value={status}
           aria-label="按启停筛选"
           onChange={(event) => setStatus(event.target.value as StatusFilter)}
@@ -171,7 +170,7 @@ export function AgentManagementTable({
           ))}
         </Select>
         <Select
-          className={styles.select}
+          className="flex-[0_0_150px] w-auto min-w-[130px]"
           value={runtime}
           aria-label="按运行时筛选"
           onChange={(event) => setRuntime(event.target.value)}
@@ -184,7 +183,7 @@ export function AgentManagementTable({
           ))}
         </Select>
         <Select
-          className={styles.select}
+          className="flex-[0_0_150px] w-auto min-w-[130px]"
           value={machine}
           aria-label="按机器筛选"
           onChange={(event) => setMachine(event.target.value)}
@@ -196,16 +195,16 @@ export function AgentManagementTable({
             </option>
           ))}
         </Select>
-        <span className={styles.resultCount}>
+        <span className="self-center ml-auto text-xs text-muted">
           {visible.length} / {agents.length} 个 Agent
         </span>
-        <div className={styles.viewToggle} role="group" aria-label="显示方式">
+        <div className="inline-flex gap-1" role="group" aria-label="显示方式">
           <IconButton
             size="sm"
             label="列表视图"
             aria-pressed={view === "list"}
             icon={<Table size={14} />}
-            className={view === "list" ? styles.viewActive : undefined}
+            className={view === "list" ? "border-accent text-accent" : undefined}
             onClick={() => changeView("list")}
           />
           <IconButton
@@ -213,7 +212,7 @@ export function AgentManagementTable({
             label="卡片视图"
             aria-pressed={view === "card"}
             icon={<LayoutGrid size={14} />}
-            className={view === "card" ? styles.viewActive : undefined}
+            className={view === "card" ? "border-accent text-accent" : undefined}
             onClick={() => changeView("card")}
           />
           <IconButton
@@ -221,7 +220,7 @@ export function AgentManagementTable({
             label={narrow ? "办公室视图（窄屏不支持）" : "办公室视图"}
             aria-pressed={view === "office" && !narrow}
             icon={<Building2 size={14} />}
-            className={view === "office" && !narrow ? styles.viewActive : undefined}
+            className={view === "office" && !narrow ? "border-accent text-accent" : undefined}
             disabled={narrow}
             onClick={() => changeView("office")}
           />

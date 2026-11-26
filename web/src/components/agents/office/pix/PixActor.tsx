@@ -7,8 +7,7 @@ import {
   PIX_CLIP_PIVOT_X,
 } from "../../../../assets/pix/manifest.js";
 import { WALK_CLIP } from "./clip-map.js";
-import styles from "../office.module.css";
-
+import { cn } from "../../../../lib/utils.js";
 /** 状态姿势淡入时长 */
 const FADE_MS = 320;
 
@@ -97,11 +96,17 @@ export function PixActor({
 
   // 有过渡时状态层改用「先隐后现」的时序，与过渡层交叉淡化；
   // 状态层的 key 跟着过渡序号走，保证每次过渡都重放一次时序。
-  const stateClass = transition === null ? styles.stateFade : styles.stateTrans;
+  const stateClass =
+    transition === null
+      ? "absolute top-0 left-0 opacity-0 [animation:office-state-fade_var(--fade-ms)_linear_var(--state-delay)_forwards] motion-reduce:!animate-none motion-reduce:!opacity-100"
+      : "absolute top-0 left-0 opacity-0 [animation:office-state-trans_var(--trans-ms)_linear_forwards] motion-reduce:!animate-none motion-reduce:!opacity-100";
 
   return (
     <div
-      className={`${styles.actor} ${dimmed ? styles.dimmed : ""}`}
+      className={cn(
+        "absolute top-0 left-0 [transform:translate3d(var(--to-x),var(--to-y),0)] [animation:office-walk-in_var(--walk-ms)_ease-in-out_var(--delay)_both] motion-reduce:animate-none",
+        dimmed && "grayscale opacity-45",
+      )}
       style={cssVars({
         "--from-x": `${walkFrom.x}px`,
         "--from-y": `${walkFrom.y}px`,
@@ -114,9 +119,9 @@ export function PixActor({
         "--trans-ms": `${transition?.durationMs ?? 0}ms`,
       })}
     >
-      <div className={styles.walkFade}>
+      <div className="absolute top-0 left-0 [animation:office-walk-fade_var(--walk-ms)_linear_var(--delay)_forwards] motion-reduce:!animate-none motion-reduce:!opacity-0">
         <div
-          className={`${SPRITE_CLASS} ${walkKeyframe} ${styles.spriteBox}`}
+          className={`${SPRITE_CLASS} ${walkKeyframe} absolute top-0 left-0`}
           style={{
             backgroundImage: sheetOf(pack),
             transform: `translate(${-walkPivot}px, ${-walkFoot}px)`,
@@ -126,10 +131,14 @@ export function PixActor({
       </div>
       <div key={`state-${transition?.seq ?? 0}`} className={stateClass}>
         <div
-          className={`${styles.pose} ${sway ? styles.sway : ""} ${breathe ? styles.breathe : ""}`}
+          className={cn(
+            "absolute top-0 left-0",
+            sway && "animate-[office-sway_1.8s_ease-in-out_infinite_alternate] motion-reduce:animate-none",
+            breathe && "animate-[office-breathe_3.4s_ease-in-out_infinite_alternate] motion-reduce:animate-none",
+          )}
         >
           <div
-            className={`${SPRITE_CLASS} ${stateKeyframe} ${styles.spriteBox}`}
+            className={`${SPRITE_CLASS} ${stateKeyframe} absolute top-0 left-0`}
             style={{
               backgroundImage: sheetOf(pack),
               transform: `translate(${-statePivot}px, ${-stateFoot}px)`,
@@ -138,9 +147,12 @@ export function PixActor({
         </div>
       </div>
       {transition !== null ? (
-        <div key={`trans-${transition.seq}`} className={styles.transFade}>
+        <div
+          key={`trans-${transition.seq}`}
+          className="absolute top-0 left-0 [animation:office-trans-fade_var(--trans-ms)_linear_forwards] motion-reduce:!animate-none motion-reduce:!opacity-0"
+        >
           <div
-            className={`${SPRITE_CLASS} ${transKeyframe} ${styles.spriteBox}`}
+            className={`${SPRITE_CLASS} ${transKeyframe} absolute top-0 left-0`}
             style={{
               backgroundImage: sheetOf(pack),
               transform: `translate(${-transPivot}px, ${-transFoot}px)`,

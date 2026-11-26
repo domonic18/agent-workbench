@@ -10,7 +10,6 @@ import {
 import { agentMentionLabel } from "../../shared/agent-label.js";
 import { Badge } from "../ui/Badge.js";
 import { JsonBlock, KeyValueList } from "./JsonBlock.js";
-import styles from "./work-item-drawer.module.css";
 
 export interface WorkItemBlockProps {
   item: WorkItemDetail;
@@ -19,8 +18,8 @@ export interface WorkItemBlockProps {
 
 export function WorkItemGoalBlock({ item }: { item: WorkItemDetail }) {
   return (
-    <section className={styles.block} aria-label="目标与边界">
-      <h3 className={styles.blockTitle}>目标与边界</h3>
+    <section className="mb-5 last:mb-0" aria-label="目标与边界">
+      <h3 className="mb-1 text-md font-bold text-foreground">目标与边界</h3>
       <KeyValueList
         items={[
           { key: "kind", label: "事项类型", value: item.kind },
@@ -48,8 +47,8 @@ export function WorkItemGoalBlock({ item }: { item: WorkItemDetail }) {
           { key: "revision", label: "进展版本", value: `第 ${item.progressRevision} 次` },
         ]}
       />
-      <div className={styles.group}>
-        <div className={styles.groupTitle}>作用域</div>
+      <div className="mb-4 last:mb-0">
+        <div className="mb-2 flex items-baseline gap-2 text-sm font-semibold text-foreground">作用域</div>
         <JsonBlock value={item.scope} empty="未定义作用域" />
       </div>
     </section>
@@ -72,9 +71,9 @@ export function WorkItemStatusBlock({ item, inbox, agentNames }: WorkItemStatusB
         : waiting;
 
   return (
-    <section className={styles.block} aria-label="当前状态">
-      <h3 className={styles.blockTitle}>当前状态</h3>
-      <div className={styles.badges}>
+    <section className="mb-5 last:mb-0" aria-label="当前状态">
+      <h3 className="mb-1 text-md font-bold text-foreground">当前状态</h3>
+      <div className="mb-3 flex flex-wrap gap-2">
         <Badge tone={WORK_ITEM_STATUS_TONE[item.status]} text={WORK_ITEM_STATUS_LABEL[item.status]} />
         <Badge tone="muted" text={WORK_ITEM_STAGE_LABEL[item.stage]} />
         <Badge
@@ -107,15 +106,15 @@ export function WorkItemStatusBlock({ item, inbox, agentNames }: WorkItemStatusB
             label: "等待对象",
             value:
               waitingText.length === 0 ? (
-                <span className={styles.muted}>无人等待</span>
+                <span className="text-muted text-xs">无人等待</span>
               ) : (
-                <span className={styles.waiting}>{[...new Set(waitingText)].join("、")}</span>
+                <span className="break-words text-sm text-text-secondary">{[...new Set(waitingText)].join("、")}</span>
               ),
           },
         ]}
       />
       {item.attention === "stalled" && item.lastProgressAt !== null ? (
-        <p className={styles.muted}>自 {formatDateTime(item.lastProgressAt)} 起无实质进展</p>
+        <p className="text-muted text-xs">自 {formatDateTime(item.lastProgressAt)} 起无实质进展</p>
       ) : null}
     </section>
   );

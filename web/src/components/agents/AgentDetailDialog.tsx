@@ -10,7 +10,6 @@ import { AgentOverviewPanel } from "./AgentOverviewPanel.js";
 import { AgentTaskPanel } from "./AgentTaskPanel.js";
 import { AgentTimeline } from "./AgentTimeline.js";
 import { statusBadges } from "./agent-rows.js";
-import styles from "./agents.module.css";
 
 export interface AgentDetailDialogProps {
   agentId: string;
@@ -29,7 +28,7 @@ export function AgentDetailDialog({ agentId, live, onClose }: AgentDetailDialogP
   if (agentsQuery.isPending) {
     return (
       <Dialog title="机器人详情" variant="drawer" size="lg" onClose={onClose}>
-        <p className={styles.muted}>加载中…</p>
+        <p className="text-muted">加载中…</p>
       </Dialog>
     );
   }
@@ -37,7 +36,7 @@ export function AgentDetailDialog({ agentId, live, onClose }: AgentDetailDialogP
   if (agent === undefined) {
     return (
       <Dialog title="机器人详情" variant="drawer" size="lg" onClose={onClose}>
-        <p className={styles.error} role="alert">
+        <p className="mt-3 text-xs text-danger" role="alert">
           该 Agent 已不存在，可能已被删除。
         </p>
       </Dialog>
@@ -51,7 +50,7 @@ export function AgentDetailDialog({ agentId, live, onClose }: AgentDetailDialogP
       variant="drawer"
       size="lg"
       onClose={onClose}
-      headerExtra={<div className={styles.statusCell}>{statusBadges(agent, live)}</div>}
+      headerExtra={<div className="flex flex-wrap gap-1 items-center">{statusBadges(agent, live)}</div>}
     >
       <Tabs
         value={tab}

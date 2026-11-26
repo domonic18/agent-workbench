@@ -5,7 +5,6 @@ import { TASK_STATUS_LABEL } from "../../shared/labels.js";
 import { Button } from "../ui/Button.js";
 import { ChipGroup } from "../ui/Chip.js";
 import { Input } from "../ui/Field.js";
-import styles from "./TaskFilters.module.css";
 
 /** 筛选条件只存 URL query,刷新与回退后保持一致(03 §3) */
 export function TaskFiltersForm() {
@@ -51,8 +50,8 @@ export function TaskFiltersForm() {
   }
 
   return (
-    <form className={styles.filters} onSubmit={apply} aria-label="任务筛选">
-      <div className={styles.filterRow}>
+    <form className="mb-4 flex flex-col gap-3" onSubmit={apply} aria-label="任务筛选">
+      <div className="flex flex-wrap items-center gap-3 max-md:items-start">
         <ChipGroup
           label="状态筛选"
           value={status}
@@ -73,9 +72,9 @@ export function TaskFiltersForm() {
         >
           更多筛选
         </Button>
-        <div className={styles.filterAside}>
+        <div className="ml-auto flex items-center gap-3 max-md:hidden">
           <span
-            className={styles.sortHint}
+            className="text-xs text-subtle max-[900px]:ml-0"
             title="任务按最后事件时间倒序排列，点任一行查看轮次链。"
           >
             默认按最后事件倒序
@@ -84,9 +83,12 @@ export function TaskFiltersForm() {
       </div>
 
       {moreOpen ? (
-        <div className={styles.moreBody}>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="task-filter-project">
+        <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-surface p-4 max-md:flex-col max-md:items-stretch">
+          <div className="flex min-w-[160px] flex-col gap-2 max-md:w-full">
+            <label
+              className="text-sm font-semibold text-text-secondary"
+              htmlFor="task-filter-project"
+            >
               项目
             </label>
             <Input
@@ -96,8 +98,11 @@ export function TaskFiltersForm() {
               placeholder="全部项目"
             />
           </div>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="task-filter-assignee">
+          <div className="flex min-w-[160px] flex-col gap-2 max-md:w-full">
+            <label
+              className="text-sm font-semibold text-text-secondary"
+              htmlFor="task-filter-assignee"
+            >
               承接方
             </label>
             <Input
@@ -107,7 +112,7 @@ export function TaskFiltersForm() {
               placeholder="Agent ID"
             />
           </div>
-          <div className={styles.actions}>
+          <div className="flex gap-2 max-md:w-full max-md:[&>button]:flex-1">
             <Button type="submit" variant="primary">
               应用
             </Button>

@@ -8,8 +8,8 @@ import { EmptyState } from "../ui/EmptyState.js";
 import { LinkButton } from "../ui/LinkButton.js";
 import { Panel } from "../ui/Panel.js";
 import { CopyActionButton, CopyBlock } from "../ui/CopyBlock.js";
+import { cn } from "../../lib/utils.js";
 import { artifactKeyOf, detectArtifactKey, GITHUB_RELEASE_BASE, type ArtifactKey } from "./platform.js";
-import styles from "./onboarding.module.css";
 
 export interface DownloadStepProps {
   /** 控制台对外地址，用来拼安装命令与直链 */
@@ -30,23 +30,24 @@ function PlatformCard({
   url: string;
   recommended: boolean;
 }) {
-  const cardClass = recommended
-    ? `${styles.platformCard} ${styles.platformRecommended}`
-    : styles.platformCard;
+  const cardClass = cn(
+    "flex flex-col gap-3 p-4 rounded-lg border",
+    recommended ? "border-accent-border bg-accent-soft" : "border-border bg-surface-2",
+  );
   return (
     <div className={cardClass}>
-      <div className={styles.platformHead}>
-        <span className={styles.platformName}>{label}</span>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-md font-bold text-foreground">{label}</span>
         {recommended ? <Badge tone="info" text="推荐" /> : null}
       </div>
-      <div className={styles.platformMeta}>
+      <div className="flex flex-wrap gap-x-3 gap-y-2 text-xs text-muted">
         <span>{formatBytes(size)}</span>
         <span>{sha256 === null ? "控制台未提供校验和" : `SHA-256 ${sha256.slice(0, 16)}…`}</span>
       </div>
       {sha256 === null ? null : (
-        <code className={styles.checksum}>{sha256}</code>
+        <code className="block font-mono text-xs text-text-secondary [overflow-wrap:anywhere]">{sha256}</code>
       )}
-      <div className={styles.platformActions}>
+      <div className="flex flex-wrap gap-2 mt-auto max-md:[&>button]:w-full max-md:[&>a]:w-full max-md:[&>a]:min-h-touch">
         <LinkButton href={url} download icon={<Download size={15} aria-hidden="true" />}>
           下载
         </LinkButton>
@@ -81,15 +82,15 @@ export function DownloadStep({ origin }: DownloadStepProps) {
   const checksumsUrl = `${origin}/artifacts/checksums.txt`;
 
   return (
-    <div className={styles.stack}>
+    <div className="flex flex-col gap-5">
       <Panel title="选择平台产物">
-        {artifacts.isPending ? <p className={styles.hint}>读取产物目录…</p> : null}
+        {artifacts.isPending ? <p className="text-xs text-muted">读取产物目录…</p> : null}
         {assets.length === 0 ? (
           <EmptyState
             title="控制台暂未镜像执行面产物"
           />
         ) : (
-          <div className={styles.platformGrid}>
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-4 max-md:grid-cols-1">
             {assets.map((asset) => {
               const key = artifactKeyOf(asset.name);
               return (
@@ -114,7 +115,7 @@ export function DownloadStep({ origin }: DownloadStepProps) {
           copyLabel="复制命令"
           copiedText="安装命令已复制"
         />
-        <div className={styles.platformActions}>
+        <div className="flex flex-wrap gap-2 mt-auto max-md:[&>button]:w-full max-md:[&>a]:w-full max-md:[&>a]:min-h-touch">
           <CopyActionButton value={checksumsUrl} label="复制校验和文件直链" />
           <LinkButton
             variant="secondary"

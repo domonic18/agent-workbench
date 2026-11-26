@@ -11,7 +11,16 @@ import { Button } from "../ui/Button.js";
 import { Table } from "../ui/Table.js";
 import { useToast } from "../ui/Toast.js";
 import type { AgentCredentials, AgentEnrollGrant } from "./types.js";
-import styles from "./access.module.css";
+
+const roster = "flex flex-col gap-3";
+const cardList = "m-0 flex list-none flex-col gap-3 p-0";
+const card = "flex flex-col gap-2 rounded-md border border-border bg-surface-2 px-4 py-3";
+const cardTop = "flex items-center justify-between gap-2";
+const cardName = "text-md font-semibold text-foreground";
+const cardMeta = "flex flex-wrap gap-x-3 gap-y-2 text-xs text-muted [overflow-wrap:anywhere]";
+const rowActions = "flex flex-wrap gap-2";
+const rosterActions = "flex justify-end";
+const hint = "m-0 mt-3 text-sm text-muted";
 
 export interface AgentRosterProps {
   /** 名册由页面统一取数,便于与密钥状态共用一次请求 */
@@ -55,6 +64,7 @@ export function AgentRoster({ agents, onCredentials, onEnroll }: AgentRosterProp
     <Button
       size="sm"
       variant="secondary"
+      className="max-md:flex-1"
       icon={<Ticket size={14} aria-hidden="true" />}
       disabled={issuing === agent.id}
       onClick={() => void issueEnrollToken(agent)}
@@ -65,27 +75,28 @@ export function AgentRoster({ agents, onCredentials, onEnroll }: AgentRosterProp
 
   return (
     <>
-      <div className={styles.roster}>
+      <div className={roster}>
         {narrow ? (
-          <ul className={styles.cardList} aria-label="Agent 卡片">
+          <ul className={cardList} aria-label="Agent 卡片">
             {agents.map((agent) => (
-              <li key={agent.id} className={styles.card}>
-                <div className={styles.cardTop}>
-                  <span className={styles.cardName}>{agent.displayName}</span>
+              <li key={agent.id} className={card}>
+                <div className={cardTop}>
+                  <span className={cardName}>{agent.displayName}</span>
                   <Badge
                     tone={agent.status === "active" ? "positive" : "muted"}
                     text={agent.status === "active" ? "启用" : "停用"}
                   />
                 </div>
-                <div className={styles.cardMeta}>
+                <div className={cardMeta}>
                   <span>{RUNTIME_LABEL[agent.runtime]}</span>
                   <span>{agent.project}</span>
                   <code>{agent.id}</code>
                 </div>
-                <div className={styles.rowActions}>
+                <div className={rowActions}>
                   <Button
                     size="sm"
                     variant="secondary"
+                    className="max-md:flex-1"
                     icon={<KeyRound size={14} aria-hidden="true" />}
                     onClick={() => setRotating(agent)}
                   >
@@ -117,10 +128,11 @@ export function AgentRoster({ agents, onCredentials, onEnroll }: AgentRosterProp
                 key: "actions",
                 header: "操作",
                 render: (row) => (
-                  <div className={styles.rowActions}>
+                  <div className={rowActions}>
                     <Button
                       size="sm"
                       variant="secondary"
+                      className="max-md:flex-1"
                       icon={<KeyRound size={14} aria-hidden="true" />}
                       onClick={() => setRotating(row)}
                     >
@@ -133,11 +145,11 @@ export function AgentRoster({ agents, onCredentials, onEnroll }: AgentRosterProp
             ]}
             rows={agents}
             rowKey={(row) => row.id}
-            empty={<p className={styles.hint}>还没有登记 Agent。点「注册新 Agent」建一个。</p>}
+            empty={<p className={hint}>还没有登记 Agent。点「注册新 Agent」建一个。</p>}
           />
         )}
-        <div className={styles.rosterActions}>
-          <Button variant="primary" onClick={() => setRegistering(true)}>
+        <div className={rosterActions}>
+          <Button variant="primary" className="max-md:w-full" onClick={() => setRegistering(true)}>
             注册新 Agent
           </Button>
         </div>

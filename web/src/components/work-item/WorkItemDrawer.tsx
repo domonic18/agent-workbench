@@ -18,7 +18,6 @@ import { WorkItemGoalBlock, WorkItemStatusBlock } from "./WorkItemBlock.js";
 import { WorkItemRelations } from "./WorkItemRelations.js";
 import { WorkItemOutcome } from "./WorkItemOutcome.js";
 import { WorkItemTimeline } from "./WorkItemTimeline.js";
-import styles from "./work-item-drawer.module.css";
 
 export interface WorkItemDrawerProps {
   workItemId: string;
@@ -58,10 +57,13 @@ export function WorkItemDrawer({ workItemId, onClose, onOpenTask }: WorkItemDraw
       }
       headerExtra={<Badge tone={REALTIME_TONE[realtime]} text={REALTIME_LABEL[realtime]} />}
     >
-      {detail.isPending ? <p className={styles.muted}>加载中…</p> : null}
+      {detail.isPending ? <p className="text-muted text-xs">加载中…</p> : null}
 
       {detail.isError ? (
-        <div className={styles.errorBox} role="alert">
+        <div
+          className="mb-4 flex flex-wrap items-center gap-3 rounded-md border border-danger-border bg-danger-soft px-4 py-3 text-sm text-danger"
+          role="alert"
+        >
           <span>
             {detail.error instanceof ApiError ? detail.error.message : "工作事项加载失败"}
           </span>

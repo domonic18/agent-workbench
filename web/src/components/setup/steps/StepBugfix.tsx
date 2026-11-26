@@ -6,7 +6,6 @@ import { fetchAgents } from "../../../api/identity.js";
 import { Button } from "../../ui/Button.js";
 import { Field, Select } from "../../ui/Field.js";
 import { Feedback } from "../Feedback.js";
-import styles from "../setup.module.css";
 
 export function StepBugfix({
   status,
@@ -47,21 +46,21 @@ export function StepBugfix({
   }
 
   return (
-    <div className={styles.card}>
-      <h1 className={styles.title}>启用 Bug 工作流</h1>
-      <div className={styles.section}>
+    <div className="w-full bg-surface border border-border rounded-lg p-6 shadow-sm max-md:[&_input]:min-h-touch max-md:[&_select]:min-h-touch max-md:[&_button]:min-h-touch">
+      <h1 className="m-0 mb-1 text-xl font-semibold">启用 Bug 工作流</h1>
+      <div className="mt-4 border border-border rounded-md p-4">
         <div><strong>预期结果</strong></div>
-        <p className={styles.hint}>{definition.mandate.expectedResult}</p>
+        <p className="text-muted text-xs mt-2">{definition.mandate.expectedResult}</p>
         <div><strong>范围</strong></div>
-        <p className={styles.hint}>{definition.mandate.scope}</p>
+        <p className="text-muted text-xs mt-2">{definition.mandate.scope}</p>
         <div><strong>验收证据</strong></div>
-        <ul className={styles.evidence}>
+        <ul className="mt-2 pl-5 text-sm text-muted">
           {definition.evidence.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
       </div>
-      <form className={styles.form} onSubmit={(event) => void submit(event)}>
+      <form className="flex flex-col items-stretch gap-4" onSubmit={(event) => void submit(event)}>
         <Field label="主责 Agent" htmlFor="primary">
           <Select
             id="primary"

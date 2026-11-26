@@ -1,7 +1,6 @@
 import { KNOWLEDGE_LIMITS } from "../../api/knowledge.js";
 import { Button } from "../ui/Button.js";
 import { Field, Input, Textarea } from "../ui/Field.js";
-import styles from "./knowledge-detail.module.css";
 
 export interface KnowledgeEditValues {
   title: string;
@@ -31,7 +30,7 @@ export function KnowledgeEditForm({
 
   return (
     <>
-      <div className={styles.toolbar}>
+      <div className="flex flex-wrap gap-2 border-t border-border pb-4 pt-3">
         <Button
           variant="primary"
           disabled={busy || values.title.trim() === ""}
@@ -45,7 +44,7 @@ export function KnowledgeEditForm({
         </Button>
       </div>
 
-      <div className={styles.editForm}>
+      <div className="flex flex-col gap-3">
         <Field label="标题" htmlFor="kb-edit-title">
           <Input
             id="kb-edit-title"
@@ -73,7 +72,7 @@ export function KnowledgeEditForm({
         <Field label="正文（Markdown）" htmlFor="kb-edit-content">
           <Textarea
             id="kb-edit-content"
-            className={styles.contentInput}
+            className="min-h-[280px] font-mono text-sm leading-[1.6]"
             value={values.content}
             rows={16}
             onChange={(event) => patch({ content: event.target.value })}

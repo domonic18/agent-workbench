@@ -5,7 +5,6 @@ import { agentDisplayName } from "../../shared/agent-label.js";
 import { Button } from "../ui/Button.js";
 import { IconButton } from "../ui/IconButton.js";
 import type { AgentGroupsApi } from "./useAgentGroups.js";
-import styles from "./GroupPanel.module.css";
 
 export interface GroupPanelProps {
   groupsApi: AgentGroupsApi;
@@ -32,10 +31,10 @@ export function GroupPanel({ groupsApi, agents }: GroupPanelProps) {
   }
 
   return (
-    <div className={styles.panel} role="group" aria-label="委派目标组">
-      <div className={styles.createRow}>
+    <div className={"flex flex-col gap-3 p-4 border border-border rounded-lg bg-surface"} role="group" aria-label="委派目标组">
+      <div className={"flex flex-wrap items-center gap-2"}>
         <input
-          className={styles.input}
+          className={"px-2 py-1 border border-border-strong rounded-md bg-surface text-foreground text-sm min-w-[180px] flex-1"}
           value={newName}
           placeholder="新组名，如「CC 三兄弟」"
           aria-label="新组名"
@@ -52,11 +51,11 @@ export function GroupPanel({ groupsApi, agents }: GroupPanelProps) {
       </div>
 
       {groups.length === 0 ? (
-        <p className={styles.empty}>
+        <p className={"m-0 text-sm text-muted"}>
           还没有组。组把一组 Agent 收成一个收件方——「谁能被这个 Agent 委派」一次配好，不用逐个勾。
         </p>
       ) : (
-        <ul className={styles.list}>
+        <ul className={"flex flex-col gap-3 m-0 p-0 list-none"}>
           {groups.map((group) => {
             const draftName = names[group.id] ?? group.name;
             const members = group.memberIds
@@ -64,10 +63,10 @@ export function GroupPanel({ groupsApi, agents }: GroupPanelProps) {
               .filter((name): name is string => name !== undefined);
             const candidates = agents.filter((agent) => !group.memberIds.includes(agent.id));
             return (
-              <li key={group.id} className={styles.item}>
-                <div className={styles.itemHead}>
+              <li key={group.id} className={"flex flex-col gap-2 p-3 border border-border rounded-md"}>
+                <div className={"flex items-center gap-2"}>
                   <input
-                    className={styles.input}
+                    className={"px-2 py-1 border border-border-strong rounded-md bg-surface text-foreground text-sm min-w-[180px] flex-1"}
                     value={draftName}
                     aria-label={`组名 ${group.name}`}
                     onChange={(event) =>
@@ -86,16 +85,16 @@ export function GroupPanel({ groupsApi, agents }: GroupPanelProps) {
                     onClick={() => void groupsApi.remove(group.id)}
                   />
                 </div>
-                <div className={styles.chips}>
+                <div className={"flex flex-wrap gap-2"}>
                   {members.length === 0 ? (
-                    <span className={styles.chipsEmpty}>暂无成员</span>
+                    <span className={"text-sm text-muted"}>暂无成员</span>
                   ) : (
                     members.map((name, index) => (
-                      <span key={group.memberIds[index] ?? name} className={styles.chip}>
+                      <span key={group.memberIds[index] ?? name} className={"inline-flex items-center gap-1 px-2 py-1 border border-accent-border rounded-full bg-accent-soft text-foreground text-sm"}>
                         {name}
                         <button
                           type="button"
-                          className={styles.chipRemove}
+                          className={"inline-flex items-center justify-center w-[18px] h-[18px] p-0 border-none rounded-full bg-transparent text-muted cursor-pointer hover:text-danger"}
                           aria-label={`从 ${group.name} 移除 ${name}`}
                           onClick={() =>
                             void groupsApi.update(group.id, {
@@ -112,10 +111,10 @@ export function GroupPanel({ groupsApi, agents }: GroupPanelProps) {
                   )}
                 </div>
                 {candidates.length === 0 ? null : (
-                  <label className={styles.addLabel}>
+                  <label className={"inline-flex items-center gap-2 text-sm text-text-secondary"}>
                     加入成员
                     <select
-                      className={styles.select}
+                      className={"px-2 py-1 border border-border-strong rounded-md bg-surface text-foreground text-sm"}
                       value=""
                       onChange={(event) => {
                         if (event.target.value === "") return;
@@ -141,7 +140,7 @@ export function GroupPanel({ groupsApi, agents }: GroupPanelProps) {
         </ul>
       )}
       {error === null ? null : (
-        <p className={styles.error} role="alert">
+        <p className={"m-0 text-sm text-danger"} role="alert">
           {error}
         </p>
       )}

@@ -6,7 +6,6 @@ import { TASK_STAGE_LABEL, TASK_STATUS_LABEL, TASK_STATUS_TONE } from "../../sha
 import { Badge } from "../ui/Badge.js";
 import { Button } from "../ui/Button.js";
 import { EmptyState } from "../ui/EmptyState.js";
-import styles from "./agents.module.css";
 
 export interface AgentTaskPanelProps {
   agentId: string;
@@ -24,12 +23,12 @@ export function AgentTaskPanel({ agentId, onOpenTask }: AgentTaskPanelProps) {
   });
 
   if (query.isPending) {
-    return <p className={styles.muted}>加载中…</p>;
+    return <p className="text-muted">加载中…</p>;
   }
 
   if (query.isError) {
     return (
-      <div className={styles.error} role="alert">
+      <div className="mt-3 text-xs text-danger" role="alert">
         <span>{query.error instanceof ApiError ? query.error.message : "任务加载失败"}</span>
         <Button size="sm" variant="secondary" onClick={() => void query.refetch()}>
           重试
@@ -46,16 +45,16 @@ export function AgentTaskPanel({ agentId, onOpenTask }: AgentTaskPanelProps) {
   }
 
   return (
-    <ul className={styles.taskList}>
+    <ul className="flex flex-col gap-2 m-0 p-0 list-none">
       {tasks.map((task) => (
         <li key={task.id}>
           <button
             type="button"
-            className={styles.taskRow}
+            className="flex flex-col gap-1 w-full p-3 border border-border rounded-md bg-surface-2 text-inherit [font:inherit] text-left cursor-pointer enabled:hover:border-accent-border"
             onClick={() => onOpenTask(task.id)}
           >
-            <span className={styles.taskRowTitle}>{task.title}</span>
-            <span className={styles.taskRowMeta}>
+            <span className="text-sm font-semibold text-foreground">{task.title}</span>
+            <span className="flex flex-wrap items-center gap-2 text-xs text-muted">
               <Badge
                 tone={TASK_STATUS_TONE[task.status]}
                 text={TASK_STATUS_LABEL[task.status]}

@@ -11,7 +11,6 @@ import { Button } from "../ui/Button.js";
 import { Dialog } from "../ui/Dialog.js";
 import { Field, Select } from "../ui/Field.js";
 import { useToast } from "../ui/Toast.js";
-import styles from "./agents.module.css";
 
 export interface AgentDeleteDialogProps {
   agentId: string;
@@ -108,10 +107,10 @@ export function AgentDeleteDialog({
         </>
       }
     >
-      {impactQuery.isPending ? <p className={styles.muted}>正在核对影响范围…</p> : null}
+      {impactQuery.isPending ? <p className="text-muted">正在核对影响范围…</p> : null}
 
       {impactQuery.isError ? (
-        <p className={styles.error} role="alert">
+        <p className="mt-3 text-xs text-danger" role="alert">
           {impactQuery.error instanceof ApiError
             ? impactQuery.error.message
             : "影响范围读取失败"}
@@ -120,39 +119,39 @@ export function AgentDeleteDialog({
 
       {preview === undefined ? null : (
         <>
-          <p className={styles.dangerNote}>
+          <p className="mb-3 text-sm text-danger">
             删除不可逆：以下内容会随该 Agent 一起消失，界面上无法恢复。
           </p>
-          <div className={styles.impact}>
-            <div className={styles.impactGroup}>
-              <div className={styles.impactGroupTitle}>将被删除</div>
-              <ul className={styles.impactList}>
+          <div className="grid grid-cols-[repeat(3,minmax(0,1fr))] gap-3 mb-4 max-md:grid-cols-1">
+            <div className="p-3 border border-border rounded-md bg-surface-2">
+              <div className="flex items-center gap-2 mb-2 text-sm font-bold">将被删除</div>
+              <ul className="flex flex-col gap-1 m-0 p-0 list-none text-xs text-muted">
                 {DESTROYED_LABELS.map(([key, label]) => (
-                  <li key={key}>
+                  <li key={key} className="flex justify-between gap-2">
                     <span>{label}</span>
-                    <span className={styles.impactCount}>{preview.impact.destroyed[key]}</span>
+                    <span className="tabular-nums text-foreground font-semibold">{preview.impact.destroyed[key]}</span>
                   </li>
                 ))}
               </ul>
             </div>
-            <div className={styles.impactGroup}>
-              <div className={styles.impactGroupTitle}>将置空引用</div>
-              <ul className={styles.impactList}>
+            <div className="p-3 border border-border rounded-md bg-surface-2">
+              <div className="flex items-center gap-2 mb-2 text-sm font-bold">将置空引用</div>
+              <ul className="flex flex-col gap-1 m-0 p-0 list-none text-xs text-muted">
                 {DETACHED_LABELS.map(([key, label]) => (
-                  <li key={key}>
+                  <li key={key} className="flex justify-between gap-2">
                     <span>{label}</span>
-                    <span className={styles.impactCount}>{preview.impact.detached[key]}</span>
+                    <span className="tabular-nums text-foreground font-semibold">{preview.impact.detached[key]}</span>
                   </li>
                 ))}
               </ul>
             </div>
-            <div className={styles.impactGroup}>
-              <div className={styles.impactGroupTitle}>保留</div>
-              <ul className={styles.impactList}>
+            <div className="p-3 border border-border rounded-md bg-surface-2">
+              <div className="flex items-center gap-2 mb-2 text-sm font-bold">保留</div>
+              <ul className="flex flex-col gap-1 m-0 p-0 list-none text-xs text-muted">
                 {RETAINED_LABELS.map(([key, label]) => (
-                  <li key={key}>
+                  <li key={key} className="flex justify-between gap-2">
                     <span>{label}</span>
-                    <span className={styles.impactCount}>{preview.impact.retained[key]}</span>
+                    <span className="tabular-nums text-foreground font-semibold">{preview.impact.retained[key]}</span>
                   </li>
                 ))}
               </ul>
@@ -184,7 +183,7 @@ export function AgentDeleteDialog({
       )}
 
       {error === null ? null : (
-        <p className={styles.error} role="alert">
+        <p className="mt-3 text-xs text-danger" role="alert">
           {error}
         </p>
       )}

@@ -4,7 +4,6 @@ import { setAgentUsageLimit, type AgentRosterSummary } from "../../api/identity.
 import { Button } from "../ui/Button.js";
 import { Field, Input } from "../ui/Field.js";
 import { useToast } from "../ui/Toast.js";
-import styles from "./agents.module.css";
 
 export interface AgentUsageLimitSectionProps {
   agent: AgentRosterSummary;
@@ -47,12 +46,12 @@ export function AgentUsageLimitSection({ agent, onSaved }: AgentUsageLimitSectio
   }
 
   return (
-    <section className={styles.section}>
-      <h3 className={styles.sectionTitle}>用量上限</h3>
-      <p className={styles.sectionHint}>
+    <section className="py-4 border-b border-line-soft first:pt-0 last:pb-0 last:border-b-0">
+      <h3 className="mb-1 text-md font-bold">用量上限</h3>
+      <p className="mb-3 text-xs text-muted">
         按日累计 Token 计。达到告警线开始提醒；开启「达额停摆」后超额的运行会被拒绝。
       </p>
-      <div className={styles.fieldGrid}>
+      <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3">
         <Field label="日 Token 额度" htmlFor="usage-daily-limit">
           <Input
             id="usage-daily-limit"
@@ -73,7 +72,7 @@ export function AgentUsageLimitSection({ agent, onSaved }: AgentUsageLimitSectio
             onChange={(event) => setWarnPercent(Number(event.target.value))}
           />
         </Field>
-        <label className={styles.targetRow}>
+        <label className="flex items-center gap-2 text-sm max-md:min-h-touch">
           <input
             type="checkbox"
             checked={isActive}
@@ -82,7 +81,7 @@ export function AgentUsageLimitSection({ agent, onSaved }: AgentUsageLimitSectio
           />
           <span>启用额度控制</span>
         </label>
-        <label className={styles.targetRow}>
+        <label className="flex items-center gap-2 text-sm max-md:min-h-touch">
           <input
             type="checkbox"
             checked={hardStop}
@@ -92,13 +91,13 @@ export function AgentUsageLimitSection({ agent, onSaved }: AgentUsageLimitSectio
           <span>达额后停摆</span>
         </label>
       </div>
-      <div className={styles.rowActionsLeft}>
+      <div className="flex flex-wrap gap-2 items-center">
         <Button size="sm" variant="secondary" disabled={pending} onClick={() => void save()}>
           {pending ? "保存中…" : "保存上限"}
         </Button>
       </div>
       {error === null ? null : (
-        <p className={styles.error} role="alert">
+        <p className="mt-3 text-xs text-danger" role="alert">
           {error}
         </p>
       )}
