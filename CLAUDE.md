@@ -63,7 +63,7 @@
 - 安全:外部输入边界校验;**启动层密钥(POSTGRES_PASSWORD、FRP_AUTH_TOKEN、采集器 secret)仍仅存 env(.env 不入库)**;**控制台运行时凭据(飞书 app secret、嵌入 API key、GitHub webhook secret 等)入 `system_config`**(2026-11-26 裁决:库内明文、API 对密钥只写不读、日志不记值、备份含凭据属已知取舍)。Agent / 采集器密钥库中只存哈希,永不硬编码;日志记事件不记敏感值,**命令行参数与 shell history 同样不得出现明文密钥,部署示例一律用占位符并采用隐藏输入/stdin/env 注入**。**仓库是公开的**:文档与示例不写真实 IP、域名、主机名、SSH 路径与内网端口,真实值只放 gitignored 的 `docs/plan/*.local.md`。
 - e2e/联测脚本:无 body 的 POST 不要带 `content-type: application/json`——Fastify 以 400 拒空 body,失败响应形状错位会伪装成下游故障(s9 曾把坏 Bearer 掩护成假 401);依赖响应字段前先断言 HTTP 状态码。**联测脚本自建的 Agent 必须跑完即删**(用 `e2e/lib/cleanup.mjs`),否则库里攒测试垃圾淹没总览与路由注册表。
 - **单元测试库会残留**:每个测试文件自建 `aw_test_*` 随机库,正常由 `createTestDatabase` 的 close() 销毁;文件中途失败或 worker 被回收时删不掉,残留越积越多会把 PG 目录撑大、`CREATE DATABASE` 变慢、跑批超时——2026-11-09 曾积到 3405 个残留库,`make check` 直接假红。`vitest.config.ts` 的 globalSetup（`src/store/test-db-gc.ts`）每跑批前回收**早于 1 小时**的残留库;看到 `[test-db-gc] 回收陈旧测试库 N 个` 是正常自愈,不必手工处理。
-- 前端:样式走 `web/src/global.css` 的设计令牌与 `web/src/components/ui/` 基元层,不写死颜色/间距/字号,不在组件里新造按钮与表格 class;基元不得 import `api/` 层。详见 docs/arch/03 §10。
+- 前端:样式统一走 **Tailwind CSS v3**(2026-11-26 裁决,CSS Modules 已清零):设计令牌仍是 `web/src/global.css` 的 CSS 变量,经 `web/tailwind.config.ts` 映射成工具类;类拼接用 `web/src/lib/utils.ts` 的 `cn()`;跨组件复用的样式常量收敛成 TS 模块(如 `task/shared.ts`、`markdown/markdown.ts`)。不写死颜色/间距/字号,不在组件里新造按钮与表格 class;基元不得 import `api/` 层。详见 docs/arch/03 §10。
 - 状态只更新 plan/development-plan.md,不回填过程。
 
 ### CodeReview(每轮迭代完成后必须执行)
