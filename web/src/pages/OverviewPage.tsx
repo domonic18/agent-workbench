@@ -24,12 +24,10 @@ import { Button } from "../components/ui/Button.js";
 import { EmptyState } from "../components/ui/EmptyState.js";
 import { ErrorState } from "../components/ui/ErrorState.js";
 import { LoadingState } from "../components/ui/LoadingState.js";
-import { PageFooter } from "../components/ui/PageFooter.js";
 import { SectionHeader } from "../components/ui/SectionHeader.js";
 import { StatCard } from "../components/ui/StatCard.js";
 import { ToneIcon } from "../components/ui/ToneIcon.js";
 import { formatExactTokens, formatTokens } from "../shared/format.js";
-import { VISIBILITY_NOTE } from "../shared/labels.js";
 import type { Tone } from "../shared/tone.js";
 import styles from "./OverviewPage.module.css";
 
@@ -181,7 +179,6 @@ export function OverviewPage() {
           <section className={styles.section}>
             <SectionHeader
               title="Agent 管理"
-              hint="名册里的每个 Agent 都在这里，可以改名、停用、调整白名单或删除"
               actions={
                 <>
                   <Button size="sm" onClick={() => navigate("/onboarding")}>
@@ -210,7 +207,7 @@ export function OverviewPage() {
           </section>
 
           <section className={styles.section}>
-            <SectionHeader title="需要你看一眼" hint="只放异常与待决策，不是消息流" />
+            <SectionHeader title="需要你看一眼" />
             <ul className={styles.attention}>
               {attentionRows(
                 data.metrics.pendingApprovals,
@@ -263,8 +260,6 @@ export function OverviewPage() {
           )}
         </>
       )}
-
-      <PageFooter>可见性说明：{VISIBILITY_NOTE}</PageFooter>
     </div>
   );
 }

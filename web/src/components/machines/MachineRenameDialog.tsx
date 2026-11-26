@@ -12,10 +12,6 @@ export interface MachineRenameDialogProps {
   onSaved: () => void;
 }
 
-/**
- * 改机器展示名:主机名登记成 IP 时给一个人能认的名字。
- * hostname 是 enroll 去重键,服务端只改 display_name,重装机器不会多出一行。
- */
 export function MachineRenameDialog({ machine, onClose, onSaved }: MachineRenameDialogProps) {
   const toast = useToast();
   const [name, setName] = useState(machine.displayName ?? machine.hostname);
@@ -61,7 +57,6 @@ export function MachineRenameDialog({ machine, onClose, onSaved }: MachineRename
       <Field
         label="显示名"
         htmlFor="machine-display-name"
-        hint="只影响控制台展示;主机名与采集器配置不变。"
         error={error}
       >
         <Input

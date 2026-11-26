@@ -70,7 +70,7 @@ export function KnowledgeEditForm({
             onChange={(event) => patch({ category: event.target.value })}
           />
         </Field>
-        <Field label="正文（Markdown）" htmlFor="kb-edit-content" hint="保存会写入 Markdown 文件并重建该条索引。">
+        <Field label="正文（Markdown）" htmlFor="kb-edit-content">
           <Textarea
             id="kb-edit-content"
             className={styles.contentInput}

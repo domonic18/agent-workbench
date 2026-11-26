@@ -45,7 +45,6 @@ function MachineRow({
   const tone = STATUS_TONE[machine.status] ?? "muted";
   const label = STATUS_LABEL[machine.status] ?? machine.status;
   const confirmed = machine.projects.filter((project) => project.confirmed).length;
-  // 心跳与发现上报不同源:心跳是存活上报,发现是 cc-connect 扫描结果,不能混用
   const heartbeat = machine.lastSeenAt === null ? "未上报" : formatRelativeTime(machine.lastSeenAt);
   const discovered = machine.receivedAt === null ? "未上报" : formatRelativeTime(machine.receivedAt);
   const pending = machine.projects.filter((project) => !project.confirmed);
@@ -150,7 +149,6 @@ function MachineRow({
   );
 }
 
-/** 第 3 步下半：已上线机器清单。执行机每轮心跳都会回报，控制台按轮询刷新。 */
 export function OnlineMachines() {
   const client = useQueryClient();
   const machines = useQuery({
@@ -162,10 +160,7 @@ export function OnlineMachines() {
   const list = machines.data?.machines ?? [];
 
   return (
-    <Panel
-      title="已上线执行机"
-      description="执行机 enroll 成功后开始上报心跳，这里按机器维度列出状态与发现到的项目。"
-    >
+    <Panel title="已上线执行机">
       {machines.isPending ? <LoadingState label="读取执行机列表…" /> : null}
 
       {machines.isError ? (
@@ -178,10 +173,7 @@ export function OnlineMachines() {
       ) : null}
 
       {!machines.isPending && !machines.isError && list.length === 0 ? (
-        <EmptyState
-          title="还没有执行机上线"
-          description="在目标机跑完安装命令并完成 enroll 后，这里会立刻出现该机器。"
-        />
+        <EmptyState title="还没有执行机上线" />
       ) : null}
 
       {!machines.isPending && !machines.isError && list.length > 0 ? (

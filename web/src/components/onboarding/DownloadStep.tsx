@@ -82,15 +82,11 @@ export function DownloadStep({ origin }: DownloadStepProps) {
 
   return (
     <div className={styles.stack}>
-      <Panel
-        title="选择平台产物"
-        description="aw-node 目前只支持 macOS，按 CPU 架构取对应产物；控制台取不到时安装脚本会自动回退 GitHub Release。"
-      >
+      <Panel title="选择平台产物">
         {artifacts.isPending ? <p className={styles.hint}>读取产物目录…</p> : null}
         {assets.length === 0 ? (
           <EmptyState
             title="控制台暂未镜像执行面产物"
-            description="一键安装命令仍可用：脚本会从 GitHub Release 取件。"
           />
         ) : (
           <div className={styles.platformGrid}>
@@ -111,13 +107,12 @@ export function DownloadStep({ origin }: DownloadStepProps) {
         )}
       </Panel>
 
-      <Panel title="一键安装" description="在目标机执行下面这条命令，其余步骤脚本会带你走完。">
+      <Panel title="一键安装">
         <CopyBlock
           label="在目标机执行"
           value={installCommand}
           copyLabel="复制命令"
           copiedText="安装命令已复制"
-          note="脚本会自己识别 CPU 架构、下载产物并比对 SHA-256。一次性令牌由脚本交互式隐藏输入，不进命令行参数、不落 shell history。"
         />
         <div className={styles.platformActions}>
           <CopyActionButton value={checksumsUrl} label="复制校验和文件直链" />

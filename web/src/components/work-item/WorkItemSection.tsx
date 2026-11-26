@@ -13,12 +13,10 @@ import { ChipGroup } from "../ui/Chip.js";
 import { EmptyState } from "../ui/EmptyState.js";
 import { ErrorState } from "../ui/ErrorState.js";
 import { LoadingState } from "../ui/LoadingState.js";
-import { PageFooter } from "../ui/PageFooter.js";
 import { SectionHeader } from "../ui/SectionHeader.js";
 import { WorkItemTable } from "./WorkItemTable.js";
 import styles from "./work-item-list.module.css";
 
-/** 首屏条数:先给一页,更多靠加载 */
 const PAGE_SIZE = 20;
 
 const FILTERS: { key: string; label: string }[] = [
@@ -29,7 +27,6 @@ const FILTERS: { key: string; label: string }[] = [
   { key: "stalled", label: "异常停滞" },
 ];
 
-/** 注意力严重度优先,同级按更新时间倒序:要人处理的事浮到最上面 */
 function sortByAttention(items: readonly WorkItemListItem[]): WorkItemListItem[] {
   return [...items].sort((a, b) => {
     const byAttention =
@@ -41,7 +38,6 @@ function sortByAttention(items: readonly WorkItemListItem[]): WorkItemListItem[]
   });
 }
 
-/** 任务屏的「工作事项」区块:服务端按注意力筛选,不是全量流水 */
 export function WorkItemSection() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -74,10 +70,7 @@ export function WorkItemSection() {
 
   return (
     <section className={styles.section} aria-label="工作事项">
-      <SectionHeader
-        title="工作事项"
-        hint="业务事项的目标、状态与进展；点开看关联任务与永久时间线"
-      />
+      <SectionHeader title="工作事项" />
       <div className={styles.toolbar}>
         <ChipGroup
           label="注意力筛选"
@@ -104,7 +97,6 @@ export function WorkItemSection() {
         <EmptyState
           icon={<ClipboardList size={28} aria-hidden="true" />}
           title="还没有工作事项"
-          description="工作事项由触发事实路由而来；Agent 领到派工后，这里会显示它的目标与进展。"
         />
       ) : (
         <WorkItemTable items={items} from={from} search={location.search} />
@@ -122,8 +114,6 @@ export function WorkItemSection() {
           </Button>
         </div>
       ) : null}
-
-      <PageFooter>仅展示已由触发事实路由出的工作事项——没被路由的活不会出现在这里。</PageFooter>
     </section>
   );
 }

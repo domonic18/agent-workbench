@@ -4,12 +4,10 @@ import { LogIn, ShieldCheck, Sparkles } from "lucide-react";
 import { feishuLogin, feishuStatus, login } from "../api/auth.js";
 import { ApiError } from "../api/client.js";
 import { bootstrapStatus } from "../api/bootstrap.js";
-import { LogoIcon } from "../components/brand/LogoIcon.js";
 import { requestFeishuAuthCode } from "../components/auth/feishu-jsapi.js";
 import { Button } from "../components/ui/Button.js";
 import { EmptyState } from "../components/ui/EmptyState.js";
 import { Field, Input } from "../components/ui/Field.js";
-import { APP_NAME, APP_NAME_EN, APP_VERSION } from "../shared/app.js";
 import styles from "./LoginPage.module.css";
 
 /** 只接受站内路径,避免 next 参数被用作开放重定向 */
@@ -19,21 +17,6 @@ function safeNext(value: string | null): string {
   }
   return value;
 }
-
-const CAPABILITIES = [
-  {
-    title: "看清状态",
-    detail: "谁在跑、跑到哪一步、卡在哪里，一屏看完，不用去群里追问。",
-  },
-  {
-    title: "管住权力",
-    detail: "授权判定留在控制面，越权动作直接被拦下并留痕。",
-  },
-  {
-    title: "算清成本",
-    detail: "每次运行、每个 Token 都进账，月底不再靠猜。",
-  },
-];
 
 /** 免登阶段:探测配置中 / 自动免登中(表单隐藏) / 回落口令登录 */
 type FeishuPhase = "checking" | "auto" | "password";
@@ -129,35 +112,6 @@ export function LoginPage() {
 
   return (
     <div className={styles.page}>
-      <section className={styles.brand} aria-label="产品介绍">
-        <div className={styles.brandHead}>
-          <span className={styles.brandMark} aria-hidden="true">
-            <LogoIcon size={32} />
-          </span>
-          <span>
-            <span className={styles.brandTitle}>{APP_NAME}</span>
-            <span className={styles.brandSub}>{APP_NAME_EN}</span>
-          </span>
-        </div>
-        <div className={styles.brandBody}>
-          <h1 className={styles.brandHeadline}>
-            把散落在群聊与脚本里的多 Agent 协作，收进一个可看、可控、可计量的工作台
-          </h1>
-          <ul className={styles.capabilities}>
-            {CAPABILITIES.map((item) => (
-              <li key={item.title} className={styles.capability}>
-                <ShieldCheck size={16} strokeWidth={1.8} aria-hidden="true" />
-                <span>
-                  <span className={styles.capabilityTitle}>{item.title}</span>
-                  <span className={styles.capabilityDetail}>{item.detail}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <span className={styles.brandVersion}>{APP_VERSION}</span>
-      </section>
-
       <section className={styles.formSide}>
         {feishuPhase === "auto" ? (
           <div className={styles.card} aria-live="polite">
@@ -186,7 +140,6 @@ export function LoginPage() {
                 <EmptyState
                   icon={<ShieldCheck size={28} aria-hidden="true" />}
                   title="控制台未初始化"
-                  description="首次使用要先在 /setup 设置管理员口令并完成初始化，再回来登录。"
                   action={
                     <Link className={styles.link} to="/setup">
                       前往 /setup 完成初始化 →

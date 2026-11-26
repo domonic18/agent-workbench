@@ -25,7 +25,6 @@ interface RunGroup {
   entries: AgentTimelineEntry[];
 }
 
-/** 按 run 分组：一次运行 = 一个会话，组内按时间正序 */
 function groupByRun(entries: readonly AgentTimelineEntry[]): RunGroup[] {
   const groups = new Map<string, RunGroup>();
   for (const entry of entries) {
@@ -48,7 +47,6 @@ function errorMessage(error: unknown, fallback: string): string {
   return error instanceof ApiError ? error.message : fallback;
 }
 
-/** Agent 的对话工作流记录：按会话分组的事件流 */
 export function AgentTimeline({ agent }: AgentTimelineProps) {
   const [filter, setFilter] = useState("all");
   const collected = hasCollector(agent);
@@ -65,7 +63,6 @@ export function AgentTimeline({ agent }: AgentTimelineProps) {
     enabled: collected,
   });
 
-  // 页是「最近一页 → 更早一页」，翻平成时间正序要把页序倒过来
   const entries = useMemo(() => {
     const pages = query.data?.pages ?? [];
     return pages
@@ -86,7 +83,6 @@ export function AgentTimeline({ agent }: AgentTimelineProps) {
     return (
       <EmptyState
         title="未接入过程数据"
-        description="该 Agent 不是由本机 aw-node 采集的运行时，控制台拿不到它的对话与工具调用记录。"
       />
     );
   }
@@ -121,11 +117,6 @@ export function AgentTimeline({ agent }: AgentTimelineProps) {
       {groups.length === 0 ? (
         <EmptyState
           title={entries.length === 0 ? "还没有对话记录" : "没有匹配的事件"}
-          description={
-            entries.length === 0
-              ? "该 Agent 还没有上报过会话过程数据。"
-              : "换个类型筛选再试。"
-          }
         />
       ) : (
         <ol className={styles.groups}>

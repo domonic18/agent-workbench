@@ -4,7 +4,6 @@ import { MCP_ACCESS } from "@shared/constants.js";
 import { fetchAgentKit } from "../api/agent-kit.js";
 import { ApiError } from "../api/client.js";
 import { fetchAgents } from "../api/identity.js";
-import { AccessPaths } from "../components/access/AccessPaths.js";
 import { AgentRoster } from "../components/access/AgentRoster.js";
 import { EnrollDialog } from "../components/access/EnrollDialog.js";
 import { AccessParameters, ConfigSnippets } from "../components/access/McpConfig.js";
@@ -16,10 +15,6 @@ import { Panel } from "../components/ui/Panel.js";
 import { formatDateTime } from "../shared/format.js";
 import styles from "./AgentAccessPage.module.css";
 
-/**
- * 协作接入：把「接入参数 + 凭据」一次性交给人。
- * 两条路径并存——手工路径贴配置到客户端；自助路径只交一段接入包，Agent 自己换密钥并按规范协作。
- */
 export function AgentAccessPage() {
   const [credentials, setCredentials] = useState<AgentCredentials | null>(null);
   const [grant, setGrant] = useState<AgentEnrollGrant | null>(null);
@@ -45,17 +40,11 @@ export function AgentAccessPage() {
 
   return (
     <div className={styles.page}>
-      <AccessPaths />
-
       <AccessParameters endpoint={endpoint} fallbackOrigin={publicUrl === null} />
 
-      {/* 机器维度状态与待登记项目:发现到但未注册的项目在这里一键登记,不再只藏在 /setup */}
       <OnlineMachines />
 
-      <Panel
-        title="Agent 名册"
-        description="每个 Agent 一把密钥。「签发接入令牌」走自助路径，「轮换密钥」走手工路径。"
-      >
+      <Panel title="Agent 名册">
         <AsyncSection
           pending={agents.isPending}
           error={

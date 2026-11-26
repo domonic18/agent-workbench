@@ -22,7 +22,6 @@ export interface WorkItemRelationsProps {
   inbox: readonly WorkItemInboxLink[];
   threads: readonly WorkItemThreadLink[];
   agentNames: ReadonlyMap<string, string>;
-  /** 跳到任务详情;工作事项与任务两个维度,入口在关联任务里 */
   onOpenTask: (taskId: string) => void;
 }
 
@@ -50,7 +49,6 @@ function Empty({ text }: { text: string }) {
   return <p className={styles.empty}>{text}</p>;
 }
 
-/** 关联工作:任务 / 执行 / 派工 / 线程;没有就是没有,不补假节点 */
 export function WorkItemRelations({
   tasks,
   runs,
@@ -62,7 +60,6 @@ export function WorkItemRelations({
   return (
     <section className={styles.block} aria-label="关联工作">
       <h3 className={styles.blockTitle}>关联工作</h3>
-      <p className={styles.blockHint}>任务与执行是干的事，派工与线程是协作事实</p>
 
       <Group title="关联任务" count={tasks.length}>
         {tasks.length === 0 ? (

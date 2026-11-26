@@ -155,7 +155,6 @@ describe("协作接入页", () => {
     renderPage();
 
     expect(await screen.findByText("外接机器人")).toBeTruthy();
-    expect(screen.getByText(/自助接入（推荐）/)).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: /签发接入令牌/ }));
 

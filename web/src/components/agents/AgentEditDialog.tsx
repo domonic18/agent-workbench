@@ -179,9 +179,6 @@ export function AgentEditDialog({
     >
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>档案</h3>
-        <p className={styles.sectionHint}>
-          显示名与项目决定控制台里的身份标识；改名不影响已跑起来的历史记录。
-        </p>
         <div className={styles.fieldGrid}>
           <Field label="显示名" htmlFor="agent-display-name">
             <Input
@@ -238,11 +235,6 @@ export function AgentEditDialog({
 
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>运行归属</h3>
-        <p className={styles.sectionHint}>
-          {agent.runtime === "claude_code"
-            ? "Claude Code 由该机的 aw-node 采集与调度，机器由初始化确认流程决定，不能在此改。"
-            : "外部运行时只登记「跑在哪台机器上」：该机不会接管它的过程数据，绑定后可按机器与项目匹配飞书 bot 名。"}
-        </p>
         <div className={styles.fieldGrid}>
           <Field label="运行时" htmlFor="agent-runtime">
             <Input id="agent-runtime" readOnly value={RUNTIME_LABEL[agent.runtime]} />
@@ -256,7 +248,7 @@ export function AgentEditDialog({
               />
             </Field>
           ) : (
-            <Field label="宿主机器" htmlFor="agent-machine" hint="可留空；留空表示不绑定任何机器。">
+            <Field label="宿主机器" htmlFor="agent-machine">
               <Select
                 id="agent-machine"
                 value={machineId === undefined ? (agent.machineId ?? "") : (machineId ?? "")}
@@ -290,9 +282,6 @@ export function AgentEditDialog({
 
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>密钥</h3>
-        <p className={styles.sectionHint}>
-          轮换后旧密钥立即失效，正在运行的 Agent 会断开，需要把新密钥写入其运行环境后重启。
-        </p>
         {rotatedSecret === null ? (
           <div className={styles.rowActionsLeft}>
             <Button
@@ -326,9 +315,6 @@ export function AgentEditDialog({
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>危险操作</h3>
         <div className={styles.dangerZone}>
-          <p className={styles.sectionHint}>
-            删除不可逆：会级联清理该 Agent 的收件箱、整条 A2A 线程、运行记录与 Token 账目，历史任务保留。
-          </p>
           <Button
             size="sm"
             variant="danger"

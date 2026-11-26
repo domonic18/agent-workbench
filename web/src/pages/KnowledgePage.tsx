@@ -15,27 +15,17 @@ import { Badge } from "../components/ui/Badge.js";
 import { Button } from "../components/ui/Button.js";
 import { EmptyState } from "../components/ui/EmptyState.js";
 import { Input } from "../components/ui/Field.js";
-import { PageFooter } from "../components/ui/PageFooter.js";
 import { Tabs } from "../components/ui/Tabs.js";
 import { useNow } from "../shared/useNow.js";
 import styles from "./KnowledgePage.module.css";
 
 const EMPTY_HINT: Record<
   (typeof KNOWLEDGE_VIEWS)[number],
-  { title: string; description: string }
+  { title: string }
 > = {
-  active: {
-    title: "知识库还没有生效条目",
-    description: "Agent 写入的知识先进入待采纳，人工采纳后才会参与检索。",
-  },
-  candidate: {
-    title: "没有待采纳的知识",
-    description: "Agent 通过 kb_write 写入的内容会出现在这里，需要逐条审阅。",
-  },
-  archived: {
-    title: "没有已归档条目",
-    description: "被丢弃或主动归档的知识会留在这里备查。",
-  },
+  active: { title: "知识库还没有生效条目" },
+  candidate: { title: "没有待采纳的知识" },
+  archived: { title: "没有已归档条目" },
 };
 
 export function KnowledgePage() {
@@ -111,12 +101,7 @@ export function KnowledgePage() {
 
   const list =
     items.length === 0 ? (
-      <EmptyState
-        title={search === "" ? EMPTY_HINT[view].title : "没有匹配的知识"}
-        description={
-          search === "" ? EMPTY_HINT[view].description : "换个关键词，或清除搜索后重试。"
-        }
-      />
+      <EmptyState title={search === "" ? EMPTY_HINT[view].title : "没有匹配的知识"} />
     ) : (
       <KnowledgeList items={items} view={view} search={search} now={now} />
     );
@@ -160,10 +145,6 @@ export function KnowledgePage() {
             ) : null,
         }))}
       />
-
-      <PageFooter>
-        只有已生效条目参与 Agent 检索；候选必须逐条采纳，避免 Agent 自己决定知识库。
-      </PageFooter>
 
       <Outlet />
     </div>

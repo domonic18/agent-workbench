@@ -9,7 +9,6 @@ import { TaskTable } from "../components/task/TaskTable.js";
 import { WorkItemSection } from "../components/work-item/WorkItemSection.js";
 import { AsyncSection } from "../components/ui/AsyncSection.js";
 import { EmptyState } from "../components/ui/EmptyState.js";
-import { PageFooter } from "../components/ui/PageFooter.js";
 import { useNow } from "../shared/useNow.js";
 import { agentNameMap } from "../shared/agent-label.js";
 import styles from "../components/task/task-list.module.css";
@@ -63,14 +62,7 @@ export function TasksPage() {
         onLoadMore={() => void tasksQuery.fetchNextPage()}
       >
         {tasks.length === 0 ? (
-          <EmptyState
-            title={hasFilters ? "没有匹配的任务" : "暂无任务记录"}
-            description={
-              hasFilters
-                ? "调整筛选条件后再试。"
-                : "Agent 尚未上报任务；未建单的工作不会出现在这里。"
-            }
-          />
+          <EmptyState title={hasFilters ? "没有匹配的任务" : "暂无任务记录"} />
         ) : (
           <TaskTable
             tasks={tasks}
@@ -80,10 +72,6 @@ export function TasksPage() {
           />
         )}
       </AsyncSection>
-
-      <PageFooter>
-        仅显示已自报的任务——Agent 判断不需要建单的活不会出现在这里。
-      </PageFooter>
 
       <WorkItemSection />
     </div>

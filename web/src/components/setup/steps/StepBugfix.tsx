@@ -49,7 +49,6 @@ export function StepBugfix({
   return (
     <div className={styles.card}>
       <h1 className={styles.title}>启用 Bug 工作流</h1>
-      <p className={styles.description}>核对默认 bug_fix 装配摘要,选择主责 Agent 后完成初始化。无需手工编辑 RouteRule 或 Mandate。</p>
       <div className={styles.section}>
         <div><strong>预期结果</strong></div>
         <p className={styles.hint}>{definition.mandate.expectedResult}</p>

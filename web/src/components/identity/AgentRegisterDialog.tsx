@@ -18,11 +18,9 @@ import { SecretReveal } from "./SecretReveal.js";
 
 export interface AgentRegisterDialogProps {
   onClose: () => void;
-  /** 注册成功后把明文密钥交出去,便于调用方接着渲染接入配置 */
   onCreated?: (created: AgentSecret) => void;
 }
 
-/** 外部运行时:没有 aw-node,只登记归属机器 */
 const EXTERNAL_RUNTIMES: AgentRuntime[] = ["workbuddy", "codex", "deepseek"];
 
 export function AgentRegisterDialog({ onClose, onCreated }: AgentRegisterDialogProps) {
@@ -96,11 +94,6 @@ export function AgentRegisterDialog({ onClose, onCreated }: AgentRegisterDialogP
           <Field
             label="运行时"
             htmlFor="agent-runtime"
-            hint={
-              external
-                ? "外部运行时不由 aw-node 调度，过程数据固定显示「未接入」。"
-                : "Claude Code 由该机的 aw-node 采集与调度。"
-            }
           >
             <Select
               id="agent-runtime"
@@ -120,11 +113,6 @@ export function AgentRegisterDialog({ onClose, onCreated }: AgentRegisterDialogP
             label="机器"
             htmlFor="agent-machine"
             required={!external}
-            hint={
-              external
-                ? "Claude Code 必选：选择已接入的执行机；外部运行时可不绑定"
-                : "选择已接入的执行机"
-            }
             error={
               machines.isError
                 ? "机器列表加载失败，请先到「接入执行机」页完成安装。"
@@ -155,7 +143,6 @@ export function AgentRegisterDialog({ onClose, onCreated }: AgentRegisterDialogP
               id="agent-display-name"
               value={displayName}
               onChange={(event) => setDisplayName(event.target.value)}
-              placeholder="控制台里的名称，飞书 bot 名字回写后以 bot 名为准"
               required
             />
           </Field>
@@ -165,7 +152,6 @@ export function AgentRegisterDialog({ onClose, onCreated }: AgentRegisterDialogP
               id="agent-project"
               value={project}
               onChange={(event) => setProject(event.target.value)}
-              placeholder="cc-connect 项目名，如 cc-sysdev（路由 key 默认取它）"
               required
             />
           </Field>
@@ -176,7 +162,6 @@ export function AgentRegisterDialog({ onClose, onCreated }: AgentRegisterDialogP
                 id="agent-key"
                 value={key}
                 onChange={(event) => setKey(event.target.value)}
-                placeholder="Git 项目注册表引用该 Agent 用的稳定键，如 a2a-real-workbuddy"
               />
             </Field>
           ) : null}
@@ -186,7 +171,6 @@ export function AgentRegisterDialog({ onClose, onCreated }: AgentRegisterDialogP
               id="agent-feishu-app"
               value={feishuAppId}
               onChange={(event) => setFeishuAppId(event.target.value)}
-              placeholder="飞书自建应用的 App ID（cli_xxx），留空表示不绑定应用"
             />
           </Field>
 
@@ -195,7 +179,6 @@ export function AgentRegisterDialog({ onClose, onCreated }: AgentRegisterDialogP
               id="agent-targets"
               value={allowedTargets}
               onChange={(event) => setAllowedTargets(event.target.value)}
-              placeholder="可委派的目标 Agent ID，多个用英文逗号分隔"
             />
           </Field>
 
@@ -221,7 +204,6 @@ export function AgentRegisterDialog({ onClose, onCreated }: AgentRegisterDialogP
           </p>
           <SecretReveal
             secret={created.secret}
-            note="把密钥写入该 Agent 的 MCP proxy 运行环境。"
             hints={agentEnvHints(created.agent.id)}
           />
           <div className={styles.actions}>

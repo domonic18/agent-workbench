@@ -1,14 +1,8 @@
-import { CircleHelp, Monitor } from "lucide-react";
+import { Monitor } from "lucide-react";
 import type { AgentRosterSummary } from "../../api/identity.js";
 import type { OverviewAgent } from "../../api/types.js";
 import { formatDateTime, formatExactTokens, formatRelativeTime, formatTokens } from "../../shared/format.js";
-import {
-  AGENT_COLUMN_HINT,
-  MACHINE_COLUMN_HINT,
-  NOT_COLLECTED,
-  RUNTIME_LABEL,
-  SESSION_COLUMN_HINT,
-} from "../../shared/labels.js";
+import { NOT_COLLECTED, RUNTIME_LABEL } from "../../shared/labels.js";
 import { agentDisplayName, hasCollector } from "../../shared/agent-label.js";
 import { RuntimeIcon } from "../../shared/runtime-icon.js";
 import { Button } from "../ui/Button.js";
@@ -30,14 +24,7 @@ export function buildAgentColumns(options: AgentColumnOptions): TableColumn<Agen
     {
       key: "agent",
       width: "154px",
-      header: (
-        <span className={styles.headerCell}>
-          机器人
-          <Tooltip label={AGENT_COLUMN_HINT}>
-            <CircleHelp size={13} aria-hidden="true" />
-          </Tooltip>
-        </span>
-      ),
+      header: "机器人",
       render: (agent) => (
         <div className={styles.identity}>
           <span className={styles.identityName}>{agentDisplayName(agent)}</span>
@@ -62,14 +49,7 @@ export function buildAgentColumns(options: AgentColumnOptions): TableColumn<Agen
     {
       key: "machine",
       width: "96px",
-      header: (
-        <span className={styles.headerCell}>
-          机器
-          <Tooltip label={MACHINE_COLUMN_HINT}>
-            <CircleHelp size={13} aria-hidden="true" />
-          </Tooltip>
-        </span>
-      ),
+      header: "机器",
       render: (agent) => {
         const name = agent.machineDisplayName ?? agent.machineHostname;
         return (
@@ -89,14 +69,7 @@ export function buildAgentColumns(options: AgentColumnOptions): TableColumn<Agen
     {
       key: "sessions",
       width: "76px",
-      header: (
-        <span className={styles.headerCell}>
-          活跃会话
-          <Tooltip label={SESSION_COLUMN_HINT}>
-            <CircleHelp size={13} aria-hidden="true" />
-          </Tooltip>
-        </span>
-      ),
+      header: "活跃会话",
       align: "right",
       render: (agent) => {
         if (!hasCollector(agent)) {
