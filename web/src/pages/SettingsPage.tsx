@@ -43,6 +43,84 @@ const EMPTY_FORM: FormState = {
   githubWebhookSecret: "",
 };
 
+const FIELD_DEFAULTS: Partial<Record<keyof FormState, string | number>> = {
+  taskZombieHours: 2,
+  assignmentStallHours: 24,
+};
+
+interface FieldMeta {
+  label: string;
+  hint: string;
+  type?: string;
+  restart?: boolean;
+}
+
+const FIELD_META: Record<keyof FormState, FieldMeta> = {
+  publicUrl: {
+    label: "对外地址",
+    hint: "控制台对外可访问的 URL，用于生成回调与跳转链接。",
+  },
+  consoleAllowedHosts: {
+    label: "允许的来源 Host",
+    hint: "允许承载控制台的 Host 列表，多个用逗号分隔；留空则使用当前 Host。",
+  },
+  taskZombieHours: {
+    label: "僵尸任务判定小时数",
+    hint: "running 状态任务超过该小时数未结束，自动回收并重排。",
+  },
+  assignmentStallHours: {
+    label: "派工停滞升级小时数",
+    hint: "派工 pending 超过该小时数未领取，升级播报并转人工介入。",
+  },
+  feishuAppId: {
+    label: "App ID",
+    hint: "飞书自建应用的 App ID，用于机器人消息与飞书免登。",
+    restart: true,
+  },
+  feishuAppSecret: {
+    label: "App Secret",
+    hint: "飞书自建应用的 App Secret，保存后 API 不再回显。",
+    type: "password",
+    restart: true,
+  },
+  feishuAllowedOpenIds: {
+    label: "白名单 open_id",
+    hint: "允许登录控制台、接收机器人指令的飞书 open_id，多个用逗号分隔。",
+  },
+  feishuApprovalChatId: {
+    label: "审批卡片群 ID",
+    hint: "人工审批、决策类卡片的目标群 ID。",
+    restart: true,
+  },
+  feishuCollabChatId: {
+    label: "协作通知群 ID",
+    hint: "派发、挂起、完成等协作播报的目标群 ID。",
+    restart: true,
+  },
+  embeddingBaseUrl: {
+    label: "Base URL",
+    hint: "Embedding 服务 Base URL，例如 OpenAI 兼容端点。",
+    restart: true,
+  },
+  embeddingApiKey: {
+    label: "API Key",
+    hint: "Embedding 服务 API Key，保存后 API 不再回显。",
+    type: "password",
+    restart: true,
+  },
+  embeddingModel: {
+    label: "模型",
+    hint: "Embedding 模型名，例如 text-embedding-3-small。",
+    restart: true,
+  },
+  githubWebhookSecret: {
+    label: "Webhook Secret",
+    hint: "GitHub Webhook 签名密钥，保存后 API 不再回显。",
+    type: "password",
+    restart: true,
+  },
+};
+
 const DB_KEY = SYSTEM_CONFIG_KEYS;
 
 function valueFrom(map: Record<string, string | boolean>, key: string): string {
@@ -146,29 +224,32 @@ export function SettingsPage() {
     update.mutate(changedEntries(form, original));
   };
 
-  const field = (
-    key: keyof FormState,
-    label: string,
-    options: { hint?: string; type?: string; restart?: boolean } = {},
-  ) => {
+  const field = (key: keyof FormState) => {
+    const meta = FIELD_META[key];
     const configured = original[DB_KEY[key]] === true;
+    const currentValue = valueFrom(original, DB_KEY[key]);
+    const defaultValue = FIELD_DEFAULTS[key];
+    const hintParts: string[] = [meta.hint];
+    if (currentValue === "" && defaultValue !== undefined) {
+      hintParts.push(`默认：${defaultValue}`);
+    }
     return (
       <Field
         key={key}
         label={
           <span className="inline-flex items-center gap-2">
-            {label}
-            {options.restart === true ? (
+            {meta.label}
+            {meta.restart === true ? (
               <Badge tone="warning" text="重启生效" />
             ) : null}
           </span>
         }
         htmlFor={`settings-${key}`}
-        hint={options.hint}
+        hint={hintParts.join(" ")}
       >
         <Input
           id={`settings-${key}`}
-          type={options.type ?? "text"}
+          type={meta.type ?? "text"}
           value={form[key]}
           placeholder={configured ? "已设置,留空保持不变" : undefined}
           onChange={(e) => updateField(key, e.target.value)}
@@ -195,47 +276,44 @@ export function SettingsPage() {
       >
         <Panel title="基本">
           <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
-            {field("publicUrl", "对外地址")}
+            {field("publicUrl")}
           </div>
         </Panel>
 
         <Panel title="飞书">
           <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
-            {field("feishuAppId", "App ID", { restart: true })}
-            {field("feishuAppSecret", "App Secret", { type: "password", restart: true })}
-            {field("feishuApprovalChatId", "审批卡片群 ID", { restart: true })}
-            {field("feishuCollabChatId", "协作通知群 ID", { restart: true })}
-            {field("feishuAllowedOpenIds", "白名单 open_id")}
+            {field("feishuAppId")}
+            {field("feishuAppSecret")}
+            {field("feishuApprovalChatId")}
+            {field("feishuCollabChatId")}
+            {field("feishuAllowedOpenIds")}
           </div>
         </Panel>
 
         <Panel title="接入安全">
           <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
-            {field("consoleAllowedHosts", "允许的来源 Host")}
+            {field("consoleAllowedHosts")}
           </div>
         </Panel>
 
         <Panel title="治理">
           <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
-            {field("taskZombieHours", "僵尸任务判定小时数")}
-            {field("assignmentStallHours", "派工停滞升级小时数")}
+            {field("taskZombieHours")}
+            {field("assignmentStallHours")}
           </div>
         </Panel>
 
         <Panel title="知识嵌入">
           <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
-            {field("embeddingBaseUrl", "Base URL", { restart: true })}
-            {field("embeddingApiKey", "API Key", { type: "password", restart: true })}
-            {field("embeddingModel", "模型", { restart: true })}
+            {field("embeddingBaseUrl")}
+            {field("embeddingApiKey")}
+            {field("embeddingModel")}
           </div>
         </Panel>
 
         <Panel title="GitHub Webhook">
           <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
-            {field("githubWebhookSecret", "Webhook Secret", {
-              type: "password",
-              restart: true,
-            })}
+            {field("githubWebhookSecret")}
           </div>
         </Panel>
       </AsyncSection>
