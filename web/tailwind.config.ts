@@ -146,6 +146,10 @@ export default {
       minWidth: {
         "menu-min": "var(--menu-w-min)",
       },
+      minHeight: {
+        touch: "var(--size-touch)",
+        textarea: "var(--size-textarea)",
+      },
     },
   },
   plugins: [],

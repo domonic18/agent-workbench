@@ -4,7 +4,7 @@ import type {
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from "react";
-import styles from "./controls.module.css";
+import { cn } from "../../lib/utils.js";
 
 export interface FieldProps {
   label: ReactNode;
@@ -16,34 +16,43 @@ export interface FieldProps {
   children: ReactNode;
 }
 
-/** 表单字段壳：label + 说明 + 错误，控件本身由调用方传入 */
 export function Field({ label, htmlFor, hint, error, required, children }: FieldProps) {
   return (
-    <div className={styles.field}>
-      <label className={styles.label} htmlFor={htmlFor}>
+    <div className="flex flex-col gap-2">
+      <label className="text-sm font-semibold text-text-secondary" htmlFor={htmlFor}>
         {label}
-        {required === true ? <span className={styles.required}>*</span> : null}
+        {required === true ? <span className="ml-1 text-danger">*</span> : null}
       </label>
       {children}
       {error === undefined || error === null ? null : (
-        <span className={styles.error} role="alert">
+        <span className="text-xs text-danger" role="alert">
           {error}
         </span>
       )}
-      {hint === undefined ? null : <span className={styles.hint}>{hint}</span>}
+      {hint === undefined ? null : <span className="text-xs text-muted">{hint}</span>}
     </div>
   );
 }
+
+const inputBase =
+  "w-full border rounded-md bg-surface text-foreground transition-colors placeholder:text-subtle disabled:bg-surface-3 disabled:text-muted disabled:cursor-not-allowed focus:border-accent focus:ring";
+
+const inputSize = "h-control-md px-3 text-md";
+
+const invalidClasses = "border-danger focus:border-danger focus:ring-ring-danger";
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   invalid?: boolean;
 }
 
 export function Input({ invalid, className, ...rest }: InputProps) {
-  const classes = [styles.input, invalid === true ? styles.invalid : null, className]
-    .filter((item): item is string => typeof item === "string" && item !== "")
-    .join(" ");
-  return <input {...rest} className={classes} aria-invalid={invalid === true || undefined} />;
+  return (
+    <input
+      {...rest}
+      className={cn(inputBase, inputSize, invalid === true && invalidClasses, className)}
+      aria-invalid={invalid === true || undefined}
+    />
+  );
 }
 
 export interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -51,10 +60,18 @@ export interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElemen
 }
 
 export function Textarea({ invalid, className, ...rest }: TextareaProps) {
-  const classes = [styles.textarea, invalid === true ? styles.invalid : null, className]
-    .filter((item): item is string => typeof item === "string" && item !== "")
-    .join(" ");
-  return <textarea {...rest} className={classes} aria-invalid={invalid === true || undefined} />;
+  return (
+    <textarea
+      {...rest}
+      className={cn(
+        inputBase,
+        "min-h-textarea px-3 py-2 leading-relaxed resize-y",
+        invalid === true && invalidClasses,
+        className,
+      )}
+      aria-invalid={invalid === true || undefined}
+    />
+  );
 }
 
 export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
@@ -62,11 +79,12 @@ export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 }
 
 export function Select({ invalid, className, children, ...rest }: SelectProps) {
-  const classes = [styles.select, invalid === true ? styles.invalid : null, className]
-    .filter((item): item is string => typeof item === "string" && item !== "")
-    .join(" ");
   return (
-    <select {...rest} className={classes} aria-invalid={invalid === true || undefined}>
+    <select
+      {...rest}
+      className={cn(inputBase, inputSize, invalid === true && invalidClasses, className)}
+      aria-invalid={invalid === true || undefined}
+    >
       {children}
     </select>
   );
