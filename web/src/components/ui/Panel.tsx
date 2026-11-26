@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import styles from "./surfaces.module.css";
+import { cn } from "../../lib/utils.js";
 
 export interface PanelProps {
   title?: ReactNode;
@@ -12,39 +12,39 @@ export interface PanelProps {
   className?: string;
 }
 
-/** 带标题/说明/动作区的容器，页面分区统一用它 */
 export function Panel({ title, description, actions, footer, children, className }: PanelProps) {
-  const classes = className === undefined ? styles.panel : `${styles.panel} ${className}`;
   const hasHeader = title !== undefined || description !== undefined || actions !== undefined;
   return (
-    <section className={classes}>
+    <section className={cn("bg-surface border border-border rounded-lg shadow-xs", className)}>
       {hasHeader ? (
-        <div className={styles.panelHeader}>
+        <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-line-soft">
           <div>
-            {title === undefined ? null : <h2 className={styles.panelTitle}>{title}</h2>}
+            {title === undefined ? null : <h2 className="m-0 text-lg font-bold text-foreground">{title}</h2>}
             {description === undefined ? null : (
-              <p className={styles.panelDescription}>{description}</p>
+              <p className="mt-1 mb-0 text-sm text-muted">{description}</p>
             )}
           </div>
-          {actions === undefined ? null : <div className={styles.panelActions}>{actions}</div>}
+          {actions === undefined ? null : <div className="flex flex-shrink-0 items-center gap-2">{actions}</div>}
         </div>
       ) : null}
-      <div className={styles.panelBody}>{children}</div>
-      {footer === undefined ? null : <div className={styles.panelFooter}>{footer}</div>}
+      <div className="p-5">{children}</div>
+      {footer === undefined ? null : (
+        <div className="flex justify-end gap-2 px-5 py-3 border-t border-line-soft bg-surface-2">
+          {footer}
+        </div>
+      )}
     </section>
   );
 }
 
 export interface CardProps {
   children: ReactNode;
-  /** CSS Module 类名取值可能是 undefined，调用方可直接透传 */
   className?: string | undefined;
 }
 
-/** 无标题的浅容器 */
 export function Card({ children, className }: CardProps) {
   return (
-    <div className={className === undefined ? styles.card : `${styles.card} ${className}`}>
+    <div className={cn("p-4 bg-surface border border-border rounded-lg shadow-xs", className)}>
       {children}
     </div>
   );

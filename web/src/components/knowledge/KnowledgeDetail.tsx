@@ -21,8 +21,7 @@ import { Badge } from "../ui/Badge.js";
 import { Button } from "../ui/Button.js";
 import { Dialog } from "../ui/Dialog.js";
 import { KnowledgeEditForm, type KnowledgeEditValues } from "./KnowledgeEditForm.js";
-import markdownStyles from "../markdown/markdown.module.css";
-import styles from "./knowledge-detail.module.css";
+import { MARKDOWN_CLASS } from "../markdown/markdown.js";
 
 export interface KnowledgeDetailProps {
   entryId: string;
@@ -35,9 +34,9 @@ function errorMessage(error: unknown, fallback: string): string {
 
 function MetaRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className={styles.metaRow}>
-      <dt className={styles.metaLabel}>{label}</dt>
-      <dd className={styles.metaValue}>{children}</dd>
+    <div className="grid grid-cols-[84px_minmax(0,1fr)] items-baseline gap-3 max-md:grid-cols-[76px_minmax(0,1fr)]">
+      <dt className="m-0 text-xs text-muted">{label}</dt>
+      <dd className="m-0 text-sm text-foreground [overflow-wrap:anywhere]">{children}</dd>
     </div>
   );
 }
@@ -141,10 +140,10 @@ export function KnowledgeDetail({ entryId, onClose }: KnowledgeDetailProps) {
         )
       }
     >
-      {detail.isPending ? <p className={styles.loading}>加载中…</p> : null}
+      {detail.isPending ? <p className="m-0 text-sm text-muted">加载中…</p> : null}
 
       {detail.isError ? (
-        <div className={styles.errorBox} role="alert">
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md border border-danger-border bg-danger-soft p-3 text-sm text-danger" role="alert">
           <span>{errorMessage(detail.error, "知识详情加载失败")}</span>
           <Button size="sm" variant="secondary" onClick={() => void detail.refetch()}>
             重试
@@ -153,16 +152,16 @@ export function KnowledgeDetail({ entryId, onClose }: KnowledgeDetailProps) {
       ) : null}
 
       {actionError === null ? null : (
-        <div className={styles.errorBox} role="alert">
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md border border-danger-border bg-danger-soft p-3 text-sm text-danger" role="alert">
           <span>{actionError}</span>
         </div>
       )}
 
       {entry === undefined || detail.isError ? null : (
         <>
-          <dl className={styles.meta}>
+          <dl className="m-0 mb-4 flex flex-col gap-2">
             <MetaRow label="路径">
-              <span className={styles.path}>{entry.path}</span>
+              <span className="font-mono text-xs text-text-secondary">{entry.path}</span>
             </MetaRow>
             <MetaRow label="分类">{entry.category === "" ? "未分类" : entry.category}</MetaRow>
             <MetaRow label="来源任务">
@@ -176,7 +175,7 @@ export function KnowledgeDetail({ entryId, onClose }: KnowledgeDetailProps) {
           </dl>
 
           {entry.protected ? (
-            <p className={styles.protectedNote}>
+            <p className="m-0 mb-4 rounded-md border border-border bg-surface-2 px-3 py-2 text-sm text-muted">
               index.md / log.md 由系统维护，控制台只读。
             </p>
           ) : null}
@@ -194,7 +193,7 @@ export function KnowledgeDetail({ entryId, onClose }: KnowledgeDetailProps) {
             />
           ) : (
             <>
-              <div className={styles.toolbar}>
+              <div className="flex flex-wrap gap-2 border-t border-border pb-4 pt-3">
                 {entry.protected ? null : (
                   <Button variant="secondary" onClick={() => startEditing(entry, content)}>
                     编辑
@@ -232,7 +231,7 @@ export function KnowledgeDetail({ entryId, onClose }: KnowledgeDetailProps) {
                 ) : null}
               </div>
 
-              <div className={markdownStyles.markdown}>
+              <div className={MARKDOWN_CLASS}>
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
               </div>
             </>

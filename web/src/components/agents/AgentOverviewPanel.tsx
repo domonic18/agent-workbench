@@ -3,7 +3,6 @@ import type { OverviewAgent } from "../../api/types.js";
 import { agentDisplayName, hasCollector } from "../../shared/agent-label.js";
 import { formatDateTime, formatExactTokens, formatRelativeTime } from "../../shared/format.js";
 import { NOT_COLLECTED, RUNTIME_LABEL } from "../../shared/labels.js";
-import styles from "./agents.module.css";
 
 export interface AgentOverviewPanelProps {
   agent: AgentRosterSummary;
@@ -63,25 +62,25 @@ export function AgentOverviewPanel({ agent, live }: AgentOverviewPanelProps) {
 
   return (
     <div>
-      <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>身份档案</h3>
-        <dl className={styles.kvGrid}>
+      <section className="py-4 border-b border-line-soft first:pt-0 last:pb-0 last:border-b-0">
+        <h3 className="mb-1 text-md font-bold">身份档案</h3>
+        <dl className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3 m-0 max-md:grid-cols-1">
           {identity.map((field) => (
-            <div key={field.label} className={styles.kvItem}>
-              <dt className={styles.kvLabel}>{field.label}</dt>
-              <dd className={styles.kvValue}>{field.value}</dd>
+            <div key={field.label} className="min-w-0">
+              <dt className="text-xs text-muted">{field.label}</dt>
+              <dd className="m-0 text-sm text-foreground [overflow-wrap:anywhere]">{field.value}</dd>
             </div>
           ))}
         </dl>
       </section>
 
-      <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>用量</h3>
-        <dl className={styles.kvGrid}>
+      <section className="py-4 border-b border-line-soft first:pt-0 last:pb-0 last:border-b-0">
+        <h3 className="mb-1 text-md font-bold">用量</h3>
+        <dl className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3 m-0 max-md:grid-cols-1">
           {usage.map((field) => (
-            <div key={field.label} className={styles.kvItem}>
-              <dt className={styles.kvLabel}>{field.label}</dt>
-              <dd className={styles.kvValue}>{field.value}</dd>
+            <div key={field.label} className="min-w-0">
+              <dt className="text-xs text-muted">{field.label}</dt>
+              <dd className="m-0 text-sm text-foreground [overflow-wrap:anywhere]">{field.value}</dd>
             </div>
           ))}
         </dl>

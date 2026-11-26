@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { cn } from "../../../lib/utils.js";
 import type { AgentRosterSummary } from "../../../api/identity.js";
 import type { OverviewAgent } from "../../../api/types.js";
 import { officeTransitionOf } from "./office-behavior.js";
@@ -8,7 +9,7 @@ import { StationSprite } from "./StationSprite.js";
 import { buildScene, createStageMapper } from "./scene-layout.js";
 import type { PixTransition } from "./pix/PixActor.js";
 import { ROOM_H, ROOM_W } from "./pix/geometry.js";
-import styles from "./office.module.css";
+import "./office.css";
 
 /** 「刚刚完成」这类时效文案的复查间隔 */
 const NOW_TICK_MS = 10_000;
@@ -16,11 +17,11 @@ const NOW_TICK_MS = 10_000;
 const OFFICE_STATES: OfficeState[] = ["running", "idle", "hold", "offline", "disabled"];
 
 const DOT_CLASS: Record<OfficeState, string> = {
-  running: styles.dotRunning ?? "",
-  idle: styles.dotIdle ?? "",
-  hold: styles.dotHold ?? "",
-  offline: styles.dotOffline ?? "",
-  disabled: styles.dotDisabled ?? "",
+  running: "bg-accent",
+  idle: "bg-info",
+  hold: "bg-warning",
+  offline: "bg-muted",
+  disabled: "bg-subtle",
 };
 
 export interface AgentOfficeSceneProps {
@@ -100,15 +101,15 @@ export function AgentOfficeScene({ agents, liveById, onOpenDetail }: AgentOffice
 
   return (
     <div>
-      <div className={styles.scene} role="group" aria-label="办公室视图" ref={frameRef}>
-        <div className={styles.stage} style={{ width: ROOM_W * scale, height: ROOM_H * scale }}>
+      <div className="relative overflow-hidden border border-border rounded-lg bg-surface-2" role="group" aria-label="办公室视图" ref={frameRef}>
+        <div className="relative mx-auto" style={{ width: ROOM_W * scale, height: ROOM_H * scale }}>
           <div
-            className={styles.room}
+            className="absolute top-0 left-0 overflow-hidden origin-top-left"
             style={{ width: ROOM_W, height: ROOM_H, transform: `scale(${scale})` }}
           >
-            <img className={styles.roomImage} src="/pix/room.webp" alt="" />
+            <img className="block w-full h-full" src="/pix/room.webp" alt="" />
             <div
-              className={styles.stations}
+              className="absolute inset-0"
               style={{
                 transform: `scale(${scene.roomScale})`,
                 transformOrigin: `${scene.origin.x}px ${scene.origin.y}px`,
@@ -135,10 +136,10 @@ export function AgentOfficeScene({ agents, liveById, onOpenDetail }: AgentOffice
         </div>
       </div>
 
-      <ul className={styles.legend} aria-label="状态图例">
+      <ul className="flex flex-wrap gap-x-4 gap-y-2 mt-2 p-0 list-none" aria-label="状态图例">
         {OFFICE_STATES.map((state) => (
-          <li key={state} className={styles.legendItem}>
-            <span className={`${styles.legendDot} ${DOT_CLASS[state]}`} aria-hidden="true" />
+          <li key={state} className="inline-flex items-center gap-1 text-xs text-muted">
+            <span className={cn("w-2 h-2 rounded-full", DOT_CLASS[state])} aria-hidden="true" />
             {OFFICE_STATE_LABEL[state]}
           </li>
         ))}

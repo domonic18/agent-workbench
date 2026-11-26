@@ -3,7 +3,6 @@ import { useState } from "react";
 import { copyToClipboard } from "../../shared/clipboard.js";
 import { Button } from "./Button.js";
 import { useToast } from "./Toast.js";
-import styles from "./controls.module.css";
 
 export interface CopyActionButtonProps {
   value: string;
@@ -15,7 +14,6 @@ export interface CopyActionButtonProps {
   disabled?: boolean;
 }
 
-/** 行内复制按钮：复制成功走 toast 反馈，失败也要说清楚 */
 export function CopyActionButton({
   value,
   label,
@@ -60,7 +58,6 @@ export interface CopyBlockProps {
   note?: string;
 }
 
-/** 大号命令块：等宽展示 + 一键复制（toast 反馈），供安装命令与令牌用 */
 export function CopyBlock({
   label,
   value,
@@ -69,13 +66,15 @@ export function CopyBlock({
   note,
 }: CopyBlockProps) {
   return (
-    <div className={styles.commandBlock}>
-      <div className={styles.commandHead}>
-        <span className={styles.commandLabel}>{label}</span>
+    <div className="flex flex-col gap-2 p-4 border rounded-lg bg-surface-2">
+      <div className="flex items-center justify-between gap-3 max-md:flex-col max-md:items-stretch">
+        <span className="text-sm font-semibold text-text-secondary">{label}</span>
         <CopyActionButton value={value} label={copyLabel} copiedText={copiedText} />
       </div>
-      <pre className={styles.commandValue}>{value}</pre>
-      {note === undefined ? null : <p className={styles.note}>{note}</p>}
+      <pre className="m-0 p-3 border rounded-md bg-surface font-mono text-sm leading-relaxed text-foreground overflow-x-auto whitespace-pre-wrap break-words">
+        {value}
+      </pre>
+      {note === undefined ? null : <p className="m-0 text-sm text-muted">{note}</p>}
     </div>
   );
 }

@@ -1,31 +1,51 @@
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "../../lib/utils.js";
 import type { ButtonSize } from "./Button.js";
-import styles from "./controls.module.css";
 
-export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+const iconButtonVariants = cva(
+  "inline-flex items-center justify-center p-0 border rounded-md bg-surface text-text-secondary transition-colors disabled:opacity-55",
+  {
+    variants: {
+      variant: {
+        surface: "border-border hover:bg-surface-3 hover:border-border-strong hover:text-foreground",
+        ghost: "border-transparent bg-transparent hover:bg-accent-soft hover:text-accent",
+      },
+      size: {
+        sm: "w-control-sm h-control-sm",
+        md: "w-control-md h-control-md",
+        lg: "w-control-lg h-control-lg",
+      },
+    },
+    defaultVariants: {
+      variant: "surface",
+      size: "md",
+    },
+  },
+);
+
+export interface IconButtonProps
+  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "size">,
+    VariantProps<typeof iconButtonVariants> {
   /** 无障碍名称：图标按钮没有可见文字，必须显式给出 */
   label: string;
   size?: ButtonSize;
   icon: ReactNode;
-  /** surface 带边框（默认）；ghost 无边框，hover 才显形 */
-  variant?: "surface" | "ghost";
 }
 
-const VARIANT_CLASS = {
-  surface: undefined,
-  ghost: styles.iconButtonGhost,
-} as const;
-
-/** 纯图标可点区：触达尺寸不小于 44px 时用 lg（03 §6 移动适配） */
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
   { label, size = "md", icon, variant = "surface", className, type, ...rest },
   ref,
 ) {
-  const classes = [styles.iconButton, styles[size], VARIANT_CLASS[variant], className]
-    .filter((item): item is string => typeof item === "string" && item !== "")
-    .join(" ");
   return (
-    <button {...rest} ref={ref} type={type ?? "button"} aria-label={label} title={label} className={classes}>
+    <button
+      {...rest}
+      ref={ref}
+      type={type ?? "button"}
+      aria-label={label}
+      title={label}
+      className={cn(iconButtonVariants({ variant, size }), className)}
+    >
       {icon}
     </button>
   );

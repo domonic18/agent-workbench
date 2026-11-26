@@ -19,7 +19,6 @@ import {
 import { Badge } from "../ui/Badge.js";
 import { Button } from "../ui/Button.js";
 import { Table, type TableColumn } from "../ui/Table.js";
-import styles from "./knowledge-list.module.css";
 
 export interface KnowledgeListProps {
   items: KnowledgeEntryDto[];
@@ -64,7 +63,7 @@ function RowActions({
 }: RowActionsProps) {
   const busy = pendingAction !== null;
   return (
-    <div className={styles.rowActions}>
+    <div className="flex flex-wrap gap-2">
       {entry.status === "candidate" ? (
         <>
           <Button variant="primary" size="sm" onClick={onAdopt} disabled={busy}>
@@ -150,10 +149,10 @@ export function KnowledgeList({ items, view, search, now }: KnowledgeListProps) 
       width: "38%",
       render: (entry) => (
         <>
-          <Link to={detailPath(entry.id, view, search)} className={styles.title} title={entry.path}>
+          <Link to={detailPath(entry.id, view, search)} className="block overflow-hidden text-ellipsis whitespace-nowrap font-semibold text-foreground no-underline hover:text-accent hover:underline" title={entry.path}>
             {entry.title}
           </Link>
-          <span className={styles.subline}>
+          <span className="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-xs text-subtle">
             {entry.summary === "" ? entry.path : entry.summary}
           </span>
         </>
@@ -179,7 +178,7 @@ export function KnowledgeList({ items, view, search, now }: KnowledgeListProps) 
       width: "10%",
       render: (entry) =>
         entry.embeddingStatus === "ready" ? (
-          <span className={styles.muted}>已索引</span>
+          <span className="text-sm text-muted">已索引</span>
         ) : (
           <Badge
             tone={KNOWLEDGE_EMBEDDING_TONE[entry.embeddingStatus]}
@@ -204,22 +203,22 @@ export function KnowledgeList({ items, view, search, now }: KnowledgeListProps) 
   ];
 
   return (
-    <div className={styles.wrap}>
+    <div className="flex flex-col gap-3">
       {error === null ? null : (
-        <p className={styles.error} role="alert">
+        <p className="m-0 rounded-md border border-danger-border bg-danger-soft px-4 py-3 text-sm text-danger" role="alert">
           {error}
         </p>
       )}
 
-      <div className={styles.tableArea}>
+      <div className="block max-md:hidden">
         <Table columns={columns} rows={items} rowKey={(entry) => entry.id} minWidth="760px" fixedLayout />
       </div>
 
-      <ul className={styles.cards}>
+      <ul className="m-0 hidden list-none p-0 max-md:flex max-md:flex-col max-md:gap-3">
         {items.map((entry) => (
-          <li key={entry.id} className={styles.card}>
-            <div className={styles.cardTop}>
-              <Link to={detailPath(entry.id, view, search)} className={styles.cardTitle}>
+          <li key={entry.id} className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4">
+            <div className="flex items-start justify-between gap-3">
+              <Link to={detailPath(entry.id, view, search)} className="font-semibold text-foreground text-md no-underline [overflow-wrap:anywhere]">
                 {entry.title}
               </Link>
               <Badge
@@ -227,7 +226,7 @@ export function KnowledgeList({ items, view, search, now }: KnowledgeListProps) 
                 text={KNOWLEDGE_STATUS_LABEL[entry.status]}
               />
             </div>
-            <div className={styles.cardMeta}>
+            <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
               <span>{entry.category === "" ? "未分类" : entry.category}</span>
               <span>{formatRelativeTime(entry.updatedAt, now)}</span>
               {entry.embeddingStatus === "ready" ? null : (

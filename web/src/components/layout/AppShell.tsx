@@ -18,12 +18,12 @@ import { RealtimeProvider, useRealtimeStatus } from "../../api/stream.js";
 import { APP_NAME, APP_NAME_EN, APP_VERSION } from "../../shared/app.js";
 import { REALTIME_LABEL, REALTIME_TONE } from "../../shared/labels.js";
 import { useTheme } from "../../shared/theme.js";
+import { cn } from "../../lib/utils.js";
 import { LogoIcon } from "../brand/LogoIcon.js";
 import { ChangePasswordDialog } from "../identity/ChangePasswordDialog.js";
 import { Badge } from "../ui/Badge.js";
 import { Menu, type MenuItem } from "../ui/Menu.js";
 import { ThemeToggle } from "./ThemeToggle.js";
-import styles from "./AppShell.module.css";
 
 const NAV_GROUPS = [
   {
@@ -197,29 +197,41 @@ function Shell() {
   ];
 
   return (
-    <div className={styles.shell}>
-      <nav className={styles.nav} aria-label="主导航">
-        <div className={styles.brand}>
-          <span className={styles.brandLogo} aria-hidden="true">
+    <div className="flex min-h-screen bg-background max-md:flex-col">
+      <nav
+        className="sticky top-0 flex w-sidebar shrink-0 grow-0 basis-sidebar flex-col border-r border-border bg-surface text-text-secondary max-md:static max-md:h-auto max-md:w-auto max-md:basis-auto max-md:flex-row max-md:flex-wrap max-md:items-center"
+        aria-label="主导航"
+      >
+        <div className="flex items-center gap-3 border-b border-border px-5 py-4 max-md:border-b-0 max-md:px-4 max-md:py-3">
+          <span className="inline-flex text-accent" aria-hidden="true">
             <LogoIcon size={26} />
           </span>
-          <span className={styles.brandText}>
-            <span className={styles.brandTitle}>{APP_NAME}</span>
-            <span className={styles.brandSub}>{APP_NAME_EN}</span>
+          <span className="block min-w-0 max-md:hidden">
+            <span className="block text-md font-bold text-foreground">{APP_NAME}</span>
+            <span className="mt-1 block text-xs text-muted">{APP_NAME_EN}</span>
           </span>
         </div>
 
-        <div className={styles.links}>
+        <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-3 py-4 max-md:order-1 max-md:basis-full max-md:flex-row max-md:gap-1 max-md:overflow-x-auto max-md:px-3 max-md:py-2">
           {NAV_GROUPS.map((group) => (
-            <div key={group.label} className={styles.navGroup}>
-              <div className={styles.navGroupLabel}>{group.label}</div>
+            <div key={group.label} className="flex flex-col gap-1 max-md:flex-row max-md:gap-1">
+              <div className="px-3 text-2xs font-semibold uppercase tracking-wide text-muted max-md:hidden">
+                {group.label}
+              </div>
               {group.items.map((item) => {
                 const Icon = item.icon;
                 return (
                   <NavLink
                     key={item.to}
                     to={item.to}
-                    className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ""}`}
+                    className={({ isActive }) =>
+                      cn(
+                        "flex h-control-md items-center gap-3 rounded-md px-3 text-sm font-medium no-underline transition-colors duration-fast",
+                        "hover:bg-surface-2 hover:text-foreground",
+                        isActive && "bg-surface-2 font-semibold text-foreground",
+                        "max-md:inline-flex max-md:h-auto max-md:min-h-touch max-md:shrink-0 max-md:whitespace-nowrap",
+                      )
+                    }
                   >
                     <Icon size={16} strokeWidth={1.8} aria-hidden="true" />
                     {item.label}
@@ -230,19 +242,21 @@ function Shell() {
           ))}
         </div>
 
-        <div className={styles.navFooter}>
+        <div className="flex items-center justify-between gap-2 border-t border-border px-5 py-3 max-md:order-0 max-md:ml-auto max-md:px-4 max-md:py-2">
           <Badge tone={env.local ? "positive" : "warning"} text={env.label} />
-          <span className={styles.version}>{APP_VERSION}</span>
+          <span className="text-xs text-muted">{APP_VERSION}</span>
         </div>
       </nav>
 
-      <div className={styles.body}>
-        <header className={styles.topbar}>
-          <div className={styles.heading}>
-            <h1 className={styles.pageTitle}>{meta.title}</h1>
-            <span className={styles.pageDescription}>{meta.description}</span>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-20 flex h-topbar items-center gap-4 border-b border-border bg-header-bg px-6 max-md:h-auto max-md:px-4 max-md:py-3">
+          <div className="flex min-w-0 items-baseline gap-3">
+            <h1 className="m-0 text-lg font-semibold text-foreground">{meta.title}</h1>
+            <span className="overflow-hidden text-ellipsis whitespace-nowrap text-sm text-muted max-md:hidden">
+              {meta.description}
+            </span>
           </div>
-          <div className={styles.topbarRight}>
+          <div className="ml-auto flex items-center gap-2">
             <Badge tone={REALTIME_TONE[realtime]} text={REALTIME_LABEL[realtime]} />
             <ThemeToggle />
             <Menu
@@ -252,13 +266,16 @@ function Shell() {
               trigger={({ open, toggle }) => (
                 <button
                   type="button"
-                  className={styles.avatarButton}
+                  className="inline-flex h-[var(--size-avatar)] w-[var(--size-avatar)] items-center justify-center rounded-full border-none bg-transparent p-0"
                   aria-label="账号菜单"
                   aria-haspopup="menu"
                   aria-expanded={open}
                   onClick={toggle}
                 >
-                  <span className={styles.avatar} aria-hidden="true">
+                  <span
+                    className="flex h-full w-full items-center justify-center rounded-full bg-avatar-bg text-xs font-bold text-avatar-text"
+                    aria-hidden="true"
+                  >
                     管
                   </span>
                 </button>
@@ -268,10 +285,17 @@ function Shell() {
         </header>
 
         {/* 委派屏是图版面,内容区按窄栏排会把画布压扁——这一屏放开宽度 */}
-        <main className={WIDE_ROUTES.some((path) => location.pathname.startsWith(path)) ? `${styles.main} ${styles.mainWide}` : styles.main}>
+        <main
+          className={cn(
+            "mx-auto min-w-0 w-full flex-1 p-6 max-md:p-4",
+            WIDE_ROUTES.some((path) => location.pathname.startsWith(path))
+              ? "max-w-none"
+              : "max-w-content-narrow",
+          )}
+        >
           <Suspense
             fallback={
-              <p className={styles.pageLoading} role="status">
+              <p className="text-md text-muted" role="status">
                 加载中…
               </p>
             }

@@ -16,7 +16,24 @@ import { Badge } from "../ui/Badge.js";
 import { Button } from "../ui/Button.js";
 import { Card } from "../ui/Panel.js";
 import { CapabilityFlow } from "./CapabilityFlow.js";
-import styles from "./CapabilityCard.module.css";
+
+const card =
+  "flex min-w-0 flex-col gap-3 rounded-md border border-border bg-surface p-4 transition-colors duration-fast hover:border-border-hover";
+const header = "flex items-start justify-between gap-3";
+const meta = "m-0 grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-x-3 gap-y-2";
+const metaItem = "flex min-w-0 flex-col gap-1";
+const metaDt = "text-xs text-muted";
+const metaDd = "m-0 text-sm text-foreground [overflow-wrap:anywhere]";
+const monoClass = "font-mono text-xs text-subtle";
+const scopeSection = "flex flex-col gap-2";
+const scopeTitle = "m-0 text-sm font-semibold text-text-secondary";
+const scope =
+  "m-0 max-h-[320px] overflow-auto whitespace-pre-wrap break-words rounded-md border border-line-soft bg-surface-2 p-3 font-mono text-xs leading-normal text-foreground";
+const errorClass = "m-0 text-sm text-danger";
+const actions = "flex flex-wrap gap-2";
+const failure =
+  "flex flex-col gap-2 rounded-md border border-warning-border bg-warning-soft p-3 text-sm text-warning";
+const failureActions = "flex gap-2";
 
 export interface CapabilityCardProps {
   capability: CapabilityDto;
@@ -101,8 +118,8 @@ export function CapabilityCard({ capability, view, now, subjectName = null }: Ca
   const revoked = capability.status === "revoked";
 
   return (
-    <Card className={styles.card}>
-      <header className={styles.header}>
+    <Card className={card}>
+      <header className={header}>
         <CapabilityFlow
           subject={capability.subject}
           subjectName={subjectName}
@@ -116,82 +133,83 @@ export function CapabilityCard({ capability, view, now, subjectName = null }: Ca
         />
       </header>
 
-      <dl className={styles.meta}>
-        <div className={styles.metaItem}>
-          <dt>申请人</dt>
-          <dd>{capability.subject}</dd>
+      <dl className={meta}>
+        <div className={metaItem}>
+          <dt className={metaDt}>申请人</dt>
+          <dd className={metaDd}>{capability.subject}</dd>
         </div>
-        <div className={styles.metaItem}>
-          <dt>任务</dt>
-          <dd className={styles.mono}>{capability.taskId}</dd>
+        <div className={metaItem}>
+          <dt className={metaDt}>任务</dt>
+          <dd className={`${monoClass} ${metaDd}`}>{capability.taskId}</dd>
         </div>
-        <div className={styles.metaItem}>
-          <dt>TTL</dt>
-          <dd>{formatDuration(capability.ttlSeconds * 1000)}</dd>
+        <div className={metaItem}>
+          <dt className={metaDt}>TTL</dt>
+          <dd className={metaDd}>{formatDuration(capability.ttlSeconds * 1000)}</dd>
         </div>
         {remaining === null ? null : (
-          <div className={styles.metaItem}>
-            <dt>剩余有效期</dt>
-            <dd>{remaining > 0 ? formatDuration(remaining) : "已过期"}</dd>
+          <div className={metaItem}>
+            <dt className={metaDt}>剩余有效期</dt>
+            <dd className={metaDd}>{remaining > 0 ? formatDuration(remaining) : "已过期"}</dd>
           </div>
         )}
         {capability.expiresAt === null ? null : (
-          <div className={styles.metaItem}>
-            <dt>到期</dt>
-            <dd>{formatDateTime(capability.expiresAt)}</dd>
+          <div className={metaItem}>
+            <dt className={metaDt}>到期</dt>
+            <dd className={metaDd}>{formatDateTime(capability.expiresAt)}</dd>
           </div>
         )}
         {revoked && capability.revokedAt !== null ? (
-          <div className={styles.metaItem}>
-            <dt>吊销于</dt>
-            <dd>{formatDateTime(capability.revokedAt)}</dd>
+          <div className={metaItem}>
+            <dt className={metaDt}>吊销于</dt>
+            <dd className={metaDd}>{formatDateTime(capability.revokedAt)}</dd>
           </div>
         ) : null}
         {view === "history" ? (
-          <div className={styles.metaItem}>
-            <dt>创建</dt>
-            <dd>{formatDateTime(capability.createdAt)}</dd>
+          <div className={metaItem}>
+            <dt className={metaDt}>创建</dt>
+            <dd className={metaDd}>{formatDateTime(capability.createdAt)}</dd>
           </div>
         ) : null}
       </dl>
 
-      <section className={styles.scopeSection} aria-label="授权范围">
-        <h4 className={styles.scopeTitle}>范围（完整展示，不折叠）</h4>
-        <pre className={styles.scope}>{JSON.stringify(capability.scope, null, 2)}</pre>
+      <section className={scopeSection} aria-label="授权范围">
+        <h4 className={scopeTitle}>范围（完整展示，不折叠）</h4>
+        <pre className={scope}>{JSON.stringify(capability.scope, null, 2)}</pre>
       </section>
 
       {error === null ? null : (
-        <p className={styles.error} role="alert">
+        <p className={errorClass} role="alert">
           {error}
         </p>
       )}
 
       {view === "pending" ? (
-        <div className={styles.actions}>
+        <div className={actions}>
           {issueFailed ? (
-            <div className={styles.failure}>
+            <div className={failure}>
               <span>签发失败，可重试；当前未生效。</span>
-              <div className={styles.failureActions}>
-                <Button variant="primary" onClick={handleRetry}>
+              <div className={failureActions}>
+                <Button className="max-md:flex-1" variant="primary" onClick={handleRetry}>
                   重试
                 </Button>
-                <Button variant="secondary" onClick={() => setIssueFailed(false)}>
+                <Button className="max-md:flex-1" variant="secondary" onClick={() => setIssueFailed(false)}>
                   知道了
                 </Button>
               </div>
             </div>
           ) : capability.status === "issuing" ? (
             <>
-              <Button variant="primary" disabled>
+              <Button className="max-md:flex-1" variant="primary" disabled>
                 签发中…
               </Button>
-              <Button variant="secondary" disabled>
+              <Button className="max-md:flex-1" variant="secondary" disabled>
                 拒绝
               </Button>
             </>
           ) : (
             <>
               <Button
+                className="max-md:flex-1"
                 variant="primary"
                 onClick={handleApprove}
                 disabled={pending}
@@ -200,6 +218,7 @@ export function CapabilityCard({ capability, view, now, subjectName = null }: Ca
                 {pending ? "签发中…" : "批准"}
               </Button>
               <Button
+                className="max-md:flex-1"
                 variant="secondary"
                 onClick={handleReject}
                 disabled={pending}
@@ -212,8 +231,9 @@ export function CapabilityCard({ capability, view, now, subjectName = null }: Ca
       ) : null}
 
       {view === "active" ? (
-        <div className={styles.actions}>
+        <div className={actions}>
           <Button
+            className="max-md:flex-1"
             variant={confirmRevoke ? "danger" : "secondary"}
             onClick={handleRevoke}
             disabled={pending}
@@ -221,7 +241,7 @@ export function CapabilityCard({ capability, view, now, subjectName = null }: Ca
             {confirmRevoke ? "确认吊销" : "吊销"}
           </Button>
           {confirmRevoke ? (
-            <Button variant="secondary" onClick={() => setConfirmRevoke(false)}>
+            <Button className="max-md:flex-1" variant="secondary" onClick={() => setConfirmRevoke(false)}>
               取消
             </Button>
           ) : null}
@@ -229,8 +249,8 @@ export function CapabilityCard({ capability, view, now, subjectName = null }: Ca
       ) : null}
 
       {view === "history" && capability.status === "rejected" ? (
-        <div className={styles.actions}>
-          <Button variant="secondary" onClick={handleRetry} disabled={pending}>
+        <div className={actions}>
+          <Button className="max-md:flex-1" variant="secondary" onClick={handleRetry} disabled={pending}>
             {pending ? "申请中…" : "重新申请"}
           </Button>
         </div>

@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { Button } from "./Button.js";
 import { Skeleton } from "./Skeleton.js";
-import styles from "./feedback.module.css";
 
 export interface AsyncSectionProps {
   /** 首屏加载中 */
@@ -16,7 +15,6 @@ export interface AsyncSectionProps {
   children: ReactNode;
 }
 
-/** 列表三态（加载 / 出错 / 有内容）+ 分页加载，收敛各屏重复的状态样板 */
 export function AsyncSection({
   pending,
   error,
@@ -28,7 +26,7 @@ export function AsyncSection({
 }: AsyncSectionProps) {
   if (pending) {
     return (
-      <div className={styles.skeletonList}>
+      <div className="flex flex-col gap-3">
         {Array.from({ length: 5 }, (_, index) => (
           <Skeleton key={index} height={44} />
         ))}
@@ -38,7 +36,7 @@ export function AsyncSection({
 
   if (error !== null) {
     return (
-      <div className={styles.errorBanner} role="alert">
+      <div className="flex flex-wrap items-center gap-3 px-4 py-3 border border-danger-border rounded-md bg-danger-soft text-danger text-sm" role="alert">
         <span>{error}</span>
         <Button size="sm" variant="secondary" onClick={onRetry}>
           重试
@@ -51,7 +49,7 @@ export function AsyncSection({
     <>
       {children}
       {hasMore ? (
-        <div className={styles.loadMore}>
+        <div className="flex justify-center mt-4">
           <Button variant="secondary" loading={fetchingMore} onClick={onLoadMore}>
             加载更多
           </Button>

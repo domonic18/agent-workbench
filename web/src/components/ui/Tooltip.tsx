@@ -1,6 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import styles from "./overlays.module.css";
 
 export interface TooltipProps {
   /** 气泡文案,也是触发元素的无障碍名 */
@@ -9,10 +8,6 @@ export interface TooltipProps {
   children: ReactNode;
 }
 
-/**
- * 轻量提示气泡:图标 + 悬浮/聚焦说明。
- * 气泡挂在 document.body 上按视口坐标定位,不会被表格滚动容器裁掉。
- */
 export function Tooltip({ label, children }: TooltipProps) {
   const triggerRef = useRef<HTMLSpanElement>(null);
   const bubbleRef = useRef<HTMLSpanElement>(null);
@@ -31,7 +26,6 @@ export function Tooltip({ label, children }: TooltipProps) {
     }
     const rect = trigger.getBoundingClientRect();
     const bubbleRect = bubble.getBoundingClientRect();
-    // 上方放不下就翻到下方;左右夹在视口内
     const above = rect.top - bubbleRect.height - 8;
     const top = above >= 8 ? above : rect.bottom + 8;
     const left = Math.max(
@@ -44,7 +38,6 @@ export function Tooltip({ label, children }: TooltipProps) {
     setAnchor({ top, left });
   }, [open]);
 
-  // 页面滚动后锚点失真,直接收起气泡
   useEffect(() => {
     if (!open) {
       return;
@@ -62,7 +55,7 @@ export function Tooltip({ label, children }: TooltipProps) {
     <>
       <span
         ref={triggerRef}
-        className={styles.tooltipTrigger}
+        className="inline-flex items-center justify-center text-muted cursor-help focus-visible:outline-none focus-visible:rounded-xs focus-visible:ring"
         role="img"
         tabIndex={0}
         aria-label={label}
@@ -80,7 +73,7 @@ export function Tooltip({ label, children }: TooltipProps) {
               ref={bubbleRef}
               id={tooltipId}
               role="tooltip"
-              className={styles.tooltipBubble}
+              className="fixed z-90 w-max max-w-tooltip-max px-3 py-2 border border-border rounded-md bg-surface text-foreground text-xs leading-relaxed shadow-md pointer-events-none"
               style={anchor === null ? { visibility: "hidden" } : { top: anchor.top, left: anchor.left }}
             >
               {label}

@@ -2,7 +2,6 @@ import { useState } from "react";
 import { ApiError } from "../../api/client.js";
 import { rotateAgentKey } from "../../api/identity.js";
 import { agentEnvHints } from "./envHints.js";
-import styles from "./IdentityForm.module.css";
 import { Button } from "../ui/Button.js";
 import { Dialog } from "../ui/Dialog.js";
 import { SecretReveal } from "./SecretReveal.js";
@@ -36,20 +35,20 @@ export function AgentRotateDialog({ agent, onClose, onRotated }: AgentRotateDial
   return (
     <Dialog title={secret === null ? "轮换 Agent 密钥" : "新密钥已生成"} onClose={onClose} dismissible={secret === null}>
       {secret === null ? (
-        <div className={styles.form}>
-          <p className={styles.hint}>
+        <div className="flex flex-col gap-4">
+          <p className="m-0 text-xs text-muted">
             {agent.displayName}（{agent.project}，{agent.id}）
           </p>
-          <p className={styles.warning}>
+          <p className="m-0 rounded-md border border-warning-border bg-warning-soft px-3 py-2 text-sm text-warning">
             轮换后旧密钥立即失效。正在用旧密钥连接的 Agent 会断开，需要把新密钥写进它的 MCP
             客户端配置后重连。
           </p>
           {error === null ? null : (
-            <p className={styles.error} role="alert">
+            <p className="m-0 text-sm text-danger" role="alert">
               {error}
             </p>
           )}
-          <div className={styles.actions}>
+          <div className="mt-1 flex justify-end gap-2 max-md:flex-col-reverse">
             <Button variant="secondary" onClick={onClose}>
               取消
             </Button>
@@ -63,13 +62,13 @@ export function AgentRotateDialog({ agent, onClose, onRotated }: AgentRotateDial
           </div>
         </div>
       ) : (
-        <div className={styles.form}>
+        <div className="flex flex-col gap-4">
           <SecretReveal
             secret={secret}
             note={`请把新密钥写进 ${agent.id} 的 MCP 客户端配置；端点与鉴权头见「协作接入」页。`}
             hints={agentEnvHints(agent.id)}
           />
-          <div className={styles.actions}>
+          <div className="mt-1 flex justify-end gap-2 max-md:flex-col-reverse">
             <Button variant="primary" onClick={onClose}>
               我已保存，关闭
             </Button>

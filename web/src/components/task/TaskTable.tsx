@@ -7,9 +7,10 @@ import {
   formatTokens,
 } from "../../shared/format.js";
 import { TASK_ORIGIN_LABEL, TASK_STAGE_LABEL, TASK_STATUS_LABEL, TASK_STATUS_TONE } from "../../shared/labels.js";
+import { cn } from "../../lib/utils.js";
 import { Badge } from "../ui/Badge.js";
 import { Table, type TableColumn } from "../ui/Table.js";
-import styles from "./TaskTable.module.css";
+import { mono as sharedMono, muted as sharedMuted } from "./shared.js";
 
 export interface TaskTableProps {
   tasks: readonly TaskDto[];
@@ -19,18 +20,21 @@ export interface TaskTableProps {
   now?: number;
 }
 
+/** 固定列宽表格下由单元格宽度决定截断位置 */
+const CLIP = "block overflow-hidden whitespace-nowrap text-ellipsis";
+
 function taskUrl(id: string, search: string): string {
   return `/tasks/${encodeURIComponent(id)}${search}`;
 }
 
 function OutputCell({ output }: { output: string | null }) {
   if (output === null) {
-    return <span className={styles.muted}>—</span>;
+    return <span className={sharedMuted}>—</span>;
   }
   if (/^https?:\/\//i.test(output)) {
     return (
       <a
-        className={styles.output}
+        className="block max-w-full overflow-hidden whitespace-nowrap text-ellipsis text-accent"
         href={output}
         target="_blank"
         rel="noreferrer"
@@ -42,7 +46,10 @@ function OutputCell({ output }: { output: string | null }) {
     );
   }
   return (
-    <span className={`${styles.output} ${styles.outputCode}`} title={output}>
+    <span
+      className="block max-w-full overflow-hidden whitespace-nowrap text-ellipsis font-mono text-xs text-accent"
+      title={output}
+    >
       {output}
     </span>
   );
@@ -59,15 +66,15 @@ export function TaskTable({ tasks, agentNames, search, now = Date.now() }: TaskT
       render: (task) => (
         <>
           <Link
-            className={styles.rowLink}
+            className="block overflow-hidden whitespace-nowrap text-ellipsis text-foreground no-underline hover:text-accent hover:underline"
             to={taskUrl(task.id, search)}
             onClick={(event) => event.stopPropagation()}
           >
-            <span className={styles.primary}>{task.title}</span>
+            <span className="font-semibold text-foreground">{task.title}</span>
           </Link>
-          <div className={styles.subline}>
-            <code className={styles.mono}>{task.id}</code>
-            <span className={styles.origin}>{TASK_ORIGIN_LABEL[task.origin]}</span>
+          <div className="mt-1 flex items-center gap-2 text-xs text-subtle">
+            <code className={sharedMono}>{task.id}</code>
+            <span className="before:content-['·_']">{TASK_ORIGIN_LABEL[task.origin]}</span>
           </div>
         </>
       ),
@@ -80,7 +87,7 @@ export function TaskTable({ tasks, agentNames, search, now = Date.now() }: TaskT
         // 下发人也可能是 Agent,取不到名字时回退后端标签(系统派单为「aw-console」等)
         const name = agentNames.get(task.assigner);
         return (
-          <span className={styles.clip} title={task.assigner_label}>
+          <span className={CLIP} title={task.assigner_label}>
             {name ?? task.assigner_label}
           </span>
         );
@@ -94,9 +101,9 @@ export function TaskTable({ tasks, agentNames, search, now = Date.now() }: TaskT
         const name = agentNames.get(task.assignee);
         return (
           <>
-            <span className={styles.clip}>{name ?? task.assignee_label}</span>
+            <span className={CLIP}>{name ?? task.assignee_label}</span>
             {name === undefined ? null : (
-              <span className={`${styles.mono} ${styles.clip}`}>{task.assignee}</span>
+              <span className={cn(sharedMono, CLIP)}>{task.assignee}</span>
             )}
           </>
         );
@@ -111,7 +118,7 @@ export function TaskTable({ tasks, agentNames, search, now = Date.now() }: TaskT
         <>
           <div>第 {task.round} 轮</div>
           {task.rework_count > 0 ? (
-            <div className={styles.muted}>返工 {task.rework_count} 次</div>
+            <div className={sharedMuted}>返工 {task.rework_count} 次</div>
           ) : null}
         </>
       ),
@@ -135,7 +142,7 @@ export function TaskTable({ tasks, agentNames, search, now = Date.now() }: TaskT
       header: "产出",
       width: "15%",
       render: (task) => (
-        <span className={styles.clipWide}>
+        <span className="block overflow-hidden">
           <OutputCell output={task.output} />
         </span>
       ),
@@ -166,7 +173,7 @@ export function TaskTable({ tasks, agentNames, search, now = Date.now() }: TaskT
 
   return (
     <>
-      <div className={styles.tableArea}>
+      <div className="max-md:hidden">
         <Table
           columns={columns}
           rows={[...tasks]}
@@ -178,25 +185,31 @@ export function TaskTable({ tasks, agentNames, search, now = Date.now() }: TaskT
       </div>
 
       {/* 移动端只留最关键三列:任务 / 承接 / 状态,其余进详情抽屉(03 §8) */}
-      <ul className={styles.cards} aria-label="任务卡片">
+      <ul
+        className="m-0 hidden list-none p-0 max-md:flex max-md:flex-col max-md:gap-3"
+        aria-label="任务卡片"
+      >
         {tasks.map((task) => {
           const assigneeName = agentNames.get(task.assignee);
           return (
-            <li key={task.id} className={styles.card}>
+            <li
+              key={task.id}
+              className="rounded-lg border border-border bg-surface"
+            >
               <Link
-                className={styles.cardLink}
+                className="flex min-h-touch flex-col gap-3 p-4 text-foreground no-underline active:bg-accent-soft"
                 to={taskUrl(task.id, search)}
                 aria-label={task.title}
               >
-                <span className={styles.cardTop}>
-                  <span className={styles.cardTitle}>{task.title}</span>
+                <span className="flex items-start justify-between gap-3">
+                  <span className="text-md font-semibold [overflow-wrap:anywhere]">{task.title}</span>
                   <Badge
                     tone={TASK_STATUS_TONE[task.status]}
                     text={TASK_STATUS_LABEL[task.status]}
                   />
                 </span>
-                <span className={styles.cardMeta}>
-                  <span className={styles.cardMetaLabel}>承接</span>
+                <span className="flex flex-wrap items-baseline gap-2 text-sm">
+                  <span className="text-xs text-muted">承接</span>
                   <span>{assigneeName ?? task.assignee_label}</span>
                 </span>
               </Link>

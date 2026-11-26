@@ -1,6 +1,6 @@
+import { LogIn, ShieldCheck, Sparkles } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
-import { LogIn, ShieldCheck, Sparkles } from "lucide-react";
 import { feishuLogin, feishuStatus, login } from "../api/auth.js";
 import { ApiError } from "../api/client.js";
 import { bootstrapStatus } from "../api/bootstrap.js";
@@ -8,9 +8,7 @@ import { requestFeishuAuthCode } from "../components/auth/feishu-jsapi.js";
 import { Button } from "../components/ui/Button.js";
 import { EmptyState } from "../components/ui/EmptyState.js";
 import { Field, Input } from "../components/ui/Field.js";
-import styles from "./LoginPage.module.css";
 
-/** 只接受站内路径,避免 next 参数被用作开放重定向 */
 function safeNext(value: string | null): string {
   if (value === null || !value.startsWith("/") || value.startsWith("//")) {
     return "/overview";
@@ -18,7 +16,6 @@ function safeNext(value: string | null): string {
   return value;
 }
 
-/** 免登阶段:探测配置中 / 自动免登中(表单隐藏) / 回落口令登录 */
 type FeishuPhase = "checking" | "auto" | "password";
 
 export function LoginPage() {
@@ -33,7 +30,6 @@ export function LoginPage() {
   const [feishuNotice, setFeishuNotice] = useState<string | null>(null);
   const appIdRef = useRef("");
 
-  /** 登录成功后的落地逻辑对口令与免登一致:初始化未完成去 /setup,否则按 next 回目标页 */
   const landAfterLogin = useCallback(
     async (fallbackTarget: string) => {
       let target = fallbackTarget;
@@ -58,7 +54,6 @@ export function LoginPage() {
       await feishuLogin(code);
       await landAfterLogin(safeNext(params.get("next")));
     } catch (caught) {
-      // 未在白名单 / 环境不支持 / 超时都回落口令登录;给一行提示,不吞错
       setFeishuNotice(caught instanceof ApiError ? caught.message : "飞书免登未完成,可使用口令登录");
       setFeishuPhase("password");
     }
@@ -88,7 +83,6 @@ export function LoginPage() {
     return () => {
       cancelled = true;
     };
-    // 仅进页探测一次;手动重试走表单里的按钮
   }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -100,7 +94,6 @@ export function LoginPage() {
       await login(password);
       await landAfterLogin(safeNext(params.get("next")));
     } catch (caught) {
-      // 控制台未初始化时登录必然被拒:引导去 /setup,不给死胡同
       if (caught instanceof ApiError && caught.code === "BOOTSTRAP_REQUIRED") {
         setNeedsSetup(true);
       }
@@ -111,20 +104,23 @@ export function LoginPage() {
   }
 
   return (
-    <div className={styles.page}>
-      <section className={styles.formSide}>
+    <div className="min-h-screen flex items-center justify-center p-5 bg-background max-md:p-4">
+      <section className="w-full max-w-dialog-sm">
         {feishuPhase === "auto" ? (
-          <div className={styles.card} aria-live="polite">
-            <h2 className={styles.title}>登录控制台</h2>
-            <p className={styles.feishuPending}>
+          <div className="w-full flex flex-col gap-4 p-6 border border-border rounded-lg bg-surface shadow-md max-md:p-5" aria-live="polite">
+            <h2 className="m-0 text-xl font-semibold">登录控制台</h2>
+            <p className="flex items-center justify-center gap-2 min-h-touch text-sm text-muted">
               <Sparkles size={16} aria-hidden="true" />
               飞书免登中…
             </p>
           </div>
         ) : (
-          <form className={styles.card} onSubmit={(event) => void handleSubmit(event)}>
-            <h2 className={styles.title}>登录控制台</h2>
-            <p className={styles.description}>输入管理员口令以继续</p>
+          <form
+            className="w-full flex flex-col gap-4 p-6 border border-border rounded-lg bg-surface shadow-md max-md:p-5"
+            onSubmit={(event) => void handleSubmit(event)}
+          >
+            <h2 className="m-0 text-xl font-semibold">登录控制台</h2>
+            <p className="-mt-2 mb-0 text-sm text-muted">输入管理员口令以继续</p>
             <Field label="控制台口令" htmlFor="password">
               <Input
                 id="password"
@@ -141,14 +137,14 @@ export function LoginPage() {
                   icon={<ShieldCheck size={28} aria-hidden="true" />}
                   title="控制台未初始化"
                   action={
-                    <Link className={styles.link} to="/setup">
+                    <Link className="text-sm" to="/setup">
                       前往 /setup 完成初始化 →
                     </Link>
                   }
                 />
               </div>
             ) : error === null ? null : (
-              <p className={styles.error} role="alert">
+              <p className="m-0 text-sm text-danger" role="alert">
                 {error}
               </p>
             )}
@@ -163,9 +159,11 @@ export function LoginPage() {
             </Button>
             {!feishuEnabled ? null : (
               <>
-                <span className={styles.feishuDivider}>或</span>
+                <span className="flex items-center gap-3 -my-1 text-muted text-xs before:content-[''] before:flex-1 before:border-t before:border-border after:content-[''] after:flex-1 after:border-t after:border-border">
+                  或
+                </span>
                 {feishuNotice === null ? null : (
-                  <p className={styles.notice}>{feishuNotice}</p>
+                  <p className="m-0 text-sm text-muted">{feishuNotice}</p>
                 )}
                 <Button
                   type="button"

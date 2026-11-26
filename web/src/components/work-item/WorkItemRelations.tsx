@@ -14,7 +14,6 @@ import {
   WORK_HOLD_REASON_LABEL,
 } from "../../shared/labels.js";
 import { agentMentionLabel } from "../../shared/agent-label.js";
-import styles from "./work-item-drawer.module.css";
 
 export interface WorkItemRelationsProps {
   tasks: readonly WorkItemTaskLink[];
@@ -35,10 +34,10 @@ function Group({
   children: ReactNode;
 }) {
   return (
-    <div className={styles.group}>
-      <div className={styles.groupTitle}>
+    <div className="mb-4 last:mb-0">
+      <div className="mb-2 flex items-baseline gap-2 text-sm font-semibold text-foreground">
         {title}
-        <span className={styles.groupCount}>{count}</span>
+        <span className="text-xs font-normal text-muted">{count}</span>
       </div>
       {children}
     </div>
@@ -46,7 +45,7 @@ function Group({
 }
 
 function Empty({ text }: { text: string }) {
-  return <p className={styles.empty}>{text}</p>;
+  return <p className="text-sm text-muted">{text}</p>;
 }
 
 export function WorkItemRelations({
@@ -58,24 +57,24 @@ export function WorkItemRelations({
   onOpenTask,
 }: WorkItemRelationsProps) {
   return (
-    <section className={styles.block} aria-label="关联工作">
-      <h3 className={styles.blockTitle}>关联工作</h3>
+    <section className="mb-5 last:mb-0" aria-label="关联工作">
+      <h3 className="mb-1 text-md font-bold text-foreground">关联工作</h3>
 
       <Group title="关联任务" count={tasks.length}>
         {tasks.length === 0 ? (
           <Empty text="暂无关联任务" />
         ) : (
-          <ul className={styles.linkList}>
+          <ul className="m-0 flex list-none flex-col gap-2 p-0">
             {tasks.map((task) => (
-              <li key={task.id} className={styles.linkRow}>
+              <li key={task.id} className="flex flex-col gap-1 rounded-md border border-border bg-surface-2 p-3">
                 <button
                   type="button"
-                  className={styles.linkButton}
+                  className="cursor-pointer break-words border-0 bg-transparent p-0 text-left font-[inherit] font-semibold text-accent enabled:hover:underline"
                   onClick={() => onOpenTask(task.id)}
                 >
                   {task.title}
                 </button>
-                <span className={styles.linkMeta}>
+                <span className="flex flex-wrap items-baseline gap-2 text-xs text-muted">
                   <span>{agentMentionLabel(task.assignee, agentNames, task.assignee)}</span>
                   <span>·</span>
                   <span>{task.status}</span>
@@ -92,13 +91,13 @@ export function WorkItemRelations({
         {runs.length === 0 ? (
           <Empty text="暂无执行记录" />
         ) : (
-          <ul className={styles.linkList}>
+          <ul className="m-0 flex list-none flex-col gap-2 p-0">
             {runs.map((run) => (
-              <li key={run.id} className={styles.linkRow}>
-                <span className={styles.linkTitle}>
+              <li key={run.id} className="flex flex-col gap-1 rounded-md border border-border bg-surface-2 p-3">
+                <span className="break-words text-sm font-semibold text-foreground">
                   {agentMentionLabel(run.agentId, agentNames, run.agentId)}
                 </span>
-                <span className={styles.linkMeta}>
+                <span className="flex flex-wrap items-baseline gap-2 text-xs text-muted">
                   <span>{run.status}</span>
                   {run.startedAt === null ? null : (
                     <>
@@ -123,15 +122,15 @@ export function WorkItemRelations({
         {inbox.length === 0 ? (
           <Empty text="暂无派工与续接输入" />
         ) : (
-          <ul className={styles.linkList}>
+          <ul className="m-0 flex list-none flex-col gap-2 p-0">
             {inbox.map((row) => (
-              <li key={row.id} className={styles.linkRow}>
-                <span className={styles.linkTitle}>
+              <li key={row.id} className="flex flex-col gap-1 rounded-md border border-border bg-surface-2 p-3">
+                <span className="break-words text-sm font-semibold text-foreground">
                   {WORKER_INBOX_KIND_LABEL[row.kind] ?? row.kind}
                   {" · "}
                   {agentMentionLabel(row.targetAgentId, agentNames, row.targetAgentId)}
                 </span>
-                <span className={styles.linkMeta}>
+                <span className="flex flex-wrap items-baseline gap-2 text-xs text-muted">
                   <span>{WORKER_INBOX_STATUS_LABEL[row.status] ?? row.status}</span>
                   {row.reason === null ? null : (
                     <>
@@ -153,20 +152,20 @@ export function WorkItemRelations({
         {threads.length === 0 ? (
           <Empty text="暂无关联线程" />
         ) : (
-          <ul className={styles.linkList}>
+          <ul className="m-0 flex list-none flex-col gap-2 p-0">
             {threads.map((thread) => (
-              <li key={thread.subscriptionId} className={styles.linkRow}>
-                <span className={styles.linkTitle}>
+              <li key={thread.subscriptionId} className="flex flex-col gap-1 rounded-md border border-border bg-surface-2 p-3">
+                <span className="break-words text-sm font-semibold text-foreground">
                   {THREAD_MODE_LABEL[thread.mode] ?? thread.mode}
                   {" · "}
                   {thread.source}
                   {" · "}
                   {thread.externalKind}
                 </span>
-                <span className={styles.linkMeta}>
+                <span className="flex flex-wrap items-baseline gap-2 text-xs text-muted">
                   {/^https?:\/\//i.test(thread.externalKey) ? (
                     <a
-                      className={styles.external}
+                      className="break-words text-accent"
                       href={thread.externalKey}
                       target="_blank"
                       rel="noreferrer"
@@ -174,7 +173,7 @@ export function WorkItemRelations({
                       {thread.externalKey}
                     </a>
                   ) : (
-                    <span className={styles.mono}>{thread.externalKey}</span>
+                    <span className="font-mono text-xs text-subtle">{thread.externalKey}</span>
                   )}
                   {thread.revokedAt === null ? null : (
                     <>

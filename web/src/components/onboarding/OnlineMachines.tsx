@@ -17,7 +17,6 @@ import { LoadingState } from "../ui/LoadingState.js";
 import { Panel } from "../ui/Panel.js";
 import { useToast } from "../ui/Toast.js";
 import type { Tone } from "../../shared/labels.js";
-import styles from "./onboarding.module.css";
 
 const STATUS_TONE: Record<string, Tone> = {
   active: "positive",
@@ -73,20 +72,20 @@ function MachineRow({
   }
 
   return (
-    <li className={styles.machineRow}>
-      <div className={styles.machineIdentity}>
-        <span className={styles.machineName}>
+    <li className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border border-border rounded-md bg-surface-2">
+      <div className="flex flex-col gap-1 min-w-0">
+        <span className="text-md font-semibold text-foreground">
           {machine.displayName ?? machine.hostname}
         </span>
-        <span className={styles.machineSub}>
+        <span className="text-xs text-muted [overflow-wrap:anywhere]">
           {machine.machineId} · 心跳 {heartbeat} · 发现 {discovered} · 采集器 v{machine.collectorVersion}
           {machine.displayName === null || machine.displayName === machine.hostname
             ? ""
             : ` · 主机名 ${machine.hostname}`}
         </span>
       </div>
-      <div className={styles.machineTags}>
-        <span className={styles.machineSub}>
+      <div className="flex flex-wrap gap-2 items-center">
+        <span className="text-xs text-muted [overflow-wrap:anywhere]">
           项目 {machine.projects.length} 个（已登记 {confirmed}）
         </span>
         {machine.upgradeAvailable ? (
@@ -112,12 +111,12 @@ function MachineRow({
         />
       ) : null}
       {pending.length > 0 ? (
-        <div className={styles.machineProjects}>
-          <span className={styles.machineSub}>待登记项目</span>
-          <ul className={styles.projectList}>
+        <div className="flex flex-col gap-2 basis-full pt-3 border-t border-border [&>button]:self-start">
+          <span className="text-xs text-muted [overflow-wrap:anywhere]">待登记项目</span>
+          <ul className="flex flex-wrap gap-x-4 gap-y-2 m-0 p-0 list-none">
             {pending.map((project) => (
               <li key={project.name}>
-                <label className={styles.projectCheck}>
+                <label className="inline-flex items-center gap-2 text-sm text-foreground cursor-pointer">
                   <input
                     type="checkbox"
                     checked={isChecked(machine.machineId, project.name)}
@@ -128,7 +127,7 @@ function MachineRow({
                   <span>
                     {project.name}
                     {project.feishuBotName === undefined ? null : (
-                      <span className={styles.machineSub}> · {project.feishuBotName}</span>
+                      <span className="text-xs text-muted [overflow-wrap:anywhere]"> · {project.feishuBotName}</span>
                     )}
                   </span>
                 </label>
@@ -177,7 +176,7 @@ export function OnlineMachines() {
       ) : null}
 
       {!machines.isPending && !machines.isError && list.length > 0 ? (
-        <ul className={styles.machineList}>
+        <ul className="flex flex-col gap-3 m-0 p-0 list-none">
           {list.map((machine) => (
             <MachineRow
               key={machine.machineId}

@@ -10,7 +10,7 @@ import {
   GROUP_NODE_W,
   type LayoutNode,
 } from "./layout.js";
-import styles from "./DelegationCanvas.module.css";
+import { cn } from "../../lib/utils.js";
 
 const NAME_MAX = 9;
 
@@ -49,7 +49,11 @@ export function DelegationNode({ node, active, memberNames }: DelegationNodeProp
         width={width}
         height={height}
         rx={10}
-        className={active ? styles.nodeRectActive : styles.nodeRect}
+        className={cn(
+          active
+            ? "fill-accent-soft stroke-accent [stroke-width:2]"
+            : "fill-surface stroke-border-strong [stroke-width:1]",
+        )}
       >
         <title>{name}</title>
       </rect>
@@ -57,14 +61,20 @@ export function DelegationNode({ node, active, memberNames }: DelegationNodeProp
         cx={node.x + 24}
         cy={node.y + height / 2}
         r={13}
-        className={node.kind === "group" ? styles.groupAvatar : styles.nodeAvatar}
+        className={cn(
+          node.kind === "group"
+            ? "fill-accent-soft stroke-accent [stroke-width:1]"
+            : "fill-avatar-bg stroke-avatar-text [stroke-width:1]",
+        )}
       />
       <text
         x={node.x + 24}
         y={node.y + height / 2 + 1}
         textAnchor="middle"
         dominantBaseline="central"
-        className={node.kind === "group" ? styles.groupInitial : styles.nodeInitial}
+        className={cn(
+          node.kind === "group" ? "fill-accent text-xs font-bold" : "fill-avatar-text text-xs font-bold",
+        )}
       >
         {node.kind === "group" ? "组" : shorten(name).slice(0, 1).toUpperCase()}
       </text>
@@ -72,13 +82,13 @@ export function DelegationNode({ node, active, memberNames }: DelegationNodeProp
         x={node.x + 44}
         y={node.y + (node.kind === "group" ? 22 : height / 2 + 1)}
         dominantBaseline="central"
-        className={styles.nodeName}
+        className={"fill-foreground text-sm"}
       >
         {shorten(name)}
         <title>{name}</title>
       </text>
       {node.kind === "group" ? (
-        <text x={node.x + 44} y={node.y + 46} className={styles.groupMeta}>
+        <text x={node.x + 44} y={node.y + 46} className={"fill-muted text-2xs"}>
           {count} 个成员{memberNames.length > 0 ? ` · ${memberNames.slice(0, 2).join("、")}` : ""}
         </text>
       ) : null}
@@ -86,7 +96,7 @@ export function DelegationNode({ node, active, memberNames }: DelegationNodeProp
         cx={node.x + width - 13}
         cy={node.y + height / 2}
         r={7}
-        className={styles.handle}
+        className={"fill-accent [fill-opacity:0.55] stroke-accent [stroke-width:1] cursor-crosshair pointer-events-all hover:[fill-opacity:1]"}
         data-handle="1"
         data-node-key={node.key}
       >

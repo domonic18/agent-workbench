@@ -2,7 +2,6 @@ import { Check, Copy } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { copyToClipboard } from "../../shared/clipboard.js";
 import { Button } from "./Button.js";
-import styles from "./controls.module.css";
 
 export interface CopyFieldProps {
   label?: ReactNode;
@@ -12,7 +11,6 @@ export interface CopyFieldProps {
   copiedText?: string;
 }
 
-/** 值 + 一键复制 + 复制反馈，接管散落的复制按钮 */
 export function CopyField({ label, value, hint, copiedText = "已复制" }: CopyFieldProps) {
   const [copied, setCopied] = useState(false);
 
@@ -27,9 +25,9 @@ export function CopyField({ label, value, hint, copiedText = "已复制" }: Copy
 
   return (
     <div>
-      {label === undefined ? null : <div className={styles.hint}>{label}</div>}
-      <div className={styles.copyField}>
-        <span className={styles.copyValue}>{value}</span>
+      {label === undefined ? null : <div className="text-xs text-muted">{label}</div>}
+      <div className="flex items-center gap-2 py-2 pr-2 pl-3 border rounded-md bg-surface-2">
+        <span className="flex-1 min-w-0 font-mono text-sm break-words">{value}</span>
         <Button
           size="sm"
           variant="secondary"
@@ -46,7 +44,7 @@ export function CopyField({ label, value, hint, copiedText = "已复制" }: Copy
           {copied ? copiedText : "复制"}
         </Button>
       </div>
-      {hint === undefined ? null : <div className={styles.hint}>{hint}</div>}
+      {hint === undefined ? null : <div className="text-xs text-muted">{hint}</div>}
     </div>
   );
 }

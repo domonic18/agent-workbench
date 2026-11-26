@@ -6,7 +6,6 @@ import { Button } from "../ui/Button.js";
 import { Dialog } from "../ui/Dialog.js";
 import { Field, Input } from "../ui/Field.js";
 import { useToast } from "../ui/Toast.js";
-import styles from "./IdentityForm.module.css";
 
 export interface ChangePasswordDialogProps {
   onClose: () => void;
@@ -51,8 +50,8 @@ export function ChangePasswordDialog({ onClose }: ChangePasswordDialogProps) {
 
   return (
     <Dialog title="修改管理员口令" onClose={onClose}>
-      <form className={styles.form} onSubmit={(event) => void handleSubmit(event)}>
-        <p className={styles.hint}>
+      <form className="flex flex-col gap-4" onSubmit={(event) => void handleSubmit(event)}>
+        <p className="m-0 text-xs text-muted">
           改完口令后,其他已登录的设备需要重新登录;当前这台设备不会被踢下线。
         </p>
         <Field label="当前口令" htmlFor="current-password" required>
@@ -91,15 +90,15 @@ export function ChangePasswordDialog({ onClose }: ChangePasswordDialogProps) {
           />
         </Field>
         {error === null ? null : (
-          <p className={styles.error} role="alert">
+          <p className="m-0 text-sm text-danger" role="alert">
             {error}
           </p>
         )}
-        <div className={styles.actions}>
-          <Button type="button" variant="secondary" onClick={onClose}>
+        <div className="mt-1 flex justify-end gap-2 max-md:flex-col-reverse">
+          <Button className="max-md:w-full" type="button" variant="secondary" onClick={onClose}>
             取消
           </Button>
-          <Button type="submit" variant="primary" loading={pending}>
+          <Button className="max-md:w-full" type="submit" variant="primary" loading={pending}>
             {pending ? "提交中…" : "修改口令"}
           </Button>
         </div>

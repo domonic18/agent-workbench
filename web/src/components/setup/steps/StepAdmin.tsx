@@ -5,7 +5,6 @@ import { bootstrapAdmin } from "../../../api/bootstrap.js";
 import { Button } from "../../ui/Button.js";
 import { Field, Input } from "../../ui/Field.js";
 import { Feedback } from "../Feedback.js";
-import styles from "../setup.module.css";
 
 export function StepAdmin() {
   const queryClient = useQueryClient();
@@ -29,12 +28,12 @@ export function StepAdmin() {
   }
 
   return (
-    <div className={styles.card}>
-      <h1 className={styles.title}>初始化控制台</h1>
-      <p className={styles.description}>
+    <div className="w-full bg-surface border border-border rounded-lg p-6 shadow-sm max-md:[&_input]:min-h-touch max-md:[&_select]:min-h-touch max-md:[&_button]:min-h-touch">
+      <h1 className="m-0 mb-1 text-xl font-semibold">初始化控制台</h1>
+      <p className="text-muted m-0 mb-5 text-md">
         输入本机启动输出的 bootstrap token 并设置管理员口令,即解锁完整控制台。空库与空知识将自动建好。
       </p>
-      <form className={styles.form} onSubmit={(event) => void submit(event)}>
+      <form className="flex flex-col items-stretch gap-4" onSubmit={(event) => void submit(event)}>
         <Field label="bootstrap token" htmlFor="token">
           <Input
             id="token"

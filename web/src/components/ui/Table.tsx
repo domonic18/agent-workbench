@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import styles from "./surfaces.module.css";
+import { cn } from "../../lib/utils.js";
 
 export interface TableColumn<T> {
   key: string;
@@ -30,12 +30,31 @@ export interface TableProps<T> {
 }
 
 const ALIGN_CLASS = {
-  left: "",
-  right: styles.right,
-  center: styles.center,
+  left: "text-left",
+  right: "text-right",
+  center: "text-center",
 } as const;
 
-/** 粘性表头 + 行悬浮态的表格；窄屏由调用方转卡片 */
+function headerCellClasses(align: "left" | "right" | "center", nowrap?: boolean, plain?: boolean): string {
+  return cn(
+    "sticky top-0 z-[1] px-4 py-3 border-b border-border align-middle",
+    plain
+      ? "text-sm font-semibold tracking-normal normal-case text-foreground"
+      : "text-xs font-semibold tracking-tight uppercase text-muted whitespace-nowrap",
+    ALIGN_CLASS[align],
+    nowrap && !plain && "whitespace-nowrap",
+  );
+}
+
+function bodyCellClasses(align: "left" | "right" | "center", nowrap?: boolean, plain?: boolean): string {
+  return cn(
+    "px-4 py-3 border-b border-border align-middle",
+    plain && "text-sm font-semibold tracking-normal normal-case text-foreground",
+    ALIGN_CLASS[align],
+    nowrap && "whitespace-nowrap",
+  );
+}
+
 export function Table<T>({
   columns,
   rows,
@@ -50,9 +69,9 @@ export function Table<T>({
     return <>{empty}</>;
   }
   return (
-    <div className={styles.tableWrap}>
+    <div className="overflow-x-auto">
       <table
-        className={`${styles.table}${fixedLayout ? ` ${styles.tableFixed}` : ""}`}
+        className={cn("w-full border-collapse text-sm", fixedLayout && "table-fixed")}
         style={minWidth === undefined ? undefined : { minWidth }}
       >
         <thead>
@@ -62,7 +81,11 @@ export function Table<T>({
                 key={column.key}
                 scope="col"
                 style={column.width === undefined ? undefined : { width: column.width }}
-                className={`${ALIGN_CLASS[column.align ?? "left"]} ${column.nowrap === true ? styles.nowrap : ""} ${column.plain === true ? styles.plainColumn : ""}`}
+                className={headerCellClasses(
+                  column.align ?? "left",
+                  column.nowrap,
+                  column.plain,
+                )}
                 data-align={column.align ?? "left"}
                 data-nowrap={column.nowrap === true ? "true" : undefined}
               >
@@ -71,16 +94,20 @@ export function Table<T>({
             ))}
           </tr>
         </thead>
-        <tbody>
+        <tbody className="[&_tr:last-child_td]:border-b-0">
           {rows.map((row) => (
             <tr
               key={rowKey(row)}
-              className={onRowClick === undefined ? undefined : styles.clickable}
+              className={cn("hover:bg-row-hover", onRowClick !== undefined && "cursor-pointer")}
               onClick={onRowClick === undefined ? undefined : () => onRowClick(row)}
             >
               {columns.map((column, index) => {
                 const isRowHeader = rowHeader && index === 0;
-                const cellClass = `${ALIGN_CLASS[column.align ?? "left"]} ${column.nowrap === true ? styles.nowrap : ""} ${column.plain === true ? styles.plainColumn : ""}`;
+                const cellClass = bodyCellClasses(
+                  column.align ?? "left",
+                  column.nowrap,
+                  column.plain,
+                );
                 if (isRowHeader) {
                   return (
                     <th

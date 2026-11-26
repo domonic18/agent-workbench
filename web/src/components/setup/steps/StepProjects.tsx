@@ -6,7 +6,6 @@ import { formatRelativeTime } from "../../../shared/format.js";
 import { useProjectSelection } from "../../machines/useProjectSelection.js";
 import { Button } from "../../ui/Button.js";
 import { Feedback } from "../Feedback.js";
-import styles from "../setup.module.css";
 
 export function StepProjects() {
   const [pending, setPending] = useState(false);
@@ -48,23 +47,23 @@ export function StepProjects() {
   }
 
   return (
-    <div className={styles.card}>
-      <h1 className={styles.title}>添加项目</h1>
-      <p className={styles.description}>
+    <div className="w-full bg-surface border border-border rounded-lg p-6 shadow-sm max-md:[&_input]:min-h-touch max-md:[&_select]:min-h-touch max-md:[&_button]:min-h-touch">
+      <h1 className="m-0 mb-1 text-xl font-semibold">添加项目</h1>
+      <p className="text-muted m-0 mb-5 text-md">
         确认执行机上报的 cc-connect 项目,控制台据此创建主责 Agent 并下发不含明文 Bearer 的运行时配置。
       </p>
       {machines.length === 0 ? (
-        <p className={styles.hint}>尚未检测到执行机上报的发现结果…</p>
+        <p className="text-muted text-xs mt-2">尚未检测到执行机上报的发现结果…</p>
       ) : (
         machines.map((machine) => (
-          <div key={machine.machineId} className={styles.section}>
+          <div key={machine.machineId} className="mt-4 border border-border rounded-md p-4">
             <strong>{machine.displayName ?? machine.hostname}</strong>
-            <span className={styles.hint}>
+            <span className="text-muted text-xs mt-2">
               {machine.machineId} · 心跳{" "}
               {machine.lastSeenAt === null ? "未上报" : formatRelativeTime(machine.lastSeenAt)}
             </span>
             {machine.projects.map((project) => (
-              <label key={project.name} className={styles.project}>
+              <label key={project.name} className="flex items-center gap-3 py-1 text-md">
                 <input
                   type="checkbox"
                   checked={isChecked(machine.machineId, project.name)}
@@ -75,9 +74,9 @@ export function StepProjects() {
                 <span>
                   {project.name}
                   {project.feishuBotName === undefined ? null : (
-                    <span className={styles.hint}> · {project.feishuBotName}</span>
+                    <span className="text-muted text-xs mt-2"> · {project.feishuBotName}</span>
                   )}
-                  {project.cwd === undefined ? null : <span className={styles.hint}> · {project.cwd}</span>}
+                  {project.cwd === undefined ? null : <span className="text-muted text-xs mt-2"> · {project.cwd}</span>}
                 </span>
               </label>
             ))}
@@ -85,9 +84,9 @@ export function StepProjects() {
         ))
       )}
       {machines.length > 0 && pickedCount === 0 ? (
-        <p className={styles.hint}>执行机尚未上报可确认的项目,请确认目标机已配置 cc-connect。</p>
+        <p className="text-muted text-xs mt-2">执行机尚未上报可确认的项目,请确认目标机已配置 cc-connect。</p>
       ) : null}
-      <div className={styles.form}>
+      <div className="flex flex-col items-stretch gap-4">
         <Button
           variant="primary"
           size="lg"
@@ -97,7 +96,7 @@ export function StepProjects() {
           {pending ? "确认中…" : confirmed ? "已确认,等待配置下发" : "确认项目与主责 Agent"}
         </Button>
       </div>
-      {confirmed ? <p className={styles.hint}>aw-node 将自动拉取配置并回执,完成后进入下一步。</p> : null}
+      {confirmed ? <p className="text-muted text-xs mt-2">aw-node 将自动拉取配置并回执,完成后进入下一步。</p> : null}
       <Feedback error={error} />
     </div>
   );

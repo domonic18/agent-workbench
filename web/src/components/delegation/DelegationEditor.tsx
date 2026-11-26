@@ -3,7 +3,7 @@ import type { AgentGroupSummary } from "../../api/types.js";
 import { agentDisplayName } from "../../shared/agent-label.js";
 import { Button } from "../ui/Button.js";
 import type { DelegationDraft } from "./useDelegationDraft.js";
-import styles from "./DelegationEditor.module.css";
+import { cn } from "../../lib/utils.js";
 
 export interface DelegationEditorProps {
   draft: DelegationDraft;
@@ -22,7 +22,7 @@ export function DelegationEditor({ draft, groups, selectedId }: DelegationEditor
   const selected = agents.find((agent) => agent.id === selectedId) ?? null;
   if (selected === null) {
     return (
-      <p className={styles.hint}>
+      <p className={"m-0 text-sm text-muted"}>
         点节点选中发起方，或从节点右侧手柄拖一条线到目标节点，即可建立委派。
       </p>
     );
@@ -55,21 +55,25 @@ export function DelegationEditor({ draft, groups, selectedId }: DelegationEditor
   ];
 
   return (
-    <div className={styles.editor} role="group" aria-label="委派编辑面板">
-      <h3 className={styles.editorTitle}>{agentDisplayName(selected)} 可委派给</h3>
-      <div className={styles.chips}>
+    <div className={"flex flex-col gap-3 p-4 border border-border rounded-lg bg-surface"} role="group" aria-label="委派编辑面板">
+      <h3 className={"m-0 text-md font-bold text-foreground"}>{agentDisplayName(selected)} 可委派给</h3>
+      <div className={"flex flex-wrap gap-2"}>
         {recipients.length === 0 ? (
-          <span className={styles.chipsEmpty}>暂无收件方（默认全不勾）</span>
+          <span className={"text-sm text-muted"}>暂无收件方（默认全不勾）</span>
         ) : (
           recipients.map((recipient) => (
             <span
               key={recipient.id}
-              className={recipient.kind === "group" ? styles.chipGroup : styles.chip}
+              className={cn(
+              recipient.kind === "group"
+                ? "inline-flex items-center gap-1 px-2 py-1 border border-dashed border-accent-border rounded-full bg-accent-soft text-foreground text-sm"
+                : "inline-flex items-center gap-1 px-2 py-1 border border-accent-border rounded-full bg-accent-soft text-foreground text-sm",
+            )}
             >
               {recipient.label}
               <button
                 type="button"
-                className={styles.chipRemove}
+                className={"inline-flex items-center justify-center w-5 h-5 p-0 border-none rounded-full bg-transparent text-muted cursor-pointer hover:text-danger"}
                 aria-label={`移除 ${recipient.label}`}
                 onClick={() => draft.toggle(selected, recipient.id)}
               >
@@ -79,14 +83,14 @@ export function DelegationEditor({ draft, groups, selectedId }: DelegationEditor
           ))
         )}
       </div>
-      <div className={styles.addRow}>
+      <div className={"flex flex-wrap items-center gap-3"}>
         {candidates.length === 0 ? (
-          <span className={styles.chipsEmpty}>没有其他目标可添加</span>
+          <span className={"text-sm text-muted"}>没有其他目标可添加</span>
         ) : (
-          <label className={styles.addLabel}>
+          <label className={"inline-flex items-center gap-2 text-sm text-text-secondary"}>
             添加收件方
             <select
-              className={styles.select}
+              className={"px-2 py-1 border border-border-strong rounded-md bg-surface text-foreground text-sm"}
               value=""
               onChange={(event) => {
                 if (event.target.value !== "") {
@@ -114,10 +118,10 @@ export function DelegationEditor({ draft, groups, selectedId }: DelegationEditor
         </Button>
       </div>
       {dirty.length === 0 ? null : (
-        <p className={styles.dirtyNote}>{dirty.length} 个发起方有未保存的改动。</p>
+        <p className={"m-0 text-sm text-warning"}>{dirty.length} 个发起方有未保存的改动。</p>
       )}
       {error === null ? null : (
-        <p className={styles.error} role="alert">
+        <p className={"m-0 text-sm text-danger"} role="alert">
           {error}
         </p>
       )}

@@ -8,7 +8,6 @@ import { RuntimeIcon } from "../../shared/runtime-icon.js";
 import { Button } from "../ui/Button.js";
 import { Tooltip } from "../ui/Tooltip.js";
 import { statusBadges, taskMeta } from "./agent-rows.js";
-import styles from "./agents.module.css";
 
 export interface AgentCardListProps {
   agents: readonly AgentRosterSummary[];
@@ -28,51 +27,51 @@ export function AgentCardList({
   onRotateKey,
 }: AgentCardListProps) {
   return (
-    <ul className={styles.cardList} aria-label="机器人卡片">
+    <ul className="flex flex-col gap-3 p-4" aria-label="机器人卡片">
       {agents.map((agent) => {
         const live = liveById.get(agent.id);
         const title = live?.currentTaskTitle ?? null;
         const instruction = title === null && live?.running === true ? live.currentInstruction : null;
         const machineName = agent.machineDisplayName ?? agent.machineHostname;
         return (
-          <li key={agent.id} className={styles.card}>
-            <div className={styles.cardTop}>
-              <div className={styles.identity}>
+          <li key={agent.id} className="p-4 border border-border rounded-md bg-surface-2">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-col gap-px min-w-0">
                 <button
                   type="button"
-                  className={`${styles.identityName} ${styles.nameButton}`}
+                  className="font-semibold text-foreground [overflow-wrap:normal] [word-break:normal] p-0 border-0 bg-transparent text-inherit text-left cursor-pointer enabled:hover:text-accent"
                   onClick={() => onOpenDetail(agent)}
                 >
                   {agentDisplayName(agent)}
                 </button>
-                <span className={styles.identitySub}>
+                <span className="text-xs text-muted overflow-hidden text-ellipsis whitespace-nowrap">
                   {agent.project}
                   <Tooltip label={`运行时：${RUNTIME_LABEL[agent.runtime]}`}>
                     <RuntimeIcon runtime={agent.runtime} size={12} />
                   </Tooltip>
                 </span>
               </div>
-              <div className={styles.statusCell}>{statusBadges(agent, live)}</div>
+              <div className="flex flex-wrap gap-1 items-center">{statusBadges(agent, live)}</div>
             </div>
             {title === null ? (
               instruction === null ? (
-                <p className={styles.muted}>
+                <p className="text-muted">
                   {live?.running === true ? "运行中 · 当前会话未关联任务" : "当前没有进行中的任务"}
                 </p>
               ) : (
-                <p className={styles.cardInstruction} title={instruction}>
-                  <span className={styles.instructionTag}>最近指令</span>
+                <p className="mt-3 text-sm text-foreground [overflow-wrap:anywhere] line-clamp-3 overflow-hidden" title={instruction}>
+                  <span className="mr-1 font-semibold text-muted">最近指令</span>
                   {instruction}
                 </p>
               )
             ) : (
-              <p className={styles.cardInstruction} title={title}>
+              <p className="mt-3 text-sm text-foreground [overflow-wrap:anywhere] line-clamp-3 overflow-hidden" title={title}>
                 {title}
                 {taskMeta(live) === "" ? "" : ` · ${taskMeta(live)}`}
               </p>
             )}
-            <div className={styles.cardMeta}>
-              <span className={styles.machineCell}>
+            <div className="flex flex-wrap gap-2 mt-3 text-xs text-muted">
+              <span className="inline-flex items-center gap-1 max-w-full text-text-secondary">
                 <Monitor size={12} aria-hidden="true" />
                 {machineName ?? "未绑定"}
               </span>
@@ -89,11 +88,21 @@ export function AgentCardList({
                 </>
               )}
             </div>
-            <div className={styles.rowActionsLeft}>
-              <Button size="sm" variant="secondary" onClick={() => onEdit(agent)}>
+            <div className="flex flex-wrap gap-2 items-center">
+              <Button
+                size="sm"
+                variant="secondary"
+                className="max-md:h-touch max-md:px-4 max-md:py-0"
+                onClick={() => onEdit(agent)}
+              >
                 管理
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => onRotateKey(agent)}>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="max-md:h-touch max-md:px-4 max-md:py-0"
+                onClick={() => onRotateKey(agent)}
+              >
                 密钥
               </Button>
             </div>

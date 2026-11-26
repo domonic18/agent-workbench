@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import styles from "./overlays.module.css";
+import { cn } from "../../lib/utils.js";
 
 export type ToastTone = "info" | "positive" | "danger";
 
@@ -24,9 +24,9 @@ interface ToastContextValue {
 const ToastContext = createContext<ToastContextValue | null>(null);
 
 const TONE_CLASS: Record<ToastTone, string> = {
-  info: styles.toastInfo ?? "",
-  positive: styles.toastPositive ?? "",
-  danger: styles.toastDanger ?? "",
+  info: "border-accent-border bg-accent-soft text-accent",
+  positive: "border-positive-border bg-positive-soft text-positive",
+  danger: "border-danger-border bg-danger-soft text-danger",
 };
 
 const AUTO_DISMISS_MS = 3600;
@@ -49,9 +49,15 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className={styles.toastViewport} role="status" aria-live="polite">
+      <div className="fixed right-5 bottom-5 z-80 flex flex-col gap-2" role="status" aria-live="polite">
         {items.map((item) => (
-          <div key={item.id} className={`${styles.toast} ${TONE_CLASS[item.tone]}`}>
+          <div
+            key={item.id}
+            className={cn(
+              "flex items-center gap-2 min-w-toast-min max-w-toast-max px-4 py-3 border rounded-md bg-surface shadow-md text-sm animate-rise",
+              TONE_CLASS[item.tone],
+            )}
+          >
             {item.text}
           </div>
         ))}

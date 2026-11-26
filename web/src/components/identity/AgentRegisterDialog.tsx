@@ -10,7 +10,6 @@ import {
 import type { AgentRuntime } from "../../api/types.js";
 import { RUNTIME_LABEL } from "../../shared/labels.js";
 import { agentEnvHints } from "./envHints.js";
-import styles from "./IdentityForm.module.css";
 import { Button } from "../ui/Button.js";
 import { Dialog } from "../ui/Dialog.js";
 import { Field, Input, Select } from "../ui/Field.js";
@@ -90,7 +89,7 @@ export function AgentRegisterDialog({ onClose, onCreated }: AgentRegisterDialogP
       dismissible={created === null}
     >
       {created === null ? (
-        <form className={styles.form} onSubmit={(event) => void handleSubmit(event)}>
+        <form className="flex flex-col gap-4" onSubmit={(event) => void handleSubmit(event)}>
           <Field
             label="运行时"
             htmlFor="agent-runtime"
@@ -183,31 +182,31 @@ export function AgentRegisterDialog({ onClose, onCreated }: AgentRegisterDialogP
           </Field>
 
           {error === null ? null : (
-            <p className={styles.error} role="alert">
+            <p className="m-0 text-sm text-danger" role="alert">
               {error}
             </p>
           )}
 
-          <div className={styles.actions}>
-            <Button variant="ghost" onClick={onClose}>
+          <div className="mt-1 flex justify-end gap-2 max-md:flex-col-reverse">
+            <Button className="max-md:w-full" variant="ghost" onClick={onClose}>
               取消
             </Button>
-            <Button type="submit" variant="primary" loading={pending}>
+            <Button className="max-md:w-full" type="submit" variant="primary" loading={pending}>
               {pending ? "注册中…" : "注册"}
             </Button>
           </div>
         </form>
       ) : (
-        <div className={styles.form}>
-          <p className={styles.hint}>
+        <div className="flex flex-col gap-4">
+          <p className="m-0 text-xs text-muted">
             {created.agent.displayName}（{created.agent.project}，{created.agent.id}）已登记。
           </p>
           <SecretReveal
             secret={created.secret}
             hints={agentEnvHints(created.agent.id)}
           />
-          <div className={styles.actions}>
-            <Button variant="primary" onClick={onClose}>
+          <div className="mt-1 flex justify-end gap-2 max-md:flex-col-reverse">
+            <Button className="max-md:w-full" variant="primary" onClick={onClose}>
               我已保存，关闭
             </Button>
           </div>

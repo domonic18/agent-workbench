@@ -15,7 +15,12 @@ import {
 import { agentMentionLabel } from "../../shared/agent-label.js";
 import { Badge } from "../ui/Badge.js";
 import { describeTaskEvent, latestEventReason } from "./task-event.js";
-import styles from "./task-drawer.module.css";
+import {
+  hint as sharedHint,
+  muted as sharedMuted,
+  output as sharedOutput,
+  outputCode as sharedOutputCode,
+} from "./shared.js";
 
 export interface TaskDetailSummaryProps {
   task: TaskDto;
@@ -32,26 +37,26 @@ const TERMINAL_STATUSES: readonly TaskDto["status"][] = ["done", "cancelled"];
 
 function SummaryRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className={styles.summaryRow}>
-      <dt className={styles.summaryLabel}>{label}</dt>
-      <dd className={styles.summaryValue}>{children}</dd>
+    <div className="grid grid-cols-[60px_minmax(0,1fr)] items-baseline gap-3">
+      <dt className="m-0 text-xs text-muted">{label}</dt>
+      <dd className="m-0 text-sm text-foreground [overflow-wrap:anywhere]">{children}</dd>
     </div>
   );
 }
 
 function OutputValue({ output }: { output: string | null }) {
   if (output === null) {
-    return <span className={styles.muted}>—</span>;
+    return <span className={sharedMuted}>—</span>;
   }
   if (/^https?:\/\//i.test(output)) {
     return (
-      <a className={styles.output} href={output} target="_blank" rel="noreferrer" title={output}>
+      <a className={sharedOutput} href={output} target="_blank" rel="noreferrer" title={output}>
         {output}
       </a>
     );
   }
   return (
-    <code className={styles.outputCode} title={output}>
+    <code className={sharedOutputCode} title={output}>
       {output}
     </code>
   );
@@ -73,13 +78,13 @@ export function TaskDetailSummary({
   const workItemId = task.work_item_id;
 
   return (
-    <section className={styles.summary} aria-label="任务摘要">
-      <dl className={styles.summaryRows}>
+    <section className="m-0" aria-label="任务摘要">
+      <dl className="m-0 flex flex-col gap-2">
         <SummaryRow label="项目">{task.project}</SummaryRow>
         <SummaryRow label="承接">
           {agentMentionLabel(task.assignee, agentNames, task.assignee_label)}
           {agentNames.has(task.assignee) ? (
-            <span className={styles.inlineMono}>{task.assignee}</span>
+            <span className="ml-2 font-mono text-xs text-subtle">{task.assignee}</span>
           ) : null}
         </SummaryRow>
         <SummaryRow label="下发">
@@ -88,9 +93,13 @@ export function TaskDetailSummary({
         <SummaryRow label="阶段">{TASK_STAGE_LABEL[task.stage]}</SummaryRow>
         <SummaryRow label="所属工作事项">
           {workItemId === null ? (
-            <span className={styles.muted}>未关联工作事项</span>
+            <span className={sharedMuted}>未关联工作事项</span>
           ) : (
-            <button type="button" className={styles.linkButton} onClick={() => onOpenWorkItem(workItemId)}>
+            <button
+              type="button"
+              className="cursor-pointer [font:inherit] [overflow-wrap:anywhere] border-none bg-transparent p-0 text-left font-mono text-xs text-accent hover:underline"
+              onClick={() => onOpenWorkItem(workItemId)}
+            >
               {workItemId}
             </button>
           )}
@@ -124,24 +133,24 @@ export function TaskDetailSummary({
         </SummaryRow>
       </dl>
       {last === undefined ? null : (
-        <p className={styles.hint}>{describeTaskEvent(last, agentNames)}</p>
+        <p className={sharedHint}>{describeTaskEvent(last, agentNames)}</p>
       )}
 
-      <div className={styles.inlineSection}>
-        <h4 className={styles.inlineTitle}>关联凭证</h4>
+      <div className="mt-5 border-t border-line-soft pt-4">
+        <h4 className="m-0 text-md font-bold text-foreground">关联凭证</h4>
         {capabilities.length === 0 ? (
-          <p className={styles.muted}>未关联授权凭证。</p>
+          <p className={sharedMuted}>未关联授权凭证。</p>
         ) : (
-          <ul className={styles.capList}>
+          <ul className="m-0 flex list-none flex-col gap-1 p-0 text-xs">
             {capabilities.map((capability) => (
-              <li key={capability.id} className={styles.capItem}>
+              <li key={capability.id} className="flex flex-wrap items-center gap-2 text-text-secondary">
                 <Badge
                   tone={CAPABILITY_STATUS_TONE[capability.status]}
                   text={CAPABILITY_STATUS_LABEL[capability.status]}
                 />{" "}
-                <code className={styles.outputCode}>{capability.action}</code>{" "}
+                <code className={sharedOutputCode}>{capability.action}</code>{" "}
                 {capability.target}
-                <span className={styles.muted}>
+                <span className={sharedMuted}>
                   {capability.expires_at === null
                     ? " · 无到期时间"
                     : ` · 到期 ${formatDateTime(capability.expires_at)}`}

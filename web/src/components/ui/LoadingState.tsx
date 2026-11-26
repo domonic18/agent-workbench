@@ -1,15 +1,13 @@
 import { Loader2 } from "lucide-react";
-import styles from "./feedback.module.css";
 
 export interface LoadingStateProps {
   label?: string;
 }
 
-/** 整屏加载态：居中 spinner + 一句说明 */
 export function LoadingState({ label = "加载中…" }: LoadingStateProps) {
   return (
-    <div className={styles.loading} role="status">
-      <Loader2 size={22} strokeWidth={1.8} className={styles.loadingSpinner} aria-hidden="true" />
+    <div className="flex flex-col items-center justify-center gap-3 min-h-[400px] text-sm text-muted" role="status">
+      <Loader2 size={22} strokeWidth={1.8} className="inline-flex text-accent animate-spin" aria-hidden="true" />
       <span>{label}</span>
     </div>
   );

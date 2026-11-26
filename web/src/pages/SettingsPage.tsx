@@ -10,7 +10,6 @@ import { Button } from "../components/ui/Button.js";
 import { Field, Input } from "../components/ui/Field.js";
 import { Panel } from "../components/ui/Panel.js";
 import { useToast } from "../components/ui/Toast.js";
-import styles from "./SettingsPage.module.css";
 
 interface FormState {
   publicUrl: string;
@@ -157,7 +156,7 @@ export function SettingsPage() {
       <Field
         key={key}
         label={
-          <span className={styles.fieldLabel}>
+          <span className="inline-flex items-center gap-2">
             {label}
             {options.restart === true ? (
               <Badge tone="warning" text="重启生效" />
@@ -179,7 +178,7 @@ export function SettingsPage() {
   };
 
   return (
-    <form className={styles.page} onSubmit={handleSubmit}>
+    <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
       <AsyncSection
         pending={query.isPending}
         error={
@@ -195,13 +194,13 @@ export function SettingsPage() {
         onLoadMore={() => undefined}
       >
         <Panel title="基本">
-          <div className={styles.section}>
+          <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
             {field("publicUrl", "对外地址")}
           </div>
         </Panel>
 
         <Panel title="飞书">
-          <div className={styles.section}>
+          <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
             {field("feishuAppId", "App ID", { restart: true })}
             {field("feishuAppSecret", "App Secret", { type: "password", restart: true })}
             {field("feishuApprovalChatId", "审批卡片群 ID", { restart: true })}
@@ -211,20 +210,20 @@ export function SettingsPage() {
         </Panel>
 
         <Panel title="接入安全">
-          <div className={styles.section}>
+          <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
             {field("consoleAllowedHosts", "允许的来源 Host")}
           </div>
         </Panel>
 
         <Panel title="治理">
-          <div className={styles.section}>
+          <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
             {field("taskZombieHours", "僵尸任务判定小时数")}
             {field("assignmentStallHours", "派工停滞升级小时数")}
           </div>
         </Panel>
 
         <Panel title="知识嵌入">
-          <div className={styles.section}>
+          <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
             {field("embeddingBaseUrl", "Base URL", { restart: true })}
             {field("embeddingApiKey", "API Key", { type: "password", restart: true })}
             {field("embeddingModel", "模型", { restart: true })}
@@ -232,7 +231,7 @@ export function SettingsPage() {
         </Panel>
 
         <Panel title="GitHub Webhook">
-          <div className={styles.section}>
+          <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
             {field("githubWebhookSecret", "Webhook Secret", {
               type: "password",
               restart: true,
@@ -241,7 +240,7 @@ export function SettingsPage() {
         </Panel>
       </AsyncSection>
 
-      <div className={styles.actionsBar}>
+      <div className="flex gap-3 items-center flex-wrap">
         <Button
           type="submit"
           variant="primary"
@@ -252,7 +251,7 @@ export function SettingsPage() {
           保存
         </Button>
         {restartPending ? (
-          <span className={styles.restartNotice}>部分配置已变更,请重启控制台后生效</span>
+          <span className="text-warning text-sm">部分配置已变更,请重启控制台后生效</span>
         ) : null}
       </div>
     </form>

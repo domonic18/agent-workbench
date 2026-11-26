@@ -1,8 +1,8 @@
 import { X } from "lucide-react";
 import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { cn } from "../../lib/utils.js";
 import { IconButton } from "./IconButton.js";
-import styles from "./overlays.module.css";
 
 export type DialogSize = "sm" | "md" | "lg" | "xl";
 export type DialogVariant = "center" | "drawer";
@@ -40,7 +40,6 @@ export function Dialog({
   children,
 }: DialogProps) {
   const panelRef = useRef<HTMLDivElement>(null);
-  // 监听只注册一次并读最新值：密钥揭示后即使旧闭包尚未清理，Esc 也不会误关
   const dismissibleRef = useRef(dismissible);
   const onCloseRef = useRef(onClose);
   dismissibleRef.current = dismissible;
@@ -105,15 +104,14 @@ export function Dialog({
   }
 
   const drawer = variant === "drawer";
-  const overlayClass = drawer
-    ? styles.overlayDrawer
-    : size === "lg" || size === "xl"
-      ? `${styles.overlay} ${styles.overlayWide}`
-      : styles.overlay;
+  const wide = size === "lg" || size === "xl";
 
   return createPortal(
     <div
-      className={overlayClass}
+      className={cn(
+        "fixed inset-0 z-60 bg-overlay animate-fade",
+        drawer ? "flex items-stretch justify-end" : "flex items-center justify-center p-5 max-md:p-0",
+      )}
       onClick={() => {
         if (dismissible) {
           onCloseRef.current();
@@ -122,7 +120,17 @@ export function Dialog({
     >
       <div
         ref={panelRef}
-        className={`${styles.dialog} ${drawer ? styles.dialogDrawer : styles[size]}`}
+        className={cn(
+          "flex flex-col w-full max-h-[88vh] bg-surface border border-border rounded-lg shadow-lg animate-rise outline-none",
+          !drawer && [
+            size === "sm" && "max-w-dialog-sm",
+            size === "md" && "max-w-dialog-md",
+            size === "lg" && "max-w-dialog-lg",
+            size === "xl" && "max-w-dialog-xl",
+            wide && "max-md:max-w-none max-md:h-full max-md:max-h-full max-md:rounded-none max-md:border-none",
+          ],
+          drawer && "w-[min(var(--drawer-w),100%)] max-w-drawer h-full max-h-full rounded-l-lg rounded-r-none border-r-none max-md:max-w-none max-md:rounded-none max-md:border-none",
+        )}
         role="dialog"
         aria-modal="true"
         aria-label={ariaLabel ?? (typeof title === "string" ? title : undefined)}
@@ -130,22 +138,22 @@ export function Dialog({
         onKeyDown={handleTab}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className={styles.dialogHeader}>
-          <div className={styles.dialogHeading}>
-            <h2 className={styles.dialogTitle}>{title}</h2>
+        <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-line-soft">
+          <div className="min-w-0">
+            <h2 className="m-0 text-lg font-bold">{title}</h2>
             {description === undefined ? null : (
-              <p className={styles.dialogDescription}>{description}</p>
+              <p className="mt-1 mb-0 text-sm text-muted">{description}</p>
             )}
           </div>
           {headerExtra === undefined ? null : (
-            <div className={styles.dialogHeaderExtra}>{headerExtra}</div>
+            <div className="flex flex-shrink-0 items-center gap-2">{headerExtra}</div>
           )}
           {dismissible ? (
             <IconButton label="关闭" icon={<X size={16} aria-hidden="true" />} onClick={onClose} />
           ) : null}
         </div>
-        <div className={styles.dialogBody}>{children}</div>
-        {footer === undefined ? null : <div className={styles.dialogFooter}>{footer}</div>}
+        <div className="flex-1 min-h-0 overflow-y-auto p-5">{children}</div>
+        {footer === undefined ? null : <div className="flex justify-end gap-2 px-5 py-3 border-t border-line-soft bg-surface-2">{footer}</div>}
       </div>
     </div>,
     document.body,

@@ -7,7 +7,7 @@ import { IconButton } from "../ui/IconButton.js";
 import { HANDLE_W, layoutGraph, nodeAt } from "./layout.js";
 import { DelegationNode, edgePath } from "./DelegationNode.js";
 import { toGraph, useViewport } from "./useViewport.js";
-import styles from "./DelegationCanvas.module.css";
+import { cn } from "../../lib/utils.js";
 
 const ZOOM_STEP = 1.25;
 
@@ -187,9 +187,9 @@ export function DelegationCanvas({
     drag === null ? null : (layout.nodes.find((node) => node.key === drag.fromKey) ?? null);
 
   return (
-    <div className={styles.wrapper}>
+    <div className={"flex flex-col gap-3"}>
       <div
-        className={styles.canvas}
+        className={"relative flex-1 min-h-[420px] overflow-hidden border border-border rounded-lg bg-surface touch-none cursor-grab active:cursor-grabbing"}
         ref={containerRef}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -197,7 +197,7 @@ export function DelegationCanvas({
         onPointerCancel={onPointerUp}
         data-testid="delegation-canvas"
       >
-        <svg className={styles.svg} width={size.w} height={size.h} role="img" aria-label="委派关系图">
+        <svg className={"block"} width={size.w} height={size.h} role="img" aria-label="委派关系图">
           <defs>
             <marker
               id="aw-delegation-arrow"
@@ -208,7 +208,7 @@ export function DelegationCanvas({
               markerHeight={7}
               orient="auto"
             >
-              <path d="M0,0 L8,4 L0,8 z" className={styles.arrowHead} />
+              <path d="M0,0 L8,4 L0,8 z" className={"fill-accent"} />
             </marker>
           </defs>
           <g transform={`translate(${viewport.x} ${viewport.y}) scale(${viewport.scale})`}>
@@ -220,7 +220,9 @@ export function DelegationCanvas({
                 <path
                   key={`${edge.from.key}->${edge.to.key}`}
                   d={edgePath(edge.from, edge.to)}
-                  className={active ? styles.edgeActive : styles.edge}
+                  className={cn(
+                    active ? "fill-none stroke-accent [stroke-width:2]" : "fill-none stroke-accent [stroke-opacity:0.55] [stroke-width:1.5]",
+                  )}
                   markerEnd="url(#aw-delegation-arrow)"
                 />
               );
@@ -228,7 +230,7 @@ export function DelegationCanvas({
             {dragSource !== null && drag !== null ? (
               <path
                 d={`M ${dragSource.x + dragSource.width} ${dragSource.y + dragSource.height / 2} L ${drag.x} ${drag.y}`}
-                className={styles.edgeDraft}
+                className={"fill-none stroke-accent [stroke-dasharray:4_3] [stroke-width:2]"}
               />
             ) : null}
             {layout.nodes.map((node) => (
@@ -248,7 +250,7 @@ export function DelegationCanvas({
           </g>
         </svg>
         <div
-          className={styles.hits}
+          className={"absolute inset-0 origin-[0_0] pointer-events-none"}
           style={{
             transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.scale})`,
           }}
@@ -257,7 +259,7 @@ export function DelegationCanvas({
             <button
               key={node.key}
               type="button"
-              className={styles.hit}
+              className={"absolute p-0 border border-transparent rounded-md bg-transparent pointer-events-auto cursor-pointer hover:bg-accent-soft hover:border-accent-border focus-visible:[outline:var(--focus-ring)] focus-visible:-outline-offset-2"}
               data-node-key={node.key}
               style={{
                 left: node.x,
@@ -280,7 +282,7 @@ export function DelegationCanvas({
           ))}
         </div>
       </div>
-      <div className={styles.controls}>
+      <div className={"flex items-center self-end gap-2 p-2 border border-border rounded-md bg-surface"}>
         <IconButton
           label="放大"
           icon={<Plus size={14} />}
@@ -306,7 +308,7 @@ export function DelegationCanvas({
           }}
         />
         <IconButton label="重置视图" icon={<RotateCcw size={14} />} onClick={reset} />
-        <span className={styles.scale}>{Math.round(viewport.scale * 100)}%</span>
+        <span className={"text-xs text-muted min-w-[40px] text-right"}>{Math.round(viewport.scale * 100)}%</span>
       </div>
     </div>
   );

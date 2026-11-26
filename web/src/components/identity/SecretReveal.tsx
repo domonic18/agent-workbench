@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Button } from "../ui/Button.js";
-import styles from "./IdentityForm.module.css";
 
 export interface SecretRevealProps {
   secret: string;
@@ -21,24 +20,24 @@ export function SecretReveal({ secret, note, hints = [] }: SecretRevealProps) {
   }
 
   return (
-    <div className={styles.secret}>
-      <p className={styles.warning} role="alert">
+    <div className="flex flex-col gap-3">
+      <p className="m-0 rounded-md border border-warning-border bg-warning-soft px-3 py-2 text-sm text-warning" role="alert">
         关闭后不可再查看，请立即保存到安全位置。
       </p>
-      <div className={styles.secretRow}>
-        <code className={styles.secretCode}>{secret}</code>
+      <div className="flex items-stretch gap-2">
+        <code className="min-w-0 flex-1 rounded-md border border-border bg-surface-2 px-3 py-2 font-mono text-xs break-all max-md:min-h-touch">{secret}</code>
         <Button variant="secondary" onClick={() => void copy()}>
           {copied === "copied" ? "已复制" : "复制"}
         </Button>
       </div>
       {copied === "failed" ? (
-        <p className={styles.hint}>复制失败，请手动选中密钥。</p>
+        <p className="m-0 text-xs text-muted">复制失败，请手动选中密钥。</p>
       ) : null}
-      {note === undefined ? null : <p className={styles.hint}>{note}</p>}
+      {note === undefined ? null : <p className="m-0 text-xs text-muted">{note}</p>}
       {hints.length === 0 ? null : (
-        <ul className={styles.hints}>
+        <ul className="m-0 pl-5 text-xs text-muted">
           {hints.map((hint) => (
-            <li key={hint}>{hint}</li>
+            <li key={hint} className="mt-1">{hint}</li>
           ))}
         </ul>
       )}

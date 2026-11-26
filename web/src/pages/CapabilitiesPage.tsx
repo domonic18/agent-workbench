@@ -15,7 +15,6 @@ import { EmptyState } from "../components/ui/EmptyState.js";
 import { Tabs } from "../components/ui/Tabs.js";
 import { agentDisplayName } from "../shared/agent-label.js";
 import { useNow } from "../shared/useNow.js";
-import styles from "./CapabilitiesPage.module.css";
 
 const EMPTY_HINT: Record<
   (typeof CAPABILITY_VIEWS)[number],
@@ -68,7 +67,7 @@ export function CapabilitiesPage() {
     capabilities.length === 0 ? (
       <EmptyState title={EMPTY_HINT[view].title} />
     ) : (
-      <div className={styles.grid}>
+      <div className="grid gap-4 items-start grid-cols-[repeat(auto-fill,minmax(360px,1fr))] max-md:grid-cols-1">
         {capabilities.map((capability) => (
           <CapabilityCard
             key={capability.id}
@@ -82,7 +81,7 @@ export function CapabilitiesPage() {
     );
 
   return (
-    <div className={styles.page}>
+    <div className="flex flex-col gap-4">
       <Tabs
         value={view}
         onValueChange={selectView}

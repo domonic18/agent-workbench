@@ -1,5 +1,4 @@
 import type { CSSProperties } from "react";
-import styles from "./feedback.module.css";
 
 export interface SkeletonProps {
   width?: number | string;
@@ -12,7 +11,14 @@ export function Skeleton({ width = "100%", height = 16, circle = false }: Skelet
   const style: CSSProperties = {
     width,
     height,
-    ...(circle ? { borderRadius: "var(--radius-full)" } : {}),
   };
-  return <span className={styles.skeleton} style={style} aria-hidden="true" />;
+  return (
+    <span
+      className={`rounded-md bg-gradient-to-r from-surface-3 via-surface-2 to-surface-3 bg-[length:400%_100%] animate-shimmer ${
+        circle ? "rounded-full" : ""
+      }`}
+      style={style}
+      aria-hidden="true"
+    />
+  );
 }

@@ -15,7 +15,6 @@ import { Field, Input, Select } from "../ui/Field.js";
 import { useToast } from "../ui/Toast.js";
 import { AgentTargetsSection } from "./AgentTargetsSection.js";
 import { AgentUsageLimitSection } from "./AgentUsageLimitSection.js";
-import styles from "./agents.module.css";
 
 export interface AgentEditDialogProps {
   agentId: string;
@@ -148,7 +147,7 @@ export function AgentEditDialog({
   if (agentsQuery.isPending) {
     return (
       <Dialog title="管理 Agent" onClose={onClose}>
-        <p className={styles.muted}>加载中…</p>
+        <p className="text-muted">加载中…</p>
       </Dialog>
     );
   }
@@ -156,7 +155,7 @@ export function AgentEditDialog({
   if (agent === undefined) {
     return (
       <Dialog title="管理 Agent" onClose={onClose}>
-        <p className={styles.error} role="alert">
+        <p className="mt-3 text-xs text-danger" role="alert">
           该 Agent 已不存在，可能已被删除。
         </p>
       </Dialog>
@@ -177,9 +176,9 @@ export function AgentEditDialog({
         </Button>
       }
     >
-      <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>档案</h3>
-        <div className={styles.fieldGrid}>
+      <section className="py-4 border-b border-line-soft first:pt-0 last:pb-0 last:border-b-0">
+        <h3 className="mb-1 text-md font-bold">档案</h3>
+        <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3">
           <Field label="显示名" htmlFor="agent-display-name">
             <Input
               id="agent-display-name"
@@ -195,7 +194,7 @@ export function AgentEditDialog({
             />
           </Field>
         </div>
-        <div className={styles.rowActionsLeft}>
+        <div className="flex flex-wrap gap-2 items-center">
           <Button
             size="sm"
             variant="secondary"
@@ -224,7 +223,7 @@ export function AgentEditDialog({
           )}
         </div>
         {error === null ? null : (
-          <p className={styles.error} role="alert">
+          <p className="mt-3 text-xs text-danger" role="alert">
             {error}
           </p>
         )}
@@ -233,9 +232,9 @@ export function AgentEditDialog({
       <AgentTargetsSection agent={agent} allAgents={agentsQuery.data ?? []} onSaved={() => void refresh()} />
       <AgentUsageLimitSection agent={agent} onSaved={() => void refresh()} />
 
-      <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>运行归属</h3>
-        <div className={styles.fieldGrid}>
+      <section className="py-4 border-b border-line-soft first:pt-0 last:pb-0 last:border-b-0">
+        <h3 className="mb-1 text-md font-bold">运行归属</h3>
+        <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3">
           <Field label="运行时" htmlFor="agent-runtime">
             <Input id="agent-runtime" readOnly value={RUNTIME_LABEL[agent.runtime]} />
           </Field>
@@ -267,7 +266,7 @@ export function AgentEditDialog({
           )}
         </div>
         {agent.runtime === "claude_code" ? null : (
-          <div className={styles.rowActionsLeft}>
+          <div className="flex flex-wrap gap-2 items-center">
             <Button
               size="sm"
               variant="secondary"
@@ -280,10 +279,10 @@ export function AgentEditDialog({
         )}
       </section>
 
-      <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>密钥</h3>
+      <section className="py-4 border-b border-line-soft first:pt-0 last:pb-0 last:border-b-0">
+        <h3 className="mb-1 text-md font-bold">密钥</h3>
         {rotatedSecret === null ? (
-          <div className={styles.rowActionsLeft}>
+          <div className="flex flex-wrap gap-2 items-center">
             <Button
               size="sm"
               variant="ghost"
@@ -294,7 +293,7 @@ export function AgentEditDialog({
             </Button>
             {confirmRotate ? (
               <>
-                <span className={styles.muted}>确认轮换？旧密钥会立刻失效。</span>
+                <span className="text-muted">确认轮换？旧密钥会立刻失效。</span>
                 <Button size="sm" variant="danger" loading={pending} onClick={() => void rotate()}>
                   确认轮换
                 </Button>
@@ -302,8 +301,8 @@ export function AgentEditDialog({
             ) : null}
           </div>
         ) : (
-          <div className={styles.fieldGrid}>
-            <div className={styles.fieldFull}>
+          <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3">
+            <div className="col-span-full">
               <Field label="新密钥（只显示这一次）" htmlFor="rotated-secret">
                 <Input id="rotated-secret" readOnly value={rotatedSecret} />
               </Field>
@@ -312,9 +311,9 @@ export function AgentEditDialog({
         )}
       </section>
 
-      <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>危险操作</h3>
-        <div className={styles.dangerZone}>
+      <section className="py-4 border-b border-line-soft first:pt-0 last:pb-0 last:border-b-0">
+        <h3 className="mb-1 text-md font-bold">危险操作</h3>
+        <div className="p-4 border border-danger-border rounded-md bg-danger-soft">
           <Button
             size="sm"
             variant="danger"

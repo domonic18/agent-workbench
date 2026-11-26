@@ -4,7 +4,6 @@ import { setAgentTargets, type AgentRosterSummary } from "../../api/identity.js"
 import { agentDisplayName } from "../../shared/agent-label.js";
 import { Button } from "../ui/Button.js";
 import { useToast } from "../ui/Toast.js";
-import styles from "./agents.module.css";
 
 export interface AgentTargetsSectionProps {
   agent: AgentRosterSummary;
@@ -49,17 +48,17 @@ export function AgentTargetsSection({ agent, allAgents, onSaved }: AgentTargetsS
   }
 
   return (
-    <section className={styles.section}>
-      <h3 className={styles.sectionTitle}>委派白名单</h3>
-      <p className={styles.sectionHint}>
+    <section className="py-4 border-b border-line-soft first:pt-0 last:pb-0 last:border-b-0">
+      <h3 className="mb-1 text-md font-bold">委派白名单</h3>
+      <p className="mb-3 text-xs text-muted">
         勾选后该 Agent 可以向对方发送 A2A 消息；空白名单意味着不能主动发起委派。
       </p>
       {candidates.length === 0 ? (
-        <p className={styles.muted}>没有其他可委派的 Agent。</p>
+        <p className="text-muted">没有其他可委派的 Agent。</p>
       ) : (
-        <div className={styles.targets}>
+        <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto p-3 border border-border rounded-md bg-surface-2">
           {candidates.map((other) => (
-            <label key={other.id} className={styles.targetRow}>
+            <label key={other.id} className="flex items-center gap-2 text-sm max-md:min-h-touch">
               <input
                 type="checkbox"
                 checked={draft.includes(other.id)}
@@ -67,12 +66,12 @@ export function AgentTargetsSection({ agent, allAgents, onSaved }: AgentTargetsS
                 onChange={() => toggle(other.id)}
               />
               <span>{agentDisplayName(other)}</span>
-              <span className={styles.identitySub}>{other.project}</span>
+              <span className="text-xs text-muted overflow-hidden text-ellipsis whitespace-nowrap">{other.project}</span>
             </label>
           ))}
         </div>
       )}
-      <div className={styles.rowActionsLeft}>
+      <div className="flex flex-wrap gap-2 items-center">
         <Button
           size="sm"
           variant="secondary"
@@ -83,7 +82,7 @@ export function AgentTargetsSection({ agent, allAgents, onSaved }: AgentTargetsS
         </Button>
       </div>
       {error === null ? null : (
-        <p className={styles.error} role="alert">
+        <p className="mt-3 text-xs text-danger" role="alert">
           {error}
         </p>
       )}
