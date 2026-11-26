@@ -37,7 +37,11 @@ function sortByAttention(items: readonly WorkItemListItem[]): WorkItemListItem[]
   });
 }
 
-export function WorkItemSection() {
+export interface WorkItemSectionProps {
+  showHeader?: boolean;
+}
+
+export function WorkItemSection({ showHeader = true }: WorkItemSectionProps) {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const attention = readWorkItemFilter(searchParams);
@@ -69,7 +73,7 @@ export function WorkItemSection() {
 
   return (
     <section className="flex flex-col gap-4" aria-label="工作事项">
-      <SectionHeader title="工作事项" />
+      {showHeader ? <SectionHeader title="工作事项" /> : null}
       <div className="flex flex-wrap items-center gap-3">
         <ChipGroup
           label="注意力筛选"
