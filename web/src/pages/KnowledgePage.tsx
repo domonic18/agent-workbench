@@ -17,7 +17,6 @@ import { EmptyState } from "../components/ui/EmptyState.js";
 import { Input } from "../components/ui/Field.js";
 import { Tabs } from "../components/ui/Tabs.js";
 import { useNow } from "../shared/useNow.js";
-import styles from "./KnowledgePage.module.css";
 
 const EMPTY_HINT: Record<
   (typeof KNOWLEDGE_VIEWS)[number],
@@ -80,8 +79,9 @@ export function KnowledgePage() {
   }
 
   const searchForm = (
-    <form className={styles.search} role="search" onSubmit={submitSearch}>
+    <form className="flex items-center gap-2 mb-4 max-md:flex-wrap" role="search" onSubmit={submitSearch}>
       <Input
+        className="flex-1 min-w-0"
         type="search"
         value={term}
         placeholder="搜索标题、摘要或正文"
@@ -107,7 +107,7 @@ export function KnowledgePage() {
     );
 
   return (
-    <div className={styles.page}>
+    <div className="flex flex-col gap-4">
       <Tabs
         value={view}
         onValueChange={selectView}

@@ -9,7 +9,6 @@ import { AsyncSection } from "../components/ui/AsyncSection.js";
 import { LinkButton } from "../components/ui/LinkButton.js";
 import { Panel } from "../components/ui/Panel.js";
 import markdownStyles from "../components/markdown/markdown.module.css";
-import styles from "./AgentGuidePage.module.css";
 
 export function AgentGuidePage() {
   const kit = useQuery({
@@ -33,7 +32,7 @@ export function AgentGuidePage() {
   };
 
   return (
-    <div className={styles.page}>
+    <div className="flex flex-col gap-5">
       <Panel
         title="A2A 协作规范"
         actions={
@@ -64,7 +63,7 @@ export function AgentGuidePage() {
       <Panel title="工作区提示词">
         <AsyncSection {...loadState} hasMore={false} fetchingMore={false} onLoadMore={() => undefined}>
           {prompts === undefined ? null : (
-            <div className={styles.prompts}>
+            <div className="flex flex-col gap-4">
               <CopyBlock label="接收侧" value={prompts.receiver} />
               <CopyBlock label="发起侧" value={prompts.senderTemplate} />
             </div>

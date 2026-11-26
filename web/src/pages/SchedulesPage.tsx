@@ -13,7 +13,6 @@ import { Table, type TableColumn } from "../components/ui/Table.js";
 import { describeCron } from "../shared/cron.js";
 import { useNow } from "../shared/useNow.js";
 import { formatCountdown, formatDateTimeIn, formatRelativeTime } from "../shared/format.js";
-import styles from "./SchedulesPage.module.css";
 
 const SOON_MS = 24 * 60 * 60 * 1000;
 
@@ -82,9 +81,11 @@ export function SchedulesPage() {
       width: "26%",
       plain: true,
       render: (row) => (
-        <span className={styles.taskCell}>
-          <span className={styles.taskTitle}>{row.description}</span>
-          <span className={styles.taskSub}>项目 {row.project}</span>
+        <span className="flex flex-col gap-0.5 min-w-0">
+          <span className="overflow-hidden text-ellipsis whitespace-nowrap">{row.description}</span>
+          <span className="text-xs text-muted overflow-hidden text-ellipsis whitespace-nowrap">
+            项目 {row.project}
+          </span>
         </span>
       ),
     },
@@ -158,7 +159,7 @@ export function SchedulesPage() {
   ];
 
   return (
-    <div className={styles.page}>
+    <div className="flex flex-col gap-6">
       {query.isPending ? <LoadingState label="加载定时任务…" /> : null}
       {query.isError ? (
         <ErrorState
@@ -169,7 +170,7 @@ export function SchedulesPage() {
 
       {query.data === undefined ? null : (
         <>
-          <section className={styles.metrics} aria-label="定时任务指标">
+          <section className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(180px,1fr))]" aria-label="定时任务指标">
             <StatCard
               icon={<CalendarClock size={16} aria-hidden="true" />}
               label="计划总数"
@@ -187,7 +188,7 @@ export function SchedulesPage() {
             />
           </section>
 
-          <section className={styles.section}>
+          <section className="flex flex-col gap-4">
             <SectionHeader title="定时任务" />
             {rows.length === 0 ? (
               <EmptyState
@@ -196,29 +197,29 @@ export function SchedulesPage() {
               />
             ) : (
               <>
-                <div className={styles.tableArea}>
+                <div className="overflow-x-auto max-md:hidden">
                   <Table columns={columns} rows={rows} rowKey={(row) => row.id} minWidth="880px" />
                 </div>
-                <ul className={styles.cards} aria-label="定时任务卡片">
+                <ul className="hidden m-0 p-0 list-none max-md:flex max-md:flex-col max-md:gap-3" aria-label="定时任务卡片">
                   {rows.map((row) => {
                     const status = statusOf(row, now);
                     const frequency = frequencyCell(row);
                     return (
-                      <li key={row.id} className={styles.card}>
-                        <span className={styles.cardTop}>
-                          <span className={styles.cardTitle}>{row.description}</span>
+                      <li key={row.id} className="flex flex-col gap-2 p-4 border border-border rounded-lg bg-surface">
+                        <span className="flex items-start justify-between gap-3">
+                          <span className="text-md font-semibold break-words">{row.description}</span>
                           <Badge tone={status.tone} text={status.text} />
                         </span>
-                        <span className={styles.cardMeta}>
-                          <span className={styles.cardMetaLabel}>机器人</span>
+                        <span className="flex flex-wrap items-baseline gap-2 text-sm">
+                          <span className="text-xs text-muted">机器人</span>
                           <span>{agentLabel(row)}</span>
                         </span>
-                        <span className={styles.cardMeta}>
-                          <span className={styles.cardMetaLabel}>频率</span>
+                        <span className="flex flex-wrap items-baseline gap-2 text-sm">
+                          <span className="text-xs text-muted">频率</span>
                           <span>{frequency.text}</span>
                         </span>
-                        <span className={styles.cardMeta}>
-                          <span className={styles.cardMetaLabel}>下次</span>
+                        <span className="flex flex-wrap items-baseline gap-2 text-sm">
+                          <span className="text-xs text-muted">下次</span>
                           <span>
                             {row.nextRunAt === null
                               ? "—"
