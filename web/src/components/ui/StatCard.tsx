@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import styles from "./surfaces.module.css";
 
 export interface StatCardProps {
   /** 微标签：短、大写、弱化 */
@@ -12,20 +11,19 @@ export interface StatCardProps {
   title?: string;
 }
 
-/** 指标卡：一眼看清一个数，不承载操作 */
 export function StatCard({ label, value, sub, icon, title }: StatCardProps) {
   return (
-    <div className={styles.stat} title={title}>
-      <div className={styles.statHead}>
-        <span className={styles.statLabel}>{label}</span>
+    <div className="p-4 border border-border rounded-md bg-surface transition-colors hover:border-border-hover" title={title}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-semibold tracking-tight uppercase text-text-secondary">{label}</span>
         {icon === undefined ? null : (
-          <span className={styles.statIcon} aria-hidden="true">
+          <span className="inline-flex items-center justify-center w-icon-tile h-icon-tile rounded-sm bg-accent-soft text-accent" aria-hidden="true">
             {icon}
           </span>
         )}
       </div>
-      <div className={styles.statValue}>{value}</div>
-      {sub === undefined ? null : <div className={styles.statDesc}>{sub}</div>}
+      <div className="mt-2 text-2xl font-bold tabular-nums text-foreground">{value}</div>
+      {sub === undefined ? null : <div className="mt-1 text-xs text-muted">{sub}</div>}
     </div>
   );
 }

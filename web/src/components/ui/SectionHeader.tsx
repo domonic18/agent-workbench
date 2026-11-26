@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import styles from "./surfaces.module.css";
 
 export interface SectionHeaderProps {
   title: ReactNode;
@@ -9,15 +8,14 @@ export interface SectionHeaderProps {
   actions?: ReactNode;
 }
 
-/** 分区标题：统一各页的标题层级与操作位 */
 export function SectionHeader({ title, hint, actions }: SectionHeaderProps) {
   return (
-    <div className={styles.sectionHeader}>
-      <div className={styles.sectionHeading}>
-        <h2 className={styles.sectionTitle}>{title}</h2>
-        {hint === undefined ? null : <span className={styles.sectionHint}>{hint}</span>}
+    <div className="flex items-start justify-between gap-4">
+      <div className="flex min-w-0 flex-col gap-1">
+        <h2 className="m-0 text-lg font-semibold text-foreground">{title}</h2>
+        {hint === undefined ? null : <span className="text-sm text-muted">{hint}</span>}
       </div>
-      {actions === undefined ? null : <div className={styles.sectionActions}>{actions}</div>}
+      {actions === undefined ? null : <div className="flex flex-shrink-0 items-center gap-2">{actions}</div>}
     </div>
   );
 }

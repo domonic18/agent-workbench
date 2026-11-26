@@ -112,6 +112,7 @@ export default {
           md: "var(--size-control-md)",
           lg: "var(--size-control-lg)",
         },
+        "icon-tile": "var(--size-icon-tile)",
         "dialog-sm": "var(--dialog-sm)",
         "dialog-md": "var(--dialog-md)",
         "dialog-lg": "var(--dialog-lg)",
@@ -130,6 +131,7 @@ export default {
           lg: "var(--size-control-lg)",
         },
         touch: "var(--size-touch)",
+        "icon-tile": "var(--size-icon-tile)",
       },
       maxWidth: {
         content: "var(--content-max)",
