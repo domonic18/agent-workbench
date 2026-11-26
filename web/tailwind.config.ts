@@ -105,6 +105,15 @@ export default {
       transitionTimingFunction: {
         DEFAULT: "var(--ease)",
       },
+      keyframes: {
+        shimmer: {
+          "0%": { backgroundPosition: "100% 0" },
+          "100%": { backgroundPosition: "0 0" },
+        },
+      },
+      animation: {
+        shimmer: "shimmer 1.4s ease infinite",
+      },
       width: {
         sidebar: "var(--sidebar-w)",
         control: {
