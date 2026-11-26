@@ -14,16 +14,13 @@ import styles from "./work-item-drawer.module.css";
 
 export interface WorkItemBlockProps {
   item: WorkItemDetail;
-  /** id → 机器人名;取不到时回退 id */
   agentNames: ReadonlyMap<string, string>;
 }
 
-/** 目标与边界:人可核对「为什么可以做、做到什么程度」 */
 export function WorkItemGoalBlock({ item }: { item: WorkItemDetail }) {
   return (
     <section className={styles.block} aria-label="目标与边界">
       <h3 className={styles.blockTitle}>目标与边界</h3>
-      <p className={styles.blockHint}>预期结果与不可变 Mandate，来源事实，不由前端推断</p>
       <KeyValueList
         items={[
           { key: "kind", label: "事项类型", value: item.kind },
@@ -48,7 +45,6 @@ export function WorkItemGoalBlock({ item }: { item: WorkItemDetail }) {
                 : `${item.authorization.kind} · ${item.authorization.ref}`,
           },
           { key: "policy", label: "策略版本", value: item.policyVersion },
-          // 进展版本是业务侧的事实推进次数,与 SSE 的作用域 revision 不是一回事
           { key: "revision", label: "进展版本", value: `第 ${item.progressRevision} 次` },
         ]}
       />
@@ -64,9 +60,7 @@ export interface WorkItemStatusBlockProps extends WorkItemBlockProps {
   inbox: readonly WorkItemInboxLink[];
 }
 
-/** 当前状态:阶段、等待对象、下一步与最近进展 */
 export function WorkItemStatusBlock({ item, inbox, agentNames }: WorkItemStatusBlockProps) {
-  // 等待对象由派工信箱推导:还没领走或已领未确认的行都算「在等这个机器人」
   const waiting = inbox
     .filter((row) => row.status === "pending" || row.status === "claimed")
     .map((row) => agentMentionLabel(row.targetAgentId, agentNames, row.targetAgentId));

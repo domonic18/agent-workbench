@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ScheduleRow } from "../api/types.js";
@@ -109,15 +109,5 @@ describe("定时任务屏", () => {
     renderPage([]);
 
     expect(await screen.findByText("还没有定时任务")).toBeTruthy();
-  });
-
-  it("页脚交代只读边界与可见性口径", async () => {
-    renderPage([row()]);
-
-    await screen.findAllByText("盘后自选更新");
-    await waitFor(() => {
-      expect(screen.getByText(/只读视图/)).toBeTruthy();
-    });
-    expect(screen.getByText(/未纳管机器/)).toBeTruthy();
   });
 });

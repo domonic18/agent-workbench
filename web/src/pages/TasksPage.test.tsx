@@ -101,9 +101,6 @@ describe("任务列表页", () => {
     expect(requested.some((url) => url.includes("status=running") && url.includes("project=aw"))).toBe(
       true,
     );
-    expect(
-      screen.getByText("仅显示已自报的任务——Agent 判断不需要建单的活不会出现在这里。"),
-    ).toBeTruthy();
     expect(FakeEventSource.lastUrl).toContain("scope=overview");
   });
 
@@ -112,7 +109,6 @@ describe("任务列表页", () => {
     renderPage("/tasks?project=aw");
 
     expect(await screen.findByText("没有匹配的任务")).toBeTruthy();
-    expect(screen.getByText("调整筛选条件后再试。")).toBeTruthy();
   });
 
   it("无筛选且无记录时说明 Agent 尚未上报", async () => {
@@ -120,9 +116,6 @@ describe("任务列表页", () => {
     renderPage("/tasks");
 
     expect(await screen.findByText("暂无任务记录")).toBeTruthy();
-    expect(
-      screen.getByText("Agent 尚未上报任务；未建单的工作不会出现在这里。"),
-    ).toBeTruthy();
   });
 
   it("任务屏同时给出工作事项区块", async () => {
@@ -130,8 +123,5 @@ describe("任务列表页", () => {
     renderPage("/tasks");
 
     expect(await screen.findByRole("region", { name: "工作事项" })).toBeTruthy();
-    expect(
-      screen.getByText("仅展示已由触发事实路由出的工作事项——没被路由的活不会出现在这里。"),
-    ).toBeTruthy();
   });
 });

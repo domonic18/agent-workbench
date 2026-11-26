@@ -2,7 +2,7 @@ import type { AgentRosterSummary } from "../../api/identity.js";
 import type { OverviewAgent } from "../../api/types.js";
 import { agentDisplayName, hasCollector } from "../../shared/agent-label.js";
 import { formatDateTime, formatExactTokens, formatRelativeTime } from "../../shared/format.js";
-import { NOT_COLLECTED, RUNTIME_LABEL, VISIBILITY_NOTE } from "../../shared/labels.js";
+import { NOT_COLLECTED, RUNTIME_LABEL } from "../../shared/labels.js";
 import styles from "./agents.module.css";
 
 export interface AgentOverviewPanelProps {
@@ -86,8 +86,6 @@ export function AgentOverviewPanel({ agent, live }: AgentOverviewPanelProps) {
           ))}
         </dl>
       </section>
-
-      <p className={styles.sectionHint}>可见性说明：{VISIBILITY_NOTE}</p>
     </div>
   );
 }

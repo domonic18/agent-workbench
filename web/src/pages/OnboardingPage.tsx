@@ -32,10 +32,7 @@ export function OnboardingPage() {
 
       {step === 2 ? (
         <>
-          <Panel
-            title="签发令牌并确认上线"
-            description="令牌用于执行机 enroll，签发后 15 分钟内有效；执行机上线后这里会出现它。"
-          >
+          <Panel title="签发令牌并确认上线">
             <EnrollTokenPanel
               token={enroll.token}
               expiresAt={enroll.expiresAt}

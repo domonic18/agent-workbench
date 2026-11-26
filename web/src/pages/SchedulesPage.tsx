@@ -7,7 +7,6 @@ import { Badge } from "../components/ui/Badge.js";
 import { EmptyState } from "../components/ui/EmptyState.js";
 import { ErrorState } from "../components/ui/ErrorState.js";
 import { LoadingState } from "../components/ui/LoadingState.js";
-import { PageFooter } from "../components/ui/PageFooter.js";
 import { SectionHeader } from "../components/ui/SectionHeader.js";
 import { StatCard } from "../components/ui/StatCard.js";
 import { Table, type TableColumn } from "../components/ui/Table.js";
@@ -16,7 +15,6 @@ import { useNow } from "../shared/useNow.js";
 import { formatCountdown, formatDateTimeIn, formatRelativeTime } from "../shared/format.js";
 import styles from "./SchedulesPage.module.css";
 
-/** 24 小时内待执行的口径 */
 const SOON_MS = 24 * 60 * 60 * 1000;
 
 interface StatusView {
@@ -25,7 +23,6 @@ interface StatusView {
   title?: string;
 }
 
-/** 状态按「机器是否还活着 → 计划是否停用 → 上次是否出错」排序,最该先看的排最前 */
 function statusOf(row: ScheduleRow, now: number): StatusView {
   if (row.stale) {
     const at = row.collectedAt === null ? null : formatRelativeTime(row.collectedAt, now);
@@ -44,7 +41,6 @@ function statusOf(row: ScheduleRow, now: number): StatusView {
   return { tone: "positive", text: "正常" };
 }
 
-/** Agent 机器人:bot 名为准,其次登记名;项目没登记就如实说没登记 */
 function agentLabel(row: ScheduleRow): string {
   if (row.botName !== null && row.botName !== "") return row.botName;
   if (row.agentName !== null && row.agentName !== "") return row.agentName;
@@ -65,13 +61,7 @@ function frequencyCell(row: ScheduleRow): { text: string; title?: string } {
   return { text: described.text, title: row.cronExpr };
 }
 
-/**
- * 定时任务屏:执行机上自动跑的计划清单,只读。
- *
- * 真相源在 cc-connect 侧,这里不改频率、不停用、不触发执行。
- */
 export function SchedulesPage() {
-  // 计划随执行机上报变化,一分钟刷一次;倒计时提示也跟着走
   const query = useQuery({
     queryKey: ["schedules"],
     queryFn: fetchSchedules,
@@ -184,39 +174,31 @@ export function SchedulesPage() {
               icon={<CalendarClock size={16} aria-hidden="true" />}
               label="计划总数"
               value={String(rows.length)}
-              sub="周期任务与未触发的一次性任务"
             />
             <StatCard
               icon={<Clock size={16} aria-hidden="true" />}
               label="24 小时内待执行"
               value={String(soon)}
-              sub="按各机器自己的时区计算"
             />
             <StatCard
               icon={<TriangleAlert size={16} aria-hidden="true" />}
               label="需要看一眼"
               value={String(abnormal)}
-              sub="上次出错或机器离线"
             />
           </section>
 
           <section className={styles.section}>
-            <SectionHeader
-              title="定时任务"
-              hint="执行机上按计划自动触发的活——谁在跑、什么节奏、下次什么时候"
-            />
+            <SectionHeader title="定时任务" />
             {rows.length === 0 ? (
               <EmptyState
                 icon={<CalendarClock size={28} aria-hidden="true" />}
                 title="还没有定时任务"
-                description="执行机上的 cc-connect 配了周期计划后，这里会出现清单。"
               />
             ) : (
               <>
                 <div className={styles.tableArea}>
                   <Table columns={columns} rows={rows} rowKey={(row) => row.id} minWidth="880px" />
                 </div>
-                {/* 窄屏转卡片(03 §8):任务 / 机器人 / 频率 / 状态 */}
                 <ul className={styles.cards} aria-label="定时任务卡片">
                   {rows.map((row) => {
                     const status = statusOf(row, now);
@@ -250,12 +232,6 @@ export function SchedulesPage() {
               </>
             )}
           </section>
-
-          <PageFooter>
-            只读视图：定时任务由 cc-connect 侧维护，控制台不改频率、不停用、不触发执行。
-            <br />
-            仅展示已装 aw-node 的执行机上报的计划——未纳管机器与外部运行时的计划不在此列。
-          </PageFooter>
         </>
       )}
     </div>

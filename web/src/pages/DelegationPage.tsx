@@ -17,18 +17,6 @@ import styles from "./DelegationPage.module.css";
 
 type View = "graph" | "table";
 
-const HINT: Record<View, string> = {
-  graph:
-    "节点=Agent，箭头=可委派方向（发起方 → 收件方）；滚轮缩放、拖空白平移，从节点右侧手柄拖到目标即建立委派。",
-  table: "行=发起方，列=收件方（Agent 或组）；勾选即允许该发起方向该收件方发送 A2A 消息。默认全不勾，自我委派不可选。",
-};
-
-/**
- * 委派关系屏:谁能找谁。
- *
- * 图是主视图(整块画布,可缩放平移,可拖线),表是批量勾选与核对用的;
- * 两者共用同一份草稿,保存语义恒为「只提交变更过的发起方行」。
- */
 export function DelegationPage() {
   const draft = useDelegationDraft();
   const groupsApi = useAgentGroups();
@@ -58,7 +46,6 @@ export function DelegationPage() {
       <header className={styles.header}>
         <div className={styles.heading}>
           <h2 className={styles.title}>委派关系</h2>
-          <p className={styles.hint}>{HINT[view]}</p>
         </div>
         <div className={styles.headerActions}>
           <input
@@ -107,7 +94,7 @@ export function DelegationPage() {
 
       {!draft.isPending && !draft.isError ? (
         draft.agents.length === 0 ? (
-          <EmptyState title="暂无 Agent" description="先注册 Agent，才能在这里配置谁能找谁。" />
+          <EmptyState title="暂无 Agent" />
         ) : (
           <div className={styles.body}>
             <div className={styles.canvasArea}>

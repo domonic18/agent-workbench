@@ -142,7 +142,6 @@ describe("总览页", () => {
     renderPage();
 
     expect(await screen.findByText("名册里还没有 Agent")).toBeTruthy();
-    expect(screen.getByText(/控制台只看到自报的与自己的会话/)).toBeTruthy();
     expect(screen.getByText("Agent 在线")).toBeTruthy();
     expect(screen.getByText("今日 Token")).toBeTruthy();
     expect(screen.getByText("1.2M")).toBeTruthy();

@@ -194,58 +194,36 @@ export function SettingsPage() {
         fetchingMore={false}
         onLoadMore={() => undefined}
       >
-        <Panel
-          title="基本"
-          description="控制台对外地址,Agent 接入材料与产物下载链接会引用它。"
-        >
+        <Panel title="基本">
           <div className={styles.section}>
-            {field("publicUrl", "对外地址", {
-              hint: "示例:https://aw.example.com;留空则使用当前访问地址",
-            })}
+            {field("publicUrl", "对外地址")}
           </div>
         </Panel>
 
-        <Panel
-          title="飞书"
-          description="应用凭据与两个群 ID 改后需重启控制台;白名单改后立即生效。"
-        >
+        <Panel title="飞书">
           <div className={styles.section}>
             {field("feishuAppId", "App ID", { restart: true })}
             {field("feishuAppSecret", "App Secret", { type: "password", restart: true })}
             {field("feishuApprovalChatId", "审批卡片群 ID", { restart: true })}
             {field("feishuCollabChatId", "协作通知群 ID", { restart: true })}
-            {field("feishuAllowedOpenIds", "白名单 open_id", {
-              hint: "逗号分隔;仅名单内用户可向控制台下指令与点击审批卡片",
-            })}
+            {field("feishuAllowedOpenIds", "白名单 open_id")}
           </div>
         </Panel>
 
-        <Panel
-          title="接入安全"
-          description="来源 Host 白名单;改错把自己锁外面时,可去数据库删掉 console_allowed_hosts 行回到 env 值。"
-        >
+        <Panel title="接入安全">
           <div className={styles.section}>
-            {field("consoleAllowedHosts", "允许的来源 Host", {
-              hint: "逗号分隔,含端口,如 aw.example.com:8787",
-            })}
+            {field("consoleAllowedHosts", "允许的来源 Host")}
           </div>
         </Panel>
 
-        <Panel title="治理" description="僵尸任务回收与派工停滞升级阈值。">
+        <Panel title="治理">
           <div className={styles.section}>
-            {field("taskZombieHours", "僵尸任务判定小时数", {
-              hint: "running 超过该时长未动 → blocked + 按条件重排",
-            })}
-            {field("assignmentStallHours", "派工停滞升级小时数", {
-              hint: "assignment pending 超过该时长 → attention=stalled + 播报",
-            })}
+            {field("taskZombieHours", "僵尸任务判定小时数")}
+            {field("assignmentStallHours", "派工停滞升级小时数")}
           </div>
         </Panel>
 
-        <Panel
-          title="知识嵌入"
-          description="OpenAI 兼容嵌入接口;未配齐则只建关键词索引,条目保持 pending。"
-        >
+        <Panel title="知识嵌入">
           <div className={styles.section}>
             {field("embeddingBaseUrl", "Base URL", { restart: true })}
             {field("embeddingApiKey", "API Key", { type: "password", restart: true })}
@@ -253,12 +231,11 @@ export function SettingsPage() {
           </div>
         </Panel>
 
-        <Panel title="GitHub Webhook" description="Pull Request 与推送事件的验签密钥。">
+        <Panel title="GitHub Webhook">
           <div className={styles.section}>
             {field("githubWebhookSecret", "Webhook Secret", {
               type: "password",
               restart: true,
-              hint: "留空不注册 /api/webhooks/github",
             })}
           </div>
         </Panel>

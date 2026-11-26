@@ -19,20 +19,11 @@ import styles from "./CapabilitiesPage.module.css";
 
 const EMPTY_HINT: Record<
   (typeof CAPABILITY_VIEWS)[number],
-  { title: string; description: string }
+  { title: string }
 > = {
-  pending: {
-    title: "没有待批授权",
-    description: "Agent 请求受限操作时，授权申请会在这里等待你批准或拒绝。",
-  },
-  active: {
-    title: "没有生效中的授权",
-    description: "批准并签发成功的授权会显示在这里，直到过期或被吊销。",
-  },
-  history: {
-    title: "暂无历史授权",
-    description: "过期、已吊销与签发失败的授权会留在这里备查。",
-  },
+  pending: { title: "没有待批授权" },
+  active: { title: "没有生效中的授权" },
+  history: { title: "暂无历史授权" },
 };
 
 export function CapabilitiesPage() {
@@ -52,7 +43,6 @@ export function CapabilitiesPage() {
 
   const capabilities = capabilitiesQuery.data?.pages.flatMap((page) => page.items) ?? [];
 
-  // subject 形如 agent:<id|key>:按 id 再按 key 解析显示名,都查不到回落原文
   const agentsQuery = useQuery({ queryKey: ["agents"], queryFn: fetchAgents });
   const subjectNames = useMemo(() => {
     const agents = agentsQuery.data ?? [];
@@ -76,7 +66,7 @@ export function CapabilitiesPage() {
 
   const list =
     capabilities.length === 0 ? (
-      <EmptyState title={EMPTY_HINT[view].title} description={EMPTY_HINT[view].description} />
+      <EmptyState title={EMPTY_HINT[view].title} />
     ) : (
       <div className={styles.grid}>
         {capabilities.map((capability) => (
