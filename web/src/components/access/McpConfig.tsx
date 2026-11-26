@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { MCP_ACCESS, formatBearer } from "@shared/constants.js";
 import { CopyBlock } from "../ui/CopyBlock.js";
 import { Panel } from "../ui/Panel.js";
+import { Tabs } from "../ui/Tabs.js";
 import {
   exportSecretCommand,
   mcpServersSnippet,
@@ -52,37 +54,64 @@ export interface ConfigSnippetsProps {
 }
 
 export function ConfigSnippets({ endpoint, credentials }: ConfigSnippetsProps) {
+  const [activeClient, setActiveClient] = useState("claude-code");
+  if (credentials === null) {
+    return (
+      <Panel title="就绪配置片段">
+        <p className="text-sm text-muted">从 Agent 名册选择一名 Agent 并轮换/查看密钥后，方可生成配置片段。</p>
+      </Panel>
+    );
+  }
+
+  const bearer = bearerValue(credentials);
+  const commonWarning = (
+    <p className={warning} role="alert">
+      密钥只显示这一次，离开本页即不可再查看。已用旧密钥连着的 Agent 需要重新配置。
+    </p>
+  );
+
   return (
     <Panel title="就绪配置片段">
-      {credentials === null ? null : (
-        <div className={snippets}>
-          <p className={warning} role="alert">
-            密钥只显示这一次，离开本页即不可再查看。已用旧密钥连着的 Agent 需要重新配置。
-          </p>
-
-          <CopyBlock
-            label="Claude Code"
-            value={`claude mcp add --transport http aw-console ${endpoint} --header "${MCP_ACCESS.authHeader}: ${bearerValue(credentials)}"`}
-          />
-          <CopyBlock
-            label="通用 MCP 客户端"
-            value={mcpServersSnippet(endpoint, bearerValue(credentials))}
-          />
-          <CopyBlock
-            label="WorkBuddy"
-            value={`URL: ${endpoint}\nHeader 名: ${MCP_ACCESS.authHeader}\nHeader 值: ${bearerValue(credentials)}`}
-          />
-
-          <CopyBlock
-            label="通用 MCP 客户端（env 版）"
-            value={mcpServersSnippetWithEnv(endpoint, credentials.agentId)}
-          />
-          <CopyBlock
-            label="设置环境变量"
-            value={exportSecretCommand(credentials.secret)}
-          />
-        </div>
-      )}
+      <div className={snippets}>
+        {commonWarning}
+        <Tabs
+          value={activeClient}
+          onValueChange={setActiveClient}
+          items={[
+            {
+              key: "claude-code",
+              label: "Claude Code",
+              content: (
+                <CopyBlock
+                  label="添加 aw-console MCP"
+                  value={`claude mcp add --transport http aw-console ${endpoint} --header "${MCP_ACCESS.authHeader}: ${bearer}"`}
+                />
+              ),
+            },
+            {
+              key: "generic",
+              label: "通用 MCP",
+              content: (
+                <div className={snippets}>
+                  <CopyBlock label="mcpServers 配置（env 版，推荐进仓库）" value={mcpServersSnippetWithEnv(endpoint, credentials.agentId)} />
+                  <CopyBlock label="设置环境变量" value={exportSecretCommand(credentials.secret)} />
+                  <CopyBlock label="mcpServers 配置（明文版）" value={mcpServersSnippet(endpoint, bearer)} />
+                </div>
+              ),
+            },
+            {
+              key: "workbuddy",
+              label: "WorkBuddy",
+              content: (
+                <CopyBlock
+                  label="WorkBuddy 连接参数"
+                  value={`URL: ${endpoint}\nHeader 名: ${MCP_ACCESS.authHeader}\nHeader 值: ${bearer}`}
+                />
+              ),
+            },
+          ]}
+        />
+      </div>
     </Panel>
   );
 }
