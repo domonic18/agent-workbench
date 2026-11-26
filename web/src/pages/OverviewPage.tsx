@@ -29,7 +29,6 @@ import { StatCard } from "../components/ui/StatCard.js";
 import { ToneIcon } from "../components/ui/ToneIcon.js";
 import { formatExactTokens, formatTokens } from "../shared/format.js";
 import type { Tone } from "../shared/tone.js";
-import styles from "./OverviewPage.module.css";
 
 interface AttentionRow {
   icon: ReactNode;
@@ -130,7 +129,7 @@ export function OverviewPage() {
   const empty = roster.length === 0 && agents.length === 0;
 
   return (
-    <div className={styles.page}>
+    <div className="flex flex-col gap-6">
       {isPending ? <LoadingState label="加载总览…" /> : null}
 
       {isError ? (
@@ -142,7 +141,7 @@ export function OverviewPage() {
 
       {data === undefined ? null : (
         <>
-          <section className={styles.metrics} aria-label="关键指标">
+          <section className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(180px,1fr))]" aria-label="关键指标">
             <StatCard
               icon={<Users size={16} aria-hidden="true" />}
               label="Agent 在线"
@@ -176,7 +175,7 @@ export function OverviewPage() {
             />
           </section>
 
-          <section className={styles.section}>
+          <section className="flex flex-col gap-4">
             <SectionHeader
               title="Agent 管理"
               actions={
@@ -206,21 +205,21 @@ export function OverviewPage() {
             )}
           </section>
 
-          <section className={styles.section}>
+          <section className="flex flex-col gap-4">
             <SectionHeader title="需要你看一眼" />
-            <ul className={styles.attention}>
+            <ul className="flex flex-col gap-2 m-0 p-4 border border-border rounded-md bg-surface list-none">
               {attentionRows(
                 data.metrics.pendingApprovals,
                 data.metrics.heartbeatTimeouts,
                 data.metrics.todayTokens,
               ).map((row) => (
-                <li key={row.text} className={styles.attentionRow}>
+                <li key={row.text} className="flex items-center gap-2 text-sm text-text-secondary max-md:items-start">
                   <ToneIcon tone={row.tone} icon={row.icon} />
                   <span>{row.text}</span>
                 </li>
               ))}
               {unregistered.length > 0 ? (
-                <li className={styles.attentionRow}>
+                <li className="flex items-center gap-2 text-sm text-text-secondary max-md:items-start">
                   <ToneIcon tone="warning" icon={<AlertTriangle size={14} aria-hidden="true" />} />
                   <span>{unregisteredHint(unregistered)}</span>
                 </li>

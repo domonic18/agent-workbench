@@ -8,7 +8,6 @@ import { useEnrollToken } from "../components/onboarding/useEnrollToken.js";
 import { Button } from "../components/ui/Button.js";
 import { Panel } from "../components/ui/Panel.js";
 import { Stepper, type StepperStep } from "../components/ui/Stepper.js";
-import styles from "./OnboardingPage.module.css";
 
 const STEPS: StepperStep[] = [
   { key: "download", label: "下载产物" },
@@ -23,7 +22,7 @@ export function OnboardingPage() {
   const origin = typeof window === "undefined" ? "" : window.location.origin;
 
   return (
-    <div className={styles.page}>
+    <div className="flex flex-col gap-5">
       <Stepper steps={STEPS} current={step} />
 
       {step === 0 ? <DownloadStep origin={origin} /> : null}
@@ -47,8 +46,8 @@ export function OnboardingPage() {
         </>
       ) : null}
 
-      <nav className={styles.nav} aria-label="步骤切换">
-        <div className={styles.navGroup}>
+      <nav className="flex justify-between gap-3 max-md:flex-col-reverse" aria-label="步骤切换">
+        <div className="flex gap-2 max-md:flex-col-reverse max-md:[&_button]:w-full">
           <Button
             variant="ghost"
             icon={<ArrowLeft size={15} aria-hidden="true" />}
@@ -58,7 +57,7 @@ export function OnboardingPage() {
             上一步
           </Button>
         </div>
-        <div className={styles.navGroup}>
+        <div className="flex gap-2 max-md:flex-col-reverse max-md:[&_button]:w-full">
           {step < STEPS.length - 1 ? (
             <Button
               variant="primary"

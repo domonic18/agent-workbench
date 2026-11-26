@@ -13,7 +13,6 @@ import { ErrorState } from "../components/ui/ErrorState.js";
 import { IconButton } from "../components/ui/IconButton.js";
 import { LoadingState } from "../components/ui/LoadingState.js";
 import { agentDisplayName } from "../shared/agent-label.js";
-import styles from "./DelegationPage.module.css";
 
 type View = "graph" | "table";
 
@@ -42,20 +41,20 @@ export function DelegationPage() {
   }
 
   return (
-    <div className={styles.page}>
-      <header className={styles.header}>
-        <div className={styles.heading}>
-          <h2 className={styles.title}>委派关系</h2>
+    <div className="flex flex-col gap-4">
+      <header className="flex items-start justify-between gap-4 max-md:flex-col max-md:items-stretch">
+        <div className="flex flex-col gap-1 min-w-0">
+          <h2 className="m-0 text-lg font-bold text-foreground">委派关系</h2>
         </div>
-        <div className={styles.headerActions}>
+        <div className="flex flex-none items-center gap-3 max-md:flex-wrap">
           <input
-            className={styles.search}
+            className="px-2 py-1 border border-border-strong rounded-md bg-surface text-foreground text-sm min-w-[180px]"
             value={keyword}
             placeholder="按名称 / 项目筛选"
             aria-label="筛选 Agent"
             onChange={(event) => setKeyword(event.target.value)}
           />
-          <div className={styles.viewToggle} role="group" aria-label="委派视图切换">
+          <div className="flex gap-1" role="group" aria-label="委派视图切换">
             <IconButton
               label="关系图视图"
               icon={<Network size={14} />}
@@ -96,8 +95,8 @@ export function DelegationPage() {
         draft.agents.length === 0 ? (
           <EmptyState title="暂无 Agent" />
         ) : (
-          <div className={styles.body}>
-            <div className={styles.canvasArea}>
+          <div className="flex items-start gap-4 max-lg:flex-col">
+            <div className="flex flex-1 min-w-0 flex-col gap-2 h-[clamp(460px,72vh,900px)]">
               {view === "graph" ? (
                 <DelegationCanvas
                   agents={agents}
@@ -111,15 +110,15 @@ export function DelegationPage() {
                 <DelegationTable draft={draft} groups={groupsApi.groups} />
               )}
               {draft.dirty.length === 0 ? null : (
-                <p className={styles.dirtyNote}>{draft.dirty.length} 个发起方有未保存的改动。</p>
+                <p className="m-0 text-sm text-warning">{draft.dirty.length} 个发起方有未保存的改动。</p>
               )}
               {draft.error === null ? null : (
-                <p className={styles.error} role="alert">
+                <p className="m-0 text-sm text-danger" role="alert">
                   {draft.error}
                 </p>
               )}
             </div>
-            <aside className={styles.side}>
+            <aside className="flex flex-none flex-col gap-3 w-80 max-lg:flex-auto max-lg:w-full">
               {view === "graph" ? (
                 <DelegationEditor draft={draft} groups={groupsApi.groups} selectedId={selectedId} />
               ) : null}

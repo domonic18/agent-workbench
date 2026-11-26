@@ -13,7 +13,6 @@ import { AsyncSection } from "../components/ui/AsyncSection.js";
 import { Button } from "../components/ui/Button.js";
 import { Panel } from "../components/ui/Panel.js";
 import { formatDateTime } from "../shared/format.js";
-import styles from "./AgentAccessPage.module.css";
 
 export function AgentAccessPage() {
   const [credentials, setCredentials] = useState<AgentCredentials | null>(null);
@@ -39,7 +38,7 @@ export function AgentAccessPage() {
   const endpoint = `${origin}${MCP_ACCESS.path}`;
 
   return (
-    <div className={styles.page}>
+    <div className="flex flex-col gap-5">
       <AccessParameters endpoint={endpoint} fallbackOrigin={publicUrl === null} />
 
       <OnlineMachines />
@@ -71,7 +70,7 @@ export function AgentAccessPage() {
       </Panel>
 
       {grant === null || enrollOpen ? null : (
-        <div className={styles.recentEnroll}>
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border border-border rounded-md bg-surface-2 text-sm text-text-secondary">
           <span>
             已为 {grant.displayName} 签发接入令牌，有效期到 {formatDateTime(grant.expiresAt)}
           </span>
