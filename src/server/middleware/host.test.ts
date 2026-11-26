@@ -4,7 +4,7 @@ import { requireAllowedHost } from "./host.js";
 
 function build(allowedHosts: readonly string[]) {
   const app = Fastify({ logger: false });
-  app.addHook("onRequest", requireAllowedHost(allowedHosts));
+  app.addHook("onRequest", requireAllowedHost(allowedHosts, async () => allowedHosts));
   app.get("/probe", async () => ({ ok: true }));
   return app;
 }

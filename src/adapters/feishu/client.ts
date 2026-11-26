@@ -1,8 +1,9 @@
 import * as Lark from "@larksuiteoapi/node-sdk";
-import type { FeishuConfig } from "../../config/env.js";
+import { parseOpenIds, SYSTEM_CONFIG_KEYS, type FeishuConfig } from "../../config/env.js";
 import type { CapabilityService } from "../../domain/capability/service.js";
 import type { Db } from "../../store/database.js";
 import { claimFeishuEvent } from "../../store/repositories/feishu-event.js";
+import { readSystemConfig } from "../../store/repositories/system-config.js";
 import { handleCardCallback, type CardCallbackDeps } from "./callback.js";
 import { buildCardCallbackResponse } from "./card.js";
 import { createCommandHandler } from "./command-handler.js";
@@ -49,7 +50,18 @@ export async function startFeishuInbound(
     log,
   );
 
-  const isAllowed = (openId: string): boolean => allowed.has(openId);
+  const isAllowed = async (openId: string): Promise<boolean> => {
+    try {
+      const rows = await readSystemConfig(db);
+      const raw = rows[SYSTEM_CONFIG_KEYS.feishuAllowedOpenIds];
+      if (raw !== undefined) {
+        return parseOpenIds(raw).includes(openId);
+      }
+    } catch (error) {
+      log.warn({ err: error }, "读取飞书白名单失败,使用启动快照");
+    }
+    return allowed.has(openId);
+  };
   const claimEvent = async (eventId: string, eventType: string): Promise<boolean> =>
     claimFeishuEvent(db, eventId, eventType);
 

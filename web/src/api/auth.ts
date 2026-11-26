@@ -4,6 +4,20 @@ export function login(password: string): Promise<unknown> {
   return api.post("/api/auth/login", { password });
 }
 
+export interface FeishuStatus {
+  enabled: boolean;
+  appId: string;
+}
+
+export function feishuStatus(): Promise<FeishuStatus> {
+  return api.get<FeishuStatus>("/api/auth/feishu/status");
+}
+
+/** 飞书免登:code 由 JSAPI 取得,服务端校验白名单后发会话 */
+export function feishuLogin(code: string): Promise<{ ok: boolean; expiresAt: number }> {
+  return api.post<{ ok: boolean; expiresAt: number }>("/api/auth/feishu/login", { code });
+}
+
 export function logout(): Promise<unknown> {
   return api.post("/api/auth/logout");
 }

@@ -55,9 +55,22 @@ main push     → 同上三查
   workspace/            # 持久化数据（知识目录、制品、备份），从旧栈迁移
 ```
 
-## 3. 日常发布
+## 3. 配置变更
 
-1. 在短期分支（`dev/xxx`）上开发，推运端开 PR；
+日常配置（飞书凭据、publicUrl、来源 Host 白名单、僵尸/停滞阈值、嵌入接口、GitHub Webhook Secret 等）**走控制台「设置」页**，不再手工改 `.env`：
+
+- 热读组（publicUrl、console_allowed_hosts、feishu_allowed_open_ids、task_zombie_hours、assignment_stall_hours）保存后立即生效。
+- 启动组（feishu_app_id/secret、两个群 ID、embedding_*、github_webhook_secret）保存后提示重启；`make restart DEPLOY_PATH=...` 让新容器读新配置。
+- env 中保留的项仅作首次回落：DB 无对应行时控制台按 env 值启动；DB 有行后完全以 DB 为准。
+- 若改错 `console_allowed_hosts` 把自己锁外面，可进部署目录的 PostgreSQL 容器执行：
+  ```bash
+  docker exec -i agent_workbench-postgres-1 psql -U agent_workbench -d agent_workbench -c "DELETE FROM system_config WHERE key='console_allowed_hosts';"
+  ```
+  删行后立即回到 env 回落值，无需重启控制台（下次请求即生效）。
+
+## 4. 日常发布
+
+1. 在短期分支（`dev/xxx`）上开发，推远端开 PR；
 2. PR 上三查（类型与 lint / 单元测试 / 迁移守卫）全绿后合并到 `main`；
 3. 合并触发的 push 即自动走：三查 → 构建推送 TCR → 部署 → 镜像回收；
 4. 看 Actions 的 `Deploy / 发布本机生产栈` job 结论；`Verify` 步骤打印
@@ -66,7 +79,7 @@ main push     → 同上三查
 发布前演练：Actions 页手动触发（workflow_dispatch）——跑同样的三查与构建推送，
 但 deploy 只在 push 事件上执行，演练不会动生产栈。
 
-## 4. deploy.sh 做了什么（按顺序）
+## 5. deploy.sh 做了什么（按顺序）
 
 1. **参数校验**：tag 只放行 `^main-[0-9a-f]{7,40}$`；`--image-repo` 只认
    `[a-z0-9./_-]`（防注入、防误传 `latest`）
@@ -99,7 +112,7 @@ bash scripts/deploy.sh --gc-only --image-repo ccr.ccs.tencentyun.com/<ns>/aw-con
 不部署、不碰 `.env`、不碰容器，只按上述规则回收镜像。给 CI 的 `image-gc` job
 一个**与部署成败无关**的清理入口；回收失败不判红，看步骤日志与 warning。
 
-## 5. 手动回滚
+## 6. 手动回滚
 
 线上出问题时，先看状态文件：
 
@@ -120,7 +133,7 @@ bash scripts/deploy.sh --tag main-yyyyyyy --image-repo ccr.ccs.tencentyun.com/<n
 注意：**回滚不会回滚数据库**。迁移是 forward-only 的，回滚旧镜像后新 schema
 会留在库里；新版本的 DDL 必须是旧版本能容忍的（expand-contract：先加列不删列）。
 
-## 6. 排障
+## 7. 排障
 
 | 现象 | 排查 |
 |---|---|
@@ -131,7 +144,7 @@ bash scripts/deploy.sh --tag main-yyyyyyy --image-repo ccr.ccs.tencentyun.com/<n
 | 磁盘告警 | `docker system df`；deploy.sh 已按仓库保留 3 个 tag + `prune -f` |
 | 清理报「过滤未命中」 | 仓库路径与本地镜像对不上（`docker images` 按完整仓库名匹配）：核对 `--image-repo` 与 `docker images`，别用短前缀 |
 
-## 7. 本地开发与生产栈的关系
+## 8. 本地开发与生产栈的关系
 
 - 生产栈在 `DEPLOY_PATH` 起容器（compose 项目名 `agent-workbench`，
   数据卷 `agent_workbench_postgres` 与旧栈延续）；**本仓的

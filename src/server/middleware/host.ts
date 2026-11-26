@@ -1,14 +1,24 @@
+import type { Db } from "../../store/database.js";
+import { readSystemConfig } from "../../store/repositories/system-config.js";
 import type { PreHandler } from "./session.js";
 
 /**
- * 来源白名单(01 §3):只校验 Host,必须是白名单值(含端口)。
- * `X-Forwarded-For` 不作准入依据——frpc 在容器内转发,来源恒为网桥地址且头可伪造;
- * 这里只把它写进日志,用于排查谁打过这个端口。
+ * 来源白名单支持运行时热读:DB 系统配置覆盖 env 值;DB 读失败时回落到 env fallback,
+ * 避免配置表故障把管理员锁在外面。
  */
-export function requireAllowedHost(allowedHosts: readonly string[]): PreHandler {
-  const allowed = new Set(allowedHosts.map((host) => host.trim().toLowerCase()));
-
+export function requireAllowedHost(
+  envFallback: readonly string[],
+  getHosts: () => Promise<readonly string[]>,
+): PreHandler {
   return async (request, reply) => {
+    let hosts = envFallback;
+    try {
+      hosts = await getHosts();
+    } catch (error) {
+      request.log.warn({ err: error }, "读取 Host 白名单失败,使用 env 回落值");
+    }
+    const allowed = new Set(hosts.map((host) => host.trim().toLowerCase()));
+
     const forwardedFor = request.headers["x-forwarded-for"];
     if (typeof forwardedFor === "string" && forwardedFor !== "") {
       request.log.info(
@@ -31,4 +41,19 @@ export function requireAllowedHost(allowedHosts: readonly string[]): PreHandler 
     }
     return undefined;
   };
+}
+
+export async function resolveAllowedHosts(
+  db: Db,
+  envFallback: readonly string[],
+): Promise<readonly string[]> {
+  const rows = await readSystemConfig(db);
+  const raw = rows["console_allowed_hosts"];
+  if (raw === undefined) {
+    return envFallback;
+  }
+  return raw
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter((item) => item !== "");
 }

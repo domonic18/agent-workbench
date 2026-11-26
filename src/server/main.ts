@@ -6,7 +6,8 @@ import { startFeishuInbound, type FeishuInbound } from "../adapters/feishu/clien
 import { createTeleportAuditAdapter } from "../adapters/teleport/audit.js";
 import { createProcessRunner } from "../adapters/teleport/process-runner.js";
 import { createTeleportAdapter } from "../adapters/teleport/tctl.js";
-import { loadConfig } from "../config/env.js";
+import { loadConfig, mergeRuntimeConfig, SYSTEM_CONFIG_KEYS, type RuntimeConfigOverrides } from "../config/env.js";
+import { readSystemConfig } from "../store/repositories/system-config.js";
 import { createA2aService } from "../domain/a2a/service.js";
 import { issueOneTimeToken } from "../domain/bootstrap/one-time-token.js";
 import { createAuditReconciler } from "../domain/capability/audit-reconcile.js";
@@ -33,12 +34,14 @@ import { startWorkInboxReclaimer } from "./jobs/work-reclaim.js";
 import { startZombieReclaimer } from "./jobs/zombie-reclaim.js";
 import { startRunReclaimer } from "./jobs/run-reclaim.js";
 
-// 启动顺序(01 §2):env → 单实例锁 → 打开库 → 迁移与口令初始化 → 注册路由 → 监听。
+// 启动顺序(01 §2):env → 单实例锁 → 打开库 → 迁移与口令初始化 → DB 配置合并 → 注册路由 → 监听。
 // 锁先于开库:第二个进程不能在第一个进程的库上跑迁移。
 const config = loadConfig();
 const lock = acquireInstanceLock(join(process.cwd(), "console.lock"));
 const db = await createDb(config.databaseUrl);
 
+/** DB 系统配置覆盖 env;启动组合并入 config,热读组由调用方每轮/每请求读 DB */
+let runtimeOverrides: RuntimeConfigOverrides;
 try {
   await runMigrations(db);
   await ensureConsoleCredential(db, config.consoleInitPassword);
@@ -53,11 +56,27 @@ try {
         `一次性 token(${ONE_TIME_TOKEN.adminTtlMs / 60_000} 分钟内有效,仅本次打印): ${issued.token}`,
     );
   }
+  runtimeOverrides = mergeRuntimeConfig(config, await readSystemConfig(db));
 } catch (error) {
   await db.close();
   lock.release();
   throw error;
 }
+
+// 启动组合并:DB 覆盖 env 后,后续启动装配链照原样消费
+const effectivePublicUrl = runtimeOverrides.publicUrl ?? config.publicUrl;
+const effectiveAllowedHosts = runtimeOverrides.allowedHosts ?? config.allowedHosts;
+const effectiveFeishu = runtimeOverrides.feishu ?? config.feishu;
+const effectiveEmbedding = runtimeOverrides.embedding ?? config.embedding;
+const effectiveGithubSecret = runtimeOverrides.githubWebhookSecret ?? config.githubWebhookSecret;
+const effectiveTaskZombieMs =
+  runtimeOverrides.taskZombieHours === undefined
+    ? config.taskZombieMs
+    : runtimeOverrides.taskZombieHours * 3_600_000;
+const effectiveAssignmentStallMs =
+  runtimeOverrides.assignmentStallHours === undefined
+    ? config.assignmentStallMs
+    : runtimeOverrides.assignmentStallHours * 3_600_000;
 
 const teleport = await createTeleportAdapter(config.teleport, createProcessRunner());
 const service = createCapabilityService({ db, teleport });
@@ -65,10 +84,10 @@ const a2a = createA2aService({ db });
 const knowledgeRebuilder = createKnowledgeRebuilder({
   databaseUrl: config.databaseUrl,
   knowledgeDir: config.knowledgeDir,
-  ...(config.embedding === undefined ? {} : { embedding: config.embedding }),
+  ...(effectiveEmbedding === undefined ? {} : { embedding: effectiveEmbedding }),
 });
 const knowledgeEmbedding =
-  config.embedding === undefined ? undefined : createEmbeddingClient(config.embedding);
+  effectiveEmbedding === undefined ? undefined : createEmbeddingClient(effectiveEmbedding);
 const knowledgeIndexer = await createKnowledgeIndexService({
   db,
   knowledgeDir: config.knowledgeDir,
@@ -91,18 +110,16 @@ const app = buildApp({
   knowledgeRebuilder,
   knowledgeIndexer,
   knowledgeEntries,
-  allowedHosts: config.allowedHosts,
+  allowedHosts: effectiveAllowedHosts,
   trustProxy: config.trustProxy,
   // src/server 与 dist/server 到仓库根同为两级目录
   installScriptPath: fileURLToPath(new URL("../../scripts/install-aw-node.sh", import.meta.url)),
   // 执行面产物镜像:宿主机 workspace/artifacts(容器内同路径),缺失时只影响取件口
   artifactDir: fileURLToPath(new URL("../../workspace/artifacts", import.meta.url)),
   webRoot: fileURLToPath(new URL("../../dist/web", import.meta.url)),
-  ...(config.publicUrl === undefined ? {} : { publicUrl: config.publicUrl }),
-  ...(config.feishu === undefined ? {} : { feishu: config.feishu }),
-  ...(config.githubWebhookSecret === undefined
-    ? {}
-    : { githubWebhookSecret: config.githubWebhookSecret }),
+  ...(effectivePublicUrl === undefined ? {} : { publicUrl: effectivePublicUrl }),
+  ...(effectiveFeishu === undefined ? {} : { feishu: effectiveFeishu }),
+  ...(effectiveGithubSecret === undefined ? {} : { githubWebhookSecret: effectiveGithubSecret }),
 });
 
 // Git 版本化策略校验(01 §9.2):结构错误 fail-fast;引用缺失只告警,派工时再校验
@@ -119,9 +136,32 @@ const workInboxReclaimer = startWorkInboxReclaimer(db, app.log);
 
 // 僵尸任务回收与派工停滞升级(M3.10-4):超时 running → blocked 按条件重排,pending 停滞升级
 const zombieReclaimer = startZombieReclaimer(
-  { db, now: Date.now, chatId: config.feishu?.collabChatId },
+  {
+    db,
+    now: Date.now,
+    chatId: effectiveFeishu?.collabChatId,
+    getTiming: async () => {
+      try {
+        const rows = await readSystemConfig(db);
+        const zombieHours = rows[SYSTEM_CONFIG_KEYS.taskZombieHours];
+        const stallHours = rows[SYSTEM_CONFIG_KEYS.assignmentStallHours];
+        return {
+          zombieMs:
+            zombieHours === undefined
+              ? effectiveTaskZombieMs
+              : Number(zombieHours) * 3_600_000,
+          stallMs:
+            stallHours === undefined
+              ? effectiveAssignmentStallMs
+              : Number(stallHours) * 3_600_000,
+        };
+      } catch {
+        return { zombieMs: effectiveTaskZombieMs, stallMs: effectiveAssignmentStallMs };
+      }
+    },
+  },
   app.log,
-  { zombieMs: config.taskZombieMs, stallMs: config.assignmentStallMs },
+  { zombieMs: effectiveTaskZombieMs, stallMs: effectiveAssignmentStallMs },
 );
 
 // 迟滞 run 兜底收敛(04 §2 L3):running 不允许无限期滞留,超 idle 阈值即收尾
@@ -157,12 +197,12 @@ if (auditReconciler === undefined) {
 
 // 有飞书凭据才起投递作业;无凭据时发件箱照样可写,待配好凭据后补投
 const outbox: OutboxSender | undefined =
-  config.feishu === undefined
+  effectiveFeishu === undefined
     ? undefined
     : startOutboxSender(
         db,
         createCardSender(
-          new Lark.Client({ appId: config.feishu.appId, appSecret: config.feishu.appSecret }),
+          new Lark.Client({ appId: effectiveFeishu.appId, appSecret: effectiveFeishu.appSecret }),
         ),
         app.log,
       );
@@ -206,12 +246,12 @@ process.on("SIGINT", shutdown);
 await app.listen({ host: config.host, port: config.port });
 
 // 飞书不可用时控制台照常运行(01 §8);只有配置了应用凭据才建立长连接
-if (config.feishu !== undefined) {
-  if (config.feishu.allowedOpenIds.length === 0) {
+if (effectiveFeishu !== undefined) {
+  if (effectiveFeishu.allowedOpenIds.length === 0) {
     app.log.warn("FEISHU_ALLOWED_OPEN_IDS 为空,所有入站指令都将被回执无权限");
   }
   try {
-    inbound = await startFeishuInbound(config.feishu, db, service, app.log);
+    inbound = await startFeishuInbound(effectiveFeishu, db, service, app.log);
     app.log.info("飞书长连接已建立,等待消息与卡片事件");
   } catch (error) {
     app.log.error({ err: error }, "飞书长连接启动失败,控制台继续运行");

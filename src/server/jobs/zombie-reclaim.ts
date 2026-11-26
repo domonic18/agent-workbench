@@ -34,6 +34,8 @@ export interface ZombieReclaimDeps {
   /** 协作群;未配置时照常回收,只不播报 */
   chatId: string | undefined;
   newEventId?: () => string;
+  /** 每轮动态读阈值;缺省时用启动快照 */
+  getTiming?: () => Promise<ZombieReclaimTiming>;
 }
 
 export interface ZombieReclaimTiming {
@@ -227,14 +229,17 @@ export function startZombieReclaimer(
   logger: JobLogger,
   options: ZombieReclaimerOptions,
 ): ZombieReclaimer {
-  const sweep = (): void => {
-    void reclaimZombiesOnce(deps, options, logger).catch((error) => {
+  const sweep = async (): Promise<void> => {
+    try {
+      const timing = deps.getTiming === undefined ? options : await deps.getTiming();
+      await reclaimZombiesOnce(deps, timing, logger);
+    } catch (error) {
       logger.error({ err: error }, "僵尸任务回收失败");
-    });
+    }
   };
 
-  sweep();
-  const timer = setInterval(sweep, options.intervalMs ?? ZOMBIE_RECLAIM.pollMs);
+  void sweep();
+  const timer = setInterval(() => void sweep(), options.intervalMs ?? ZOMBIE_RECLAIM.pollMs);
   timer.unref();
 
   return {

@@ -131,6 +131,38 @@
   color: var(--danger);
 }
 
+.notice {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+
+.feishuDivider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: calc(-1 * var(--space-1)) 0;
+  color: var(--muted);
+  font-size: var(--font-xs);
+}
+
+.feishuDivider::before,
+.feishuDivider::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--border);
+}
+
+.feishuPending {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--size-touch);
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+
 .link {
   font-size: var(--font-sm);
 }
