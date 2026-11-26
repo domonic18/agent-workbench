@@ -1,5 +1,8 @@
 import { z } from "zod";
+import { SYSTEM_CONFIG_KEYS, type SystemConfigKey } from "../shared/constants.js";
 import type { EmbeddingConfig } from "../domain/knowledge/embedding.js";
+
+export { SYSTEM_CONFIG_KEYS, type SystemConfigKey };
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -107,7 +110,7 @@ function parseFlag(value: string | undefined, name: string): boolean {
   throw new Error(`${name} 只能取 1/0 或 true/false,收到 ${text}`);
 }
 
-function parseOpenIds(value: string | undefined): string[] {
+export function parseOpenIds(value: string | undefined): string[] {
   const text = optionalText(value);
   if (text === undefined) {
     return [];
@@ -115,7 +118,7 @@ function parseOpenIds(value: string | undefined): string[] {
   return [...new Set(text.split(",").map((id) => id.trim()).filter((id) => id !== ""))];
 }
 
-function parseAllowedHosts(
+export function parseAllowedHosts(
   value: string | undefined,
   host: string,
   port: number,
@@ -133,6 +136,102 @@ function parseAllowedHosts(
     throw new Error("CONSOLE_ALLOWED_HOSTS 不能为空");
   }
   return unique;
+}
+
+/** 启动组合并:DB 有值覆盖 env;这些项变更后需重启才生效(设置页标注) */
+export const SYSTEM_CONFIG_BOOT_KEYS: readonly SystemConfigKey[] = [
+  SYSTEM_CONFIG_KEYS.feishuAppId,
+  SYSTEM_CONFIG_KEYS.feishuAppSecret,
+  SYSTEM_CONFIG_KEYS.feishuApprovalChatId,
+  SYSTEM_CONFIG_KEYS.feishuCollabChatId,
+  SYSTEM_CONFIG_KEYS.embeddingBaseUrl,
+  SYSTEM_CONFIG_KEYS.embeddingApiKey,
+  SYSTEM_CONFIG_KEYS.embeddingModel,
+  SYSTEM_CONFIG_KEYS.githubWebhookSecret,
+];
+
+/** 热读组:DB 有值覆盖 env;路由/作业每轮直读 */
+export const SYSTEM_CONFIG_HOT_KEYS: readonly SystemConfigKey[] = [
+  SYSTEM_CONFIG_KEYS.publicUrl,
+  SYSTEM_CONFIG_KEYS.feishuAllowedOpenIds,
+  SYSTEM_CONFIG_KEYS.consoleAllowedHosts,
+  SYSTEM_CONFIG_KEYS.taskZombieHours,
+  SYSTEM_CONFIG_KEYS.assignmentStallHours,
+];
+
+export interface RuntimeConfigOverrides {
+  publicUrl?: string;
+  allowedHosts?: string[];
+  taskZombieHours?: number | undefined;
+  assignmentStallHours?: number | undefined;
+  feishu?: FeishuConfig | undefined;
+  embedding?: EmbeddingConfig | undefined;
+  githubWebhookSecret?: string;
+}
+
+/** DB 系统配置行合并进 env 启动快照;列表值按当前 env 解析器处理 */
+export function mergeRuntimeConfig(
+  config: Config,
+  rows: Record<string, string>,
+): RuntimeConfigOverrides {
+  const overrides: RuntimeConfigOverrides = {};
+
+  const publicUrl = optionalText(rows[SYSTEM_CONFIG_KEYS.publicUrl]);
+  if (publicUrl !== undefined) {
+    overrides.publicUrl = publicUrl;
+  }
+
+  const allowedHostsText = optionalText(rows[SYSTEM_CONFIG_KEYS.consoleAllowedHosts]);
+  if (allowedHostsText !== undefined) {
+    overrides.allowedHosts = parseAllowedHosts(allowedHostsText, config.host, config.port);
+  }
+
+  const zombieHours = optionalText(rows[SYSTEM_CONFIG_KEYS.taskZombieHours]);
+  const stallHours = optionalText(rows[SYSTEM_CONFIG_KEYS.assignmentStallHours]);
+  if (zombieHours !== undefined || stallHours !== undefined) {
+    overrides.taskZombieHours = zombieHours === undefined ? undefined : Number(zombieHours);
+    overrides.assignmentStallHours = stallHours === undefined ? undefined : Number(stallHours);
+  }
+
+  const feishuAppId = optionalText(rows[SYSTEM_CONFIG_KEYS.feishuAppId]);
+  const feishuAppSecret = optionalText(rows[SYSTEM_CONFIG_KEYS.feishuAppSecret]);
+  if (feishuAppId !== undefined || feishuAppSecret !== undefined) {
+    overrides.feishu = {
+      appId: feishuAppId ?? config.feishu?.appId ?? "",
+      appSecret: feishuAppSecret ?? config.feishu?.appSecret ?? "",
+      allowedOpenIds: parseOpenIds(
+        optionalText(rows[SYSTEM_CONFIG_KEYS.feishuAllowedOpenIds]) ??
+          config.feishu?.allowedOpenIds.join(","),
+      ),
+      approvalChatId: optionalText(rows[SYSTEM_CONFIG_KEYS.feishuApprovalChatId] ?? config.feishu?.approvalChatId),
+      collabChatId: optionalText(rows[SYSTEM_CONFIG_KEYS.feishuCollabChatId] ?? config.feishu?.collabChatId),
+    };
+  } else if (rows[SYSTEM_CONFIG_KEYS.feishuAllowedOpenIds] !== undefined) {
+    // 只迁了白名单,没迁 appId/secret(不太可能,但防御)
+    overrides.feishu = config.feishu === undefined ? undefined : {
+      ...config.feishu,
+      allowedOpenIds: parseOpenIds(rows[SYSTEM_CONFIG_KEYS.feishuAllowedOpenIds]),
+      approvalChatId: optionalText(rows[SYSTEM_CONFIG_KEYS.feishuApprovalChatId] ?? config.feishu.approvalChatId),
+      collabChatId: optionalText(rows[SYSTEM_CONFIG_KEYS.feishuCollabChatId] ?? config.feishu.collabChatId),
+    };
+  }
+
+  const embeddingBaseUrl = optionalText(rows[SYSTEM_CONFIG_KEYS.embeddingBaseUrl]);
+  const embeddingModel = optionalText(rows[SYSTEM_CONFIG_KEYS.embeddingModel]);
+  if (embeddingBaseUrl !== undefined || embeddingModel !== undefined) {
+    overrides.embedding = {
+      baseUrl: embeddingBaseUrl ?? config.embedding?.baseUrl ?? "",
+      apiKey: optionalText(rows[SYSTEM_CONFIG_KEYS.embeddingApiKey] ?? config.embedding?.apiKey),
+      model: embeddingModel ?? config.embedding?.model ?? "",
+    };
+  }
+
+  const githubWebhookSecret = optionalText(rows[SYSTEM_CONFIG_KEYS.githubWebhookSecret]);
+  if (githubWebhookSecret !== undefined) {
+    overrides.githubWebhookSecret = githubWebhookSecret;
+  }
+
+  return overrides;
 }
 
 function parseFeishu(env: z.infer<typeof envSchema>): FeishuConfig | undefined {

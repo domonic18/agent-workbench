@@ -3,7 +3,9 @@ import { receiverPrompt, senderPromptTemplate } from "../../mcp/agent-kit/prompt
 import { renderAgentGuide, renderAgentSkill } from "../../mcp/agent-kit/render.js";
 import type { ConsoleTool } from "../../mcp/console-shared.js";
 import type { Db } from "../../store/database.js";
+import { readSystemConfig } from "../../store/repositories/system-config.js";
 import { requireSessionOrAgent } from "../middleware/access.js";
+import { SYSTEM_CONFIG_KEYS } from "../../config/env.js";
 
 export interface AgentKitRoutesOptions {
   db: Db;
@@ -36,12 +38,25 @@ export interface AgentKitPayload {
  */
 export function registerAgentKitRoutes(app: FastifyInstance, options: AgentKitRoutesOptions): void {
   const access = requireSessionOrAgent(options.db, options.now ?? Date.now);
-  const render = (): AgentKitPayload => ({
-    guide: renderAgentGuide(options.tools, { publicUrl: options.publicUrl }),
-    skill: renderAgentSkill(options.tools, { publicUrl: options.publicUrl }),
-    prompts: { receiver: receiverPrompt(), senderTemplate: senderPromptTemplate() },
-    publicUrl: options.publicUrl ?? null,
-  });
+  const render = async (): Promise<AgentKitPayload> => {
+    let publicUrl: string | undefined;
+    try {
+      const rows = await readSystemConfig(options.db);
+      const raw = rows[SYSTEM_CONFIG_KEYS.publicUrl];
+      if (raw !== undefined) {
+        publicUrl = raw.trim() === "" ? undefined : raw.trim();
+      }
+    } catch {
+      // 配置表故障时回落到启动快照
+    }
+    publicUrl ??= options.publicUrl;
+    return {
+      guide: renderAgentGuide(options.tools, { publicUrl }),
+      skill: renderAgentSkill(options.tools, { publicUrl }),
+      prompts: { receiver: receiverPrompt(), senderTemplate: senderPromptTemplate() },
+      publicUrl: publicUrl ?? null,
+    };
+  };
 
   app.get("/api/agent-kit/guide", { preHandler: [access] }, async () => render());
 
@@ -49,6 +64,6 @@ export function registerAgentKitRoutes(app: FastifyInstance, options: AgentKitRo
     reply
       .header("content-type", "text/markdown; charset=utf-8")
       .header("content-disposition", 'attachment; filename="SKILL.md"')
-      .send(render().skill),
+      .send((await render()).skill),
   );
 }

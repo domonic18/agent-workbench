@@ -7,6 +7,7 @@ import {
   ListChecks,
   LogOut,
   Plug,
+  Settings,
   Share2,
   ShieldCheck,
 } from "lucide-react";
@@ -39,6 +40,7 @@ const NAV_GROUPS = [
       { to: "/capabilities", label: "授权", icon: ShieldCheck },
       { to: "/delegation", label: "委派", icon: Share2 },
       { to: "/knowledge", label: "知识", icon: BookOpen },
+      { to: "/settings", label: "设置", icon: Settings },
     ],
   },
   {
@@ -103,6 +105,11 @@ const PAGE_META: { path: string; title: string; description: string }[] = [
     path: "/agent-guide",
     title: "Agent 手册",
     description: "A2A 协作规范正文与可安装的 SKILL.md",
+  },
+  {
+    path: "/settings",
+    title: "设置",
+    description: "控制台环境配置与后台管理",
   },
 ];
 

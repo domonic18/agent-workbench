@@ -9,6 +9,7 @@
   - 事实源在控制台 PostgreSQL（work_item / work_trigger / worker_inbox / task / a2a_message / capability / agent_run）；WorkItem 的 Mandate 与 Task/Run 分离，Assignment/Input/Handback 不冒充 A2A；**不使用飞书黑板，不做投影**
   - 控制台容器内监听 `0.0.0.0:8787`，宿主机仅通过 `127.0.0.1:8787` 发布，不自己处理 TLS；提供 `/healthz`；**公网入口由部署环境自备**（2026-11-09 裁决：项目面向开源、不假设用户用 frp，compose 只起 console + postgres 两件套；当前实例经部署机上独立运维的 frpc + nginx 暴露，与仓库无关）
   - 会话 Cookie 的 `Secure` 标记**按请求逐次判断**（控制台自身走 http，一刀切加 `Secure` 会让明文链路的登录被浏览器拒收、静默失效）：`AW_TRUST_PROXY=1` 才采信可信代理（回环 / 私网网段）的 `X-Forwarded-Proto`；基础安全响应头（`nosniff` / `X-Frame-Options` / `Referrer-Policy` / `Permissions-Policy`）由应用统一下发，**HSTS 归 TLS 终结点**。公网入口的 nginx 已终止 TLS，但**尚未下发 `X-Forwarded-Proto`**，补上 `proxy_set_header X-Forwarded-Proto $scheme;` 后 `Secure` 自动生效（控制台侧不用再改）
+  - **飞书免登复用 bot 指令白名单（2026-11-26 裁决）**：登录页探测 `GET /api/auth/feishu/status`，免登 `POST /api/auth/feishu/login`（code 换 open_id → 校验 `FEISHU_ALLOWED_OPEN_IDS` → 发会话，与口令登录同权）。**不建绑定表、不加迁移**——单管理员下「能对机器人下指令的飞书身份 = 可免登控制台的管理员」，信任域等同、白名单只进 env；免登失败一律回落口令表单，敏感操作（改口令等）仍走口令二次确认
   - **Teleport 占位（2026-11-09 裁决）**：暂不开工，优先优化 Agent 协作机制；原案的公网入口（`tp.example.com:8443 → 443` 独立 tcp，避开 frps HTTPS vhost 占用的 443）属部署环境细节，项目已不交付任何 frpc 配置
   - 跨机：每台运行 Agent 的机器只跑一个 `aw-node`（采集 + Claude Code 调度），launchd 常驻，采集模块只经 `/api/ingest` 单向推送；无 aw-node 的外部运行时（WorkBuddy/Codex/DeepSeek harness）拿 Agent Bearer 直接打 `/mcp`、用官方 automations 轮询，首版 Run/对话/Token 显示「未接入 / —」；**`agent.machine_id` 语义是「宿主机器」**（外部运行时可绑可解绑，只登记归属）；**有没有过程数据看两个条件：`runtime='claude_code'` 且 `machine_id` 非空**，不是单看机器绑定；Teleport node agent 装目标机
   - 授权：SSH / 数据库访问走 Teleport CE + tbot 的 15 分钟短时证书，不自研证书签发；身份按 Agent 建 bot、任务以 trait `aw_task_id` 携带，证书扩展用 `external.*` 插值（`internal.*` 不插值）；Teleport CE 为 AGPL-3.0，独立容器运行，只经 API 调用
@@ -59,7 +60,7 @@
 - KISS、YAGNI、DRY;单文件不超过 350 行,超限即拆分。
 - 未经用户批准不要提交到 git。不要主动创建 *.md/README。
 - 永远不要模拟、不要占位符、不要省略代码;对想法的好坏坦率诚实。
-- 安全:外部输入边界校验;系统密钥仅存 env(.env 不入库),Agent / 采集器密钥库中只存哈希,永不硬编码;日志记事件不记敏感值,**命令行参数与 shell history 同样不得出现明文密钥,部署示例一律用占位符并采用隐藏输入/stdin/env 注入**。**仓库是公开的**:文档与示例不写真实 IP、域名、主机名、SSH 路径与内网端口,真实值只放 gitignored 的 `docs/plan/*.local.md`。
+- 安全:外部输入边界校验;**启动层密钥(POSTGRES_PASSWORD、FRP_AUTH_TOKEN、采集器 secret)仍仅存 env(.env 不入库)**;**控制台运行时凭据(飞书 app secret、嵌入 API key、GitHub webhook secret 等)入 `system_config`**(2026-11-26 裁决:库内明文、API 对密钥只写不读、日志不记值、备份含凭据属已知取舍)。Agent / 采集器密钥库中只存哈希,永不硬编码;日志记事件不记敏感值,**命令行参数与 shell history 同样不得出现明文密钥,部署示例一律用占位符并采用隐藏输入/stdin/env 注入**。**仓库是公开的**:文档与示例不写真实 IP、域名、主机名、SSH 路径与内网端口,真实值只放 gitignored 的 `docs/plan/*.local.md`。
 - e2e/联测脚本:无 body 的 POST 不要带 `content-type: application/json`——Fastify 以 400 拒空 body,失败响应形状错位会伪装成下游故障(s9 曾把坏 Bearer 掩护成假 401);依赖响应字段前先断言 HTTP 状态码。**联测脚本自建的 Agent 必须跑完即删**(用 `e2e/lib/cleanup.mjs`),否则库里攒测试垃圾淹没总览与路由注册表。
 - **单元测试库会残留**:每个测试文件自建 `aw_test_*` 随机库,正常由 `createTestDatabase` 的 close() 销毁;文件中途失败或 worker 被回收时删不掉,残留越积越多会把 PG 目录撑大、`CREATE DATABASE` 变慢、跑批超时——2026-11-09 曾积到 3405 个残留库,`make check` 直接假红。`vitest.config.ts` 的 globalSetup（`src/store/test-db-gc.ts`）每跑批前回收**早于 1 小时**的残留库;看到 `[test-db-gc] 回收陈旧测试库 N 个` 是正常自愈,不必手工处理。
 - 前端:样式走 `web/src/global.css` 的设计令牌与 `web/src/components/ui/` 基元层,不写死颜色/间距/字号,不在组件里新造按钮与表格 class;基元不得 import `api/` 层。详见 docs/arch/03 §10。

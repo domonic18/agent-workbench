@@ -22,7 +22,7 @@ export interface InboundLogger {
 }
 
 export interface InboundDeps {
-  isAllowed(openId: string): boolean;
+  isAllowed(openId: string): boolean | Promise<boolean>;
   claimEvent(eventId: string, eventType: string): Promise<boolean>;
   /** 回执按事件时间决定引用原消息还是发新消息(见 reply.ts) */
   reply(event: InboundMessage, text: string): Promise<void>;
@@ -58,7 +58,7 @@ export async function handleInboundMessage(
   }
 
   const openId = event.senderOpenId;
-  if (openId === undefined || !deps.isAllowed(openId)) {
+  if (openId === undefined || !(await deps.isAllowed(openId))) {
     try {
       await deps.reply(event, DENIED_RECEIPT);
     } catch (error) {

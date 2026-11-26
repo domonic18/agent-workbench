@@ -434,3 +434,28 @@ export const ENVELOPE_LIMITS = {
   identifier: 128,
   refs: 20,
 } as const;
+
+/** 控制台后台设置键(02 §3.8.1);列表值存逗号分隔 TEXT;前后端共用,禁止各写一份 */
+export const SYSTEM_CONFIG_KEYS = {
+  // 基本
+  publicUrl: "public_url",
+  // 飞书
+  feishuAppId: "feishu_app_id",
+  feishuAppSecret: "feishu_app_secret",
+  feishuAllowedOpenIds: "feishu_allowed_open_ids",
+  feishuApprovalChatId: "feishu_approval_chat_id",
+  feishuCollabChatId: "feishu_collab_chat_id",
+  // 接入安全
+  consoleAllowedHosts: "console_allowed_hosts",
+  // 治理
+  taskZombieHours: "task_zombie_hours",
+  assignmentStallHours: "assignment_stall_hours",
+  // 知识嵌入
+  embeddingBaseUrl: "embedding_base_url",
+  embeddingApiKey: "embedding_api_key",
+  embeddingModel: "embedding_model",
+  // GitHub webhook
+  githubWebhookSecret: "github_webhook_secret",
+} as const;
+
+export type SystemConfigKey = (typeof SYSTEM_CONFIG_KEYS)[keyof typeof SYSTEM_CONFIG_KEYS];

@@ -7,7 +7,7 @@ import type { InboundLogger } from "./inbound.js";
 export type CapabilitySnapshot = NonNullable<Awaited<ReturnType<CapabilityService["find"]>>>;
 
 export interface CardCallbackDeps {
-  isAllowed(openId: string): boolean;
+  isAllowed(openId: string): boolean | Promise<boolean>;
   claimEvent(eventId: string, eventType: string): Promise<boolean>;
   service: Pick<CapabilityService, "approve" | "reject" | "find">;
   log: InboundLogger;
@@ -110,7 +110,7 @@ export async function handleCardCallback(
     return { outcome: "expired" };
   }
 
-  if (event.openId === undefined || !deps.isAllowed(event.openId)) {
+  if (event.openId === undefined || !(await deps.isAllowed(event.openId))) {
     deps.log.warn({ eventId: event.eventId, openId: event.openId }, "非白名单用户点击审批卡片,拒绝");
     return { outcome: "denied" };
   }

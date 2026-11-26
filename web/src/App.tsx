@@ -68,6 +68,10 @@ const AgentAccessPage = lazy(async () => {
   const module = await import("./pages/AgentAccessPage.js");
   return { default: module.AgentAccessPage };
 });
+const SettingsPage = lazy(async () => {
+  const module = await import("./pages/SettingsPage.js");
+  return { default: module.SettingsPage };
+});
 
 /** 任意 API 401 统一回登录页,并记住原路径(03 §3) */
 function UnauthorizedRedirect() {
@@ -133,6 +137,7 @@ export function App() {
               <Route path="/onboarding" element={<OnboardingPage />} />
               <Route path="/agent-guide" element={<AgentGuidePage />} />
               <Route path="/agent-access" element={<AgentAccessPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
               <Route path="/knowledge" element={<KnowledgePage />}>
                 <Route path=":id" element={<KnowledgeDetailRoute />} />
               </Route>

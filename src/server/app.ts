@@ -15,7 +15,7 @@ import { createWorkerService } from "../domain/work/worker-service.js";
 import { createConsoleTools } from "../mcp/console-tools.js";
 import { healthPayload, type DatabaseStatus } from "../shared/health.js";
 import type { Db } from "../store/database.js";
-import { requireAllowedHost } from "./middleware/host.js";
+import { requireAllowedHost, resolveAllowedHosts } from "./middleware/host.js";
 import { requireConsoleReadiness } from "./middleware/bootstrap-mode.js";
 import { securityHeaders } from "./middleware/security-headers.js";
 import { createApprovalNotifier } from "./notification/approval.js";
@@ -28,7 +28,7 @@ import { registerAgentLifecycleRoutes } from "./routes/agent-lifecycle.js";
 import { registerAgentPeersRoutes } from "./routes/agent-peers.js";
 import { registerAgentSelfRoutes } from "./routes/agent-self.js";
 import { registerAuditRoutes } from "./routes/audit.js";
-import { registerAuthRoutes } from "./routes/auth.js";
+import { registerAuthRoutes, type AuthRoutesOptions } from "./routes/auth.js";
 import { registerArtifactRoutes } from "./routes/artifacts.js";
 import { registerAwNodeRoutes } from "./routes/aw-node.js";
 import { registerBootstrapRoutes } from "./routes/bootstrap.js";
@@ -38,6 +38,7 @@ import { registerIngestRoutes } from "./routes/ingest.js";
 import { registerKnowledgeRoutes } from "./routes/knowledge.js";
 import { registerMachineRoutes } from "./routes/machine.js";
 import { registerScheduleRoutes } from "./routes/schedules.js";
+import { registerSettingsRoutes } from "./routes/settings.js";
 import { registerMcpRoutes } from "./routes/mcp.js";
 import { registerOverviewRoutes } from "./routes/overview.js";
 import { registerInstallScriptRoute, registerWebRoutes } from "./routes/static.js";
@@ -75,6 +76,8 @@ export interface BuildAppOptions {
   knowledgeEntries?: KnowledgeEntryService;
   /** 飞书配置存在且带 approvalChatId 时,申请落库后推送审批卡片 */
   feishu?: FeishuConfig;
+  /** 免登 code 兑换桩;路由测试注入,缺省走飞书适配器出站 */
+  exchangeFeishuCode?: AuthRoutesOptions["exchangeFeishuCode"];
   /** GitHub Webhook 验签密钥;注入才注册 /api/webhooks/github */
   githubWebhookSecret?: string;
   /** 知识目录(kb_write 的 Markdown 真相源);注入才注册远程 MCP `/mcp` */
@@ -112,7 +115,12 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   app.addHook("onRequest", securityHeaders());
 
   if (options.allowedHosts !== undefined) {
-    app.addHook("onRequest", requireAllowedHost(options.allowedHosts));
+    const fallback = options.allowedHosts;
+    const getHosts =
+      options.db === undefined
+        ? async () => fallback
+        : () => resolveAllowedHosts(options.db!, fallback);
+    app.addHook("onRequest", requireAllowedHost(fallback, getHosts));
   }
 
   if (options.db !== undefined) {
@@ -138,11 +146,19 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     // A2A 服务全局一份:HTTP 路由、/mcp 与死信回执唤醒长轮询必须共用同一实例
     const a2aService: A2aService = options.a2a ?? createA2aService({ db, now: options.now ?? Date.now });
 
-    registerAuthRoutes(app, { db, ...timing });
+    registerAuthRoutes(app, {
+      db,
+      ...timing,
+      ...(options.feishu === undefined ? {} : { feishu: options.feishu }),
+      ...(options.exchangeFeishuCode === undefined
+        ? {}
+        : { exchangeFeishuCode: options.exchangeFeishuCode }),
+    });
     registerAuditRoutes(app, { db, ...timing });
     registerIdentityRoutes(app, { db, ...timing });
     registerMachineRoutes(app, { db, ...timing });
     registerScheduleRoutes(app, { db, ...timing });
+    registerSettingsRoutes(app, { db, ...timing });
     registerAgentLifecycleRoutes(app, { db, ...timing });
     registerAgentDetailRoutes(app, { db, ...timing });
     registerAgentGroupRoutes(app, { db, ...timing });

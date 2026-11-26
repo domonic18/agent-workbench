@@ -18,7 +18,9 @@ import { listDiscoveryForConsole } from "../../domain/bootstrap/discovery.js";
 import { BootstrapError } from "../../domain/bootstrap/errors.js";
 import { CONSOLE_PASSWORD_MIN_LENGTH, ONE_TIME_TOKEN } from "../../shared/constants.js";
 import type { Db } from "../../store/database.js";
+import { readSystemConfig } from "../../store/repositories/system-config.js";
 import { hasConsoleCredential, setConsolePassword } from "../credential.js";
+import { SYSTEM_CONFIG_KEYS } from "../../config/env.js";
 import {
   isSecureRequest,
   requireCsrf,
@@ -51,6 +53,20 @@ export interface BootstrapRoutesOptions {
   /** 对外可达的控制台地址;站点据此给出可复制的下载地址 */
   publicUrl?: string;
   now?: () => number;
+}
+
+async function resolvePublicUrl(db: Db, fallback?: string): Promise<string | undefined> {
+  try {
+    const rows = await readSystemConfig(db);
+    const raw = rows[SYSTEM_CONFIG_KEYS.publicUrl];
+    if (raw !== undefined) {
+      const trimmed = raw.trim();
+      return trimmed === "" ? undefined : trimmed;
+    }
+  } catch {
+    // 配置表故障时回落到启动快照,避免把自己锁死
+  }
+  return fallback;
 }
 
 interface AdminBody {
@@ -129,7 +145,7 @@ export function registerBootstrapRoutes(app: FastifyInstance, options: Bootstrap
     // 匿名可读:只暴露公开产物名、大小与校验和,不含任何凭据
     const assets =
       options.artifactDir === undefined ? [] : listArtifacts(options.artifactDir);
-    return { publicUrl: options.publicUrl ?? null, assets };
+    return { publicUrl: (await resolvePublicUrl(db, options.publicUrl)) ?? null, assets };
   });
 
   app.post(
